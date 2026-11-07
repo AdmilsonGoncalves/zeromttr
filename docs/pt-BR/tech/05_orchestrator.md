@@ -39,11 +39,11 @@ main.ts        composition root
 2. **InvestigateIncident:**
    - Executa o loop de investigação via `ToolsPort` (orçamento máximo de 6 chamadas de tool decididas pelo agente ou sequência canônica no `DeterministicFallbackReasoningAdapter`):
      `execute_promql_range` → `trace_id` do exemplar → `analyze_otel_trace` → `query_loki_logs` (filtrado por `trace_id`), além de consultar `TargetStatusPort` (`GET /chaos/status` no `target-app-demo`) para obter `version` (`v2.14.8`), `previousHealthyVersion` (`v2.14.7`) e `rawEdgeLogPreCollector` (usado apenas na comparação visual no Dashboard, **jamais** incluído no prompt do LLM).
-3. **EnrichWithDeployDiff:** chama a tool MCP `inspect_git_deploy_diff` comparando as tags reais `v2.14.7` e `v2.14.8` no repositório-alvo `zeromttr-target-demo`, isolando o commit e o arquivo `src/repositories/PaymentRepository.ts` (com seu `blobSha`).
+3. **EnrichWithDeployDiff:** chama a tool MCP `inspect_git_deploy_diff` comparando as tags reais `v2.14.7` e `v2.14.8` em `apps/target-app-demo`, isolando o commit e o arquivo `apps/target-app-demo/src/repositories/PaymentRepository.ts` (com seu `blobSha`).
 4. **DispatchRemediation:**
    - Audita as evidências com **`PiiPromptGuard.inspectAndAssertSafe`** (comprovando zero PII no prompt).
    - Sintetiza o RCA e o patch cirúrgico via `ReasoningPort` (`GeminiReasoningAdapter` configurável via `LLM_MODEL`, com fallback automático para `DeterministicFallbackReasoningAdapter` em caso de erro/timeout da API).
-   - Injeta anotação no Grafana via `annotate_grafana_incident` (`REMEDIATING`), transiciona para `AWAITING_PR` e aciona `create_remediation_pr` no repositório-alvo `zeromttr-target-demo`, recebendo `branchUrl`, `pullRequestUrl` e `commitSha`.
+   - Injeta anotação no Grafana via `annotate_grafana_incident` (`REMEDIATING`), transiciona para `AWAITING_PR` e aciona `create_remediation_pr` (mirando `release/target-v2.14.8`), recebendo `branchUrl`, `pullRequestUrl` e `commitSha`.
 5. **NotifyOnCall (HMAC Exclusivo no E-mail):**
    - Calcula `approveSig`, `rejectSig` e `exp` (HMAC-SHA256 com `DECISION_HMAC_SECRET`).
    - Envia o post-mortem via tool MCP `send_post_mortem_resend` contendo os links assinados `${PUBLIC_DASHBOARD_URL}/decision/${id}?action=approve|reject&sig=<HMAC>&exp=<TS>`.

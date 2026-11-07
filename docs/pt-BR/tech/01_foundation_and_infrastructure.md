@@ -49,9 +49,10 @@ Criar `infra/grafana/provisioning/alerting/`:
 - `policies.yaml`: rota padrão vinculada ao contact point.
 
 ### T1.5 CI/CD com GitHub Actions (`.github/workflows/`)
-Criar os workflows no monorepo principal (`zeromttr/.github/workflows/`):
+Criar os 3 workflows em `.github/workflows/`:
 1. **`ci.yml`:** Node 24 + `pnpm/action-setup@v4`, `pnpm install --frozen-lockfile`, lint, typecheck, `gitleaks`, testes unitários/contrato com cobertura (≥ 80 %) via Nx, build, `pnpm audit --prod --audit-level=critical` (bloqueante para vulnerabilidades críticas) e smoke test do `docker compose config`.
-2. **`cd-release.yml`:** publica as imagens Docker no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**. **Regra de estabilidade operacional:** o job `deploy-vps` **não** executa a cada push na branch principal; ele roda **exclusivamente quando uma tag semântica `v*.*.*` é publicada ou por acionamento manual (`workflow_dispatch`)**, mantendo a VPS de demonstração congelada e estável durante períodos de avaliação.
+2. **`hotfix-verify.yml`:** dispara nos Pull Requests de branches `hotfix/zeromttr-*` abertos pelo ZeroMTTR (mirando `release/target-v2.14.8`), executa a suíte de testes de regressão do `apps/target-app-demo` e publica o comentário de certificação (`✅ ZeroMTTR Autonomous CI Gate: PASSED`) no PR.
+3. **`cd-release.yml`:** publica as imagens Docker no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**. **Regra de estabilidade operacional:** o job `deploy-vps` **não** executa a cada push na branch principal; ele roda **exclusivamente quando uma tag semântica `v*.*.*` é publicada ou por acionamento manual (`workflow_dispatch`)**, mantendo a VPS de demonstração congelada e estável durante períodos de avaliação.
 
 ### T1.6 Documentação Inicial
 `README.md` (en-US) e `README.pt-BR.md` declarando a trilha (**Logística & Automação** — automação de fluxos de trabalho e integração entre sistemas), a arquitetura aberta e agnóstica de domínio, o posicionamento técnico frente ao mercado, instruções de execução local e distinção clara entre modo `Live` e modo `Replay`. Criar `LICENSE` (MIT), `.env.example` e `AGENTS.md`.
@@ -99,10 +100,11 @@ MCP_URL=http://mcp-server:8000
 TARGET_DEMO_URL=http://target-app-demo:3001
 DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
 
-# External Integrations (Repositório Alvo Dedicado & Resend)
+# External Integrations (GitHub API & Resend)
 GITHUB_TOKEN=
-TARGET_GITHUB_REPO=https://github.com/AdmilsonGoncalves/zeromttr-target-demo
-TARGET_SERVICE_PATH=src
+TARGET_GITHUB_REPO=https://github.com/AdmilsonGoncalves/zeromttr
+TARGET_BASE_BRANCH=release/target-v2.14.8
+TARGET_SERVICE_PATH=apps/target-app-demo
 RESEND_API_KEY=
 RESEND_FROM="ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>"
 ON_CALL_ENGINEER_EMAIL=admilson@agjworks.com
@@ -173,6 +175,54 @@ jobs:
       - run: cp .env.example .env
       - run: docker compose config -q
       - run: docker compose build
+```
+
+#### `.github/workflows/hotfix-verify.yml` (Validação Automática dos PRs Autônomos `hotfix/zeromttr-*`)
+```yaml
+name: Autonomous Hotfix PR Verification
+
+on:
+  pull_request:
+    branches: [release/target-v2.14.8, main, master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  verify-autonomous-hotfix:
+    if: startsWith(github.head_ref, 'hotfix/zeromttr-')
+    name: Verify Autonomous ZeroMTTR Hotfix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zeromttr/target-app-demo run typecheck
+      - run: pnpm --filter @zeromttr/target-app-demo run test
+
+      - name: Comment Verification Badge on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const passed = '${{ job.status }}' === 'success';
+            const body = passed
+              ? '### ⚡ ZeroMTTR Autonomous CI Gate: **PASSED** ✅\n- **Branch:** `' + context.payload.pull_request.head.ref + '`\n- **Target Workload (`@zeromttr/target-app-demo`):** Regression & Pool Release Suite Green on Node.js 24 LTS\n- **Governance Status:** Ready for On-Call Engineer approval via Resend HMAC.'
+              : '### ⚠️ ZeroMTTR Autonomous CI Gate: **FAILED** ❌\nRegression suite failed on this hotfix branch.';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
 ```
 
 #### `.github/workflows/cd-release.yml` (Deploy na VPS restrito a Tags `v*` ou Disparo Manual)

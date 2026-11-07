@@ -42,7 +42,7 @@ apps/<pacote>/test/
 | `tsc --noEmit` | 0 erros (bloqueante) | `ci.yml` |
 | Segredos vazados (`gitleaks`) | 0 ocorrências (bloqueante) | `ci.yml` |
 | Auditoria de dependências (`pnpm audit --prod --audit-level=critical`) | 0 vulnerabilidades `critical` (bloqueante) | `ci.yml` |
-| Suíte de regressão nos PRs autônomos (`hotfix/zeromttr-*`) | 100 % verde + comentário no PR | `hotfix-verify.yml` (no repo-alvo) |
+| Suíte de regressão nos PRs autônomos (`hotfix/zeromttr-*`) | 100 % verde + comentário no PR | `hotfix-verify.yml` |
 | Build & Push de imagens (`ghcr.io`) | Sucesso nos 4 serviços | `cd-release.yml` |
 
 ## 6. Definition of Done (Por Pull Request)

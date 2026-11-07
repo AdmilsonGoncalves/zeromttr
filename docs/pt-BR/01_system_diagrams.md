@@ -43,10 +43,10 @@ flowchart TD
         end
     end
 
-    subgraph Provedores_Externos["3. Integrações Externas & Repositório Alvo"]
+    subgraph Provedores_Externos["3. Integrações Externas & CI"]
         LLM(["Provedor LLM (Gemini API)"])
-        GH(["GitHub API & Repo Alvo (zeromttr-target-demo)"])
-        GHCI(["GitHub Actions no Repo Alvo (hotfix-verify.yml)"])
+        GH(["GitHub API & Repositório (AdmilsonGoncalves/zeromttr)"])
+        GHCI(["GitHub Actions (hotfix-verify.yml)"])
         RS(["Resend API (E-mail ao Plantonista)"])
     end
 
@@ -89,7 +89,7 @@ flowchart TD
 Representa a interação cronológica completa entre os contêineres e APIs externas, destacando:
 1. O mascaramento de PII no corpo do log (`transform` OTTL no Collector) **antes** do armazenamento no Loki;
 2. A validação determinística pelo **`PiiPromptGuard`** **antes** de enviar o prompt ao Gemini;
-3. A inspeção das tags reais `v2.14.7...v2.14.8` e abertura do PR no repositório-alvo separado (`zeromttr-target-demo`);
+3. A inspeção das tags reais `v2.14.7...v2.14.8` (`apps/target-app-demo`) e abertura do PR contra a branch `release/target-v2.14.8` no repositório `AdmilsonGoncalves/zeromttr`;
 4. A segregação entre `GRAFANA_WEBHOOK_TOKEN` e `DASHBOARD_API_TOKEN`, mantendo o **`decisionToken` HMAC restrito exclusivamente ao e-mail enviado pelo Resend** (nunca exposto no SSE ou em `GET /api/incidents/:id`).
 
 ```mermaid
@@ -102,7 +102,7 @@ sequenceDiagram
     participant LGTM as Stack LGTM (Prom/Loki/Tempo/Grafana)
     participant ORCH as Orchestrator (FSM + PiiPromptGuard)
     participant MCP as MCP Server (8 Tools + FinOps)
-    participant EXT as APIs Externas (Gemini / GitHub Repo Alvo / Resend)
+    participant EXT as APIs Externas (Gemini / GitHub / Resend)
 
     Note over SRE,DEMO: Fase 1 — Geração da Anomalia e Mascaramento OTTL na Borda
     SRE->>UI: Clica "Simular Incidente" (POST /api/demo/chaos)
@@ -131,16 +131,16 @@ sequenceDiagram
     ORCH->>DEMO: GET /chaos/status (TargetStatusPort)
     DEMO-->>ORCH: status="degraded", version="v2.14.8", previousHealthyVersion="v2.14.7"
 
-    Note over ORCH,EXT: Fase 4 — Diff Real (v2.14.7..v2.14.8) no Repo Alvo e Auditoria PiiPromptGuard
+    Note over ORCH,EXT: Fase 4 — Diff Real (v2.14.7..v2.14.8) no GitHub e Auditoria PiiPromptGuard
     ORCH-->>UI: SSE event: incident.transition (ENRICHING)
-    ORCH->>MCP: CallTool: inspect_git_deploy_diff (base: "v2.14.7", head: "v2.14.8")
-    MCP->>EXT: GitHub API (zeromttr-target-demo): Compare v2.14.7...v2.14.8 & Get File Content
+    ORCH->>MCP: CallTool: inspect_git_deploy_diff (base: "v2.14.7", head: "v2.14.8", servicePath: "apps/target-app-demo")
+    MCP->>EXT: GitHub API (AdmilsonGoncalves/zeromttr): Compare v2.14.7...v2.14.8 & Get File Content
     EXT-->>MCP: Commit de regressão, diff real do PaymentRepository.ts e blob sha
     MCP-->>ORCH: Diff truncado (<= 1500 chars) + FinOps telemetry [Sinal 4/4 = 95% (4/4 Signals)]
     ORCH->>ORCH: PiiPromptGuard.inspect(prompt): confirma piiPatternsDetectedInPrompt === 0
     ORCH-->>UI: SSE events: incident.rca (Evidence 4/4, Blast Radius, PiiGuardAudit), incident.finops, incident.docs
 
-    Note over ORCH,EXT: Fase 5 — Síntese de Patch, Anotação no Grafana e PR no Repositório Alvo
+    Note over ORCH,EXT: Fase 5 — Síntese de Patch, Anotação no Grafana e Abertura de PR
     ORCH-->>UI: SSE event: incident.transition (REMEDIATING)
     ORCH->>MCP: CallTool: annotate_grafana_incident (tag: aiops-remediation)
     MCP->>LGTM: POST /api/annotations
@@ -148,7 +148,7 @@ sequenceDiagram
     EXT-->>ORCH: Código corrigido (restaura finally { client.release() } e pool max: 10)
     ORCH-->>UI: SSE event: incident.transition (AWAITING_PR)
     ORCH->>MCP: CallTool: create_remediation_pr (branch: hotfix/zeromttr-*, filePath, patchedContent, blobSha)
-    MCP->>EXT: GitHub API (zeromttr-target-demo): cria branch, commita fix e abre Pull Request
+    MCP->>EXT: GitHub API (AdmilsonGoncalves/zeromttr): cria branch, commita fix e abre Pull Request contra release/target-v2.14.8
     EXT-->>MCP: branchUrl + pullRequestUrl + commitSha (dispara hotfix-verify.yml no repo-alvo)
     MCP-->>ORCH: RemediationPrReceipt
     ORCH-->>UI: SSE event: incident.remediation (branchUrl, pullRequestUrl, commitSha)
@@ -479,9 +479,9 @@ flowchart TD
         end
     end
 
-    subgraph Cloud_APIs["3. APIs Externas & Repositório Alvo (Saída HTTPS)"]
+    subgraph Cloud_APIs["3. APIs Externas (Saída HTTPS)"]
         GEMINI["Google Gemini API (0 PII)"]
-        GITHUB["GitHub REST API (zeromttr-target-demo)"]
+        GITHUB["GitHub REST API (AdmilsonGoncalves/zeromttr)"]
         RESEND["Resend Email API (Links HMAC Exclusivos)"]
     end
 
