@@ -1,22 +1,21 @@
-# TECH 01 — Fundação e Infraestrutura (Fase 1)
+# TECH 01 — Fundação, Sanitização OTTL e Infraestrutura (Fase 1)
 
-**Pré-requisito de leitura:** `AGENTS.md`, [00_architecture_master.md](../00_architecture_master.md)
-**Fonte de código (apoio local, não versionado):** `docs/apoio/especifica_o_t_cnica_e_arquitetura_aiops_com_mcp_grafana_e_opentelemetry.md`, `docs/apoio/zeromttr_antigravity_blueprint_v2.md` (§3.1–3.4) e `docs/apoio/cloudflare_bind_zone_file.txt`
-**Objetivo:** monorepo com CI/CD, DNS (`agjworks.com`) e stack LGTM saudável via `docker compose up`.
+**Pré-requisito de leitura:** `AGENTS.md`, [00_architecture_master.md](../00_architecture_master.md), [01_system_diagrams.md](../01_system_diagrams.md)
+**Objetivo:** estruturar o monorepo do zero com `pnpm` + `Nx`, configurar a pipeline de CI/CD e subir a stack LGTM saudável via `docker compose up` com mascaramento determinístico de PII via OTTL (`transform`).
 
 ## 1. Escopo
-Estrutura de pastas, tooling, CI e stack de observabilidade. **Sem** código de negócio.
+Estrutura de pastas, tooling de qualidade, configurações da stack de observabilidade (`infra/`) e workflows de CI/CD. Toda a implementação deve ser escrita do zero a partir desta especificação.
 
 ## 2. Tarefas
 
-### T1.1 Esqueleto do monorepo (`pnpm` + `Nx` em `apps/*`)
-Criar a estrutura da §7 do mestre:
+### T1.1 Esqueleto do Monorepo (`pnpm` + `Nx` em `apps/*`)
+Criar a estrutura definida na §7 do documento mestre:
 - **Gerenciador de pacotes:** **pnpm** (`packageManager: "pnpm@10.x"` no `package.json` raiz via Corepack) + `pnpm-workspace.yaml` com `packages: ['apps/*']` (`apps/mcp-server`, `apps/orchestrator`, `apps/target-app-demo`, `apps/dashboard`).
 - **Orquestrador de monorepo:** **Nx (Package-Based)** com `nx.json` enxuto na raiz configurando `targetDefaults` (`build`, `lint`, `typecheck`, `test` com cache local habilitado).
 - **TypeScript & Runtime:** `tsconfig.base.json` na raiz (`strict`, `ES2024`, `NodeNext`), Node 24 em `.nvmrc` e `engines` (`>=24.0.0`).
 - **`.dockerignore` na raiz:** ignorar `node_modules/`, `.nx/`, `dist/`, `coverage/`, `.git/` e `docs/` para manter o contexto de build Docker (`context: .`) abaixo de 2 MB.
 
-### T1.2 Tooling de qualidade & Scripts enxutos (`*:workspace`)
+### T1.2 Tooling de Qualidade & Scripts Enxutos (`*:workspace`)
 ESLint (flat config `eslint.config.mjs`) + Prettier + Husky (`pre-commit` com `lint-staged` e `pre-push` rodando `pnpm run check:workspace`) + Commitlint (Conventional Commits).
 - **Regras obrigatórias no `eslint.config.mjs` raiz:**
   1. **Fronteira Hexagonal (`no-restricted-imports`):** arquivos em `apps/{mcp-server,orchestrator}/src/{domain,application}/**/*.ts` são proibidos de importar `../adapters/**`, `../transport/**`, `../http/**`, `express`, `axios` ou `@modelcontextprotocol/sdk`.
@@ -33,40 +32,41 @@ ESLint (flat config `eslint.config.mjs`) + Prettier + Husky (`pre-commit` com `l
   }
   ```
 
-### T1.3 Infra em `infra/`
-Colocar os arquivos de configuração (collector, Prometheus, Tempo, Loki e datasources) em `infra/` e ajustar os volumes do compose. Pontos obrigatórios:
+### T1.3 Infraestrutura de Observabilidade em `infra/` e Mascaramento OTTL (`transform`)
+Criar os arquivos de configuração da stack LGTM e do OpenTelemetry Collector em `infra/`:
 
-| Arquivo | Requisito |
+| Arquivo | Requisito Técnico |
 | :--- | :--- |
-| `datasources.yaml` | Adicionar `uid: prometheus-datasource` ao Prometheus (`tracesToMetrics` referencia esse uid) |
-| `docker-compose.yml` | Remover `env_file` obrigatório (ou usar `required: false`); adicionar healthchecks de Tempo e Grafana; incluir serviços `mcp-server`, `orchestrator`, `target-app-demo`, `postgres` e `dashboard` (nginx com proxy `/api` → orquestrador) |
-| `otel-collector-config.yaml` | **Validar** que o `redaction` atua em logs na versão usada; se não, usar `transform`/`attributes` para logs (risco R4) |
-| `tempo-config.yaml` | Habilitar `metrics_generator` somente se necessário para exemplars de service graph |
+| `datasources.yaml` | Configurar Prometheus (`uid: prometheus-datasource` com `exemplarTraceIdDestinations` apontando para o Tempo), Loki (com `derivedFields` extraindo `trace_id`) e Tempo (`tracesToMetrics` e `tracesToLogs`). |
+| `docker-compose.yml` | Ambiente local com healthchecks para Prometheus, Loki, Tempo, Grafana e PostgreSQL; incluir serviços `mcp-server`, `orchestrator`, `target-app-demo` (`api-liquidacao-frete-pix`) e `dashboard`. |
+| `otel-collector-config.yaml` | **Mascaramento de PII em Logs via `transform` (OTTL):** como o processor `redaction` em versões 0.114.x do Collector atua primariamente em atributos de spans, configurar obrigatoriamente o processor **`transform`** no pipeline de `logs` usando funções OTTL `replace_pattern(log.body, ...)` e `replace_all_patterns(log.attributes, "value", ...)` para mascarar deterministicamente **CPF**, **CNPJ**, **Chave PIX / E-mail** e tokens **Bearer / JWT** antes da exportação para o Loki (ver §3.3). |
+| `tempo-config.yaml` | Receptor OTLP gRPC (`4317`) e HTTP (`4318`) com busca TraceQL habilitada. |
 
-### T1.4 Alerting provisionado
+### T1.4 Alerting Provisionado com Token Segregado
 Criar `infra/grafana/provisioning/alerting/`:
-- `contact-points.yaml`: webhook para `http://orchestrator:8080/webhook/grafana-alert` com header `Authorization: Bearer ${WEBHOOK_TOKEN}`.
-- `rules.yaml`: regra "high error rate / p95 latency" sobre a métrica do demo app, `for: 30s`, labels `service`, `severity`.
-- `policies.yaml`: rota padrão para o contact point.
+- `contact-points.yaml`: webhook apontando para `http://orchestrator:8080/webhook/grafana-alert` autenticado com cabeçalho `Authorization: Bearer ${GRAFANA_WEBHOOK_TOKEN}` (token exclusivo do Grafana, separado do token do Dashboard).
+- `rules.yaml`: regra de alta latência p95 / saturação de conexões sobre as métricas de `api-liquidacao-frete-pix`, `for: 30s`, labels `service=api-liquidacao-frete-pix`, `severity=critical`.
+- `policies.yaml`: rota padrão vinculada ao contact point.
 
 ### T1.5 CI/CD com GitHub Actions (`.github/workflows/`)
-Criar os 3 workflows em `.github/workflows/` (templates de referência na §3.1):
-1. **`ci.yml`:** Node 24 + `pnpm/action-setup@v4`, `pnpm install --frozen-lockfile`, lint, typecheck, `gitleaks`, testes com cobertura (≥ 80 %) via Nx, build, `docker compose config` e smoke test dos contêineres.
-2. **`hotfix-verify.yml`:** dispara em Pull Requests de branches `hotfix/zeromttr-*` abertas autonomamente pelo **ZeroMTTR**, roda os testes de regressão do `apps/target-app-demo` e comenta o resultado de certificação no próprio PR via `GITHUB_TOKEN`.
-3. **`cd-release.yml`:** em push na `main`/`master` e tags `v*`, publica as imagens Docker no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)** com cache `type=gha` e gera a GitHub Release automática em tags `v*`.
+Criar os workflows no monorepo principal (`zeromttr/.github/workflows/`):
+1. **`ci.yml`:** Node 24 + `pnpm/action-setup@v4`, `pnpm install --frozen-lockfile`, lint, typecheck, `gitleaks`, testes unitários/contrato com cobertura (≥ 80 %) via Nx, build, `pnpm audit --prod --audit-level=critical` (bloqueante para vulnerabilidades críticas) e smoke test do `docker compose config`.
+2. **`cd-release.yml`:** publica as imagens Docker no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**. **Regra de estabilidade operacional:** o job `deploy-vps` **não** executa a cada push na branch principal; ele roda **exclusivamente quando uma tag semântica `v*.*.*` é publicada ou por acionamento manual (`workflow_dispatch`)**, mantendo a VPS de demonstração congelada e estável durante períodos de avaliação.
 
-### T1.6 Documentação inicial
-`README.md` (en-US) e `README.pt-BR.md` com badge **Node.js 24 LTS**. `LICENSE` MIT. `.env.example` (ver §3). Criar também o `AGENTS.md` na raiz (contexto para agentes de IA): visão geral, estrutura do monorepo (`pnpm` + `Nx` em `apps/*`), convenções (Node 24, TypeScript `strict`, TDD, SOLID, idioma), links para `docs/pt-BR/00_architecture_master.md` e `docs/pt-BR/tech/` e roteiro por fases. Ele deve refletir a estrutura `apps/mcp-server/` + `apps/orchestrator/` + `apps/target-app-demo/` + `apps/dashboard/` + `infra/`.
+### T1.6 Documentação Inicial
+`README.md` (en-US) e `README.pt-BR.md` declarando a trilha (**Logística & Automação**), o cenário brasileiro (`api-liquidacao-frete-pix`), o posicionamento técnico frente ao mercado, instruções de execução local e distinção clara entre modo `Live` e modo `Replay`. Criar `LICENSE` (MIT), `.env.example` e `AGENTS.md`.
 
-### T1.7 Configuração de Deploy Blindado na VPS (`docker-compose.prod.yml` + `env_file` externo + Traefik)
-Criar `docker-compose.prod.yml`, `infra/otel-collector-config.prod.yaml` e `apps/dashboard/nginx.conf.template` (especificados na §3.2) para hospedar a aplicação em produção em uma VPS Linux atrás de **Traefik + Cloudflare**:
-- **Chaves isoladas fora do repositório em diretório restrito no host** (ex.: `/path/to/secrets/.env` com `chown $VPS_USER:$VPS_USER /path/to/secrets/.env && chmod 600 /path/to/secrets/.env`), referenciado via variável/secret `${ENV_FILE_PATH}` (`env_file: [${ENV_FILE_PATH:-.env}]` e `--env-file /path/to/secrets/.env`).
-- **Zero portas publicadas no host (`expose:` apenas):** nenhum serviço usa `ports:` (evitando que o Docker manipule o `iptables` e ignore o UFW). Todos os bancos de telemetria (`prometheus`, `loki`, `tempo`, `otel-collector`, `postgres`, `grafana`, `mcp-server`, `orchestrator`, `target-app-demo`) ficam 100% isolados na rede interna `aiops-net`.
-- **Ingresso único via `dashboard` (Nginx) na `traefik-public`:** apenas o container `dashboard` conecta na rede externa do Traefik (`Host(${ZEROMTTR_DOMAIN})`), servindo o SPA Angular em `/` e fazendo proxy reverso interno de `/api/*` para `orchestrator:8080` com injeção automática do `Authorization: Bearer ${WEBHOOK_TOKEN}` e headers anti-buffering de SSE (`X-Accel-Buffering: no`, `proxy_buffering off`).
-- **Teto de RAM enxuto (~1.7 GB total):** `mem_limit` + `deploy.resources.limits` em todos os containers e `num_traces: 500` / `limit_mib: 200` no OTel Collector.
+### T1.7 Configuração de Deploy Blindado na VPS (`docker-compose.prod.yml` + Segregação de Tokens)
+Criar `docker-compose.prod.yml`, `infra/otel-collector-config.prod.yaml` e `apps/dashboard/nginx.conf.template`:
+- **Segredos externos ao repositório** (ex.: `/path/to/secrets/.env` com permissão `600`), referenciados via `${ENV_FILE_PATH}`.
+- **Zero portas publicadas no host (`expose:` apenas):** todos os serviços de telemetria e backend ficam isolados na rede `aiops-net`.
+- **Segregação de tokens no Nginx:** o container `dashboard` (Nginx) injeta `Authorization: Bearer ${DASHBOARD_API_TOKEN}` nas rotas `/api/*` do Dashboard. O token `GRAFANA_WEBHOOK_TOKEN` nunca passa pelo Nginx.
+- **Limites de RAM dimensionados com margem contra OOMKill sob carga (~2.1 GB total):** `prometheus: 512M`, `loki: 512M`, `tempo: 384M`, `otel-collector: 256M` (`limit_mib: 200`), `grafana: 256M`, `orchestrator: 256M`, `mcp-server: 192M`, `target-app-demo: 192M`, `postgres: 192M`, `dashboard: 128M`.
 
-## 3. Variáveis de ambiente (`.env.example` para dev local / `.env.prod.template` para a VPS)
-> **Regra de formatação:** nunca usar comentários *inline* na mesma linha do valor (para evitar que o parser `env_file` do Docker incorpore o comentário ao valor) e sempre envolver valores com espaços ou `< >` em aspas duplas.
+---
+
+## 3. Variáveis de Ambiente (`.env.example` / `.env.prod.template`)
+> **Regra de formatação:** nunca usar comentários *inline* na mesma linha do valor e sempre envolver valores com espaços ou `< >` em aspas duplas.
 
 ```dotenv
 # VPS / Traefik / Grafana Admin (AGJ Works)
@@ -80,51 +80,50 @@ PROMETHEUS_URL=http://prometheus:9090
 LOKI_URL=http://loki:3100
 TEMPO_URL=http://tempo:3200
 GRAFANA_URL=http://grafana:3000
-# Token de Service Account com papel Editor (para POST /api/annotations); se vazio no demo local, usa Basic Auth admin
 GRAFANA_SA_TOKEN=
 
-# Security & Rate Limiting
-MCP_AUTH_TOKEN=change-me
-WEBHOOK_TOKEN=change-me
-# Assina links de Aprovar/Rejeitar do e-mail e botões do Quadrante 4
-DECISION_HMAC_SECRET=change-me
-# Chave para forçar Live API Mode na VPS pública (vazio em dev local = modo live liberado; preenchido na VPS = protege créditos)
+# Segregação de Tokens (Menor Privilégio)
+MCP_AUTH_TOKEN=change-me-mcp-token
+GRAFANA_WEBHOOK_TOKEN=change-me-grafana-webhook-token
+DASHBOARD_API_TOKEN=change-me-dashboard-api-token
+# Assina exclusivamente os links de Aprovar/Rejeitar enviados por e-mail
+DECISION_HMAC_SECRET=change-me-hmac-secret
+# Chave exigida na VPS pública para acionar modo Live real (protege cota contra tráfego anônimo)
 LIVE_DEMO_KEY=
-# Cooldown global de 2 min entre simulações
 SIMULATION_COOLDOWN_MS=120000
-# Em dev local aponta para localhost; na VPS (.env de produção) usar https://zeromttr.agjworks.com
 PUBLIC_BASE_URL=http://localhost:8080
 PUBLIC_DASHBOARD_URL=http://localhost:4200
 
-# Orchestrator -> MCP & Demo
+# Orchestrator -> MCP & Demo Workload
 MCP_URL=http://mcp-server:8000
 TARGET_DEMO_URL=http://target-app-demo:3001
 DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
 
-# External Integrations (GitHub API & Resend)
-# Fine-grained PAT com permissões Contents (Read/Write) e Pull Requests (Read/Write) no repositório-alvo
+# External Integrations (Repositório Alvo Dedicado & Resend)
 GITHUB_TOKEN=
-TARGET_GITHUB_REPO=https://github.com/AdmilsonGoncalves/zeromttr
-TARGET_SERVICE_PATH=apps/target-app-demo
+TARGET_GITHUB_REPO=https://github.com/AdmilsonGoncalves/zeromttr-target-pix-freight
+TARGET_SERVICE_PATH=src
 RESEND_API_KEY=
 RESEND_FROM="ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>"
 ON_CALL_ENGINEER_EMAIL=admilson@agjworks.com
 
-# LLM (Orchestrator ReasoningPort)
+# LLM (Orchestrator ReasoningPort — Modelo Parametrizável)
 LLM_PROVIDER=gemini
-LLM_MODEL=gemini-2.5-flash
+LLM_MODEL=gemini-2.0-flash
 LLM_API_KEY=
 
-# Demo app
+# Flags do Workload
 CHAOS_ENABLED=true
 DEMO_MODE=true
 ```
 
-### 3.1 Especificação dos Workflows do GitHub Actions
+---
 
-#### `.github/workflows/ci.yml` (Quality, Security, Tests & Compose Smoke)
+### 3.1 Especificação dos Workflows do Monorepo Principal
+
+#### `.github/workflows/ci.yml`
 ```yaml
-name: CI — Quality, Tests & Compose Smoke
+name: CI — Quality, Security, Tests & Compose Smoke
 
 on:
   push:
@@ -137,7 +136,7 @@ permissions:
 
 jobs:
   quality-and-tests:
-    name: Lint, Typecheck & Unit/Contract Tests (Node 24)
+    name: Lint, Typecheck, Audit & Tests (Node 24)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -161,9 +160,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint:workspace
       - run: pnpm nx run-many --target=typecheck --all
-      - run: pnpm run test:workspace -- --coverage
+      - run: pnpm run test:workspace
       - run: pnpm run build:workspace
-      - run: pnpm audit --prod --audit-level=high || true
+      - run: pnpm audit --prod --audit-level=critical
 
   compose-smoke:
     name: Docker Compose Config & Build Smoke
@@ -176,63 +175,21 @@ jobs:
       - run: docker compose build
 ```
 
-#### `.github/workflows/hotfix-verify.yml` (Validação Automática dos PRs Autônomos)
+#### `.github/workflows/cd-release.yml` (Deploy na VPS restrito a Tags `v*` ou Disparo Manual)
 ```yaml
-name: Autonomous Hotfix PR Verification
-
-on:
-  pull_request:
-    branches: [main, master]
-
-permissions:
-  contents: read
-  pull-requests: write
-
-jobs:
-  verify-autonomous-hotfix:
-    if: startsWith(github.head_ref, 'hotfix/zeromttr-')
-    name: Verify Autonomous ZeroMTTR Hotfix
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm nx run-many --target=typecheck --all
-      - run: pnpm run test:workspace
-
-      - name: Comment Verification Badge on PR
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const passed = '${{ job.status }}' === 'success';
-            const body = passed
-              ? '### ⚡ ZeroMTTR Autonomous CI Gate: **PASSED** ✅\n- **Branch:** `' + context.payload.pull_request.head.ref + '`\n- **Typecheck & Regression Suite:** Green on Node.js 24 LTS\n- **Governance Status:** Ready for On-Call Engineer approval via Resend / War Room.'
-              : '### ⚠️ ZeroMTTR Autonomous CI Gate: **FAILED** ❌\nRegression suite or typecheck failed on this hotfix branch.';
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body
-            });
-```
-
-#### `.github/workflows/cd-release.yml` (CD — GHCR Image Publish & GitHub Release)
-```yaml
-name: CD — Publish Images (GHCR) & Release
+name: CD — Publish Images (GHCR) & Controlled VPS Release
 
 on:
   push:
     branches: [main, master]
     tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      deploy_to_vps:
+        description: 'Deploy latest images to production VPS'
+        required: false
+        default: 'true'
+        type: string
 
 permissions:
   contents: write
@@ -287,7 +244,7 @@ jobs:
           generate_release_notes: true
 
   deploy-vps:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_vps == 'true')
     needs: publish-images
     runs-on: ubuntu-latest
     steps:
@@ -333,309 +290,71 @@ jobs:
 
 ---
 
-### 3.2 Especificação de Produção na VPS (`docker-compose.prod.yml`, `ENV_FILE_PATH`, Nginx & Collector Enxuto)
+### 3.2 Especificação do OTel Collector com Processor `transform` (OTTL PII Masking em `log.body`)
+Em `infra/otel-collector-config.yaml` e `infra/otel-collector-config.prod.yaml`, o pipeline de `logs` aplica `transform/pii_logs` para garantir mascaramento determinístico no corpo (`body`) e nos atributos de todos os logs antes da persistência no Loki:
 
-O fluxo é **100% Dev Local $\rightarrow$ Git Push $\rightarrow$ GitHub Actions $\rightarrow$ VPS**:
-1. Você desenvolve e valida localmente na sua máquina (`docker compose up`).
-2. Ao dar `git push origin main`, o GitHub Actions compila as 4 imagens Docker nos servidores do GitHub (poupando 100% de CPU/RAM de build na VPS), publica no GHCR (`ghcr.io`), transfere apenas `docker-compose.prod.yml` e a pasta `infra/` via SCP para `${{ secrets.VPS_DEPLOY_PATH }}` e executa `docker compose --env-file "$ENV_FILE_PATH" -f docker-compose.prod.yml up -d` via SSH (por exemplo, com `ENV_FILE_PATH=/path/to/secrets/.env`):
-
-```zsh
-export ENV_FILE_PATH=/path/to/secrets/.env
-docker compose --env-file "$ENV_FILE_PATH" -f docker-compose.prod.yml up -d
-```
-
-#### `docker-compose.prod.yml` (Blindado: Zero `ports:` no host + Limites de RAM + Traefik + `ENV_FILE_PATH` externo)
 ```yaml
-services:
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.114.0
-    container_name: zeromttr-otel-collector
-    restart: unless-stopped
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-    volumes:
-      - ./infra/otel-collector-config.prod.yaml:/etc/otelcol-contrib/config.yaml:ro
-    expose:
-      - "4317"
-      - "4318"
-      - "8888"
-    depends_on:
-      prometheus:
-        condition: service_healthy
-      loki:
-        condition: service_healthy
-      tempo:
-        condition: service_started
-    mem_limit: 256m
-    cpus: 0.50
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.50'
-    networks:
-      - aiops-net
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
 
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    container_name: zeromttr-prometheus
-    restart: unless-stopped
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=3d
-      - --web.enable-remote-write-receiver
-      - --enable-feature=exemplar-storage
-      - --web.enable-lifecycle
-    volumes:
-      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prom_data:/prometheus
-    expose:
-      - "9090"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    mem_limit: 384m
-    cpus: 0.50
-    deploy:
-      resources:
-        limits:
-          memory: 384M
-          cpus: '0.50'
-    networks:
-      - aiops-net
+  transform/pii_logs:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # Mascara CPF (ex.: 123.456.789-00 -> [REDACTED_CPF])
+          - replace_pattern(body, "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
+          # Mascara CNPJ (ex.: 12.345.678/0001-99 -> [REDACTED_CNPJ])
+          - replace_pattern(body, "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
+          # Mascara tokens Bearer / JWT
+          - replace_pattern(body, "Bearer\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
+          # Mascara chaves PIX de e-mail em mensagens de erro
+          - replace_pattern(body, "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "[REDACTED_PIX_EMAIL]")
+          # Aplica o mesmo mascaramento sobre atributos string do log
+          - replace_all_patterns(attributes, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
+          - replace_all_patterns(attributes, "value", "Bearer\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
 
-  tempo:
-    image: grafana/tempo:2.6.0
-    container_name: zeromttr-tempo
-    restart: unless-stopped
-    command: ["-config.file=/etc/tempo.yaml"]
-    volumes:
-      - ./infra/tempo-config.yaml:/etc/tempo.yaml:ro
-      - tempo_data:/tmp/tempo
-    expose:
-      - "3200"
-      - "4317"
-    mem_limit: 256m
-    cpus: 0.50
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.50'
-    networks:
-      - aiops-net
+  redaction:
+    allow_all_keys: true
+    blocked_values:
+      - "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b"
+      - "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b"
+      - "Bearer\\s+[A-Za-z0-9\\-._~+/]+=*"
 
-  loki:
-    image: grafana/loki:3.2.0
-    container_name: zeromttr-loki
-    restart: unless-stopped
-    command: ["-config.file=/etc/loki/local-config.yaml"]
-    volumes:
-      - ./infra/loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - loki_data:/tmp/loki
-    expose:
-      - "3100"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --tries=1 --spider http://localhost:3100/ready || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    mem_limit: 384m
-    cpus: 0.50
-    deploy:
-      resources:
-        limits:
-          memory: 384M
-          cpus: '0.50'
-    networks:
-      - aiops-net
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 500
+    expected_new_traces_per_sec: 50
+    policies:
+      - name: errors-policy
+        type: status_code
+        status_code: { status_codes: [ERROR] }
+      - name: slow-traces-policy
+        type: latency
+        latency: { threshold_ms: 500 }
 
-  grafana:
-    image: grafana/grafana:11.2.0
-    container_name: zeromttr-grafana
-    restart: unless-stopped
-    env_file:
-      - ${ENV_FILE_PATH:-.env}
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admilson}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?Defina GRAFANA_ADMIN_PASSWORD no arquivo .env}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
-    volumes:
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana_data:/var/lib/grafana
-    expose:
-      - "3000"
-    depends_on:
-      - prometheus
-      - loki
-      - tempo
-    mem_limit: 256m
-    cpus: 0.50
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.50'
-    networks:
-      - aiops-net
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: zeromttr-postgres
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=zeromttr
-      - POSTGRES_PASSWORD=zeromttr
-      - POSTGRES_DB=payments
-    expose:
-      - "5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zeromttr -d payments"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    mem_limit: 192m
-    cpus: 0.30
-    deploy:
-      resources:
-        limits:
-          memory: 192M
-          cpus: '0.30'
-    networks:
-      - aiops-net
-
-  target-app-demo:
-    image: ghcr.io/admilsongoncalves/zeromttr/target-app-demo:latest
-    container_name: zeromttr-target-demo
-    restart: unless-stopped
-    env_file:
-      - ${ENV_FILE_PATH:-.env}
-    environment:
-      - NODE_ENV=production
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - OTEL_SERVICE_NAME=api-pagamentos-core
-      - DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
-    expose:
-      - "3001"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      otel-collector:
-        condition: service_started
-    mem_limit: 192m
-    cpus: 0.30
-    deploy:
-      resources:
-        limits:
-          memory: 192M
-          cpus: '0.30'
-    networks:
-      - aiops-net
-
-  mcp-server:
-    image: ghcr.io/admilsongoncalves/zeromttr/mcp-server:latest
-    container_name: zeromttr-mcp-server
-    restart: unless-stopped
-    env_file:
-      - ${ENV_FILE_PATH:-.env}
-    environment:
-      - NODE_ENV=production
-      - MCP_PORT=8000
-      - GRAFANA_URL=http://grafana:3000
-      - PROMETHEUS_URL=http://prometheus:9090
-      - LOKI_URL=http://loki:3100
-      - TEMPO_URL=http://tempo:3200
-    expose:
-      - "8000"
-    depends_on:
-      - grafana
-    mem_limit: 192m
-    cpus: 0.40
-    deploy:
-      resources:
-        limits:
-          memory: 192M
-          cpus: '0.40'
-    networks:
-      - aiops-net
-
-  orchestrator:
-    image: ghcr.io/admilsongoncalves/zeromttr/orchestrator:latest
-    container_name: zeromttr-orchestrator
-    restart: unless-stopped
-    env_file:
-      - ${ENV_FILE_PATH:-.env}
-    environment:
-      - NODE_ENV=production
-      - PORT=8080
-      - MCP_URL=http://mcp-server:8000
-      - GRAFANA_URL=http://grafana:3000
-      - TARGET_DEMO_URL=http://target-app-demo:3001
-    expose:
-      - "8080"
-    depends_on:
-      - mcp-server
-      - target-app-demo
-    mem_limit: 256m
-    cpus: 0.50
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.50'
-    networks:
-      - aiops-net
-
-  dashboard:
-    image: ghcr.io/admilsongoncalves/zeromttr/dashboard:latest
-    container_name: zeromttr-dashboard
-    restart: unless-stopped
-    env_file:
-      - ${ENV_FILE_PATH:-.env}
-    expose:
-      - "80"
-    depends_on:
-      - orchestrator
-    mem_limit: 128m
-    cpus: 0.25
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.25'
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.zeromttr-ui.rule=Host(`${ZEROMTTR_DOMAIN}`)"
-      - "traefik.http.routers.zeromttr-ui.entrypoints=websecure"
-      - "traefik.http.routers.zeromttr-ui.tls=true"
-      - "traefik.http.routers.zeromttr-ui.tls.certresolver=letsencrypt"
-      - "traefik.http.services.zeromttr-ui.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.zeromttr-sse.headers.customresponseheaders.X-Accel-Buffering=no"
-      - "traefik.http.routers.zeromttr-ui.middlewares=zeromttr-sse"
-    networks:
-      - aiops-net
-      - traefik-public
-
-volumes:
-  prom_data:
-  tempo_data:
-  loki_data:
-  grafana_data:
-
-networks:
-  aiops-net:
-    driver: bridge
-  traefik-public:
-    external: true
-    name: ${TRAEFIK_NETWORK_NAME:-traefik_default}
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, redaction, tail_sampling, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/pii_logs, batch]
+      exporters: [loki]
 ```
 
-#### `apps/dashboard/nginx.conf.template` (Injeta `Authorization` internamente + SSE sem buffer)
-O container oficial `nginx:1.27-alpine` processa automaticamente arquivos em `/etc/nginx/templates/*.template` com `envsubst` no boot, injetando `${WEBHOOK_TOKEN}` (lido do `env_file`) sem nunca expô-lo ao navegador:
+---
 
+### 3.3 `apps/dashboard/nginx.conf.template` (Injeta `DASHBOARD_API_TOKEN` segregado)
 ```nginx
 server {
     listen 80;
@@ -646,16 +365,15 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
 
-    # Proxy reverso interno apenas para /api/* -> orchestrator:8080 (rede interna aiops-net)
+    # Proxy reverso interno apenas para /api/* -> orchestrator:8080 (nunca expõe /webhook/*)
     location /api/ {
         proxy_pass http://orchestrator:8080/api/;
         proxy_http_version 1.1;
         proxy_set_header Connection '';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Authorization "Bearer ${WEBHOOK_TOKEN}";
+        proxy_set_header Authorization "Bearer ${DASHBOARD_API_TOKEN}";
 
-        # Essencial para Server-Sent Events (SSE) em tempo real via Traefik/Cloudflare
         proxy_buffering off;
         proxy_cache off;
         chunked_transfer_encoding off;
@@ -670,48 +388,11 @@ server {
 }
 ```
 
-#### `apps/dashboard/Dockerfile` (Build Context na raiz `.` com `pnpm`)
-```dockerfile
-FROM node:24-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@10 --activate
-WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
-COPY apps/dashboard/package.json ./apps/dashboard/
-RUN pnpm install --frozen-lockfile --filter @zeromttr/dashboard...
-COPY apps/dashboard ./apps/dashboard
-RUN pnpm --filter @zeromttr/dashboard run build --configuration=production
+---
 
-FROM nginx:1.27-alpine AS runner
-COPY apps/dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
-COPY --from=builder /app/apps/dashboard/dist/dashboard/browser /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-#### Ajuste em `infra/otel-collector-config.prod.yaml` (Proteção contra OOMKill em 256MB)
-```yaml
-processors:
-  memory_limiter:
-    check_interval: 1s
-    limit_mib: 200          # Limite explícito compatível com os 256M do container
-    spike_limit_mib: 50
-
-  tail_sampling:
-    decision_wait: 5s
-    num_traces: 500         # Reduzido de 10000 para 500 para poupar RAM na VPS
-    expected_new_traces_per_sec: 50
-```
-
-### 3.3 DNS Cloudflare (`agjworks.com`) & Entregabilidade do Resend
-O arquivo de zona BIND de referência está em `docs/apoio/cloudflare_bind_zone_file.txt`:
-- **Registros `A` (Proxied pelo Cloudflare):** `agjworks.com` e `zeromttr.agjworks.com` apontando para o IPv4 da VPS.
-- **Registros `CNAME` (1º nível com hífen para compatibilidade com Universal SSL Free do Cloudflare):** `www.agjworks.com` → `agjworks.com`; `api-zeromttr.agjworks.com` e `grafana-zeromttr.agjworks.com` → `zeromttr.agjworks.com`.
-- **Registros `CAA`:** autorizam emissão de certificados SSL Let's Encrypt no Traefik (`letsencrypt.org`) e Google Trust Services/SSL.com/DigiCert no Cloudflare (`pki.goog`, `ssl.com`, `digicert.com`).
-- **DMARC & Resend 1-Click Cloudflare:** registro TXT `_dmarc.agjworks.com` (`v=DMARC1; p=none; rua=mailto:dmarc@agjworks.com`) e configuração automática de SPF/MX/DKIM para `send.zeromttr.agjworks.com` via botão *"Configure automatically with Cloudflare"* no painel do Resend, habilitando o envio autenticado por `ZeroMTTR • AGJ Works <sre@zeromttr.agjworks.com>`.
-
-## 4. Critérios de aceite
+## 4. Critérios de Aceite
 - [ ] `pnpm install --frozen-lockfile && pnpm run check:workspace` passam em checkout limpo via Nx.
 - [ ] `docker compose up -d` deixa Prometheus, Loki, Tempo, Grafana e Collector `healthy` em ≤ 90 s.
-- [ ] Grafana lista os 3 datasources sem erro; "Test" verde.
-- [ ] Regra de alerta e contact point aparecem provisionados no Grafana.
+- [ ] Um log OTLP contendo CPF (`123.456.789-00`), CNPJ (`12.345.678/0001-99`) e `Bearer eyJ...` no `body` é gravado no Loki com `[REDACTED_CPF]`, `[REDACTED_CNPJ]` e `Bearer [REDACTED_TOKEN]`.
+- [ ] Grafana lista os 3 datasources sem erro e o contact point usa `GRAFANA_WEBHOOK_TOKEN`.
 - [ ] CI verde no GitHub; nenhum segredo no repositório.

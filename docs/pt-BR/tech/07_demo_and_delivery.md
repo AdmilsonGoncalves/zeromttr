@@ -1,42 +1,43 @@
-# TECH 07 — Demonstração, Medição de MTTR e Documentação Final (Fases 5–6)
+# TECH 07 — Demonstração Live, Medição de TTD/TTPR e Entrega Final (Fases 5–6)
 
-**Depende de:** [05](./05_orchestrator.md) · **Objetivo:** consolidar o sistema em uma entrega demonstrável, documentada e reproduzível em ambiente local e em produção.
+**Depende de:** [05](./05_orchestrator.md), [08](./08_dashboard_frontend.md)
+**Objetivo:** consolidar o sistema em uma demonstração ao vivo de 3 minutos (modo `Live` real + cliente MCP externo), documentar o baseline cronometrado de **TTD** e **TTPR** e congelar o ambiente de produção para avaliação.
 
-## 1. Roteiro de verificação ponta a ponta (3 minutos)
-| Tempo | Etapa | Evidência verificada |
+## 1. Roteiro da Demonstração em Vídeo (3 Minutos — Modo `Live` Real)
+Como visitantes anônimos na URL pública veem por padrão o modo `Replay` (para proteção de cotas), **o vídeo de demonstração grava obrigatoriamente o modo `Live` real de ponta a ponta**, além de demonstrar o contrato MCP aberto em um cliente externo:
+
+| Tempo | Etapa | Evidência Demonstrada ao Vivo |
 | :--- | :--- | :--- |
-| 0:00 | Contextualização operacional (MTTD/MTTR manual vs. automatizado) | Indicadores de baseline no War Room |
-| 0:20 | App saudável no Grafana & War Room | Status `healthy` (`v2.14.7`) |
-| 0:40 | Botão "Simular Incidente" ou `scripts/chaos.sh` liga a falha (`v2.14.8`) | Latência/erros sobem |
-| 1:00 | Alerta dispara → incidente `RECEIVED` | Stream SSE / anotações no Grafana |
-| 1:15 | RCA determinístico em ≤ 15 s | Trace com span crítico (`pg.pool.acquire`) + prova visual Antes/Depois de PII |
-| 1:30 | **GitHub Inspector** isola a regressão no diff `v2.14.7...v2.14.8` | Commit e arquivo suspeito exibidos na Aba 3 |
-| 1:45 | **GitHub Remediation** abre o Pull Request (`hotfix/zeromttr-*`) | PR real no GitHub + selo verde do `hotfix-verify.yml` |
-| 2:00 | **Resend** envia o post-mortem | E-mail com Confidence Score (95%), Blast Radius e botões HMAC |
-| 2:20 | Aprovação humana → `RESOLVED` | Linha do tempo + MTTR medido |
-| 2:45 | Consolidação das métricas | Comparativo KPI antes × depois + economia FinOps (94%) |
+| **0:00 – 0:25** | Problema Logístico no Brasil & Posicionamento | Explicação direta na trilha **Logística & Automação**: falha na liquidação de frete PIX (`api-liquidacao-frete-pix`) trava expedição de caminhões; diferencial de PII mascarada na borda + FinOps de tokens + MCP aberto. |
+| **0:25 – 0:45** | Contrato MCP Aberto (Cliente Externo) | **MCP Inspector** (ou Cursor/Claude Desktop via `.mcp.json`) conectado diretamente ao `zeromttr-mcp-server`, listando as 8 tools (`tools/list`) e invocando `execute_promql_range`. |
+| **0:45 – 1:10** | Disparo do Incidente Real (`⚡ Live API Mode`) | Clique em "Simular Incidente" no War Room; `api-liquidacao-frete-pix` entra em `degraded` (`v2.14.8`); Grafana dispara alerta para o Orchestrator. |
+| **1:10 – 1:40** | Mascaramento OTTL na Borda & Coleta OTel (`TTD ≤ 15s`) | Aba 1 mostra `Evidence Coverage: 4/4 Signals (95%)` + `Blast Radius` + span `pg.pool.acquire` em erro; Aba 2 mostra o log bruto antes do Collector vs. log mascarado pelo `transform` OTTL (`[REDACTED_CPF]`, `[REDACTED_CNPJ]`, `Bearer [REDACTED_TOKEN]`) e a auditoria do `PiiPromptGuard` (`0 PII patterns in LLM prompt`). |
+| **1:40 – 2:10** | Diff Real `v2.14.7...v2.14.8` & PR Autônomo (`TTPR ≤ 30s`) | Aba 3 mostra o diff extraído do repositório-alvo `zeromttr-target-pix-freight` (`PixSettlementRepository.ts`) e a economia FinOps (`~94% context compression`). Clique no link abre no GitHub o **Pull Request real recém-criado** com o comentário `✅ ZeroMTTR Autonomous CI Gate: PASSED` postado pelo `hotfix-verify.yml`. |
+| **2:10 – 2:40** | Post-Mortem no Resend & Aprovação Humana via HMAC | Exibição do e-mail real recebido via **Resend** (`sre@zeromttr.agjworks.com`); clique no botão **Aprovar Hotfix** do e-mail abre `/decision/:id`, confirma via `POST` com assinatura HMAC e muda o estado para `RESOLVED` + anotação no gráfico do Grafana. |
+| **2:40 – 3:00** | Fechamento com Métricas Cronometradas | Comparação entre o baseline manual cronometrado (7 passos) e o TTD/TTPR medido pelo `scripts/measure-mttr.sh`. |
 
-## 2. Medição de MTTR
-`scripts/measure-mttr.sh` lê as transições do incidente (`GET /api/incidents/:id`) e imprime: tempo até RCA, até PR, até e-mail, total. Registrar baseline manual (tempo estimado/cronometrado de um engenheiro executando os mesmos passos) para comparação.
+## 2. Medição Honesta de TTD e TTPR vs. Baseline Manual Cronometrado
+O script `scripts/measure-mttr.sh` lê os timestamps de transição de `GET /api/incidents/:id` e calcula:
+1. **TTD (*Time to Deterministic Diagnosis*):** `timestamp(REMEDIATING) - timestamp(RECEIVED)` (meta: ≤ 15 s).
+2. **TTPR (*Time to Reviewable Pull Request*):** `timestamp(AWAITING_PR/NOTIFIED) - timestamp(RECEIVED)` (meta: ≤ 30 s).
+3. **Tempo até Post-Mortem Entregue:** `timestamp(NOTIFIED) - timestamp(RECEIVED)` (meta: ≤ 45 s).
 
-## 3. Documentação para o repositório público
-- `README.md` (en-US) e `README.pt-BR.md`: problema, arquitetura (diagramas C4/FSM), stack tecnológica (OTel, LGTM, MCP, GitHub API, Gemini, Resend, Angular/PrimeNG), quick start de ≤ 3 comandos, variáveis de ambiente, como rodar o cenário de simulação, testes, limitações conhecidas, licença.
+Para comparação justa no README, cronometrar e registrar uma execução manual real dos mesmos 7 passos feitos por um engenheiro (1. ler alerta; 2. rodar PromQL; 3. abrir exemplar no Tempo; 4. filtrar Loki pelo `trace_id`; 5. rodar `git diff v2.14.7..v2.14.8` no repo-alvo; 6. editar `PixSettlementRepository.ts` e rodar testes; 7. criar branch e abrir PR).
+
+## 3. Documentação Obrigatória no Repositório Público
+- `README.md` (en-US) e `README.pt-BR.md`:
+  - Declaração explícita da trilha **Logística & Automação** e do problema brasileiro (`api-liquidacao-frete-pix`).
+  - Tabela comparativa de posicionamento (HolmesGPT / OpenSRE / Bits AI vs. ZeroMTTR).
+  - Explicação transparente do **Modo `Live` vs. Modo `Replay`** na demo pública (`https://zeromttr.agjworks.com`) e como qualquer avaliador pode testar em modo `Live` (localmente via Docker Compose ou com a chave `LIVE_DEMO_KEY` fornecida na submissão).
+  - Como conectar um cliente MCP externo usando o arquivo `.mcp.json` da raiz.
+  - Link para o repositório-alvo `https://github.com/AdmilsonGoncalves/zeromttr-target-pix-freight` contendo as tags `v2.14.7` e `v2.14.8` e os Pull Requests abertos pelo agente.
 - `docs/pt-BR/adr/` com os ADRs 001–009.
-- `CONTRIBUTING.md` curto (TDD, commits, DoD).
-- `SECURITY.md` curto (escopo, modo demo, credenciais padrão).
-- Badge Node.js 24 LTS, CI, licença.
+- `CONTRIBUTING.md` e `SECURITY.md`.
 
-## 4. Checklist de entrega e Deploy na VPS (Traefik + Cloudflare)
-- [ ] `docker compose up` funciona em máquina limpa (desenvolvimento local)
-- [ ] Na VPS, segredos gravados exclusivamente em arquivo externo ao repositório Git (ex.: `/path/to/secrets/.env` com `chown $VPS_USER:$VPS_USER /path/to/secrets/.env && chmod 600 /path/to/secrets/.env`)
-- [ ] Stack subida na VPS com `ENV_FILE_PATH=/path/to/secrets/.env docker compose --env-file "$ENV_FILE_PATH" -f docker-compose.prod.yml up -d` consumindo ≤ 1.8 GB de RAM e sem nenhuma porta de telemetria (`9090`, `3100`, `3200`, `4317`, `5432`) exposta no host (`ss -tulpn`)
-- [ ] No Cloudflare (`agjworks.com`), zona configurada com o IP da VPS, domínio de envio `send.zeromttr.agjworks.com` verificado no Resend e *Cache Rule* para `zeromttr.agjworks.com/api/events*` como **Bypass Cache** (eventos SSE chegando em tempo real sem buffer)
-- [ ] `.env.example` e `.env.prod.template` completos no repositório; nenhuma chave real no Git (varredura com `gitleaks`)
-- [ ] Integrações com GitHub REST API (Diff + PR) e Resend (`sre@zeromttr.agjworks.com`) validadas e cache de Replay populado
-- [ ] Release `v1.0.0` com notas e imagens publicadas no GHCR (`ghcr.io`)
-- [ ] Demonstração em vídeo/GIF e link do ambiente em produção (`https://zeromttr.agjworks.com`) no README
-
-## 5. Critérios de aceite
-- [ ] Fluxo completo executado 3 vezes seguidas sem intervenção manual além do clique de aprovação.
-- [ ] MTTR medido e documentado no README.
-- [ ] Checklist de entrega 100 % marcado.
+## 4. Checklist de Entrega e Estabilidade em Produção
+- [ ] `docker compose up` funciona em máquina limpa (desenvolvimento local).
+- [ ] Repositório-alvo `AdmilsonGoncalves/zeromttr-target-pix-freight` público com as tags `v2.14.7` e `v2.14.8` e workflow `hotfix-verify.yml` funcional.
+- [ ] Na VPS, segredos gravados exclusivamente em arquivo externo ao repositório Git (ex.: `/path/to/secrets/.env` com permissão `600`) contendo os 3 tokens segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`).
+- [ ] Stack testada sob carga na VPS consumindo ≤ 2.2 GB de RAM, sem OOMKill no Prometheus/Loki/Tempo e sem nenhuma porta de telemetria exposta no host (`ss -tulpn`).
+- [ ] Release `v1.0.0` publicada e **deploy na VPS congelado** (sem deploys automáticos em pushes soltos) para garantir 100% de disponibilidade durante todo o período de avaliação.
+- [ ] Vídeo de 3 minutos gravado em modo `Live` real e publicado no README.

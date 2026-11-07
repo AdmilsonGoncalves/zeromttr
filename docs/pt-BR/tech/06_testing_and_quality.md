@@ -1,61 +1,52 @@
-# TECH 06 — Testes e Qualidade (transversal)
+# TECH 06 — Testes, Segurança e Qualidade (Transversal)
 
 **Aplicável a:** todas as fases · **Referência:** mestre §6 e §10
 
 ## 1. Ferramentas
-Vitest (unit/integração), Supertest (HTTP), `nock` ou MSW (mocks HTTP), `@vitest/coverage-v8`, ESLint, Prettier, `tsc --noEmit`. Testcontainers opcional para Postgres.
+Vitest (unitário, segurança e integração), Supertest (HTTP), `nock` (contract tests de adapters HTTP), `@vitest/coverage-v8`, ESLint, Prettier, `tsc --noEmit`.
 
-## 2. Estrutura
+## 2. Estrutura de Testes
 ```text
 apps/<pacote>/test/
-  unit/          domínio e casos de uso (ports falsos)
-  contract/      adapters HTTP com fixtures em test/fixtures/
-  integration/   transporte HTTP/MCP, webhook, FSM + repositório
-  e2e/           (raiz) cenário completo contra o Compose
+  unit/          domínio, FSM, PiiPromptGuard, EvidenceCoverage e casos de uso (ports falsos)
+  contract/      adapters HTTP com fixtures reais em test/fixtures/
+  integration/   transporte HTTP/MCP, segregação de tokens, webhook, FSM + repositório
 ```
 
-## 3. Regras de TDD para agentes
-1. Commit separado "test: ..." (Red) antes do "feat: ..." (Green) sempre que possível.
-2. Não escrever código de produção sem teste que falhe primeiro.
-3. Nomear testes como comportamento: `should_truncate_log_line_above_500_chars`.
-4. Um *assert* conceitual por teste; sem lógica condicional em testes.
-5. Fakes explícitos (`FakeMetricsPort`) em vez de mocks frouxos; mocks HTTP apenas nos adapters.
-6. **Proibido** chamar APIs externas reais em testes automatizados.
+## 3. Regras de TDD para Agentes
+1. Escrever o teste que falha (Red) antes do código de produção (Green) e refatorar (Refactor).
+2. Nomear testes descrevendo o comportamento: `should_never_expose_hmac_decision_signatures_in_sse_or_incident_detail`.
+3. Usar fakes explícitos (`FakeMetricsPort`, `SpyReasoningPort`) para testar casos de uso; usar `nock` apenas nos contract tests dos adapters HTTP.
+4. **Proibido** chamar APIs externas reais (Gemini, GitHub, Resend) em testes automatizados.
 
-## 4. Casos obrigatórios (checklist)
-- [ ] Truncamento: 500 chars/linha, 100 linhas, 1500 chars/diff do GitHub, 5 séries PromQL.
-- [ ] Sumarização PromQL com série vazia e divisor zero.
-- [ ] Análise de trace: span com erro, `false`/`0` em atributos, trace inexistente.
-- [ ] FSM: todas as transições válidas e inválidas.
-- [ ] Deduplicação de alertas por fingerprint.
-- [ ] Escape de HTML no e-mail (payload `<script>`).
-- [ ] HMAC de decisão: válida, adulterada, expirada.
-- [ ] Redaction: CPF, cartão, JWT, Bearer, senha (teste de integração com o Collector).
-- [ ] Auth: 401 sem token em MCP, webhook e rotas protegidas.
-- [ ] Timeouts, idempotência e retries dos adapters (GitHub API e Resend).
+## 4. Casos de Teste Obrigatórios (Checklist Verificável)
+- [ ] **Truncamento e FinOps:** 500 chars/linha, 100 linhas, 1500 chars/diff do GitHub, 5 séries PromQL, e cálculo exato de `raw_bytes_fetched` vs. `compacted_bytes_sent_to_llm`.
+- [ ] **Mascaramento OTTL na Borda + `PiiPromptGuard` Pré-LLM:**
+  - Teste do Collector (`transform/pii_logs`) confirmando que CPF (`123.456.789-00`), CNPJ (`12.345.678/0001-99`), chave PIX (`motorista@translog.com.br`) e `Bearer eyJ...` no `log.body` saem mascarados.
+  - Teste com `SpyReasoningPort` capturando o prompt exato enviado pelo `DispatchRemediation` e verificando `expect(capturedPrompt).not.toMatch(CPF_REGEX)` / `CNPJ_REGEX` / `BEARER_REGEX`.
+- [ ] **Segregação de Tokens e Isolamento do HMAC:**
+  - `POST /webhook/grafana-alert` com `DASHBOARD_API_TOKEN` → `401 Unauthorized`.
+  - `GET /api/incidents/:id` e payload SSE `incident.notified` → `expect(JSON.stringify(payload)).not.toContain(approveSig)`.
+  - `POST /api/incidents/:id/decision` com assinatura válida, adulterada e expirada.
+- [ ] **Evidence Coverage Dinâmico:**
+  - 4/4 sinais presentes → `95%` (`signalsCollected: 4, signalsTotal: 4`).
+  - 3/4 sinais presentes (ex.: sem diff ou sem exemplar) → `75%` (`signalsCollected: 3, signalsTotal: 4`).
+- [ ] **FSM e Deduplicação:** todas as transições válidas/inválidas e deduplicação de alertas abertos pelo mesmo `fingerprint`.
+- [ ] **Escape de HTML no E-mail:** tentativa de injeção `<script>alert(1)</script>` no resumo do RCA ou nome do serviço é escapada em `renderPostMortem`.
 
-## 5. Métricas de qualidade (bloqueantes no GitHub Actions CI/CD)
-| Métrica | Limite | Workflow |
+## 5. Métricas de Qualidade no GitHub Actions CI/CD
+| Verificação | Critério | Workflow |
 | :--- | :--- | :--- |
-| Cobertura `domain/` + `application/` | ≥ 80 % linhas e ramos | `ci.yml` |
-| ESLint + Prettier | 0 erros | `ci.yml` |
-| `tsc --noEmit` | 0 erros | `ci.yml` e `hotfix-verify.yml` |
-| Segredos vazados (`gitleaks`) | 0 ocorrências | `ci.yml` |
-| Suíte de regressão nos PRs autônomos (`hotfix/zeromttr-*`) | 100 % verde + comentário automático no PR | `hotfix-verify.yml` |
-| Build & Push de imagens multi-stage (`ghcr.io`) | Sucesso nos 4 serviços | `cd-release.yml` |
-| Vulnerabilidades `high/critical` em prod | 0 (alerta, revisão manual) | `ci.yml` |
+| Cobertura `domain/` + `application/` | ≥ 80 % linhas e branches (bloqueante) | `ci.yml` |
+| ESLint (incluindo fronteira hexagonal) + Prettier | 0 erros (bloqueante) | `ci.yml` |
+| `tsc --noEmit` | 0 erros (bloqueante) | `ci.yml` |
+| Segredos vazados (`gitleaks`) | 0 ocorrências (bloqueante) | `ci.yml` |
+| Auditoria de dependências (`pnpm audit --prod --audit-level=critical`) | 0 vulnerabilidades `critical` (bloqueante) | `ci.yml` |
+| Suíte de regressão nos PRs autônomos (`hotfix/zeromttr-*`) | 100 % verde + comentário no PR | `hotfix-verify.yml` (no repo-alvo) |
+| Build & Push de imagens (`ghcr.io`) | Sucesso nos 4 serviços | `cd-release.yml` |
 
-## 6. Convenções de código e Regras Automáticas de Lint
-- `strict: true`; proibido `any` fora de fronteira (parse com `zod` e tipos inferidos).
-- **Fronteira Hexagonal garantida por ESLint (`no-restricted-imports`):** `domain` e `application` nunca importam `adapters`, `transport`, `http`, `express`, `axios` ou `@modelcontextprotocol/sdk`.
-- **Promises seguras:** `@typescript-eslint/no-floating-promises` e `@typescript-eslint/no-misused-promises` ativos para evitar *UnhandledPromiseRejection* em loops assíncronos, webhooks e SSE.
-- **Gate único antes do push (`.husky/pre-push`):** `pnpm run check:workspace` (executa `lint --fix`, `typecheck`, `test` e `build` em todos os pacotes via Nx).
-- Funções ≤ 30 linhas como guia; arquivos ≤ 300 linhas como guia.
-- Comentários explicam *por quê*, não *o quê*.
-
-## 7. Definition of Done (PR)
-- [ ] Testes novos escritos antes e verdes
+## 6. Definition of Done (Por Pull Request)
+- [ ] Testes escritos primeiro e passando
 - [ ] `pnpm run check:workspace` 100 % verde
-- [ ] Sem segredos/PII
-- [ ] Docs/ADR atualizados se houve decisão arquitetural
-- [ ] Critérios de aceite do doc `tech/NN` correspondente marcados
+- [ ] Sem segredos, sem PII e sem referências a artefatos externos não versionados
+- [ ] Critérios de aceite do documento `tech/NN` correspondente cumpridos
