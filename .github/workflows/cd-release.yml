@@ -1,0 +1,114 @@
+name: CD — Publish Images (GHCR) & Controlled VPS Release
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v1.*.*']
+  workflow_dispatch:
+    inputs:
+      deploy_to_vps:
+        description: 'Deploy latest images to production VPS'
+        required: false
+        default: 'true'
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish-images:
+    name: Build & Push to GHCR (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [mcp-server, orchestrator, target-app-demo, dashboard]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}
+          tags: |
+            type=sha
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v1.') || github.ref_name == github.event.repository.default_branch }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  github-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v1.')
+    needs: publish-images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
+  deploy-vps:
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v1.')) || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_vps == 'true')
+    needs: publish-images
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure deploy directory exists on VPS
+        if: ${{ env.VPS_HOST != '' }}
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            mkdir -p ${{ secrets.VPS_DEPLOY_PATH }}/infra
+
+      - name: Copy docker-compose.prod.yml and infra/ configs to VPS via SCP
+        if: ${{ env.VPS_HOST != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: 'docker-compose.prod.yml,infra/**'
+          target: '${{ secrets.VPS_DEPLOY_PATH }}'
+
+      - name: Pull GHCR images & Restart Stack on VPS
+        if: ${{ env.VPS_HOST != '' }}
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            export ENV_FILE_PATH="${{ secrets.VPS_ENV_FILE_PATH }}"
+            export IMAGE_TAG="${{ startsWith(github.ref, 'refs/tags/v1.') && github.ref_name || 'latest' }}"
+            export IMAGE_TAG="${IMAGE_TAG#v}"
+            docker compose --env-file "$ENV_FILE_PATH" -f docker-compose.prod.yml pull
+            docker compose --env-file "$ENV_FILE_PATH" -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f

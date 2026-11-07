@@ -1,0 +1,9 @@
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: ZeroMTTR-Orchestrator
+    group_by: ['alertname', 'service']
+    group_wait: 5s
+    group_interval: 10s
+    repeat_interval: 12h

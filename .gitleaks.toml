@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for synthetic placeholders and documentation examples"
+regexes = [
+  '''^change-me-(mcp-auth-token|grafana-webhook-token|dashboard-api-token|postgres-password|strong-password|gemini-api-key|github-token|resend-api-key)$''',
+  '''^123e4567-e89b-42d3-a456-426614174000$'''
+]
