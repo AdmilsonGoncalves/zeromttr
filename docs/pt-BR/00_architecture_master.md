@@ -59,7 +59,7 @@ Para compreender imediatamente o papel de cada bloco da arquitetura, o **ZeroMTT
 
 ```mermaid
 flowchart TD
-    GRAF["1. Grafana Alerting"] -->|"Dispara Webhook de Anomalia"| ORCH["Orchestrator (O Maestro / FSM)"]
+    GRAF["Grafana Alerting"] -->|"1. Dispara Webhook de Anomalia"| ORCH["Orchestrator (O Maestro / FSM)"]
     ORCH <-->|"2. Usa os OLHOS do MCP (Busca Métricas, Trace, Logs s/ PII e Diff do Git)"| MCP["MCP Server (8 Tools Determinísticas)"]
     ORCH <-->|"3. Envia evidências auditadas (0 PII) para o CÉREBRO diagnosticar e gerar o Patch"| IA["IA Gemini (O Cérebro / ReasoningPort)"]
     ORCH -->|"4. Usa as MÃOS do MCP (Cria branch hotfix/*, abre PR no GitHub e envia E-mail)"| MCP
