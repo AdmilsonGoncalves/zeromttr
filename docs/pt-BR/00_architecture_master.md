@@ -45,7 +45,27 @@ A categoria de agentes para operações de TI conta com ferramentas relevantes d
 ### 2.1 Objetivo Geral
 Entregar uma plataforma funcional, demonstrável ao vivo e de código aberto que automatize a investigação de causa raiz (RCA) e a preparação de Pull Requests de correção para incidentes em microsserviços, utilizando **Model Context Protocol (MCP)**, **OpenTelemetry**, **mascaramento verificável de PII na borda** e **governança com humano no circuito**.
 
-### 2.2 Indicadores Operacionais Mensuráveis (KPIs)
+### 2.2 A Essência do Sistema em 30 Segundos (O Maestro, o Cérebro e os Olhos/Mãos)
+Para compreender imediatamente o papel de cada bloco da arquitetura, o **ZeroMTTR** separa estritamente **quem executa ferramentas (MCP)**, **quem raciocina (IA)** e **quem coordena o fluxo (Orchestrator)**:
+
+1. **O `mcp-server` (MCP) = Os "Olhos e as Mãos" (100% Determinístico, sem IA embutida):**
+   - O **Model Context Protocol (MCP)** funciona como uma interface universal que expõe **8 ferramentas (tools)** padronizadas divididas em dois grupos:
+     - **Olhos (Leitura e Compactação FinOps):** `execute_promql_range` (Prometheus), `analyze_otel_trace` (Tempo), `query_loki_logs` (Loki) e `inspect_git_deploy_diff` (compara a versão saudável anterior com a versão atual no GitHub).
+     - **Mãos (Ação e Governança):** `create_remediation_pr` (cria branch `hotfix/zeromttr-*`, aplica o commit de correção — sempre no nível de `PATCH` semântico — e abre o Pull Request no GitHub), `annotate_grafana_incident` (marca o gráfico do Grafana) e `send_post_mortem_resend` (envia o relatório por e-mail).
+2. **A IA (`Gemini API` via `ReasoningPort`) = O "Cérebro":**
+   - A IA **não** acessa bancos de dados, observabilidade nem o GitHub diretamente. Ela recebe apenas o resumo enxuto (94% compactado) e auditado pelo `PiiPromptGuard` (zero CPF/CNPJ/PIX/JWT), sintetiza a causa raiz (RCA) e escreve o código corrigido (o patch cirúrgico).
+3. **O `orchestrator` = O "Maestro" (Máquina de Estados FSM):**
+   - Recebe o alerta do Grafana → aciona os **Olhos do MCP** para coletar as evidências → valida a ausência de PII e envia ao **Cérebro (IA)** para gerar o patch → aciona as **Mãos do MCP** para abrir o Pull Request no GitHub (disparando o CI da branch) e enviar o e-mail de aprovação humana ao plantonista.
+
+```mermaid
+flowchart TD
+    GRAF["1. Grafana Alerting"] -->|"Dispara Webhook de Anomalia"| ORCH["Orchestrator (O Maestro / FSM)"]
+    ORCH <-->|"2. Usa os OLHOS do MCP (Busca Métricas, Trace, Logs s/ PII e Diff do Git)"| MCP["MCP Server (8 Tools Determinísticas)"]
+    ORCH <-->|"3. Envia evidências auditadas (0 PII) para o CÉREBRO diagnosticar e gerar o Patch"| IA["IA Gemini (O Cérebro / ReasoningPort)"]
+    ORCH -->|"4. Usa as MÃOS do MCP (Cria branch hotfix/*, abre PR no GitHub e envia E-mail)"| MCP
+```
+
+### 2.3 Indicadores Operacionais Mensuráveis (KPIs)
 Para evitar comparações distorcidas com processos que incluem deploy completo em produção, o ZeroMTTR mede especificamente o tempo até o diagnóstico determinístico (**TTD**) e o tempo até um Pull Request testado e pronto para revisão humana (**TTPR**), comparados contra um **baseline manual cronometrado** (os mesmos 7 passos executados manualmente por um engenheiro):
 
 | KPI | Meta ZeroMTTR | Baseline Manual Cronometrado (7 passos) |
@@ -55,14 +75,14 @@ Para evitar comparações distorcidas com processos que incluem deploy completo 
 | **Tempo até entrega do Post-Mortem assinado (Resend)** | **≤ 45 s** | ~45 a 60 min (redigir resumo executivo com evidências e links) |
 | **Cobertura de testes automatizados (`domain/` + `application/`)** | **≥ 80 %** | — |
 
-### 2.3 Cinco Diferenciais Técnicos Verificáveis
+### 2.4 Cinco Diferenciais Técnicos Verificáveis
 1. **Dupla Barreira de Mascaramento de PII na Borda + Auditoria Pré-LLM (`PiiPromptGuard`):** o OTel Collector aplica transformação OTTL (`replace_pattern` sobre `log.body` e atributos) mascarando CPF, CNPJ, Chave PIX e tokens Bearer/JWT antes de gravar no Loki; adicionalmente, o `PiiPromptGuard` inspeciona o prompt final antes do `ReasoningPort` e comprova `pii_patterns_detected_in_prompt === 0`.
 2. **Telemetria FinOps / Token Economy no MCP:** cada tool calcula `raw_bytes_fetched` vs. `compacted_bytes_sent_to_llm`, exibindo no topo do dashboard a compressão de contexto em tempo real (ex.: `💰 Context Compression: 94.2% — Saved ~48k tokens`).
 3. **Contrato MCP Aberto (Interoperável com Clientes Externos):** as 8 tools MCP não ficam presas ao orquestrador interno; o repositório inclui configuração `.mcp.json` permitindo demonstrar um cliente externo (**MCP Inspector / Cursor / Claude Desktop**) consultando a mesma stack LGTM e o diff do GitHub.
-4. **Evidence Coverage Score (`0–100%` / `4 de 4 sinais`) & Blast Radius:** mede de forma transparente quantos sinais independentes convergiram para o diagnóstico (+25% anomalia PromQL, +25% `trace_id` via Exemplar, +25% Span com erro no Tempo, +25% Log correlacionado no Loki + commit isolado no diff `v2.14.7...v2.14.8`), degradando proporcionalmente (ex.: `75% — 3/4 sinais`) caso algum sinal esteja ausente, além de listar os serviços afetados (`services_involved`).
-5. **Execução Live Real (< 25s) + Modo Replay Transparente para Visitantes:** o vídeo de demonstração e as avaliações com chave (`LIVE_DEMO_KEY`) ou via Docker local executam o **fluxo `Live` 100% real** (criando branch/PR real no repositório-alvo e enviando e-mail real via Resend). Na VPS pública aberta à internet, visitantes anônimos sem chave assistem por padrão ao modo `Replay` (claramente identificado na UI e no README) para proteger as cotas de API contra abuso.
+4. **Evidence Coverage Score (`0–100%` / `4 de 4 sinais`) & Blast Radius:** mede de forma transparente quantos sinais independentes convergiram para o diagnóstico (+25% anomalia PromQL, +25% `trace_id` via Exemplar, +25% Span com erro no Tempo, +20% Log correlacionado no Loki + commit isolado no diff `v2.14.7...v2.14.8`), degradando proporcionalmente (ex.: `75% — 3/4 sinais`) caso algum sinal esteja ausente, além de listar os serviços afetados (`services_involved`).
+5. **Execução Live Real (< 25s) + Modo Replay Transparente para Visitantes:** o vídeo de demonstração e as avaliações com chave (`LIVE_DEMO_KEY`) ou via Docker local executam o **fluxo `Live` 100% real** (criando branch/PR real e enviando e-mail real via Resend). Na VPS pública aberta à internet, visitantes anônimos sem chave assistem por padrão ao modo `Replay` (claramente identificado na UI e no README) para proteger as cotas de API contra abuso.
 
-### 2.4 Fora de Escopo (MVP)
+### 2.5 Fora de Escopo (MVP)
 Multi-tenant, alta disponibilidade multi-nó, merge automático em produção sem aprovação humana, armazenamento durável de longo prazo para métricas/logs/traces.
 
 ---
