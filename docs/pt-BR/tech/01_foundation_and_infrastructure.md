@@ -38,14 +38,14 @@ Criar os arquivos de configuração da stack LGTM e do OpenTelemetry Collector e
 | Arquivo | Requisito Técnico |
 | :--- | :--- |
 | `datasources.yaml` | Configurar Prometheus (`uid: prometheus-datasource` com `exemplarTraceIdDestinations` apontando para o Tempo), Loki (com `derivedFields` extraindo `trace_id`) e Tempo (`tracesToMetrics` e `tracesToLogs`). |
-| `docker-compose.yml` | Ambiente local com healthchecks para Prometheus, Loki, Tempo, Grafana e PostgreSQL; incluir serviços `mcp-server`, `orchestrator`, `target-app-demo` (`api-liquidacao-frete-pix`) e `dashboard`. |
-| `otel-collector-config.yaml` | **Mascaramento de PII em Logs via `transform` (OTTL):** como o processor `redaction` em versões 0.114.x do Collector atua primariamente em atributos de spans, configurar obrigatoriamente o processor **`transform`** no pipeline de `logs` usando funções OTTL `replace_pattern(log.body, ...)` e `replace_all_patterns(log.attributes, "value", ...)` para mascarar deterministicamente **CPF**, **CNPJ**, **Chave PIX / E-mail** e tokens **Bearer / JWT** antes da exportação para o Loki (ver §3.3). |
+| `docker-compose.yml` | Ambiente local com healthchecks para Prometheus, Loki, Tempo, Grafana e PostgreSQL; incluir serviços `mcp-server`, `orchestrator`, `target-app-demo` (`api-pagamentos-core`) e `dashboard`. |
+| `otel-collector-config.yaml` | **Mascaramento de PII em Logs via `transform` (OTTL):** como o processor `redaction` em versões 0.114.x do Collector atua primariamente em atributos de spans, configurar obrigatoriamente o processor **`transform`** no pipeline de `logs` usando funções OTTL `replace_pattern(log.body, ...)` e `replace_all_patterns(log.attributes, "value", ...)` para mascarar deterministicamente **CPF**, **CNPJ**, **Chave PIX / E-mail** e tokens **Bearer / JWT** antes da exportação para o Loki (ver §3.2). |
 | `tempo-config.yaml` | Receptor OTLP gRPC (`4317`) e HTTP (`4318`) com busca TraceQL habilitada. |
 
 ### T1.4 Alerting Provisionado com Token Segregado
 Criar `infra/grafana/provisioning/alerting/`:
 - `contact-points.yaml`: webhook apontando para `http://orchestrator:8080/webhook/grafana-alert` autenticado com cabeçalho `Authorization: Bearer ${GRAFANA_WEBHOOK_TOKEN}` (token exclusivo do Grafana, separado do token do Dashboard).
-- `rules.yaml`: regra de alta latência p95 / saturação de conexões sobre as métricas de `api-liquidacao-frete-pix`, `for: 30s`, labels `service=api-liquidacao-frete-pix`, `severity=critical`.
+- `rules.yaml`: regra de alta latência p95 / saturação de conexões sobre as métricas de `api-pagamentos-core`, `for: 30s`, labels `service=api-pagamentos-core`, `severity=critical`.
 - `policies.yaml`: rota padrão vinculada ao contact point.
 
 ### T1.5 CI/CD com GitHub Actions (`.github/workflows/`)
@@ -54,7 +54,7 @@ Criar os workflows no monorepo principal (`zeromttr/.github/workflows/`):
 2. **`cd-release.yml`:** publica as imagens Docker no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**. **Regra de estabilidade operacional:** o job `deploy-vps` **não** executa a cada push na branch principal; ele roda **exclusivamente quando uma tag semântica `v*.*.*` é publicada ou por acionamento manual (`workflow_dispatch`)**, mantendo a VPS de demonstração congelada e estável durante períodos de avaliação.
 
 ### T1.6 Documentação Inicial
-`README.md` (en-US) e `README.pt-BR.md` declarando a trilha (**Logística & Automação**), o cenário brasileiro (`api-liquidacao-frete-pix`), o posicionamento técnico frente ao mercado, instruções de execução local e distinção clara entre modo `Live` e modo `Replay`. Criar `LICENSE` (MIT), `.env.example` e `AGENTS.md`.
+`README.md` (en-US) e `README.pt-BR.md` declarando a trilha (**Logística & Automação** — automação de fluxos de trabalho e integração entre sistemas), a arquitetura aberta e agnóstica de domínio, o posicionamento técnico frente ao mercado, instruções de execução local e distinção clara entre modo `Live` e modo `Replay`. Criar `LICENSE` (MIT), `.env.example` e `AGENTS.md`.
 
 ### T1.7 Configuração de Deploy Blindado na VPS (`docker-compose.prod.yml` + Segregação de Tokens)
 Criar `docker-compose.prod.yml`, `infra/otel-collector-config.prod.yaml` e `apps/dashboard/nginx.conf.template`:
@@ -101,7 +101,7 @@ DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
 
 # External Integrations (Repositório Alvo Dedicado & Resend)
 GITHUB_TOKEN=
-TARGET_GITHUB_REPO=https://github.com/AdmilsonGoncalves/zeromttr-target-pix-freight
+TARGET_GITHUB_REPO=https://github.com/AdmilsonGoncalves/zeromttr-target-demo
 TARGET_SERVICE_PATH=src
 RESEND_API_KEY=
 RESEND_FROM="ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>"

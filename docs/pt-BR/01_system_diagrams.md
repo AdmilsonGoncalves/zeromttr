@@ -3,7 +3,7 @@
 | Campo | Valor |
 | :--- | :--- |
 | **Projeto** | ZeroMTTR — Autonomous AIOps & Incident Remediation |
-| **Trilha** | Logística & Automação (`api-liquidacao-frete-pix`) |
+| **Trilha** | Logística & Automação (Automação de fluxos de trabalho operacionais e integrações entre sistemas) |
 | **Documento Mestre** | [`00_architecture_master.md`](./00_architecture_master.md) |
 | **Escopo** | Modelagem comportamental (Casos de Uso e Sequência) e estrutural/estática (Classes Hexagonais e Topologia de Rede) |
 
@@ -45,7 +45,7 @@ flowchart TD
 
     subgraph Provedores_Externos["3. Integrações Externas & Repositório Alvo"]
         LLM(["Provedor LLM (Gemini API)"])
-        GH(["GitHub API & Repo Alvo (zeromttr-target-pix-freight)"])
+        GH(["GitHub API & Repo Alvo (zeromttr-target-demo)"])
         GHCI(["GitHub Actions no Repo Alvo (hotfix-verify.yml)"])
         RS(["Resend API (E-mail ao Plantonista)"])
     end
@@ -89,7 +89,7 @@ flowchart TD
 Representa a interação cronológica completa entre os contêineres e APIs externas, destacando:
 1. O mascaramento de PII no corpo do log (`transform` OTTL no Collector) **antes** do armazenamento no Loki;
 2. A validação determinística pelo **`PiiPromptGuard`** **antes** de enviar o prompt ao Gemini;
-3. A inspeção das tags reais `v2.14.7...v2.14.8` e abertura do PR no repositório-alvo separado (`zeromttr-target-pix-freight`);
+3. A inspeção das tags reais `v2.14.7...v2.14.8` e abertura do PR no repositório-alvo separado (`zeromttr-target-demo`);
 4. A segregação entre `GRAFANA_WEBHOOK_TOKEN` e `DASHBOARD_API_TOKEN`, mantendo o **`decisionToken` HMAC restrito exclusivamente ao e-mail enviado pelo Resend** (nunca exposto no SSE ou em `GET /api/incidents/:id`).
 
 ```mermaid
@@ -97,14 +97,14 @@ sequenceDiagram
     autonumber
     actor SRE as Engenheiro SRE
     participant UI as War Room Dashboard (Angular + Nginx)
-    participant DEMO as target-app-demo (api-liquidacao-frete-pix)
+    participant DEMO as target-app-demo (api-pagamentos-core)
     participant OTEL as OTel Collector (OTTL Transform PII Masking)
     participant LGTM as Stack LGTM (Prom/Loki/Tempo/Grafana)
     participant ORCH as Orchestrator (FSM + PiiPromptGuard)
     participant MCP as MCP Server (8 Tools + FinOps)
     participant EXT as APIs Externas (Gemini / GitHub Repo Alvo / Resend)
 
-    Note over SRE,DEMO: Fase 1 — Geração da Anomalia Logística PIX e Mascaramento OTTL na Borda
+    Note over SRE,DEMO: Fase 1 — Geração da Anomalia e Mascaramento OTTL na Borda
     SRE->>UI: Clica "Simular Incidente" (POST /api/demo/chaos)
     UI->>ORCH: POST /api/demo/chaos (Bearer DASHBOARD_API_TOKEN + X-Live-Demo-Key)
     ORCH->>DEMO: POST /chaos/pool-saturation?enable=true
@@ -134,8 +134,8 @@ sequenceDiagram
     Note over ORCH,EXT: Fase 4 — Diff Real (v2.14.7..v2.14.8) no Repo Alvo e Auditoria PiiPromptGuard
     ORCH-->>UI: SSE event: incident.transition (ENRICHING)
     ORCH->>MCP: CallTool: inspect_git_deploy_diff (base: "v2.14.7", head: "v2.14.8")
-    MCP->>EXT: GitHub API (zeromttr-target-pix-freight): Compare v2.14.7...v2.14.8 & Get File Content
-    EXT-->>MCP: Commit de regressão, diff real do PixSettlementRepository.ts e blob sha
+    MCP->>EXT: GitHub API (zeromttr-target-demo): Compare v2.14.7...v2.14.8 & Get File Content
+    EXT-->>MCP: Commit de regressão, diff real do PaymentRepository.ts e blob sha
     MCP-->>ORCH: Diff truncado (<= 1500 chars) + FinOps telemetry [Sinal 4/4 = 95% (4/4 Signals)]
     ORCH->>ORCH: PiiPromptGuard.inspect(prompt): confirma piiPatternsDetectedInPrompt === 0
     ORCH-->>UI: SSE events: incident.rca (Evidence 4/4, Blast Radius, PiiGuardAudit), incident.finops, incident.docs
@@ -148,7 +148,7 @@ sequenceDiagram
     EXT-->>ORCH: Código corrigido (restaura finally { client.release() } e pool max: 10)
     ORCH-->>UI: SSE event: incident.transition (AWAITING_PR)
     ORCH->>MCP: CallTool: create_remediation_pr (branch: hotfix/zeromttr-*, filePath, patchedContent, blobSha)
-    MCP->>EXT: GitHub API (zeromttr-target-pix-freight): cria branch, commita fix e abre Pull Request
+    MCP->>EXT: GitHub API (zeromttr-target-demo): cria branch, commita fix e abre Pull Request
     EXT-->>MCP: branchUrl + pullRequestUrl + commitSha (dispara hotfix-verify.yml no repo-alvo)
     MCP-->>ORCH: RemediationPrReceipt
     ORCH-->>UI: SSE event: incident.remediation (branchUrl, pullRequestUrl, commitSha)
@@ -469,7 +469,7 @@ flowchart TD
         subgraph Rede_Interna["2B. Rede Docker Isolada: aiops-net (expose: apenas)"]
             ORCH["zeromttr-orchestrator (:8080)"]
             MCP["zeromttr-mcp-server (:8000)"]
-            DEMO["zeromttr-target-demo (:3001 — api-liquidacao-frete-pix)"]
+            DEMO["zeromttr-target-demo (:3001 — api-pagamentos-core)"]
             PG[("zeromttr-postgres (:5432)")]
             OTEL["zeromttr-otel-collector (:4317 / :4318 — OTTL Transform)"]
             PROM[("zeromttr-prometheus (:9090 — 512M)")]
@@ -481,7 +481,7 @@ flowchart TD
 
     subgraph Cloud_APIs["3. APIs Externas & Repositório Alvo (Saída HTTPS)"]
         GEMINI["Google Gemini API (0 PII)"]
-        GITHUB["GitHub REST API (zeromttr-target-pix-freight)"]
+        GITHUB["GitHub REST API (zeromttr-target-demo)"]
         RESEND["Resend Email API (Links HMAC Exclusivos)"]
     end
 

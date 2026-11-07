@@ -4,11 +4,11 @@
 | :--- | :--- |
 | **Projeto** | ZeroMTTR — Autonomous AIOps & Incident Remediation |
 | **Trilha Principal** | **Logística & Automação** (Automação de fluxos de trabalho operacionais e integrações autônomas entre sistemas críticos) |
-| **Contexto Brasileiro (Workload Alvo)** | **`api-liquidacao-frete-pix`** — Motor de liquidação instantânea de frete e manifesto eletrônico de carga via PIX para operadores logísticos no Brasil |
+| **Arquitetura Agnóstica de Domínio** | Desacoplada do serviço monitorado (*Clean Architecture* — o workload é um detalhe de borda conectado via OTLP e Git). Demonstração com **`api-pagamentos-core`** (aplicável a liquidação PIX, expedição logística, e-commerce, etc.) |
 | **Organização** | **AGJ Works** (`https://agjworks.com`) |
 | **Ambiente de Produção (Demo)** | `https://zeromttr.agjworks.com` (VPS Linux + Traefik + Cloudflare) |
 | **Repositório Principal (Plataforma)** | `https://github.com/AdmilsonGoncalves/zeromttr` |
-| **Repositório Alvo de Hotfix (Workload)** | `https://github.com/AdmilsonGoncalves/zeromttr-target-pix-freight` (contém as tags reais `v2.14.7` saudável e `v2.14.8` com regressão) |
+| **Repositório Alvo de Hotfix (Workload)** | `https://github.com/AdmilsonGoncalves/zeromttr-target-demo` (contém as tags reais `v2.14.7` saudável e `v2.14.8` com regressão) |
 | **Status** | Planejamento (v0.3 — OTel/LGTM + MCP Aberto + GitHub Remediation em Repo Dedicado + Resend HMAC Isolado). Implementação 100% escrita do zero após 04/11/2026 21h00 BRT |
 | **Diagramas do Sistema (UML / Rede)** | [`docs/pt-BR/01_system_diagrams.md`](./01_system_diagrams.md) (Casos de Uso, Sequência E2E, Classes Hexagonais e Topologia de Rede) |
 | **Documentos Técnicos** | Fatias de implementação em [`docs/pt-BR/tech/`](./tech/) (ver §12) |
@@ -17,15 +17,15 @@
 
 ## 1. Introdução e Posicionamento
 
-### 1.1 O Problema Real no Ecossistema de Logística e Pagamentos no Brasil
-No setor de **logística e transporte de cargas no Brasil**, a liberação de caminhões em docas e centros de distribuição depende de microsserviços de **liquidação instantânea de frete via PIX e emissão de manifesto de carga (`api-liquidacao-frete-pix`)** operando 24×7. Durante janelas de pico logístico (fechamento de rotas e expedição noturna), uma regressão introduzida em um deploy — como o esgotamento de um pool de conexões PostgreSQL em transações PIX — paralisa a expedição física de frotas em minutos.
+### 1.1 Automação de Fluxos Operacionais e Arquitetura Aberta (Clean Architecture)
+Em arquiteturas de microsserviços que sustentam operações críticas no Brasil — como processamento de transações instantâneas (PIX), sistemas de expedição logística, faturamento ou checkout — o tempo entre um alerta de degradação e a correção em produção ainda é dominado por trabalho manual fragmentado. Seguindo o princípio de **Robert C. Martin (*Clean Architecture*)** de **manter a arquitetura aberta e adiar detalhes**, o **ZeroMTTR** foi desenhado como um motor **100% agnóstico ao domínio do serviço monitorado**: qualquer aplicação que emita telemetria OpenTelemetry (OTLP) e possua um repositório Git pode ser conectada sem alterar uma única linha do orquestrador ou do servidor MCP.
 
-Enquanto isso, a resposta ao incidente sofre com três gargalos:
-1. **Fragmentação manual:** ferramentas de observabilidade param no alerta textual, exigindo que o plantonista cruze manualmente métricas (Prometheus), traces (Tempo), logs (Loki) e commits recentes (GitHub).
-2. **Risco de vazamento de PII brasileira ao usar IA:** logs de falha de liquidação logística carregam **CPF de motoristas autônomos, CNPJ de transportadoras, chaves PIX e tokens JWT/Bearer**. Colar esses logs brutos em LLMs externos viola políticas corporativas de privacidade e proteção de dados.
-3. **Custo imprevisível de tokens:** enviar despejos brutos de séries temporais, árvores completas de spans e *git diffs* extensos estoura a janela de contexto e encarece o uso de LLMs em produção.
+Na operação real, a resposta a incidentes enfrenta três gargalos:
+1. **Fragmentação manual entre sistemas:** ferramentas de observabilidade param no alerta textual, exigindo que o engenheiro de plantão cruze manualmente métricas (Prometheus), traces distribuídos (Tempo), logs (Loki) e histórico de deploys (GitHub).
+2. **Risco de vazamento de PII brasileira ao usar IA:** logs de erro em produção frequentemente contêm **CPF, CNPJ, chaves PIX/e-mails e tokens JWT/Bearer**. Enviar esses logs brutos para LLMs externos viola regras de privacidade e governança de dados.
+3. **Custo imprevisível de tokens:** enviar despejos brutos de séries temporais, árvores de spans e *git diffs* extensos estoura a janela de contexto e encarece o uso de LLMs.
 
-O **ZeroMTTR** automatiza esse fluxo operacional de ponta a ponta em segundos:
+O **ZeroMTTR** integra esses sistemas e automatiza o fluxo de trabalho de ponta a ponta em segundos:
 
 > **Alerta (Grafana) → Mascaramento de PII na Borda (OTel Collector `transform`) → RCA Agêntico via MCP (OTel/LGTM) → Correlação de Regressão no Deploy (`v2.14.7...v2.14.8` via GitHub API) → Pull Request Cirúrgico validado por CI no repositório-alvo → Post-mortem com aprovação humana assinada exclusivamente por e-mail (Resend HMAC).**
 
@@ -89,13 +89,13 @@ Multi-tenant, alta disponibilidade multi-nó, merge automático em produção se
 | Visualização / Gatilho | Grafana 11.2+ (Alerting) | Webhook de incidente e API de anotações (`POST /api/annotations`) |
 | Protocolo de Agente | **MCP** (`@modelcontextprotocol/sdk`) | Interface aberta padronizada de 8 tools de AIOps |
 | LLM do Agente | Google Gemini API (`ReasoningPort`, modelo configurável via `LLM_MODEL`, padrão `gemini-2.0-flash`) | Seleção de tools (modo agêntico), síntese de RCA e geração de patch cirúrgico (com fallback determinístico sem LLM) |
-| **Inspeção de Deploy & Auto-Remediação** | **GitHub REST API (Octokit)** sobre o repositório-alvo dedicado (`zeromttr-target-pix-freight`) | Comparação real entre as tags `v2.14.7...v2.14.8`, leitura de código, criação de branch `hotfix/zeromttr-*` e abertura de Pull Request |
+| **Inspeção de Deploy & Auto-Remediação** | **GitHub REST API (Octokit)** sobre o repositório-alvo dedicado (`zeromttr-target-demo`) | Comparação real entre as tags `v2.14.7...v2.14.8`, leitura de código, criação de branch `hotfix/zeromttr-*` e abertura de Pull Request |
 | **Notificação e Governança** | **Resend** | Entrega do Post-Mortem em HTML (`sre@zeromttr.agjworks.com`) contendo com exclusividade os links de decisão assinados via HMAC |
 | Testes | Vitest, Supertest, `nock`/MSW | TDD para domínio, casos de uso e contract tests dos adapters HTTP |
 | Qualidade | ESLint, Prettier, Husky + lint-staged, Commitlint | Padrões de código e imposição de fronteiras hexagonais |
 | Infraestrutura | Docker, Docker Compose | Execução local (`docker-compose.yml`) e em produção na VPS (`docker-compose.prod.yml`) |
 | CI/CD | GitHub Actions | `ci.yml`, `cd-release.yml` (deploy na VPS congelado apenas para tags `v*` ou disparo manual) e `hotfix-verify.yml` no repositório-alvo |
-| Workload Demo | Express + Knex + PostgreSQL | Serviço `api-liquidacao-frete-pix` com falha reproduzível de saturação de pool em liquidação de frete |
+| Workload Demo | Express + Knex + PostgreSQL | Serviço `api-pagamentos-core` com falha reproduzível de saturação do pool de conexões |
 | Frontend | **Angular (última versão estável)**, **PrimeNG (preset Aura Dark)**, Tailwind CSS v4 + `tailwindcss-primeui` | War Room Dashboard enxuto (Single-Pane, 4 quadrantes) + rota `/decision/:id` |
 
 ---
@@ -116,7 +116,7 @@ Multi-tenant, alta disponibilidade multi-nó, merge automático em produção se
 | Componente | Padrão | Organização |
 | :--- | :--- | :--- |
 | `apps/orchestrator/` e `apps/mcp-server/` | **Hexagonal (Ports & Adapters)** | `domain` → `application` → `ports` → `adapters`, com composition root em `main.ts` |
-| `apps/target-app-demo/` | **MVC em camadas** | `routes` → `controllers` → `services` → `repositories` (`PixSettlementRepository`) |
+| `apps/target-app-demo/` | **MVC em camadas** | `routes` → `controllers` → `services` → `repositories` (`PaymentRepository`) |
 | `apps/dashboard/` | **Single-Pane War Room com Signals** (Angular + PrimeNG Aura Dark) | Standalone Components (`WarRoomComponent` + `DecisionComponent`) focado no fluxo principal de 3 minutos |
 
 ### 5.3 Visão de Contexto (C4 Nível 1)
@@ -124,13 +124,13 @@ Multi-tenant, alta disponibilidade multi-nó, merge automático em produção se
 flowchart TD
     SRE(["Engenheiro de Plantão (SRE)"])
     EXT_MCP(["Cliente MCP Externo (Cursor / Claude / Inspector)"])
-    APP["Workload Logístico: api-liquidacao-frete-pix (OTel SDK)"]
+    APP["Serviço Monitorado: api-pagamentos-core (OTel SDK)"]
     ZMT[["ZeroMTTR Platform (MCP Server + Orchestrator + LGTM)"]]
     LLM["Provedor LLM (Gemini API — Zero PII)"]
-    GH["GitHub API & Repo Alvo (zeromttr-target-pix-freight: tags v2.14.7..v2.14.8)"]
+    GH["GitHub API & Repo Alvo (zeromttr-target-demo: tags v2.14.7..v2.14.8)"]
     RS["Resend API (E-mail Post-Mortem com HMAC exclusivo)"]
 
-    APP -->|"1. Telemetria OTLP (Métricas, Logs com CPF/PIX, Traces)"| ZMT
+    APP -->|"1. Telemetria OTLP (Métricas, Logs com CPF/CNPJ/PIX, Traces)"| ZMT
     EXT_MCP -.->|"Consome as 8 Tools via Contrato MCP Aberto"| ZMT
     ZMT <-->|"2. Raciocínio RCA & Patch (Validado por PiiPromptGuard)"| LLM
     ZMT <-->|"3. Inspeciona Diff real v2.14.7..v2.14.8 e abre PR hotfix/*"| GH
@@ -143,8 +143,8 @@ flowchart TD
 ### 5.4 Visão de Contêineres (C4 Nível 2)
 ```mermaid
 flowchart TD
-    subgraph Workload["Serviço Logístico Monitorado"]
-        DEMO["target-app-demo: api-liquidacao-frete-pix (Express + Knex + OTel)"]
+    subgraph Workload["Serviço Monitorado (Detalhe de Borda)"]
+        DEMO["target-app-demo: api-pagamentos-core (Express + Knex + OTel)"]
     end
 
     subgraph Observability["Camada de Observabilidade (OTel + LGTM)"]
@@ -163,7 +163,7 @@ flowchart TD
 
     subgraph External["APIs Externas & Repo Alvo"]
         LLM["Gemini API (ReasoningPort)"]
-        GH["GitHub REST API (Repo: zeromttr-target-pix-freight)"]
+        GH["GitHub REST API (Repo: zeromttr-target-demo)"]
         RS["Resend API (Post-Mortem c/ HMAC)"]
     end
 
@@ -205,7 +205,7 @@ stateDiagram-v2
 ### 5.6 Decisões Arquiteturais (ADRs Resumidos)
 | ID | Decisão | Motivo | Alternativa Descartada |
 | :--- | :--- | :--- | :--- |
-| ADR-001 | Monorepo **pnpm + Nx** (package-based) em `apps/*` para a plataforma + repositório público dedicado (`zeromttr-target-pix-freight`) para o alvo de PRs | Mantém o repositório principal limpo (CI sempre verde, sem PRs gerados pela demo poluindo a árvore principal) enquanto permite tags reais `v2.14.7`/`v2.14.8` e PRs reais no repositório-alvo | Abrir PRs autônomos dentro do próprio monorepo da plataforma |
+| ADR-001 | Monorepo **pnpm + Nx** (package-based) em `apps/*` para a plataforma + repositório público dedicado (`zeromttr-target-demo`) para o alvo de PRs | Mantém o repositório principal limpo (CI sempre verde, sem PRs gerados pela demo poluindo a árvore principal) enquanto permite tags reais `v2.14.7`/`v2.14.8` e PRs reais no repositório-alvo | Abrir PRs autônomos dentro do próprio monorepo da plataforma |
 | ADR-002 | Arquitetura Hexagonal no orquestrador e no MCP | Domínio isolado de HTTP e SDKs externos; testabilidade em TDD com fakes | Camadas acopladas |
 | ADR-003 | MCP como contrato aberto de ferramentas (`.mcp.json` incluso) | Permite que tanto o `orchestrator` quanto clientes externos (Cursor/Claude/Inspector) consumam as mesmas 8 tools | Chamadas REST internas ad hoc |
 | ADR-004 | LLM isolado atrás de `ReasoningPort` + `PiiPromptGuard` + Fallback Determinístico | Garante auditoria zero-PII antes da chamada externa e continuidade operacional mesmo se o provedor de LLM falhar | Chamada direta ao SDK sem guard-rail |
@@ -293,7 +293,7 @@ zeromttr/
 │   │   │   ├── http/             # webhook Grafana (GRAFANA_WEBHOOK_TOKEN), API REST (DASHBOARD_API_TOKEN), decisões HMAC, SSE
 │   │   │   └── main.ts
 │   │   └── test/
-│   ├── target-app-demo/          # MVC em camadas (api-liquidacao-frete-pix — emissor OTel local)
+│   ├── target-app-demo/          # MVC em camadas (api-pagamentos-core — emissor OTel local)
 │   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/
 │   │   └── test/
 │   └── dashboard/                # Angular + PrimeNG (Aura Dark) War Room enxuto, Fase 4b
@@ -316,7 +316,7 @@ zeromttr/
 | **0 — Planejamento** | Arquitetura v0.3, diagramas UML, especificações técnicas e credenciais | Este documento, `01_system_diagrams.md`, `tech/01..08.md` | Especificações revisadas e sem pontas soltas |
 | **1 — Fundação** | Monorepo (`pnpm` + `Nx`), CI, stack LGTM com `transform` OTTL para PII | `pnpm-workspace.yaml`, `nx.json`, `docker-compose`, `infra/`, CI verde | `docker compose up` saudável; Collector mascara CPF/CNPJ/PIX/JWT em `log.body` |
 | **2 — MCP Server (TDD)** | 8 tools com ports/adapters, FinOps e `.mcp.json` | `apps/mcp-server/` com testes, auth e suporte a MCP Inspector externo | Cobertura ≥ 80 %; 8 tools respondem ao Orchestrator e ao MCP Inspector |
-| **3 — Demo App + Repo Alvo** | Workload `api-liquidacao-frete-pix` + repo `zeromttr-target-pix-freight` (`v2.14.7` e `v2.14.8`) | `apps/target-app-demo/`, tags reais `v2.14.7`/`v2.14.8` no repo-alvo com `hotfix-verify.yml` | Falha dispara alerta no Grafana; `compare/v2.14.7...v2.14.8` retorna diff real no GitHub |
+| **3 — Demo App + Repo Alvo** | Workload `api-pagamentos-core` + repo `zeromttr-target-demo` (`v2.14.7` e `v2.14.8`) | `apps/target-app-demo/`, tags reais `v2.14.7`/`v2.14.8` no repo-alvo com `hotfix-verify.yml` | Falha dispara alerta no Grafana; `compare/v2.14.7...v2.14.8` retorna diff real no GitHub |
 | **4 — Orquestrador (TDD)** | Webhook segregado, FSM, `PiiPromptGuard`, GitHub PR, Resend HMAC exclusivo | `apps/orchestrator/` com testes de segurança e auditoria de prompt | E2E: alerta → diff → PR no repo-alvo → e-mail em < 30 s; zero `decisionToken` no SSE |
 | **4b — Dashboard Enxuto** | War Room Dashboard focado no roteiro de 3 min | `apps/dashboard/` (`WarRoomComponent` + `DecisionComponent`), mock server e Nginx | Golden path completo na tela com mock e com orquestrador real |
 | **5 — Hardening & Baseline** | Medição cronometrada de TTD/TTPR e testes sob carga nos limites de RAM | `measure-mttr.sh`, baseline documentado, testes E2E | TTD/TTPR medidos contra baseline manual; LGTM estável sob carga |
@@ -326,7 +326,7 @@ zeromttr/
 flowchart TD
     F0["0. Planejamento & Diagramas (v0.3)"] --> F1["1. Fundação (pnpm + Nx + LGTM c/ OTTL Transform)"]
     F1 --> F2["2. MCP Server (8 Tools + FinOps + .mcp.json em TDD)"]
-    F1 --> F3["3. Workload PIX Frete + Repo Alvo (tags v2.14.7 e v2.14.8)"]
+    F1 --> F3["3. Demo App + Repo Alvo (tags v2.14.7 e v2.14.8)"]
     F1 --> F4B["4b. War Room Dashboard Enxuto (Agente Frontend)"]
     F2 & F3 --> F4["4. Orquestrador (FSM + PiiPromptGuard + PR + Resend HMAC)"]
     F4 & F4B --> F5["5. Hardening, Teste de Carga LGTM & Medição TTD/TTPR"]
@@ -359,9 +359,9 @@ flowchart TD
   2. **`cd-release.yml` (Publicação GHCR & Deploy Controlado na VPS):**
      - Publica imagens no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**.
      - O job `deploy-vps` executa **somente quando uma tag `v*.*.*` é criada ou via `workflow_dispatch` manual**, evitando que commits intermediários derrubem ou reiniciem a VPS durante o período de avaliação.
-- **Workflow no Repositório Alvo (`zeromttr-target-pix-freight/.github/workflows/`):**
+- **Workflow no Repositório Alvo (`zeromttr-target-demo/.github/workflows/`):**
   3. **`hotfix-verify.yml` (Validação Automática dos PRs Autônomos):**
-     - Dispara nos Pull Requests `hotfix/zeromttr-*` abertos pelo ZeroMTTR no repositório-alvo, executa o teste de concorrência/liberação de pool do `PixSettlementRepository` e publica o comentário de certificação (`✅ ZeroMTTR Autonomous CI Gate: PASSED`).
+     - Dispara nos Pull Requests `hotfix/zeromttr-*` abertos pelo ZeroMTTR no repositório-alvo, executa o teste de concorrência/liberação de pool do `PaymentRepository` e publica o comentário de certificação (`✅ ZeroMTTR Autonomous CI Gate: PASSED`).
 
 ---
 
@@ -372,7 +372,7 @@ flowchart TD
 | R1 | Indisponibilidade, timeout ou deprecação de modelo na API do LLM | Baixa | Alto | Modelo configurável via env (`LLM_MODEL=gemini-2.0-flash`); fallback determinístico que executa a sequência de tools MCP e aplica o patch de referência caso a API do LLM falhe |
 | R2 | Visitante anônimo tentar aprovar incidente ou esgotar cotas na VPS pública | Média | Alto | `decisionToken` removido do SSE/REST (enviado só por e-mail); modo `replay` como padrão para visitantes sem `LIVE_DEMO_KEY`; cooldown global de 2 min |
 | R3 | Processor `redaction` não cobrir corpo de logs (`log.body`) no Collector | Média | Alto | Uso explícito do processor **`transform` (OTTL `replace_pattern` sobre `log.body`)** combinado com auditoria determinística no **`PiiPromptGuard`** antes do `ReasoningPort` |
-| R4 | Poluição do repositório principal por branches/PRs de teste | Média | Médio | Repositório-alvo separado (`zeromttr-target-pix-freight`) com tags reais `v2.14.7`/`v2.14.8` e limpeza automatizada via `scripts/reset.sh` |
+| R4 | Poluição do repositório principal por branches/PRs de teste | Média | Médio | Repositório-alvo separado (`zeromttr-target-demo`) com tags reais `v2.14.7`/`v2.14.8` e limpeza automatizada via `scripts/reset.sh` |
 | R5 | OOMKill em serviços da stack LGTM na VPS durante consultas concorrentes | Baixa | Médio | Limites dimensionados com margem segura (`prometheus: 512M`, `loki: 512M`, `tempo: 384M`, Collector `256M` com `limit_mib: 200`) validados sob carga na Fase 5 |
 
 ---

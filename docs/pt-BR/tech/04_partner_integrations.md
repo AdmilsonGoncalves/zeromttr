@@ -20,7 +20,7 @@ interface NotifierPort {
 Onde `RemediationPrReceipt` retorna `{ branchName: string; branchUrl: string; pullRequestUrl: string; commitSha: string }`.
 
 ## 2. GitHub Deploy & Code Inspector (`RepoInspectorPort` — `inspect_git_deploy_diff`)
-- **Objetivo:** comparar as tags reais `v2.14.7` (saudável) e `v2.14.8` (degradada) no repositório-alvo `TARGET_GITHUB_REPO` (`https://github.com/AdmilsonGoncalves/zeromttr-target-pix-freight`) e obter o conteúdo e o `sha` do arquivo suspeito (`src/repositories/PixSettlementRepository.ts`).
+- **Objetivo:** comparar as tags reais `v2.14.7` (saudável) e `v2.14.8` (degradada) no repositório-alvo `TARGET_GITHUB_REPO` (`https://github.com/AdmilsonGoncalves/zeromttr-target-demo`) e obter o conteúdo e o `sha` do arquivo suspeito (`src/repositories/PaymentRepository.ts`).
 - **Comportamento na API do GitHub:**
   1. Consulta `GET /repos/{owner}/{repo}/compare/{base_ref}...{head_ref}` (`v2.14.7...v2.14.8`).
   2. Filtra arquivos modificados dentro de `service_path` (`src`) e extrai o commit autor da mudança, mensagem do commit e *patch* (truncado a ≤ 1500 chars por arquivo).
@@ -28,12 +28,12 @@ Onde `RemediationPrReceipt` retorna `{ branchName: string; branchUrl: string; pu
   4. Calcula telemetria **FinOps** (`raw_bytes_fetched` do payload bruto da API do GitHub vs. `compacted_bytes_sent_to_llm` após filtrar apenas os hunks relevantes).
 
 ## 3. GitHub Autonomous PR Remediation (`RemediationPort` — `create_remediation_pr`)
-- **Objetivo:** abrir um Pull Request real, testável e determinístico em **2 a 5 segundos** no repositório-alvo `zeromttr-target-pix-freight` usando `GITHUB_TOKEN`.
+- **Objetivo:** abrir um Pull Request real, testável e determinístico em **2 a 5 segundos** no repositório-alvo `zeromttr-target-demo` usando `GITHUB_TOKEN`.
 - **Fluxo na API do GitHub:**
   1. Obtém o SHA do topo da branch padrão (`main` / `master`) em `GET /repos/{owner}/{repo}/git/ref/heads/{defaultBranch}`.
   2. Cria (ou reutiliza, garantindo **idempotência por `incident_id`**) a branch `refs/heads/hotfix/zeromttr-<incident_id>` (`POST /repos/{owner}/{repo}/git/refs`).
-  3. Obtém o `sha` atual do blob do arquivo na branch (`GET /repos/{owner}/{repo}/contents/{filePath}?ref=hotfix/zeromttr-<incident_id>`) e grava o arquivo corrigido (`PUT /repos/{owner}/{repo}/contents/{filePath}` passando `content` em Base64, `sha` do blob e `branch`), com mensagem de commit estruturada (`fix(pix-settlement): release db client in finally block and restore pool size [incident <id>]`).
-  4. Abre o Pull Request (`POST /repos/{owner}/{repo}/pulls`) no repositório `zeromttr-target-pix-freight` com título, resumo do RCA, tabela de evidências OTel, diff da regressão `v2.14.7...v2.14.8`, auditoria zero-PII e checklist de governança; **nunca executa merge automático**.
+  3. Obtém o `sha` atual do blob do arquivo na branch (`GET /repos/{owner}/{repo}/contents/{filePath}?ref=hotfix/zeromttr-<incident_id>`) e grava o arquivo corrigido (`PUT /repos/{owner}/{repo}/contents/{filePath}` passando `content` em Base64, `sha` do blob e `branch`), com mensagem de commit estruturada (`fix(payment-repo): release db client in finally block and restore pool size [incident <id>]`).
+  4. Abre o Pull Request (`POST /repos/{owner}/{repo}/pulls`) no repositório `zeromttr-target-demo` com título, resumo do RCA, tabela de evidências OTel, diff da regressão `v2.14.7...v2.14.8`, auditoria zero-PII e checklist de governança; **nunca executa merge automático**.
 - **Validação automática por CI:** a abertura do PR dispara o workflow `.github/workflows/hotfix-verify.yml` no repositório-alvo, que executa o teste de regressão e comenta o selo `✅ ZeroMTTR Autonomous CI Gate: PASSED` no PR.
 
 ## 4. Resend (`NotifierPort` — `send_post_mortem_resend`) com HMAC Exclusivo no E-mail
@@ -42,7 +42,7 @@ Onde `RemediationPrReceipt` retorna `{ branchName: string; branchUrl: string; pu
   - **Blast Radius** (`services_involved`),
   - **Auditoria Pré-LLM (`PiiPromptGuard`)** (`0 PII patterns in LLM prompt`),
   - Commit causador da regressão (`v2.14.7...v2.14.8`),
-  - Botão para revisar o Pull Request no GitHub (`zeromttr-target-pix-freight`),
+  - Botão para revisar o Pull Request no GitHub (`zeromttr-target-demo`),
   - Botões de decisão humana (**Aprovar Hotfix** / **Rejeitar Hotfix**) contendo os links assinados via HMAC-SHA256: `${PUBLIC_DASHBOARD_URL}/decision/${id}?action=approve|reject&sig=<HMAC>&exp=<TS>`.
 - **Isolamento de segurança da assinatura HMAC (Correção crítica):**
   - As assinaturas `approveSig` e `rejectSig` são enviadas **exclusivamente dentro do e-mail entregue pelo Resend** ao destinatário `ON_CALL_ENGINEER_EMAIL`.
@@ -62,5 +62,5 @@ Onde `RemediationPrReceipt` retorna `{ branchName: string; branchUrl: string; pu
 
 ## 6. Critérios de Aceite
 - [ ] Nenhum teste automatizado chama APIs externas reais.
-- [ ] Smoke manual (`scripts/smoke-integrations.sh`) valida `inspect_git_deploy_diff`, `create_remediation_pr` no repo `zeromttr-target-pix-freight` e envio de e-mail no Resend.
+- [ ] Smoke manual (`scripts/smoke-integrations.sh`) valida `inspect_git_deploy_diff`, `create_remediation_pr` no repo `zeromttr-target-demo` e envio de e-mail no Resend.
 - [ ] O e-mail chega com os links HMAC funcionais, enquanto o payload SSE `incident.notified` não expõe `sig`.

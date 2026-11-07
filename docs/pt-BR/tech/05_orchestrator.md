@@ -39,11 +39,11 @@ main.ts        composition root
 2. **InvestigateIncident:**
    - Executa o loop de investigação via `ToolsPort` (orçamento máximo de 6 chamadas de tool decididas pelo agente ou sequência canônica no `DeterministicFallbackReasoningAdapter`):
      `execute_promql_range` → `trace_id` do exemplar → `analyze_otel_trace` → `query_loki_logs` (filtrado por `trace_id`), além de consultar `TargetStatusPort` (`GET /chaos/status` no `target-app-demo`) para obter `version` (`v2.14.8`), `previousHealthyVersion` (`v2.14.7`) e `rawEdgeLogPreCollector` (usado apenas na comparação visual no Dashboard, **jamais** incluído no prompt do LLM).
-3. **EnrichWithDeployDiff:** chama a tool MCP `inspect_git_deploy_diff` comparando as tags reais `v2.14.7` e `v2.14.8` no repositório-alvo `zeromttr-target-pix-freight`, isolando o commit e o arquivo `src/repositories/PixSettlementRepository.ts` (com seu `blobSha`).
+3. **EnrichWithDeployDiff:** chama a tool MCP `inspect_git_deploy_diff` comparando as tags reais `v2.14.7` e `v2.14.8` no repositório-alvo `zeromttr-target-demo`, isolando o commit e o arquivo `src/repositories/PaymentRepository.ts` (com seu `blobSha`).
 4. **DispatchRemediation:**
    - Audita as evidências com **`PiiPromptGuard.inspectAndAssertSafe`** (comprovando zero PII no prompt).
    - Sintetiza o RCA e o patch cirúrgico via `ReasoningPort` (`GeminiReasoningAdapter` configurável via `LLM_MODEL`, com fallback automático para `DeterministicFallbackReasoningAdapter` em caso de erro/timeout da API).
-   - Injeta anotação no Grafana via `annotate_grafana_incident` (`REMEDIATING`), transiciona para `AWAITING_PR` e aciona `create_remediation_pr` no repositório-alvo `zeromttr-target-pix-freight`, recebendo `branchUrl`, `pullRequestUrl` e `commitSha`.
+   - Injeta anotação no Grafana via `annotate_grafana_incident` (`REMEDIATING`), transiciona para `AWAITING_PR` e aciona `create_remediation_pr` no repositório-alvo `zeromttr-target-demo`, recebendo `branchUrl`, `pullRequestUrl` e `commitSha`.
 5. **NotifyOnCall (HMAC Exclusivo no E-mail):**
    - Calcula `approveSig`, `rejectSig` e `exp` (HMAC-SHA256 com `DECISION_HMAC_SECRET`).
    - Envia o post-mortem via tool MCP `send_post_mortem_resend` contendo os links assinados `${PUBLIC_DASHBOARD_URL}/decision/${id}?action=approve|reject&sig=<HMAC>&exp=<TS>`.
@@ -65,7 +65,7 @@ main.ts        composition root
 | `POST /api/incidents/:id/decision` | Efetiva decisão real vinda do link do e-mail | Assinatura HMAC válida (`sig` + `exp` não expirado) |
 | `POST /api/demo/simulate-decision` | Simula decisão no War Room (rotulado como simulação) | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` se o incidente for `live` na VPS) |
 | `GET /api/events` | Stream SSE (ver [08 §4.2](./08_dashboard_frontend.md)) | Bearer `DASHBOARD_API_TOKEN` (injetado pelo Nginx) |
-| `GET /api/target/status` | Estado do `api-liquidacao-frete-pix` | Bearer `DASHBOARD_API_TOKEN` |
+| `GET /api/target/status` | Estado do `api-pagamentos-core` | Bearer `DASHBOARD_API_TOKEN` |
 | `POST /api/demo/chaos` | Dispara simulação `live` ou `replay` | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` para `mode: 'live'` na VPS) |
 | `POST /api/demo/reset` | Restaura serviço e limpa PRs de demo no repo-alvo | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` se houver sessão `live` ativa) |
 | `GET /health` | Liveness check | Público |
