@@ -9,6 +9,8 @@ groups:
       - uid: payment-core-high-latency
         title: PaymentCoreHighLatencyOrPoolSaturation
         condition: C
+        noDataState: OK
+        execErrState: Error
         data:
           - refId: A
             relativeTimeRange:

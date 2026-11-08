@@ -35,7 +35,7 @@ done
 echo "Checking Grafana provisioned datasources..."
 ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
 ADMIN_PASS="${GRAFANA_ADMIN_PASSWORD:-change-me-strong-password}"
-DATASOURCES=$(curl -s -f -u "${ADMIN_USER}:${ADMIN_PASS}" http://localhost:3000/api/datasources)
+DATASOURCES=$(curl -s -f -u "${ADMIN_USER}:${ADMIN_PASS}" http://127.0.0.1:3000/api/datasources)
 echo "$DATASOURCES" | grep -q "prometheus-datasource" || { echo "Prometheus datasource missing"; exit 1; }
 echo "$DATASOURCES" | grep -q "loki-datasource" || { echo "Loki datasource missing"; exit 1; }
 echo "$DATASOURCES" | grep -q "tempo-datasource" || { echo "Tempo datasource missing"; exit 1; }
@@ -43,7 +43,7 @@ echo "✅ Grafana lists all 3 datasources without error."
 
 # 3. Check Grafana Contact Point Token
 echo "Checking Grafana contact point authentication token..."
-CONTACT_POINTS=$(curl -s -f -u "${ADMIN_USER}:${ADMIN_PASS}" http://localhost:3000/api/v1/provisioning/contact-points)
+CONTACT_POINTS=$(curl -s -f -u "${ADMIN_USER}:${ADMIN_PASS}" http://127.0.0.1:3000/api/v1/provisioning/contact-points)
 echo "$CONTACT_POINTS" | grep -q '"authorization_credentials":"\[REDACTED\]"' || { echo "GRAFANA_WEBHOOK_TOKEN missing in contact points"; exit 1; }
 echo "$CONTACT_POINTS" | grep -q '"authorization_scheme":"Bearer"' || { echo "Bearer scheme missing in contact points"; exit 1; }
 echo "✅ Grafana contact point uses Bearer authentication with provisioned secret."
@@ -51,6 +51,7 @@ echo "✅ Grafana contact point uses Bearer authentication with provisioned secr
 # 4. Check OTel Collector OTTL PII Redaction
 echo "Testing OTel Collector OTTL PII Redaction with Loki persistence..."
 TIMESTAMP_NANO=$(date +%s%N)
+RUN_ID="smoke-$(date +%s)-${RANDOM}"
 PAYLOAD=$(cat <<EOF
 {
   "resourceLogs": [
@@ -69,7 +70,7 @@ PAYLOAD=$(cat <<EOF
               "severityNumber": 17,
               "severityText": "ERROR",
               "body": {
-                "stringValue": "Transaction failed for CPF 123.456.789-00 and CNPJ 12.345.678/0001-99 with auth Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.sig"
+                "stringValue": "[RUN_ID:${RUN_ID}] Transaction failed for CPF 123.456.789-00 and CNPJ 12.345.678/0001-99 with auth Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.sig"
               }
             }
           ]
@@ -81,18 +82,28 @@ PAYLOAD=$(cat <<EOF
 EOF
 )
 
-curl -s -f -X POST http://localhost:4318/v1/logs \
+curl -s -f -X POST http://127.0.0.1:4318/v1/logs \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD" > /dev/null
 
 echo "Waiting for log to be processed by OTel Collector transform processor and flushed to Loki..."
 REDACTION_VERIFIED=false
-for i in $(seq 1 10); do
+for i in $(seq 1 15); do
   sleep 1
-  LOKI_RES=$(curl -s -G 'http://localhost:3100/loki/api/v1/query_range' --data-urlencode 'query={service="api-pagamentos-core"}' || true)
-  if echo "$LOKI_RES" | grep -q '\[REDACTED_CPF\]' && \
+  LOKI_RES=$(curl -s -G 'http://127.0.0.1:3100/loki/api/v1/query_range' --data-urlencode "query={service=\"api-pagamentos-core\"} |= \"${RUN_ID}\"" || true)
+  if echo "$LOKI_RES" | grep -q "${RUN_ID}" && \
+     echo "$LOKI_RES" | grep -q '\[REDACTED_CPF\]' && \
      echo "$LOKI_RES" | grep -q '\[REDACTED_CNPJ\]' && \
      echo "$LOKI_RES" | grep -q 'Bearer \[REDACTED_TOKEN\]'; then
+    
+    # Assert raw sensitive data is strictly absent from Loki output
+    if echo "$LOKI_RES" | grep -q '123\.456\.789-00' || \
+       echo "$LOKI_RES" | grep -q '12\.345\.678/0001-99' || \
+       echo "$LOKI_RES" | grep -q 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.e30\.sig'; then
+      echo "❌ Security failure: Raw unredacted PII or token detected in Loki response!"
+      exit 1
+    fi
+
     REDACTION_VERIFIED=true
     break
   fi

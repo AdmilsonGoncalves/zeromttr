@@ -2,7 +2,7 @@ name: Autonomous Hotfix PR Verification
 
 on:
   pull_request:
-    branches: [release/target-v2.14.8, main, master]
+    branches: [release/target-v2.14.8]
 
 permissions:
   contents: read

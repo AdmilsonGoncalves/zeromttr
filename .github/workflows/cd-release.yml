@@ -13,8 +13,7 @@ on:
         type: string
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 env:
   REGISTRY: ghcr.io
@@ -23,6 +22,9 @@ jobs:
   publish-images:
     name: Build & Push to GHCR (${{ matrix.service }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         service: [mcp-server, orchestrator, target-app-demo, dashboard]
@@ -58,6 +60,8 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v1.')
     needs: publish-images
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: softprops/action-gh-release@v2
@@ -68,6 +72,8 @@ jobs:
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v1.')) || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_vps == 'true')
     needs: publish-images
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
     steps:
@@ -82,7 +88,7 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            mkdir -p ${{ secrets.VPS_DEPLOY_PATH }}/infra
+            mkdir -p "${{ secrets.VPS_DEPLOY_PATH }}/infra"
 
       - name: Copy docker-compose.prod.yml and infra/ configs to VPS via SCP
         if: ${{ env.VPS_HOST != '' }}
@@ -98,17 +104,20 @@ jobs:
       - name: Pull GHCR images & Restart Stack on VPS
         if: ${{ env.VPS_HOST != '' }}
         uses: appleboy/ssh-action@v1.1.0
+        env:
+          RAW_TAG: ${{ startsWith(github.ref, 'refs/tags/v1.') && github.ref_name || 'latest' }}
+          ENV_FILE_PATH: ${{ secrets.VPS_ENV_FILE_PATH }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT || 22 }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: RAW_TAG,ENV_FILE_PATH
           script: |
             set -e
-            cd ${{ secrets.VPS_DEPLOY_PATH }}
-            export ENV_FILE_PATH="${{ secrets.VPS_ENV_FILE_PATH }}"
-            export IMAGE_TAG="${{ startsWith(github.ref, 'refs/tags/v1.') && github.ref_name || 'latest' }}"
-            export IMAGE_TAG="${IMAGE_TAG#v}"
+            cd "${{ secrets.VPS_DEPLOY_PATH }}"
+            IMAGE_TAG="${RAW_TAG#v}"
+            export IMAGE_TAG
             docker compose --env-file "$ENV_FILE_PATH" -f docker-compose.prod.yml pull
             docker compose --env-file "$ENV_FILE_PATH" -f docker-compose.prod.yml up -d --remove-orphans
             docker image prune -f

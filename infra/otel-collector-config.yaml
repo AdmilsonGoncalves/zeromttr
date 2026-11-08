@@ -25,10 +25,12 @@ processors:
     log_statements:
       - context: log
         statements:
-          # Mascara CPF (ex.: 123.456.789-00 -> [REDACTED_CPF])
+          # Mascara CPF (formatado e apenas dígitos 11)
           - replace_pattern(body, "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
-          # Mascara CNPJ (ex.: 12.345.678/0001-99 -> [REDACTED_CNPJ])
+          - replace_pattern(body, "\\b\\d{11}\\b", "[REDACTED_CPF]")
+          # Mascara CNPJ (formatado e apenas dígitos 14)
           - replace_pattern(body, "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
+          - replace_pattern(body, "\\b\\d{14}\\b", "[REDACTED_CNPJ]")
           # Mascara tokens Bearer / JWT (case-insensitive para Bearer)
           - replace_pattern(body, "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
           # Mascara JWT cru sem prefixo Bearer (iniciado por eyJ)
@@ -41,26 +43,50 @@ processors:
           - replace_pattern(body, "(?i:(?:pix(?:_?key)?|chave_?pix|evp)[\"'=:\\s]+[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\b", "pixKey=[REDACTED_PIX_EVP]")
           # Aplica o mesmo mascaramento sobre atributos string do log
           - replace_all_patterns(attributes, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{11}\\b", "[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{14}\\b", "[REDACTED_CNPJ]")
           - replace_all_patterns(attributes, "value", "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
           - replace_all_patterns(attributes, "value", "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b", "[REDACTED_JWT]")
           - replace_all_patterns(attributes, "value", "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "[REDACTED_PIX_EMAIL]")
           - replace_all_patterns(attributes, "value", "(?:\\+55\\s?[1-9]{2}\\s?(?:9\\d{8}|[2-5]\\d{7})\\b|(?:\\+?55\\s?)?\\([1-9]{2}\\)\\s?(?:9\\d{4}|[2-5]\\d{3})-?\\d{4}\\b|(?:\\+?55\\s?)?\\b[1-9]{2}\\s?(?:9\\d{4}|[2-5]\\d{3})-\\d{4}\\b)", "[REDACTED_PHONE]")
           - replace_all_patterns(attributes, "value", "(?i:(?:pix(?:_?key)?|chave_?pix|evp)[\"'=:\\s]+[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\b", "pixKey=[REDACTED_PIX_EVP]")
-          # Mascara Chave PIX Aleatória (EVP) quando enviada diretamente em atributo nomeado de PIX
-          - replace_pattern(attributes["pixKey"], "\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["pixKey"] != nil
-          - replace_pattern(attributes["chave_pix"], "\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["chave_pix"] != nil
-          - replace_pattern(attributes["evp"], "\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["evp"] != nil
+          # Mascara Chave PIX Aleatória (EVP) quando enviada diretamente em atributo nomeado de PIX (case-insensitive)
+          - replace_pattern(attributes["pixKey"], "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["pixKey"] != nil
+          - replace_pattern(attributes["chave_pix"], "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["chave_pix"] != nil
+          - replace_pattern(attributes["evp"], "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["evp"] != nil
+          # Sanitiza resource.attributes para evitar vazamento de credenciais ou PII em headers/recursos
+          - replace_all_patterns(resource.attributes, "value", "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
+          - replace_all_patterns(resource.attributes, "value", "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b", "[REDACTED_JWT]")
+          - replace_all_patterns(resource.attributes, "value", "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "[REDACTED_PIX_EMAIL]")
           # Promove service.name do resource para label de stream "service" no Loki
           - set(resource.attributes["loki.resource.labels"], "service.name")
           - set(attributes["service"], resource.attributes["service.name"])
           - set(attributes["loki.attribute.labels"], "service")
 
+  transform/pii_traces:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - replace_pattern(attributes["pixKey"], "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["pixKey"] != nil
+          - replace_pattern(attributes["chave_pix"], "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["chave_pix"] != nil
+          - replace_pattern(attributes["evp"], "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["evp"] != nil
+
+  transform/metrics:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(attributes["service"], resource.attributes["service.name"]) where resource.attributes["service.name"] != nil
+
   redaction:
     allow_all_keys: true
     blocked_values:
       - "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b"
+      - "\\b\\d{11}\\b"
       - "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b"
+      - "\\b\\d{14}\\b"
       - "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*"
       - "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b"
       - "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
@@ -103,11 +129,11 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, redaction, tail_sampling, batch]
+      processors: [memory_limiter, transform/pii_traces, redaction, tail_sampling, batch]
       exporters: [otlp/tempo]
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, transform/metrics, batch]
       exporters: [prometheusremotewrite]
     logs:
       receivers: [otlp]

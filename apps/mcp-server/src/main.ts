@@ -10,8 +10,13 @@ export function bootstrap(): http.Server {
       res.end(JSON.stringify({ status: 'ok', health }));
       return;
     }
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('ZeroMTTR MCP Server Running');
+    if (req.url === '/') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('ZeroMTTR MCP Server Running');
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not Found' }));
   });
 
   server.listen(mcpConfig.port, () => {
@@ -21,4 +26,6 @@ export function bootstrap(): http.Server {
   return server;
 }
 
-bootstrap();
+if (process.env.NODE_ENV !== 'test') {
+  bootstrap();
+}

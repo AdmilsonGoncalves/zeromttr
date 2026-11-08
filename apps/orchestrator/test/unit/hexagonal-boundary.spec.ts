@@ -5,13 +5,12 @@ import path from 'node:path';
 
 describe('Hexagonal Boundary Architecture Guard', () => {
   it('should reject domain imports from adapters', async () => {
-    const filePath = path.resolve('src/domain/temp-boundary-test.ts');
-    fs.writeFileSync(
-      filePath,
-      "import { BaseIncidentAdapter } from '../adapters/index.js';\nexport const x = BaseIncidentAdapter;\n"
-    );
-
+    const filePath = path.resolve(import.meta.dirname, '../../src/domain/temp-boundary-test.ts');
     try {
+      fs.writeFileSync(
+        filePath,
+        "import { BaseIncidentAdapter } from '../adapters/index.js';\nexport const x = BaseIncidentAdapter;\n"
+      );
       const eslint = new ESLint();
       const results = await eslint.lintFiles([filePath]);
       const messages = results[0]?.messages.map((m) => m.message) || [];
