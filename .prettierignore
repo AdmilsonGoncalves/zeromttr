@@ -10,4 +10,6 @@ docs
 .claude
 skills-lock.json
 *.iml
+Comm*.sarif
+results.sarif
 .husky
