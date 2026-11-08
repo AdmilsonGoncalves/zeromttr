@@ -120,13 +120,17 @@ services:
     container_name: zeromttr-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=zeromttr
-      - POSTGRES_PASSWORD=zeromttr
-      - POSTGRES_DB=payments
+      - POSTGRES_USER=${POSTGRES_USER:-zeromttr}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me-postgres-password}
+      - POSTGRES_DB=${POSTGRES_DB:-payments}
     ports:
       - '127.0.0.1:5432:5432'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U zeromttr -d payments || exit 1']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-zeromttr} -d ${POSTGRES_DB:-payments} || exit 1'
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -186,7 +190,7 @@ services:
       - '127.0.0.1:3001:3001'
     environment:
       - PORT=3001
-      - DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
+      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-zeromttr}:${POSTGRES_PASSWORD:-change-me-postgres-password}@postgres:5432/${POSTGRES_DB:-payments}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
     depends_on:
       postgres:

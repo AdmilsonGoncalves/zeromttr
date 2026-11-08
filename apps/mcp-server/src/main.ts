@@ -2,7 +2,7 @@ import http from 'node:http';
 import { checkMcpApplicationHealth } from './application/index.js';
 import { mcpConfig } from './config/index.js';
 
-export function bootstrap(): http.Server {
+export function bootstrap(port: number = mcpConfig.port): http.Server {
   const health = checkMcpApplicationHealth();
   const server = http.createServer((req, res) => {
     if (req.url === '/health') {
@@ -19,8 +19,8 @@ export function bootstrap(): http.Server {
     res.end(JSON.stringify({ error: 'Not Found' }));
   });
 
-  server.listen(mcpConfig.port, () => {
-    console.log(`[mcp-server] Initialized on port ${mcpConfig.port}, status: ${health.status}`);
+  server.listen(port, () => {
+    console.log(`[mcp-server] Initialized on port ${port}, status: ${health.status}`);
   });
 
   return server;

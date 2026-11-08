@@ -11,7 +11,8 @@ server {
 
     # Proxy reverso interno apenas para /api/* -> orchestrator:8080 (nunca expõe /webhook/*)
     location /api/ {
-        proxy_pass http://orchestrator:8080/api/;
+        set $orchestrator_upstream http://orchestrator:8080;
+        proxy_pass $orchestrator_upstream$request_uri;
         proxy_http_version 1.1;
         proxy_set_header Connection '';
         proxy_set_header Host $host;

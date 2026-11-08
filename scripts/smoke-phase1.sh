@@ -5,6 +5,15 @@ echo "=================================================================="
 echo "⚡ ZeroMTTR Phase 1 Verification Suite (Foundation & Infrastructure)"
 echo "=================================================================="
 
+# Carrega variáveis de ambiente locais se o arquivo existir (.env por padrão ou via ENV_FILE)
+ENV_FILE="${ENV_FILE:-.env}"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
 # 1. Healthcheck of stack
 echo "Checking Docker Compose services health (<= 90s)..."
 START_TIME=$(date +%s)
@@ -91,15 +100,15 @@ REDACTION_VERIFIED=false
 for i in $(seq 1 15); do
   sleep 1
   LOKI_RES=$(curl -s -G 'http://127.0.0.1:3100/loki/api/v1/query_range' --data-urlencode "query={service=\"api-pagamentos-core\"} |= \"${RUN_ID}\"" || true)
-  if echo "$LOKI_RES" | grep -q "${RUN_ID}" && \
-     echo "$LOKI_RES" | grep -q '\[REDACTED_CPF\]' && \
-     echo "$LOKI_RES" | grep -q '\[REDACTED_CNPJ\]' && \
-     echo "$LOKI_RES" | grep -q 'Bearer \[REDACTED_TOKEN\]'; then
+  if grep -q "${RUN_ID}" <<< "$LOKI_RES" && \
+     grep -q '\[REDACTED_CPF\]' <<< "$LOKI_RES" && \
+     grep -q '\[REDACTED_CNPJ\]' <<< "$LOKI_RES" && \
+     grep -q 'Bearer \[REDACTED_TOKEN\]' <<< "$LOKI_RES"; then
     
     # Assert raw sensitive data is strictly absent from Loki output
-    if echo "$LOKI_RES" | grep -q '123\.456\.789-00' || \
-       echo "$LOKI_RES" | grep -q '12\.345\.678/0001-99' || \
-       echo "$LOKI_RES" | grep -q 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.e30\.sig'; then
+    if grep -q '123\.456\.789-00' <<< "$LOKI_RES" || \
+       grep -q '12\.345\.678/0001-99' <<< "$LOKI_RES" || \
+       grep -q 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.e30\.sig' <<< "$LOKI_RES"; then
       echo "❌ Security failure: Raw unredacted PII or token detected in Loki response!"
       exit 1
     fi
