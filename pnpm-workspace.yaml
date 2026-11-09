@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+ignoredBuiltDependencies:
+  - esbuild
+  - nx
+
+catalog:
+  '@types/node': ^22.13.14
+  '@vitest/coverage-v8': ^5.1.0
+  typescript: ^5.7.3
+  vitest: ^5.1.0
+  zod: ^3.24.2

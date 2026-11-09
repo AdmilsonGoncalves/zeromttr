@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+coverage
+.nx
+.pnpm-store
+pnpm-lock.yaml
+docs
+.agents
+.claude
+skills-lock.json
+*.iml
+Comm*.sarif
+results.sarif
+.husky

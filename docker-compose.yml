@@ -1,0 +1,220 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: zeromttr-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-remote-write-receiver'
+      - '--enable-feature=exemplar-storage'
+      - '--storage.tsdb.retention.time=24h'
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - '127.0.0.1:9090:9090'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:9090/-/healthy || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - aiops-net
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: zeromttr-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./infra/loki-config.yaml:/etc/loki/local-config.yaml:ro
+    ports:
+      - '127.0.0.1:3100:3100'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:3100/ready || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - aiops-net
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: zeromttr-tempo
+    restart: unless-stopped
+    command: -config.file=/etc/tempo.yaml
+    volumes:
+      - ./infra/tempo-config.yaml:/etc/tempo.yaml:ro
+    ports:
+      - '127.0.0.1:3200:3200'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:3200/ready || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - aiops-net
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: zeromttr-grafana
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-change-me-strong-password}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GRAFANA_WEBHOOK_TOKEN=${GRAFANA_WEBHOOK_TOKEN:-change-me-grafana-webhook-token}
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:3000/api/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    networks:
+      - aiops-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: zeromttr-otel-collector
+    restart: unless-stopped
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    volumes:
+      - ./infra/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - '127.0.0.1:4317:4317'
+      - '127.0.0.1:4318:4318'
+      - '127.0.0.1:13133:13133'
+    healthcheck:
+      test: ['CMD', '/otelcol-contrib', 'validate', '--config=/etc/otelcol-contrib/config.yaml']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    networks:
+      - aiops-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: zeromttr-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-zeromttr}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me-postgres-password}
+      - POSTGRES_DB=${POSTGRES_DB:-payments}
+    ports:
+      - '127.0.0.1:5432:5432'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-zeromttr} -d ${POSTGRES_DB:-payments} || exit 1'
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - aiops-net
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: apps/mcp-server/Dockerfile
+    container_name: zeromttr-mcp-server
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8000:8000'
+    environment:
+      - MCP_PORT=8000
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-change-me-mcp-token}
+      - PROMETHEUS_URL=http://prometheus:9090
+      - LOKI_URL=http://loki:3100
+      - TEMPO_URL=http://tempo:3200
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    networks:
+      - aiops-net
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    container_name: zeromttr-orchestrator
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080'
+    environment:
+      - PORT=8080
+      - GRAFANA_WEBHOOK_TOKEN=${GRAFANA_WEBHOOK_TOKEN:-change-me-grafana-webhook-token}
+      - DASHBOARD_API_TOKEN=${DASHBOARD_API_TOKEN:-change-me-dashboard-api-token}
+      - MCP_URL=http://mcp-server:8000
+    depends_on:
+      - mcp-server
+    networks:
+      - aiops-net
+
+  target-app-demo:
+    build:
+      context: .
+      dockerfile: apps/target-app-demo/Dockerfile
+    container_name: zeromttr-target-app-demo
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3001:3001'
+    environment:
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-zeromttr}:${POSTGRES_PASSWORD:-change-me-postgres-password}@postgres:5432/${POSTGRES_DB:-payments}}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_healthy
+    networks:
+      - aiops-net
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    container_name: zeromttr-dashboard
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:4200:80'
+    environment:
+      - DASHBOARD_API_TOKEN=${DASHBOARD_API_TOKEN:-change-me-dashboard-api-token}
+    depends_on:
+      - orchestrator
+    networks:
+      - aiops-net
+
+networks:
+  aiops-net:
+    driver: bridge

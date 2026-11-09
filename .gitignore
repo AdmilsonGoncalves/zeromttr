@@ -6,7 +6,8 @@ node_modules/
 dist/
 build/
 coverage/
-.nx/cache/
+.nx/
+*.sarif
 
 # Environment files and secrets
 .env

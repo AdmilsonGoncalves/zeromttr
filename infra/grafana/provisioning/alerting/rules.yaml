@@ -1,0 +1,81 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: payment-core-alerts
+    folder: ZeroMTTR
+    interval: 10s
+    rules:
+      - uid: payment-core-high-latency
+        title: PaymentCoreHighLatencyOrPoolSaturation
+        condition: C
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus-datasource
+            model:
+              editorMode: code
+              expr: 'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="api-pagamentos-core"}[1m])) by (le)) > 0.5 or (payment_pool_connections_active{service="api-pagamentos-core"} >= 10)'
+              instant: true
+              range: false
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: '$B > 0'
+              refId: C
+              type: math
+        for: 30s
+        labels:
+          service: api-pagamentos-core
+          severity: critical
+        annotations:
+          summary: Payment Core High Latency or Connection Pool Saturation
+          description: api-pagamentos-core connection pool saturated or p95 latency exceeded threshold

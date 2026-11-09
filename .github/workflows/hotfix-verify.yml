@@ -1,0 +1,42 @@
+name: Autonomous Hotfix PR Verification
+
+on:
+  pull_request:
+    branches: [release/target-v2.14.8]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  verify-autonomous-hotfix:
+    if: startsWith(github.head_ref, 'hotfix/zeromttr-')
+    name: Verify Autonomous ZeroMTTR Hotfix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zeromttr/target-app-demo run typecheck
+      - run: pnpm --filter @zeromttr/target-app-demo run test
+
+      - name: Comment Verification Badge on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const passed = '${{ job.status }}' === 'success';
+            const body = passed
+              ? '### ⚡ ZeroMTTR Autonomous CI Gate: **PASSED** ✅\n- **Branch:** `' + context.payload.pull_request.head.ref + '`\n- **Target Workload (`@zeromttr/target-app-demo`):** Regression & Pool Release Suite Green on Node.js 24 LTS\n- **Governance Status:** Ready for On-Call Engineer approval via Resend HMAC.'
+              : '### ⚠️ ZeroMTTR Autonomous CI Gate: **FAILED** ❌\nRegression suite failed on this hotfix branch.';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
