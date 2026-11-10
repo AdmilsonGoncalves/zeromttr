@@ -1,14 +1,28 @@
-import type http from 'node:http';
-import { createApp } from './app.js';
-import { startServer } from './server.js';
+import http from 'node:http';
+import { initTelemetry } from './telemetry/index.js';
 
-export { createApp, startServer };
+export function bootstrap(port: number = Number(process.env.PORT) || 3001): http.Server {
+  initTelemetry();
+  const server = http.createServer((req, res) => {
+    if (req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', service: 'api-pagamentos-core' }));
+      return;
+    }
+    if (req.url === '/') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('ZeroMTTR Target Demo Workload Running');
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not Found' }));
+  });
 
-const defaultPort =
-  process.env.PORT !== undefined && process.env.PORT !== '' ? Number(process.env.PORT) : 3001;
+  server.listen(port, () => {
+    console.log(`[target-app-demo] api-pagamentos-core listening on port ${port}`);
+  });
 
-export function bootstrap(port: number = defaultPort): http.Server {
-  return startServer(port);
+  return server;
 }
 
 if (process.env.NODE_ENV !== 'test') {

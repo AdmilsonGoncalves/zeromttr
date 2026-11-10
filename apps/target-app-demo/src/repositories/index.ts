@@ -1,1 +1,1 @@
-export * from './payment.repository.js';
+export {};
