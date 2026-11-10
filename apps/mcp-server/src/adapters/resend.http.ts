@@ -11,7 +11,9 @@ export interface ResendAdapterConfig {
 }
 
 export function escapeHtml(unsafe: string): string {
-  if (!unsafe) return '';
+  if (!unsafe) {
+    return '';
+  }
   return unsafe
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -110,6 +112,10 @@ export class ResendHttpAdapter implements NotifierPort {
   }
 
   async sendPostMortem(req: PostMortemNotification): Promise<NotificationReceipt> {
+    if (!this.config.apiKey) {
+      throw new Error('Resend API key is missing or empty');
+    }
+
     const html = renderPostMortemHtml(req);
     const recipient = req.recipient_email || 'oncall-sre@example.com';
 

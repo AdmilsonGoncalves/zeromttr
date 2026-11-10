@@ -15,7 +15,7 @@ describe('Tool: execute_promql_range integration', () => {
   beforeAll(async () => {
     setupNock();
     await new Promise<void>((resolve) => {
-      server = bootstrap(0);
+      server = bootstrap(0, { env: { PROMETHEUS_URL: 'http://localhost:9090' } });
       server.on('listening', () => resolve());
     });
   });

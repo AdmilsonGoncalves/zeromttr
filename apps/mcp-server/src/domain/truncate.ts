@@ -16,7 +16,9 @@ export function truncateDiff(diff: string, maxChars = 1500): string {
 }
 
 export function sanitizeCommitMessage(message: string): string {
-  if (!message) return '';
+  if (!message) {
+    return '';
+  }
   return message
     .split('\n')
     .filter((line) => !/^\s*co-authored-by\s*:/i.test(line))
@@ -27,19 +29,23 @@ export function sanitizeCommitMessage(message: string): string {
 export function sanitizeAuthorLogin(
   author: { login?: string; name?: string; email?: string } | string | null | undefined
 ): string {
-  if (!author) return 'unknown';
-  if (typeof author === 'string') return author.trim();
-  if (author.login && typeof author.login === 'string') return author.login.trim();
-  if (author.name && typeof author.name === 'string') return author.name.trim();
+  if (!author) {
+    return 'unknown';
+  }
+  if (typeof author === 'string') {
+    return author.trim();
+  }
+  if (author.login && typeof author.login === 'string') {
+    return author.login.trim();
+  }
+  if (author.name && typeof author.name === 'string') {
+    return author.name.trim();
+  }
   return 'unknown';
 }
 
 export class LogTruncator {
   static truncateLines(lines: string[], maxLines = 100, maxChars = 500): string[] {
     return truncateLines(lines, maxLines, maxChars);
-  }
-
-  static truncateDiff(diff: string, maxChars = 1500): string {
-    return truncateDiff(diff, maxChars);
   }
 }

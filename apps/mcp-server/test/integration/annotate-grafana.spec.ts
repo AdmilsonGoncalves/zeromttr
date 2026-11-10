@@ -15,7 +15,7 @@ describe('Tool: annotate_grafana_incident integration', () => {
   beforeAll(async () => {
     setupNock();
     await new Promise<void>((resolve) => {
-      server = bootstrap(0);
+      server = bootstrap(0, { env: { GRAFANA_URL: 'http://localhost:3000' } });
       server.on('listening', () => resolve());
     });
   });

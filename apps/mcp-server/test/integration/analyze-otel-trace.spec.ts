@@ -11,7 +11,7 @@ describe('Tool: analyze_otel_trace integration', () => {
   beforeAll(async () => {
     setupNock();
     await new Promise<void>((resolve) => {
-      server = bootstrap(0);
+      server = bootstrap(0, { env: { TEMPO_URL: 'http://localhost:3200' } });
       server.on('listening', () => resolve());
     });
   });

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   MCP_PORT: z.coerce.number().default(8000),
-  MCP_AUTH_TOKEN: z.string().default('dev-mcp-token'),
+  MCP_AUTH_TOKEN: z.string().min(1).default('dev-mcp-token'),
   PROMETHEUS_URL: z.string().default('http://localhost:9090'),
   LOKI_URL: z.string().default('http://localhost:3100'),
   TEMPO_URL: z.string().default('http://localhost:3200'),

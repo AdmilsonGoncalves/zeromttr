@@ -70,7 +70,9 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
     const commits = compareData.commits || [];
     if (commits.length > 0) {
       const targetCommit = commits[commits.length - 1];
-      authorLogin = sanitizeAuthorLogin(targetCommit.author || targetCommit.commit?.author);
+      authorLogin = targetCommit.author?.login
+        ? sanitizeAuthorLogin(targetCommit.author.login)
+        : 'unknown';
       rawCommitMessage = targetCommit.commit?.message || '';
     }
     const sanitizedCommitMessage = sanitizeCommitMessage(rawCommitMessage);

@@ -3,6 +3,7 @@ import type { RawPromSeries } from '../domain/summarize-series.js';
 
 export interface PrometheusAdapterConfig {
   baseUrl: string;
+  timeoutMs?: number;
 }
 
 export class PrometheusHttpAdapter implements MetricsPort {
@@ -20,7 +21,8 @@ export class PrometheusHttpAdapter implements MetricsPort {
 
     const url = `${this.config.baseUrl.replace(/\/$/, '')}/api/v1/query_range?${params.toString()}`;
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' }
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.config.timeoutMs || 10_000)
     });
 
     if (!response.ok) {

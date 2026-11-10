@@ -37,6 +37,18 @@ export class GithubRemediationHttpAdapter implements RemediationPort {
       );
     }
 
+    const segments = req.file_path.split('/').filter(Boolean);
+    if (
+      segments.length === 0 ||
+      segments.some((seg) => seg === '.' || seg === '..') ||
+      req.file_path.startsWith('/') ||
+      req.file_path.includes('\\')
+    ) {
+      throw new Error(
+        `Invalid file_path '${req.file_path}'. Must be a safe repository-relative path without dot segments.`
+      );
+    }
+
     const repo = this.config.repo;
     const branchName = `hotfix/zeromttr-${req.incident_id}`;
     const encodedBranchName = encodeURIComponent(branchName);

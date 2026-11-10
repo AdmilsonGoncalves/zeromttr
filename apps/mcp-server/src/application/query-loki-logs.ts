@@ -14,11 +14,13 @@ export class QueryLokiLogs {
   constructor(private readonly logsPort: LogsPort) {}
 
   async execute(input: LokiQueryInput): Promise<QueryLokiLogsOutput> {
-    validateTimeRange(input.start, input.end);
+    const { startIso, endIso } = validateTimeRange(input.start, input.end);
 
     const safeLimit = Math.min(100, Math.max(1, input.limit ?? 50));
     const result = await this.logsPort.queryLogs({
       ...input,
+      start: startIso,
+      end: endIso,
       limit: safeLimit
     });
 

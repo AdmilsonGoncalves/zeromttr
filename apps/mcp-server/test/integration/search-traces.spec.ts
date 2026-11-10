@@ -10,7 +10,7 @@ describe('Tool: search_traces_by_traceql integration', () => {
   beforeAll(async () => {
     setupNock();
     await new Promise<void>((resolve) => {
-      server = bootstrap(0);
+      server = bootstrap(0, { env: { TEMPO_URL: 'http://localhost:3200' } });
       server.on('listening', () => resolve());
     });
   });

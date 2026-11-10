@@ -69,13 +69,17 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
 
           sessionServer.setRequestHandler(ListToolsRequestSchema, async () => {
             const currentSession = sessions.get(sessionId);
-            if (currentSession) currentSession.lastAccessedAt = Date.now();
+            if (currentSession) {
+              currentSession.lastAccessedAt = Date.now();
+            }
             return { tools: toolRegistry.listTools() };
           });
 
           sessionServer.setRequestHandler(CallToolRequestSchema, async (request) => {
             const currentSession = sessions.get(sessionId);
-            if (currentSession) currentSession.lastAccessedAt = Date.now();
+            if (currentSession) {
+              currentSession.lastAccessedAt = Date.now();
+            }
             const result = await toolRegistry.callTool(
               request.params.name,
               request.params.arguments
@@ -138,16 +142,20 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
 
       // Direct Streamable HTTP / JSON-RPC (POST /mcp)
       if (req.method === 'POST' && (pathname === '/mcp' || pathname === '/mcp/')) {
-        let bodyText = '';
+        const chunks: Buffer[] = [];
         let bodyBytes = 0;
         let isTooLarge = false;
         const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB payload cap
 
         req.on('data', (chunk: Buffer | string) => {
-          if (isTooLarge) return;
-          bodyBytes += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
+          if (isTooLarge) {
+            return;
+          }
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          bodyBytes += buf.length;
           if (bodyBytes > MAX_BODY_BYTES) {
             isTooLarge = true;
+            req.pause();
             res.writeHead(413, { 'Content-Type': 'application/json' });
             res.end(
               JSON.stringify({
@@ -155,23 +163,22 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
                 message: 'Request body exceeds 1 MiB limit'
               })
             );
-            req.destroy();
+            res.on('finish', () => req.destroy());
             return;
           }
-          bodyText += chunk;
+          chunks.push(buf);
         });
 
         req.on('end', () => {
-          if (isTooLarge) return;
+          if (isTooLarge) {
+            return;
+          }
 
           void (async () => {
-            let body: {
-              id?: string | number | null;
-              method?: string;
-              params?: { name?: string; arguments?: Record<string, unknown> };
-            };
+            const bodyText = Buffer.concat(chunks).toString('utf-8');
+            let parsed: unknown;
             try {
-              body = JSON.parse(bodyText);
+              parsed = JSON.parse(bodyText);
             } catch {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(
@@ -183,6 +190,27 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
               );
               return;
             }
+
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: null,
+                  error: {
+                    code: -32600,
+                    message: 'Invalid Request: body must be a JSON-RPC object'
+                  }
+                })
+              );
+              return;
+            }
+
+            const body = parsed as {
+              id?: string | number | null;
+              method?: string;
+              params?: { name?: string; arguments?: Record<string, unknown> };
+            };
 
             const id = body.id ?? null;
 
@@ -255,7 +283,19 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
                 error: { code: -32601, message: `Method not found: ${body.method}` }
               })
             );
-          })();
+          })().catch((err: unknown) => {
+            logger.error({ err }, 'Error handling /mcp request');
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: null,
+                  error: { code: -32603, message: 'Internal error' }
+                })
+              );
+            }
+          });
         });
         return;
       }

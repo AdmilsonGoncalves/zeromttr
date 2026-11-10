@@ -11,7 +11,7 @@ describe('Tool: send_post_mortem_resend integration', () => {
   beforeAll(async () => {
     setupNock();
     await new Promise<void>((resolve) => {
-      server = bootstrap(0);
+      server = bootstrap(0, { env: { RESEND_API_KEY: 're_test_key_123' } });
       server.on('listening', () => resolve());
     });
   });
@@ -75,5 +75,32 @@ describe('Tool: send_post_mortem_resend integration', () => {
     expect(res.status).toBe(200);
     expect(res.result?.isError).toBe(true);
     expect(res.result?.content[0].text).toContain('Resend send email failed: 422');
+  });
+
+  it('should fail fast when Resend API key is empty', async () => {
+    const unconfiguredServer = bootstrap(0, { env: { RESEND_API_KEY: '' } });
+    await new Promise<void>((resolve) => unconfiguredServer.on('listening', () => resolve()));
+
+    try {
+      const res = await callMcpTool(unconfiguredServer, 'send_post_mortem_resend', {
+        incident_id: incidentId,
+        title: 'Unconfigured key test',
+        rca_summary: 'RCA summary',
+        evidence_coverage: '4/4',
+        reasoning_source: 'fallback',
+        blast_radius: ['service-a'],
+        regression_commit: 'v2.14.7...v2.14.8',
+        pull_request_url: 'https://github.com/pull/1',
+        approve_url: 'http://localhost:4200/decision/1#action=approve&sig=abc&exp=1',
+        reject_url: 'http://localhost:4200/decision/1#action=reject&sig=def&exp=1'
+      });
+      expect(res.status).toBe(200);
+      expect(res.result?.isError).toBe(true);
+      expect(res.result?.content[0].text).toContain('Resend API key is missing or empty');
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        unconfiguredServer.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
   });
 });

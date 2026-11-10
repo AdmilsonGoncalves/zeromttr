@@ -2,10 +2,14 @@ import type http from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 export function verifyAuthToken(req: http.IncomingMessage, expectedToken: string): boolean {
-  if (!expectedToken) return true; // dev fallback if no token configured
+  if (!expectedToken || !expectedToken.trim()) {
+    return false;
+  } // fail-closed if no token configured
 
   const authHeader = req.headers['authorization'];
-  if (!authHeader) return false;
+  if (!authHeader) {
+    return false;
+  }
 
   const parts = authHeader.split(' ');
   if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {

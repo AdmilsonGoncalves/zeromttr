@@ -10,7 +10,7 @@ describe('Tool: query_loki_logs integration', () => {
   beforeAll(async () => {
     setupNock();
     await new Promise<void>((resolve) => {
-      server = bootstrap(0);
+      server = bootstrap(0, { env: { LOKI_URL: 'http://localhost:3100' } });
       server.on('listening', () => resolve());
     });
   });

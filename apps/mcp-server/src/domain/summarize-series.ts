@@ -22,7 +22,9 @@ export interface SeriesSummary {
 }
 
 function calculatePercentile(sortedValues: number[], p: number): number {
-  if (sortedValues.length === 0) return 0;
+  if (sortedValues.length === 0) {
+    return 0;
+  }
   const index = Math.ceil((p / 100) * sortedValues.length) - 1;
   const safeIndex = Math.max(0, Math.min(sortedValues.length - 1, index));
   return sortedValues[safeIndex];

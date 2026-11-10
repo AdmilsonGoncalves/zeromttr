@@ -14,9 +14,13 @@ export class ExecutePromqlRange {
   constructor(private readonly metricsPort: MetricsPort) {}
 
   async execute(input: PromqlQueryInput): Promise<ExecutePromqlRangeOutput> {
-    validateTimeRange(input.start, input.end);
+    const { startIso, endIso } = validateTimeRange(input.start, input.end);
 
-    const result = await this.metricsPort.queryRange(input);
+    const result = await this.metricsPort.queryRange({
+      ...input,
+      start: startIso,
+      end: endIso
+    });
     const series = SeriesSummarizer.summarize(result.series, 5, 10);
 
     const compactedBytes = Buffer.byteLength(JSON.stringify(series), 'utf-8');

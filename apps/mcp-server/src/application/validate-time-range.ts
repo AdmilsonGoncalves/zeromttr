@@ -1,4 +1,7 @@
-export function validateTimeRange(startStr: string, endStr: string): { start: Date; end: Date } {
+export function validateTimeRange(
+  startStr: string,
+  endStr: string
+): { start: Date; end: Date; startIso: string; endIso: string } {
   const start = new Date(startStr);
   const end = new Date(endStr);
 
@@ -20,5 +23,10 @@ export function validateTimeRange(startStr: string, endStr: string): { start: Da
     );
   }
 
-  return { start, end };
+  return {
+    start,
+    end,
+    startIso: start.toISOString(),
+    endIso: end.toISOString()
+  };
 }
