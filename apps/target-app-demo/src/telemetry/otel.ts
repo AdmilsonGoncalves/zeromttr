@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import { chaosManager } from '../chaos/index.js';
+import { millisToUnixNano, nowIso, nowUnixNano } from '@zeromttr/utils';
+import { buildUrl } from '@zeromttr/utils/http';
 
 export enum SpanStatusCode {
   UNSET = 0,
@@ -125,7 +127,7 @@ export class TelemetryService {
     const exemplar: MetricExemplar = {
       traceId,
       value: durationSeconds,
-      timestamp: new Date().toISOString()
+      timestamp: nowIso()
     };
 
     const serviceAttributes = {
@@ -139,7 +141,7 @@ export class TelemetryService {
       value: durationSeconds,
       attributes: serviceAttributes,
       exemplar,
-      timestamp: new Date().toISOString()
+      timestamp: nowIso()
     });
 
     // http_request_duration_seconds (Grafana alert rule compatibility)
@@ -148,7 +150,7 @@ export class TelemetryService {
       value: durationSeconds,
       attributes: serviceAttributes,
       exemplar,
-      timestamp: new Date().toISOString()
+      timestamp: nowIso()
     });
 
     void this.exportMetricToOtlp(
@@ -175,7 +177,7 @@ export class TelemetryService {
       name: 'db_pool_waiting',
       value: waitingCount,
       attributes: serviceAttributes,
-      timestamp: new Date().toISOString()
+      timestamp: nowIso()
     });
 
     void this.exportMetricToOtlp('db_pool_waiting', waitingCount, serviceAttributes);
@@ -191,7 +193,7 @@ export class TelemetryService {
       name: 'db_pool_used',
       value: usedCount,
       attributes: serviceAttributes,
-      timestamp: new Date().toISOString()
+      timestamp: nowIso()
     });
 
     // payment_pool_connections_active (Grafana alert rule compatibility)
@@ -199,7 +201,7 @@ export class TelemetryService {
       name: 'payment_pool_connections_active',
       value: usedCount,
       attributes: serviceAttributes,
-      timestamp: new Date().toISOString()
+      timestamp: nowIso()
     });
 
     void this.exportMetricToOtlp('db_pool_used', usedCount, serviceAttributes);
@@ -216,7 +218,7 @@ export class TelemetryService {
     }
   ): void {
     const logRecord: LogRecord = {
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
       traceId: context?.traceId,
       spanId: context?.spanId,
       severityText: severity,
@@ -255,7 +257,7 @@ export class TelemetryService {
       return;
     }
     try {
-      const url = `${this.otlpEndpoint.replace(/\/$/, '')}/v1/logs`;
+      const url = buildUrl(this.otlpEndpoint, '/v1/logs');
       const payload = {
         resourceLogs: [
           {
@@ -270,7 +272,7 @@ export class TelemetryService {
                 scope: { name: 'api-pagamentos-core' },
                 logRecords: [
                   {
-                    timeUnixNano: String(Date.now() * 1_000_000),
+                    timeUnixNano: nowUnixNano(),
                     severityText: log.severityText,
                     body: { stringValue: log.body },
                     traceId: log.traceId,
@@ -305,7 +307,7 @@ export class TelemetryService {
       return;
     }
     try {
-      const url = `${this.otlpEndpoint.replace(/\/$/, '')}/v1/traces`;
+      const url = buildUrl(this.otlpEndpoint, '/v1/traces');
       const payload = {
         resourceSpans: [
           {
@@ -325,7 +327,7 @@ export class TelemetryService {
                     parentSpanId: span.parentSpanId,
                     name: span.name,
                     startTimeUnixNano: String(span.startTime * 1_000_000),
-                    endTimeUnixNano: String((span.endTime || Date.now()) * 1_000_000),
+                    endTimeUnixNano: millisToUnixNano(span.endTime || Date.now()),
                     status: {
                       code: span.status.code,
                       message: span.status.message
@@ -363,7 +365,7 @@ export class TelemetryService {
       return;
     }
     try {
-      const url = `${this.otlpEndpoint.replace(/\/$/, '')}/v1/metrics`;
+      const url = buildUrl(this.otlpEndpoint, '/v1/metrics');
       const payload = {
         resourceMetrics: [
           {
@@ -382,7 +384,7 @@ export class TelemetryService {
                     gauge: {
                       dataPoints: [
                         {
-                          timeUnixNano: String(Date.now() * 1_000_000),
+                          timeUnixNano: nowUnixNano(),
                           asDouble: value,
                           attributes: Object.entries(attributes).map(([key, val]) => ({
                             key,
@@ -391,7 +393,7 @@ export class TelemetryService {
                           exemplars: exemplar
                             ? [
                                 {
-                                  timeUnixNano: String(Date.now() * 1_000_000),
+                                  timeUnixNano: nowUnixNano(),
                                   asDouble: exemplar.value,
                                   traceId: exemplar.traceId
                                 }

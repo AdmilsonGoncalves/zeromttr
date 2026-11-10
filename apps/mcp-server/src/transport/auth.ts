@@ -1,8 +1,9 @@
 import type http from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { isEmpty } from '@zeromttr/utils';
 
 export function verifyAuthToken(req: http.IncomingMessage, expectedToken: string): boolean {
-  if (!expectedToken || !expectedToken.trim()) {
+  if (isEmpty(expectedToken)) {
     return false;
   } // fail-closed if no token configured
 

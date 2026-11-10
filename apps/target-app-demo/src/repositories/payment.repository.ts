@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { chaosManager } from '../chaos/index.js';
 import type { CreatePaymentInput, Payment } from '../models/payment.model.js';
 import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
+import { toErrorMessage } from '@zeromttr/utils';
 
 export class KnexTimeoutError extends Error {
   public constructor(
@@ -127,7 +128,7 @@ export class PaymentRepository {
     } catch (error) {
       telemetry.endSpan(acquireSpan, {
         code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : 'Pool acquire failed'
+        message: toErrorMessage(error, 'Pool acquire failed')
       });
       throw error;
     }
@@ -183,7 +184,7 @@ export class PaymentRepository {
     } catch (err) {
       telemetry.endSpan(span, {
         code: SpanStatusCode.ERROR,
-        message: err instanceof Error ? err.message : 'Failed to create payment'
+        message: toErrorMessage(err, 'Failed to create payment')
       });
 
       // Emit synthetic PII error log matching TECH 03 specification

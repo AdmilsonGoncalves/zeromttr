@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@zeromttr/utils": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

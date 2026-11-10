@@ -50,6 +50,13 @@ docker compose up -d
   - Routes: `payments.routes.ts`, `chaos.routes.ts`, `health.routes.ts`
   - Testes e helpers: `payment-pool.spec.ts`, `http-test-client.ts`, `mcp-client.helper.ts`
   - Domínio, Ports e Adapters: `summarize-series.ts`, `span-analysis.ts`, `repo-inspector.port.ts`, `prometheus.http.ts`
+- **Estilo de Código e Estruturas de Controle:** Toda e qualquer estrutura de controle (`if`, `else`, `for`, `while`) deve obrigatoriamente utilizar chaves `{}` delimitando o bloco, mesmo para retornos antecipados (_early returns_) ou instruções de linha única. É estritamente proibido omitir as chaves (ex.: usar sempre `if (!author) { return 'unknown'; }` e nunca `if (!author) return 'unknown';`), garantindo leitura visual rápida e prevenindo erros acidentais de escopo.
+- **Biblioteca de Utilitários Compartilhados (`libs/utils` — `@zeromttr/utils`):**
+  - Funções utilitárias puras e _Type Guards_ compartilhados devem residir em `libs/utils/src/` e ser consumidas através do alias `@zeromttr/utils`.
+  - **Funções Puras:** Utilitários de manipulação de tipos primitivos e estruturas de dados (`string.utils.ts`, `object.utils.ts`, `array.utils.ts`) são funções 100% puras, sem efeitos colaterais e com zero dependências externas (estritamente proibido adicionar Lodash ou Ramda). Podem ser importadas livremente por qualquer camada (`domain`, `application`, `adapters`, `dashboard`).
+  - **Type Guards Idiomáticos:** Usar sempre predicados de tipo do TypeScript (`value is string`, `value is NonNullable<T>`) para estreitamento automático e seguro pelo compilador.
+  - **Semântica de Whitespace:** `isEmpty(val)` e `isFilled(val)` tratam strings em branco (`'   '`) como vazias. Valores primitivos válidos como `0` e `false` não são vazios.
+  - **Isolamento de Utilitários HTTP:** Helpers HTTP (`http.utils.ts` / `@zeromttr/utils/http`) pertencem exclusivamente à camada de infraestrutura/adapters. É estritamente proibido importar utilitários HTTP no `domain` ou `application`, sendo esta barreira auditada via ESLint (`no-restricted-imports`).
 
 ---
 

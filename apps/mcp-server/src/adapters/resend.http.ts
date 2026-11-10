@@ -3,32 +3,15 @@ import type {
   PostMortemNotification,
   NotificationReceipt
 } from '../ports/notifier.port.js';
+import { escapeHtml } from '@zeromttr/utils';
+import { safeHttpUrl } from '@zeromttr/utils/http';
+
+export { escapeHtml, safeHttpUrl };
 
 export interface ResendAdapterConfig {
   apiKey: string;
   from: string;
   apiBaseUrl?: string;
-}
-
-export function escapeHtml(unsafe: string): string {
-  if (!unsafe) {
-    return '';
-  }
-  return unsafe
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-export function safeHttpUrl(raw: string): string {
-  try {
-    const u = new URL(raw);
-    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : '#';
-  } catch {
-    return '#';
-  }
 }
 
 export function renderPostMortemHtml(req: PostMortemNotification): string {

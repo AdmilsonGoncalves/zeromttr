@@ -1,3 +1,5 @@
+import { clamp, isNumber } from '@zeromttr/utils';
+
 export interface ChaosStatus {
   status: 'healthy' | 'degraded';
   service: string;
@@ -27,8 +29,8 @@ export class ChaosManager {
 
   public setPoolSaturation(enabled: boolean, delayMs = 4600): void {
     this.poolSaturation = enabled;
-    if (typeof delayMs === 'number' && Number.isFinite(delayMs) && delayMs >= 0) {
-      this.artificialDelayMs = Math.min(Math.max(delayMs, 0), 60000);
+    if (isNumber(delayMs) && delayMs >= 0) {
+      this.artificialDelayMs = clamp(delayMs, 0, 60_000);
     } else {
       this.artificialDelayMs = 4600;
     }

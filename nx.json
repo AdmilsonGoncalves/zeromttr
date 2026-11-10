@@ -10,10 +10,12 @@
       "cache": true
     },
     "typecheck": {
-      "cache": true
+      "cache": true,
+      "dependsOn": ["^build"]
     },
     "test": {
-      "cache": true
+      "cache": true,
+      "dependsOn": ["^build"]
     }
   }
 }
