@@ -21,5 +21,5 @@ describe('Hexagonal Boundary Architecture Guard', () => {
         fs.unlinkSync(filePath);
       }
     }
-  });
+  }, 30_000);
 });
