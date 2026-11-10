@@ -82,6 +82,24 @@ describe('http.utils', () => {
       expect(buildUrl('http://localhost:9090', 'health')).toBe('http://localhost:9090/health');
       expect(buildUrl('http://localhost:9090', '/health', {})).toBe('http://localhost:9090/health');
     });
+
+    it('should preserve and merge query parameters when baseUrl already contains queries and hash', () => {
+      const url = buildUrl('https://example.com/api?token=abc#section', '/users', {
+        page: 2,
+        filter: 'active'
+      });
+      expect(url).toBe('https://example.com/api/users?token=abc&page=2&filter=active#section');
+    });
+
+    it('should merge path query parameters and argument params into base URL query', () => {
+      const url = buildUrl('https://example.com/api?base=1', '/items?sub=2', { extra: 3 });
+      expect(url).toBe('https://example.com/api/items?base=1&sub=2&extra=3');
+    });
+
+    it('should handle relative base URLs and preserve existing query parameters', () => {
+      const url = buildUrl('/api?env=prod', 'status', { details: true });
+      expect(url).toBe('/api/status?env=prod&details=true');
+    });
   });
 
   describe('safeHttpUrl', () => {

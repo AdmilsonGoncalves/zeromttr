@@ -138,5 +138,19 @@ describe('object.utils', () => {
     it('should omit specified keys', () => {
       expect(omit(data, ['c', 'd'])).toEqual({ a: 1, b: 'two' });
     });
+
+    it('should copy only own properties and ignore prototype properties or __proto__ in pick', () => {
+      const proto = { inherited: 'yes' };
+      const obj = Object.create(proto) as Record<string, unknown>;
+      obj.own = 'hello';
+
+      expect(pick(obj, ['own', 'inherited'])).toEqual({ own: 'hello' });
+      expect(pick(obj, ['__proto__'])).toEqual({});
+    });
+
+    it('should safely handle __proto__ key in omit', () => {
+      const obj = { a: 1, b: 2 };
+      expect(omit(obj as Record<string, unknown>, ['__proto__'])).toEqual({ a: 1, b: 2 });
+    });
   });
 });

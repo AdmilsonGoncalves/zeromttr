@@ -273,7 +273,7 @@ zeromttr/
 ├── package.json                  # Scripts raiz delegando ao Nx (check:workspace, lint:workspace, test:workspace, build:workspace)
 ├── pnpm-workspace.yaml           # packages: ['apps/*', 'libs/*']
 ├── nx.json                       # Task pipeline, cache e affected (Nx package-based)
-├── tsconfig.base.json            # Strict TS config compartilhado com path mapping (@zeromttr/*)
+├── tsconfig.base.json            # Strict TS config compartilhado (NodeNext, ES2024)
 ├── .mcp.json                     # Configuração pronta para conectar clientes MCP externos (Inspector / Cursor / Claude)
 ├── .nvmrc                        # Node 24
 ├── .dockerignore                 # Mantém contexto de build Docker < 2 MB
@@ -305,7 +305,7 @@ zeromttr/
 │       │   ├── string.utils.ts   # isNonEmptyString, sanitize, truncate, etc.
 │       │   ├── object.utils.ts   # isEmpty, isFilled, omit, pick, etc.
 │       │   ├── array.utils.ts    # compact, chunk, etc.
-│       │   ├── http.utils.ts     # Helpers HTTP (isolado, consumo exclusivo por adapters)
+│       │   ├── http.utils.ts     # Helpers HTTP (isolado, consumo por adapters, infra e telemetria; proibido em domain e application)
 │       │   └── index.ts          # Barrel export das funções puras
 │       └── test/unit/            # Testes unitários puros com Vitest
 ├── apps/

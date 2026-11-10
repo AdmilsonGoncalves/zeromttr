@@ -82,6 +82,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 
 /**
  * Creates a shallow copy of an object picking only specified keys.
+ * Copies only own properties and skips __proto__ to guard against prototype pollution.
  */
 export function pick<T extends Record<string, unknown>, K extends keyof T>(
   obj: T,
@@ -89,7 +90,7 @@ export function pick<T extends Record<string, unknown>, K extends keyof T>(
 ): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {
-    if (key in obj) {
+    if (key !== '__proto__' && Object.prototype.hasOwnProperty.call(obj, key)) {
       result[key] = obj[key];
     }
   }
@@ -105,7 +106,9 @@ export function omit<T extends Record<string, unknown>, K extends keyof T>(
 ): Omit<T, K> {
   const result = { ...obj };
   for (const key of keys) {
-    delete result[key];
+    if (key !== '__proto__') {
+      delete result[key];
+    }
   }
   return result;
 }

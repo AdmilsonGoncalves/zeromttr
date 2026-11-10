@@ -1,3 +1,6 @@
+const ISO_DATE_REGEX =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:Z|([+-]\d{2}(?::?\d{2})?))?)?$/;
+
 /**
  * Checks if a value is a valid Date instance (not NaN).
  */
@@ -7,6 +10,7 @@ export function isValidDate(value: unknown): value is Date {
 
 /**
  * Safely parses an ISO date string or Date into a valid Date object, returning null on failure.
+ * Strict ISO-8601 validation: rejects non-ISO formats, out-of-range calendar dates, and impossible leap days.
  */
 export function parseIsoDate(value: unknown): Date | null {
   if (!value) {
@@ -18,11 +22,57 @@ export function parseIsoDate(value: unknown): Date | null {
     }
     return null;
   }
-  if (typeof value === 'string' && value.trim().length > 0) {
-    const d = new Date(value);
-    if (isValidDate(d)) {
-      return d;
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const match = ISO_DATE_REGEX.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  const maxDays = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day > maxDays) {
+    return null;
+  }
+
+  if (match[4] !== undefined) {
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6]);
+
+    if (hour > 23 || minute > 59 || second > 59) {
+      return null;
     }
+  }
+
+  if (match[8] !== undefined) {
+    const tzMatch = /^([+-])(\d{2}):?(\d{2})?$/.exec(match[8]);
+    if (tzMatch) {
+      const tzHours = Number(tzMatch[2]);
+      const tzMinutes = Number(tzMatch[3] ?? '0');
+      if (tzHours > 23 || tzMinutes > 59) {
+        return null;
+      }
+    }
+  }
+
+  const d = new Date(trimmed);
+  if (isValidDate(d)) {
+    return d;
   }
   return null;
 }
@@ -97,7 +147,8 @@ export function diffInHours(start: Date | string | number, end: Date | string | 
 
 /**
  * Returns difference in full days between two dates/timestamps (end - start).
+ * Truncates signed day difference toward zero so partial days are excluded.
  */
 export function diffInDays(start: Date | string | number, end: Date | string | number): number {
-  return diffInHours(start, end) / 24;
+  return Math.trunc(diffInHours(start, end) / 24) || 0;
 }

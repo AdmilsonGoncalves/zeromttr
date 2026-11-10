@@ -44,6 +44,22 @@ describe('date.utils', () => {
       expect(parseIsoDate(null)).toBeNull();
       expect(parseIsoDate(undefined)).toBeNull();
     });
+
+    it('should reject non-ISO strings and impossible calendar dates', () => {
+      expect(parseIsoDate('2024-02-31')).toBeNull();
+      expect(parseIsoDate('2023-02-29')).toBeNull(); // 2023 is not a leap year
+      expect(parseIsoDate('2024-04-31')).toBeNull(); // April has 30 days
+      expect(parseIsoDate('2024-12-31T25:00:00Z')).toBeNull(); // invalid hour
+      expect(parseIsoDate('2024-12-31T23:61:00Z')).toBeNull(); // invalid minute
+      expect(parseIsoDate('2024/02/15')).toBeNull(); // non-ISO format
+      expect(parseIsoDate('February 15, 2024')).toBeNull(); // non-ISO format
+      expect(parseIsoDate('15-02-2024')).toBeNull(); // non-ISO format
+    });
+
+    it('should accept valid leap year dates and offset ISO strings', () => {
+      expect(parseIsoDate('2024-02-29')).not.toBeNull();
+      expect(parseIsoDate('2024-02-29T12:00:00+03:00')).not.toBeNull();
+    });
   });
 
   describe('nowIso', () => {
@@ -100,6 +116,19 @@ describe('date.utils', () => {
 
     it('should compute diff in days', () => {
       expect(diffInDays(t0, t2)).toBe(2);
+    });
+
+    it('should truncate signed day difference toward zero to exclude partial days', () => {
+      const start = '2026-11-10T00:00:00.000Z';
+      const endPlus36h = '2026-11-11T12:00:00.000Z'; // 1.5 days -> 1
+      const endMinus36h = '2026-11-08T12:00:00.000Z'; // -1.5 days -> -1
+      const endPlus12h = '2026-11-10T12:00:00.000Z'; // 0.5 days -> 0
+      const endMinus12h = '2026-11-09T12:00:00.000Z'; // -0.5 days -> 0
+
+      expect(diffInDays(start, endPlus36h)).toBe(1);
+      expect(diffInDays(start, endMinus36h)).toBe(-1);
+      expect(diffInDays(start, endPlus12h)).toBe(0);
+      expect(diffInDays(start, endMinus12h)).toBe(0);
     });
 
     it('should return 0 when either timestamp is invalid', () => {
