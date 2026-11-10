@@ -74,8 +74,7 @@ describe('PiiPromptGuard (Fail-Closed)', () => {
   });
 
   it('should detect unmasked JWT and raw Bearer tokens', () => {
-    const rawJwt =
-      'auth token is eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.doNotLeakThisSignature';
+    const rawJwt = 'auth token is eyJhbGciOiJIUzI1NiJ9.payload.sig';
     const auditJwt = PiiPromptGuard.inspectAndEnforceFailClosed(rawJwt);
     expect(auditJwt.passed).toBe(false);
     expect(auditJwt.detectedTypes).toContain('jwt');
