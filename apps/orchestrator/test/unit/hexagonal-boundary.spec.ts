@@ -11,7 +11,7 @@ describe('Hexagonal Boundary Architecture Guard', () => {
         filePath,
         "import { BaseIncidentAdapter } from '../adapters/index.js';\nexport const x = BaseIncidentAdapter;\n"
       );
-      const eslint = new ESLint({ ignore: false });
+      const eslint = new ESLint();
       const results = await eslint.lintFiles([filePath]);
       const messages = results[0]?.messages.map((m) => m.message) || [];
       const hasBoundaryError = messages.some((msg) => msg.includes('Hexagonal boundary violation'));

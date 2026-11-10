@@ -12,8 +12,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.nx/**',
       'docs/**',
-      '**/*.d.ts',
-      '**/temp-boundary-*.ts'
+      '**/*.d.ts'
     ]
   },
   {
