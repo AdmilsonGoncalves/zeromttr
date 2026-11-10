@@ -42,6 +42,14 @@ docker compose up -d
 - **`apps/target-app-demo`:** MVC em camadas (`routes` → `controllers` → `services` → `repositories`).
 - **`apps/dashboard`:** Single-Page Application Angular standalone com Signals (`WarRoomComponent` + `DecisionComponent`).
 - **Isolamento de domínio:** O núcleo do ZeroMTTR permanece agnóstico; nenhuma regra de negócio específica de `api-pagamentos-core` pode vazar para o orquestrador ou servidor MCP.
+- **Padrão de Nomenclatura de Arquivos:** Todos os arquivos de código-fonte (`.ts`) e testes (`.spec.ts`, `.test.ts`) devem adotar a convenção **`kebab-case`** com sufixo de tipo delimitado por ponto (padrão Angular/NestJS). Exemplos:
+  - Repositórios: `payment.repository.ts`
+  - Controllers: `payments.controller.ts`, `chaos.controller.ts`, `health.controller.ts`
+  - Services: `payment.service.ts`
+  - Models: `payment.model.ts`
+  - Routes: `payments.routes.ts`, `chaos.routes.ts`, `health.routes.ts`
+  - Testes e helpers: `payment-pool.spec.ts`, `http-test-client.ts`, `mcp-client.helper.ts`
+  - Domínio, Ports e Adapters: `summarize-series.ts`, `span-analysis.ts`, `repo-inspector.port.ts`, `prometheus.http.ts`
 
 ---
 

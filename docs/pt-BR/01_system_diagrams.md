@@ -135,7 +135,7 @@ sequenceDiagram
     ORCH-->>UI: SSE event: incident.transition (ENRICHING)
     ORCH->>MCP: CallTool: inspect_git_deploy_diff (base_ref: "v2.14.7", head_ref: "v2.14.8", service_path: "apps/target-app-demo")
     MCP->>EXT: GitHub API (AdmilsonGoncalves/zeromttr): Compare v2.14.7...v2.14.8 & Get File Content
-    EXT-->>MCP: Commit de regressão, diff real do PaymentRepository.ts e blob sha
+    EXT-->>MCP: Commit de regressão, diff real do payment.repository.ts e blob sha
     MCP-->>ORCH: Diff truncado (<= 1500 chars) + FinOps telemetry [Sinal 4/4 = 100% (4/4 Signals)]
     ORCH->>ORCH: PiiPromptGuard.inspect(prompt): valida mod-11 CPF/CNPJ e JWT (leakedPatternsDetected === 0)
     ORCH-->>UI: SSE events: incident.finops, incident.docs

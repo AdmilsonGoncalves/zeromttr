@@ -62,7 +62,7 @@ export const PII_PATTERNS = {
 2. **InvestigateIncident:**
    - Executa o workflow determinístico de coleta via `ToolsPort`:
      `execute_promql_range` → `trace_id` do exemplar → `analyze_otel_trace` → `query_loki_logs` (filtrado por `trace_id`), além de consultar `TargetStatusPort` (`GET /chaos/status` no `target-app-demo`) para obter `version` (`v2.14.8`), `previousHealthyVersion` (`v2.14.7`) e `rawEdgeLogPreCollector` (amostra reportada pela aplicação antes do envio OTLP, usada apenas na comparação visual no Dashboard e **jamais** incluída no prompt do LLM).
-3. **EnrichWithDeployDiff:** chama a tool MCP `inspect_git_deploy_diff` comparando as tags reais `v2.14.7` e `v2.14.8` em `apps/target-app-demo`, isolando o commit e o arquivo `apps/target-app-demo/src/repositories/PaymentRepository.ts` (com seu `blobSha`).
+3. **EnrichWithDeployDiff:** chama a tool MCP `inspect_git_deploy_diff` comparando as tags reais `v2.14.7` e `v2.14.8` em `apps/target-app-demo`, isolando o commit e o arquivo `apps/target-app-demo/src/repositories/payment.repository.ts` (com seu `blobSha`).
 4. **DispatchRemediation:**
    - Audita o prompt montado com **`PiiPromptGuard.inspectAndEnforceFailClosed`**.
    - Se `passed === true`, sintetiza o RCA e o patch cirúrgico via `ReasoningPort` (`GeminiReasoningAdapter` configurável via `LLM_MODEL`, padrão `gemini-3.5-flash`) e registra `reasoningSource: 'llm'`. Caso o guard reprove (`fail-closed`) ou a API do LLM falhe, utiliza `DeterministicFallbackReasoningAdapter` e registra explicitamente `reasoningSource: 'fallback'`.

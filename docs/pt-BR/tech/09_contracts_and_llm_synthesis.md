@@ -176,7 +176,7 @@ Sua missão:
 
 Regras estritas de segurança e código:
 - O código corrigido em patchedContent deve conter o arquivo COMPLETO (não use reticências, nem trechos parciais).
-- No serviço de pagamentos (PaymentRepository), garanta impreterivelmente que conexões adquiridas do pool sejam liberadas em um bloco 'finally { client.release(); }' e que o tamanho do pool seja restaurado para safe defaults (max: 10).
+- No serviço de pagamentos (payment.repository.ts), garanta impreterivelmente que conexões adquiridas do pool sejam liberadas em um bloco 'finally { client.release(); }' e que o tamanho do pool seja restaurado para safe defaults (max: 10).
 - Nunca invente dependências ou altere assinaturas de métodos públicos.
 - Responda obrigatoriamente no formato JSON estruturado conforme o schema solicitado.
 ```
@@ -217,7 +217,7 @@ export const RcaAndPatchSynthesisSchema = z.object({
   summary: z.string().describe('Resumo executivo do incidente em 1 parágrafo'),
   rootCause: z.string().describe('Explicação técnica detalhada da causa raiz encontrada no código'),
   evidenceRefs: z.array(z.string()).describe('Lista de referências de evidências (ex: trace_id, métrica, commit)'),
-  suspectFilePath: z.string().describe('Caminho do arquivo remediado (ex: apps/target-app-demo/src/repositories/PaymentRepository.ts)'),
+  suspectFilePath: z.string().describe('Caminho do arquivo remediado (ex: apps/target-app-demo/src/repositories/payment.repository.ts)'),
   patchedContent: z.string().describe('Conteúdo integral do arquivo corrigido pronto para commit'),
   explanation: z.string().describe('Explicação da alteração realizada no patch e como ela resolve o incidente'),
 });
@@ -233,7 +233,7 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 
 ### 2.5 Validação Defensiva do Patch Pré-PR
 Antes de acionar a tool `create_remediation_pr`, o Orchestrator executa a validação do patch sintetizado:
-1. **Allowlist de Arquivo:** `suspectFilePath === 'apps/target-app-demo/src/repositories/PaymentRepository.ts'`.
+1. **Allowlist de Arquivo:** `suspectFilePath === 'apps/target-app-demo/src/repositories/payment.repository.ts'`.
 2. **Parsing Sintático:** O TypeScript Compiler API (`ts.createSourceFile`) valida se o `patchedContent` é sintaticamente válido.
 3. **Asserção de Resolução Operacional:** O código corrigido **deve conter** `client.release()` e `pool` configurado (`max: 10`).
 4. **Desvio para Fallback:** Se o JSON for malformado ou qualquer uma das validações falhar, o Orchestrator aborta o uso da síntese do LLM e direciona imediatamente para o `DeterministicFallbackReasoningAdapter` (`reasoningSource: 'fallback'`).
@@ -243,7 +243,7 @@ Antes de acionar a tool `create_remediation_pr`, o Orchestrator executa a valida
 ## 3. Especificação do Fallback Determinístico (`DeterministicFallbackReasoningAdapter`)
 
 Para garantir que a plataforma nunca falhe ao vivo mesmo em caso de indisponibilidade total do Gemini:
-- **Origem do Código Confiável:** O adapter obtém o arquivo `PaymentRepository.ts` diretamente da versão saudável conhecida (`v2.14.7`) — lendo via GitHub API (`GET /repos/:owner/:repo/contents/apps/target-app-demo/src/repositories/PaymentRepository.ts?ref=v2.14.7`) ou arquivo local na branch `master`.
+- **Origem do Código Confiável:** O adapter obtém o arquivo `payment.repository.ts` diretamente da versão saudável conhecida (`v2.14.7`) — lendo via GitHub API (`GET /repos/:owner/:repo/contents/apps/target-app-demo/src/repositories/payment.repository.ts?ref=v2.14.7`) ou arquivo local na branch `master`.
 - **RCA Determinístico:**
   - `summary`: "Degradação crítica de latência decorrente de saturação do pool de conexões do banco de dados."
   - `rootCause`: "A release v2.14.8 reduziu o pool de conexões para max: 2 e omitiu a liberação de conexões via client.release() em transações que sofrem timeout, provocando KnexTimeoutError."
@@ -350,7 +350,7 @@ Quando em modo `replay` na VPS pública, o orquestrador transmite os eventos gra
     "summary": "Degradação crítica com p95 > 4.5s causada por saturação do pool de conexões do PostgreSQL.",
     "rootCause": "Commit 8f14e45 em v2.14.8 removeu client.release() no tratamento de timeout e reduziu pool max para 2.",
     "reasoningSource": "llm",
-    "suspectFilePath": "apps/target-app-demo/src/repositories/PaymentRepository.ts"
+    "suspectFilePath": "apps/target-app-demo/src/repositories/payment.repository.ts"
   },
   "remediation": {
     "branchUrl": "https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-demo-golden",

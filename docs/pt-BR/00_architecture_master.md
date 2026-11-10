@@ -140,7 +140,7 @@ Para evitar comparações distorcidas com processos que incluem deploy completo 
 | Componente | Padrão | Organização |
 | :--- | :--- | :--- |
 | `apps/orchestrator/` e `apps/mcp-server/` | **Hexagonal (Ports & Adapters)** | `domain` → `application` → `ports` → `adapters`, com composition root em `main.ts` |
-| `apps/target-app-demo/` | **MVC em camadas** | `routes` → `controllers` → `services` → `repositories` (`PaymentRepository`) |
+| `apps/target-app-demo/` | **MVC em camadas** | `routes` → `controllers` → `services` → `repositories` (`payment.repository.ts`) |
 | `apps/dashboard/` | **Single-Pane War Room com Signals** (Angular + PrimeNG Aura Dark) | Standalone Components (`WarRoomComponent` + `DecisionComponent`) focado no fluxo principal de 3 minutos |
 
 ### 5.3 Visão de Contexto (C4 Nível 1)
@@ -384,7 +384,7 @@ flowchart TD
      - **Integration, Security & Support Unit Tests + Coverage Gate:** Vitest com cobertura ≥ 80 % em `domain/` + `application/` (incluindo a suíte de integração Happy/Unhappy Paths do `PiiPromptGuard` e do pipeline HTTP/MCP).
      - **Docker & Compose Smoke Test:** valida `docker compose config` e build das imagens.
   2. **`hotfix-verify.yml` (Validação Automática dos PRs Autônomos):**
-     - Dispara nos Pull Requests `hotfix/zeromttr-*` (abertos pelo ZeroMTTR contra a branch `release/target-v2.14.8`), executa a suíte de regressão do `apps/target-app-demo` (`PaymentRepository`) e publica o comentário de certificação (`✅ ZeroMTTR Autonomous CI Gate: PASSED`).
+     - Dispara nos Pull Requests `hotfix/zeromttr-*` (abertos pelo ZeroMTTR contra a branch `release/target-v2.14.8`), executa a suíte de regressão do `apps/target-app-demo` (`payment.repository.ts`) e publica o comentário de certificação (`✅ ZeroMTTR Autonomous CI Gate: PASSED`).
   3. **`cd-release.yml` (Publicação GHCR & Deploy Controlado na VPS):**
      - Publica imagens no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**.
      - O job `deploy-vps` executa **somente quando uma tag de release da plataforma `v1.*.*` é criada (ignorando tags de demo `v2.14.*`) ou via `workflow_dispatch` manual**, evitando que commits intermediários derrubem ou reiniciem a VPS durante o período de avaliação.

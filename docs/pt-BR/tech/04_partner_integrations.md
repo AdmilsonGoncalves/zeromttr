@@ -20,7 +20,7 @@ interface NotifierPort {
 Onde `RemediationPrReceipt` retorna `{ branchName: string; branchUrl: string; pullRequestUrl: string; commitSha: string }`.
 
 ## 2. GitHub Deploy & Code Inspector (`RepoInspectorPort` — `inspect_git_deploy_diff`)
-- **Objetivo:** comparar as tags reais `v2.14.7` (saudável) e `v2.14.8` (degradada) no repositório `TARGET_GITHUB_REPO` (`https://github.com/AdmilsonGoncalves/zeromttr`, pasta `apps/target-app-demo`) e obter o conteúdo e o `sha` do arquivo suspeito (`apps/target-app-demo/src/repositories/PaymentRepository.ts`).
+- **Objetivo:** comparar as tags reais `v2.14.7` (saudável) e `v2.14.8` (degradada) no repositório `TARGET_GITHUB_REPO` (`https://github.com/AdmilsonGoncalves/zeromttr`, pasta `apps/target-app-demo`) e obter o conteúdo e o `sha` do arquivo suspeito (`apps/target-app-demo/src/repositories/payment.repository.ts`).
 - **Comportamento na API do GitHub:**
   1. Consulta `GET /repos/{owner}/{repo}/compare/{base_ref}...{head_ref}` (`v2.14.7...v2.14.8`).
   2. Filtra arquivos modificados dentro de `service_path` (`apps/target-app-demo`) e extrai o commit autor da mudança, mensagem do commit e *patch* (truncado a ≤ 1500 chars por arquivo).
