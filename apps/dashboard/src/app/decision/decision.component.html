@@ -1,0 +1,92 @@
+<div class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+  <div
+    class="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl flex flex-col gap-4"
+  >
+    <!-- Header -->
+    <div class="flex items-center gap-3 border-b border-slate-800 pb-4">
+      <i class="pi pi-shield text-cyan-400 text-3xl"></i>
+      <div>
+        <h1 class="text-lg font-bold text-white tracking-wide">
+          {{ i18n.t('decisionPageTitle') }}
+        </h1>
+        <p class="text-xs text-slate-400">ZeroMTTR Human-in-the-Loop Governance</p>
+      </div>
+    </div>
+
+    <!-- Incident Info -->
+    <div
+      class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 font-mono text-xs"
+    >
+      <div class="flex justify-between items-center">
+        <span class="text-slate-400">Incident ID:</span>
+        <span class="font-bold text-cyan-300">{{ incidentId() }}</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-slate-400">Requested Action:</span>
+        <p-tag
+          [value]="action() ? action()!.toUpperCase() : 'UNKNOWN'"
+          [severity]="action() === 'approve' ? 'success' : 'danger'"
+          styleClass="text-xs"
+        />
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-slate-400">Expiration:</span>
+        <span [class]="isExpired() ? 'text-rose-400 font-bold' : 'text-slate-300'">
+          {{ expirationFormatted() }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Security Notice -->
+    <div
+      class="bg-slate-950/70 border border-slate-800 rounded p-3 text-xs text-slate-400 flex items-start gap-2"
+    >
+      <i class="pi pi-lock text-emerald-400 mt-0.5"></i>
+      <p class="leading-relaxed">
+        {{ i18n.t('decisionTokenSecurityNote') }}
+      </p>
+    </div>
+
+    <!-- Feedback Messages -->
+    @if (status() === 'success') {
+      <div
+        class="bg-emerald-950/70 border border-emerald-500 rounded p-3 text-emerald-200 text-xs flex items-center gap-2"
+      >
+        <i class="pi pi-check-circle text-emerald-400 text-base"></i>
+        <span class="font-semibold">{{ i18n.t('decisionSuccessMsg') }}</span>
+      </div>
+    }
+
+    @if (status() === 'error' || (!isValid() && errorMessage())) {
+      <div
+        class="bg-rose-950/70 border border-rose-500 rounded p-3 text-rose-200 text-xs flex items-center gap-2"
+      >
+        <i class="pi pi-exclamation-triangle text-rose-400 text-base"></i>
+        <span class="font-semibold">{{ errorMessage() || i18n.t('decisionErrorMsg') }}</span>
+      </div>
+    }
+
+    <!-- Actions -->
+    <div class="flex flex-col gap-2 pt-2 border-t border-slate-800">
+      @if (status() !== 'success') {
+        <p-button
+          [label]="
+            action() === 'reject' ? i18n.t('decisionRejectBtn') : i18n.t('decisionApproveBtn')
+          "
+          [severity]="action() === 'reject' ? 'danger' : 'success'"
+          [disabled]="isExpired() || !isValid() || isSubmitting()"
+          (onClick)="executeDecision()"
+          styleClass="w-full font-bold"
+        />
+      }
+
+      <a
+        routerLink="/"
+        class="inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs py-2 px-4 rounded transition-colors"
+      >
+        <i class="pi pi-arrow-left"></i>
+        <span>{{ i18n.t('backToWarRoom') }}</span>
+      </a>
+    </div>
+  </div>
+</div>

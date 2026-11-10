@@ -1,3 +1,4 @@
+import '@angular/compiler';
 import { describe, it, expect } from 'vitest';
 import { initDashboard } from '../src/main.js';
 
