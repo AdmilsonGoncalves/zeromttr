@@ -10,10 +10,14 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "pino": "^10.4.0",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/nock": "^11.1.0",
     "@types/node": "catalog:",
+    "nock": "^15.0.6",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -12,7 +12,8 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.nx/**',
       'docs/**',
-      '**/*.d.ts'
+      '**/*.d.ts',
+      '**/temp-boundary-*.ts'
     ]
   },
   {
@@ -30,7 +31,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
-      ]
+      ],
+      curly: ['error', 'all']
     }
   },
   {

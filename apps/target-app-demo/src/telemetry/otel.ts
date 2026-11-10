@@ -251,7 +251,9 @@ export class TelemetryService {
   }
 
   private async exportLogToOtlp(log: LogRecord): Promise<void> {
-    if (!this.otlpEndpoint) return;
+    if (!this.otlpEndpoint) {
+      return;
+    }
     try {
       const url = `${this.otlpEndpoint.replace(/\/$/, '')}/v1/logs`;
       const payload = {
@@ -299,7 +301,9 @@ export class TelemetryService {
   }
 
   private async exportSpanToOtlp(span: Span): Promise<void> {
-    if (!this.otlpEndpoint) return;
+    if (!this.otlpEndpoint) {
+      return;
+    }
     try {
       const url = `${this.otlpEndpoint.replace(/\/$/, '')}/v1/traces`;
       const payload = {
@@ -355,7 +359,9 @@ export class TelemetryService {
     attributes: Record<string, string | number | boolean>,
     exemplar?: MetricExemplar
   ): Promise<void> {
-    if (!this.otlpEndpoint) return;
+    if (!this.otlpEndpoint) {
+      return;
+    }
     try {
       const url = `${this.otlpEndpoint.replace(/\/$/, '')}/v1/metrics`;
       const payload = {

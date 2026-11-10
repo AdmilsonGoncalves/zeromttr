@@ -87,7 +87,9 @@ export class PaymentRepository {
         };
 
         const cancel = () => {
-          if (isDone) return;
+          if (isDone) {
+            return;
+          }
           cleanup();
           this.waitingWaiters = Math.max(0, this.waitingWaiters - 1);
           telemetry.recordPoolWaiting(this.waitingWaiters);
