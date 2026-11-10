@@ -1,4 +1,4 @@
-import type { RawPromSeries } from '../domain/summarize-series.js';
+import type { RawPromSeries } from '../domain/index.js';
 
 export interface PromqlQueryInput {
   query: string;

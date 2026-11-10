@@ -11,12 +11,14 @@ import type {
   SendPostMortemResend,
   AnnotateGrafanaIncident
 } from '../application/index.js';
-import type { PromqlQueryInput } from '../ports/metrics.port.js';
-import type { LokiQueryInput } from '../ports/logs.port.js';
-import type { DeployDiffRequest } from '../ports/repo-inspector.port.js';
-import type { RemediationPrRequest } from '../ports/remediation.port.js';
-import type { PostMortemNotification } from '../ports/notifier.port.js';
-import type { AnnotationRequest } from '../ports/annotation.port.js';
+import type {
+  AnnotationRequest,
+  DeployDiffRequest,
+  LokiQueryInput,
+  PostMortemNotification,
+  PromqlQueryInput,
+  RemediationPrRequest
+} from '../ports/index.js';
 
 export interface McpToolDefinition {
   name: string;

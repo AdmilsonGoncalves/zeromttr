@@ -1,6 +1,6 @@
 import { chaosManager } from '../chaos/index.js';
-import type { CreatePaymentInput, Payment } from '../models/payment.model.js';
-import { paymentRepository, PaymentRepository } from '../repositories/payment.repository.js';
+import type { CreatePaymentInput, Payment } from '../models/index.js';
+import { paymentRepository, PaymentRepository } from '../repositories/index.js';
 
 export interface ServiceHealth {
   status: 'ok' | 'degraded';

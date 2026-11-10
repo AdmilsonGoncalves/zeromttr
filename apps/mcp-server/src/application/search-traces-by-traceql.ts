@@ -1,4 +1,4 @@
-import type { TracesPort, TraceSearchResult } from '../ports/traces.port.js';
+import type { TracesPort, TraceSearchResult } from '../ports/index.js';
 
 export interface SearchTracesByTraceQLInput {
   query: string;

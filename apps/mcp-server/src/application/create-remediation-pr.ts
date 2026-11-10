@@ -2,7 +2,7 @@ import type {
   RemediationPort,
   RemediationPrRequest,
   RemediationPrReceipt
-} from '../ports/remediation.port.js';
+} from '../ports/index.js';
 
 export class CreateRemediationPr {
   constructor(private readonly remediationPort: RemediationPort) {}

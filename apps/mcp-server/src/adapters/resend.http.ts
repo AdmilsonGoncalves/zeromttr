@@ -1,8 +1,4 @@
-import type {
-  NotifierPort,
-  PostMortemNotification,
-  NotificationReceipt
-} from '../ports/notifier.port.js';
+import type { NotifierPort, PostMortemNotification, NotificationReceipt } from '../ports/index.js';
 import { escapeHtml } from '@zeromttr/utils';
 import { safeHttpUrl } from '@zeromttr/utils/http';
 

@@ -2,7 +2,7 @@ import type {
   RemediationPort,
   RemediationPrRequest,
   RemediationPrReceipt
-} from '../ports/remediation.port.js';
+} from '../ports/index.js';
 import { isSafeRelativePath } from '@zeromttr/utils';
 
 export interface GithubRemediationConfig {

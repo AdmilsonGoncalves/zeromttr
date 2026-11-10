@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { chaosManager } from '../chaos/index.js';
-import type { CreatePaymentInput, Payment } from '../models/payment.model.js';
-import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
+import type { CreatePaymentInput, Payment } from '../models/index.js';
+import { SpanStatusCode, telemetry } from '../telemetry/index.js';
 import { toErrorMessage } from '@zeromttr/utils';
 
 export class KnexTimeoutError extends Error {

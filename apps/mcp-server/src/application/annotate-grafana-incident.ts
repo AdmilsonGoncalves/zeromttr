@@ -1,8 +1,4 @@
-import type {
-  AnnotationPort,
-  AnnotationRequest,
-  AnnotationReceipt
-} from '../ports/annotation.port.js';
+import type { AnnotationPort, AnnotationRequest, AnnotationReceipt } from '../ports/index.js';
 
 export class AnnotateGrafanaIncident {
   constructor(private readonly annotationPort: AnnotationPort) {}

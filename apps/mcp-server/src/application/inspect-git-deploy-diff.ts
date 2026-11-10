@@ -1,8 +1,4 @@
-import type {
-  RepoInspectorPort,
-  DeployDiffRequest,
-  DeployDiffBundle
-} from '../ports/repo-inspector.port.js';
+import type { RepoInspectorPort, DeployDiffRequest, DeployDiffBundle } from '../ports/index.js';
 
 export class InspectGitDeployDiff {
   constructor(private readonly repoInspectorPort: RepoInspectorPort) {}

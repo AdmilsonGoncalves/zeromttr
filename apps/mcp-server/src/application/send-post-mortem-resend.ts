@@ -1,8 +1,4 @@
-import type {
-  NotifierPort,
-  PostMortemNotification,
-  NotificationReceipt
-} from '../ports/notifier.port.js';
+import type { NotifierPort, PostMortemNotification, NotificationReceipt } from '../ports/index.js';
 
 export class SendPostMortemResend {
   constructor(private readonly notifierPort: NotifierPort) {}

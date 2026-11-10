@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { paymentsController } from '../controllers/payments.controller.js';
+import { paymentsController } from '../controllers/index.js';
 
 export async function handlePaymentsRoutes(
   req: http.IncomingMessage,

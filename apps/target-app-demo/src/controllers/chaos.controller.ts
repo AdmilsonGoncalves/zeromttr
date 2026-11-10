@@ -1,6 +1,6 @@
 import type http from 'node:http';
 import { chaosManager } from '../chaos/index.js';
-import { paymentRepository } from '../repositories/payment.repository.js';
+import { paymentRepository } from '../repositories/index.js';
 
 export class ChaosController {
   public togglePoolSaturation(

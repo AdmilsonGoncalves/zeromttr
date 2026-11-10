@@ -1,5 +1,5 @@
-import type { TracesPort } from '../ports/traces.port.js';
-import { SpanAnalyzer, type RawSpan } from '../domain/span-analysis.js';
+import type { TracesPort } from '../ports/index.js';
+import { SpanAnalyzer, type RawSpan } from '../domain/index.js';
 
 export interface AnalyzeOtelTraceInput {
   trace_id: string;

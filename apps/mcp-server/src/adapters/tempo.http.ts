@@ -1,5 +1,5 @@
-import type { TracesPort, TraceSearchResult } from '../ports/traces.port.js';
-import { extractOtelAttributeValue, type RawSpan } from '../domain/span-analysis.js';
+import type { TracesPort, TraceSearchResult } from '../ports/index.js';
+import { extractOtelAttributeValue, type RawSpan } from '../domain/index.js';
 
 export interface TempoAdapterConfig {
   baseUrl: string;

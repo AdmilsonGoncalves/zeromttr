@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { chaosController } from '../controllers/chaos.controller.js';
+import { chaosController } from '../controllers/index.js';
 
 export function handleChaosRoutes(
   req: http.IncomingMessage,

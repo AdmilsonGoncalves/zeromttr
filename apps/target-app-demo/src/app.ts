@@ -1,8 +1,6 @@
 import type http from 'node:http';
-import { handleChaosRoutes } from './routes/chaos.routes.js';
-import { handleHealthRoutes } from './routes/health.routes.js';
-import { handlePaymentsRoutes } from './routes/payments.routes.js';
-import { initTelemetry } from './telemetry/otel.js';
+import { handleChaosRoutes, handleHealthRoutes, handlePaymentsRoutes } from './routes/index.js';
+import { initTelemetry } from './telemetry/index.js';
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // Basic response defaults

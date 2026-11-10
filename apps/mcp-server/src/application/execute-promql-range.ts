@@ -1,6 +1,10 @@
-import type { MetricsPort, PromqlQueryInput } from '../ports/metrics.port.js';
-import { SeriesSummarizer, type SeriesSummary } from '../domain/summarize-series.js';
-import { FinOpsCalculator, type FinOpsMetrics } from '../domain/finops.js';
+import type { MetricsPort, PromqlQueryInput } from '../ports/index.js';
+import {
+  SeriesSummarizer,
+  type SeriesSummary,
+  FinOpsCalculator,
+  type FinOpsMetrics
+} from '../domain/index.js';
 import { validateTimeRange } from './validate-time-range.js';
 
 export interface ExecutePromqlRangeOutput {

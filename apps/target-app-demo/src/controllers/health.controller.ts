@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { paymentService, PaymentService } from '../services/payment.service.js';
+import { paymentService, PaymentService } from '../services/index.js';
 
 export class HealthController {
   public constructor(private service: PaymentService = paymentService) {}

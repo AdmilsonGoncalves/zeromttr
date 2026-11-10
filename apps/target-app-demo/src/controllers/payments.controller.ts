@@ -1,8 +1,8 @@
 import type http from 'node:http';
-import { CreatePaymentSchema } from '../models/payment.model.js';
-import { KnexTimeoutError } from '../repositories/payment.repository.js';
-import { paymentService, PaymentService } from '../services/payment.service.js';
-import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
+import { CreatePaymentSchema } from '../models/index.js';
+import { KnexTimeoutError } from '../repositories/index.js';
+import { paymentService, PaymentService } from '../services/index.js';
+import { SpanStatusCode, telemetry } from '../telemetry/index.js';
 import { durationInSeconds, toErrorMessage } from '@zeromttr/utils';
 
 export class PaymentsController {
