@@ -35,6 +35,10 @@ if [ -n "${GITHUB_TOKEN}" ]; then
     "https://api.github.com/repos/${GITHUB_REPO}/pulls?state=open&per_page=100" || echo "[]")
 
   # Find PRs with head branch starting with hotfix/zeromttr-
+  if ! echo "${PRS}" | jq -e 'type == "array"' > /dev/null 2>&1; then
+    echo "⚠️ Resposta inesperada da API do GitHub. Pulando limpeza de PRs." >&2
+    PRS="[]"
+  fi
   HOTFIX_PRS=$(echo "${PRS}" | jq -r '.[] | select(.head.ref | startswith("hotfix/zeromttr-")) | "\(.number) \(.head.ref)"' || true)
 
   if [ -n "${HOTFIX_PRS}" ]; then

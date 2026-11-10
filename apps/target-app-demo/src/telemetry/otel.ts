@@ -47,10 +47,20 @@ export interface LogRecord {
 }
 
 export class TelemetryService {
+  private static readonly MAX_BUFFERED_RECORDS = 5000;
+
   private spans: Span[] = [];
   private metrics: MetricRecord[] = [];
   private logs: LogRecord[] = [];
   private otlpEndpoint: string | null = null;
+
+  private pushBounded<T>(buffer: T[], item: T): void {
+    buffer.push(item);
+    const overflow = buffer.length - TelemetryService.MAX_BUFFERED_RECORDS;
+    if (overflow > 0) {
+      buffer.splice(0, overflow);
+    }
+  }
 
   public constructor() {
     this.otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || null;
@@ -105,7 +115,7 @@ export class TelemetryService {
     span.endTime = Date.now();
     span.durationMs = span.endTime - span.startTime;
     span.status = status;
-    this.spans.push(span);
+    this.pushBounded(this.spans, span);
 
     // Asynchronously export to OTel Collector if endpoint configured
     void this.exportSpanToOtlp(span);
@@ -124,7 +134,7 @@ export class TelemetryService {
     };
 
     // http_server_duration (TECH 03 requirement)
-    this.metrics.push({
+    this.pushBounded(this.metrics, {
       name: 'http_server_duration',
       value: durationSeconds,
       attributes: serviceAttributes,
@@ -133,7 +143,7 @@ export class TelemetryService {
     });
 
     // http_request_duration_seconds (Grafana alert rule compatibility)
-    this.metrics.push({
+    this.pushBounded(this.metrics, {
       name: 'http_request_duration_seconds',
       value: durationSeconds,
       attributes: serviceAttributes,
@@ -147,6 +157,12 @@ export class TelemetryService {
       serviceAttributes,
       exemplar
     );
+    void this.exportMetricToOtlp(
+      'http_request_duration_seconds',
+      durationSeconds,
+      serviceAttributes,
+      exemplar
+    );
   }
 
   public recordPoolWaiting(waitingCount: number): void {
@@ -155,7 +171,7 @@ export class TelemetryService {
       version: this.getServiceVersion()
     };
 
-    this.metrics.push({
+    this.pushBounded(this.metrics, {
       name: 'db_pool_waiting',
       value: waitingCount,
       attributes: serviceAttributes,
@@ -171,7 +187,7 @@ export class TelemetryService {
       version: this.getServiceVersion()
     };
 
-    this.metrics.push({
+    this.pushBounded(this.metrics, {
       name: 'db_pool_used',
       value: usedCount,
       attributes: serviceAttributes,
@@ -179,7 +195,7 @@ export class TelemetryService {
     });
 
     // payment_pool_connections_active (Grafana alert rule compatibility)
-    this.metrics.push({
+    this.pushBounded(this.metrics, {
       name: 'payment_pool_connections_active',
       value: usedCount,
       attributes: serviceAttributes,
@@ -211,7 +227,7 @@ export class TelemetryService {
         ...(context?.attributes || {})
       }
     };
-    this.logs.push(logRecord);
+    this.pushBounded(this.logs, logRecord);
 
     void this.exportLogToOtlp(logRecord);
   }

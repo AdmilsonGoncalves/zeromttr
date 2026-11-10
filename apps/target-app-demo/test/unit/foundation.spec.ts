@@ -43,10 +43,26 @@ describe('target-app-demo foundation unit tests', () => {
       telemetry.recordHttpServerDuration(0.125, traceId);
 
       const metrics = telemetry.getMetrics();
-      const metric = metrics.find((m) => m.name === 'http_server_duration');
-      expect(metric).toBeDefined();
-      expect(metric?.value).toBe(0.125);
-      expect(metric?.exemplar?.traceId).toBe(traceId);
+      const serverDuration = metrics.find((m) => m.name === 'http_server_duration');
+      const reqDuration = metrics.find((m) => m.name === 'http_request_duration_seconds');
+      expect(serverDuration).toBeDefined();
+      expect(serverDuration?.value).toBe(0.125);
+      expect(serverDuration?.exemplar?.traceId).toBe(traceId);
+      expect(reqDuration).toBeDefined();
+      expect(reqDuration?.value).toBe(0.125);
+      expect(reqDuration?.exemplar?.traceId).toBe(traceId);
+    });
+
+    it('should enforce bounded buffer limits and discard oldest records', () => {
+      // Push 5005 spans to test bounded buffer capacity
+      for (let i = 0; i < 5005; i++) {
+        const s = telemetry.startSpan(`span-${i}`);
+        telemetry.endSpan(s);
+      }
+      const spans = telemetry.getSpans();
+      expect(spans.length).toBe(5000);
+      expect(spans[0].name).toBe('span-5');
+      expect(spans[spans.length - 1].name).toBe('span-5004');
     });
 
     it('should record pool metrics db_pool_waiting and db_pool_used', () => {

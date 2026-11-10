@@ -15,9 +15,18 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   let body: unknown = undefined;
   if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
     try {
+      const MAX_BODY_BYTES = 1024 * 1024;
       const rawBody = await new Promise<string>((resolve, reject) => {
         let chunks = '';
-        req.on('data', (chunk) => {
+        let totalBytes = 0;
+        req.setEncoding('utf8');
+        req.on('data', (chunk: string) => {
+          totalBytes += Buffer.byteLength(chunk, 'utf8');
+          if (totalBytes > MAX_BODY_BYTES) {
+            reject(new Error('Request body too large'));
+            req.destroy();
+            return;
+          }
           chunks += chunk;
         });
         req.on('end', () => resolve(chunks));

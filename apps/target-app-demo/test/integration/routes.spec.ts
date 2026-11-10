@@ -92,6 +92,21 @@ describe('target-app-demo routes integration', () => {
       expect(queryRes.body).toEqual(payment);
     });
 
+    it('should correctly preserve multibyte UTF-8 characters across chunk boundaries', async () => {
+      const payload = {
+        amount: 88.5,
+        payerCpf: '123.456.789-00',
+        merchantCnpj: '12.345.678/0001-99',
+        pixKey: 'cliente.teste@exemplo.com.br',
+        description: 'Venda PIX Integração Operacional com Acentuação e Cedilha'
+      };
+
+      const res = await postPayment(server, payload);
+      expect(res.status).toBe(201);
+      const payment = res.body as { description: string };
+      expect(payment.description).toBe('Venda PIX Integração Operacional com Acentuação e Cedilha');
+    });
+
     it('should return 400 Bad Request when payment payload is invalid', async () => {
       const invalidPayload = {
         amount: -50, // invalid negative amount

@@ -37,8 +37,6 @@ PAYLOAD='{
 }'
 
 END_TIME=$((SECONDS + DURATION))
-SUCCESS_COUNT=0
-TIMEOUT_COUNT=0
 
 worker_loop() {
   local worker_id=$1
