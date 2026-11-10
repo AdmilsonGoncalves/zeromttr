@@ -1,1 +1,1 @@
-export {};
+export * from './payment.model.js';
