@@ -3,6 +3,7 @@ import { CreatePaymentSchema } from '../models/payment.model.js';
 import { KnexTimeoutError } from '../repositories/payment.repository.js';
 import { paymentService, PaymentService } from '../services/payment.service.js';
 import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
+import { durationInSeconds, toErrorMessage } from '@zeromttr/utils';
 
 export class PaymentsController {
   public constructor(private service: PaymentService = paymentService) {}
@@ -26,7 +27,7 @@ export class PaymentsController {
     try {
       const parsed = CreatePaymentSchema.safeParse(body);
       if (!parsed.success) {
-        const durationSec = (Date.now() - startTime) / 1000;
+        const durationSec = durationInSeconds(startTime);
         telemetry.recordHttpServerDuration(durationSec, traceId);
         telemetry.endSpan(span, {
           code: SpanStatusCode.ERROR,
@@ -43,7 +44,7 @@ export class PaymentsController {
       // Process payment
       const payment = await this.service.createPayment(parsed.data, { traceId });
 
-      const durationSec = (Date.now() - startTime) / 1000;
+      const durationSec = durationInSeconds(startTime);
       telemetry.recordHttpServerDuration(durationSec, traceId);
       telemetry.endSpan(span, { code: SpanStatusCode.OK });
 
@@ -53,13 +54,13 @@ export class PaymentsController {
       });
       res.end(JSON.stringify(payment));
     } catch (error) {
-      const durationSec = (Date.now() - startTime) / 1000;
+      const durationSec = durationInSeconds(startTime);
       telemetry.recordHttpServerDuration(durationSec, traceId);
 
       const isPoolTimeout = error instanceof KnexTimeoutError;
       telemetry.endSpan(span, {
         code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : 'Internal Server Error'
+        message: toErrorMessage(error, 'Internal Server Error')
       });
 
       const statusCode = isPoolTimeout ? 503 : 500;
@@ -97,7 +98,7 @@ export class PaymentsController {
 
     try {
       const payment = await this.service.getPayment(paymentId, traceId);
-      const durationSec = (Date.now() - startTime) / 1000;
+      const durationSec = durationInSeconds(startTime);
       telemetry.recordHttpServerDuration(durationSec, traceId);
 
       if (!payment) {
@@ -120,13 +121,13 @@ export class PaymentsController {
       });
       res.end(JSON.stringify(payment));
     } catch (error) {
-      const durationSec = (Date.now() - startTime) / 1000;
+      const durationSec = durationInSeconds(startTime);
       telemetry.recordHttpServerDuration(durationSec, traceId);
 
       const isPoolTimeout = error instanceof KnexTimeoutError;
       telemetry.endSpan(span, {
         code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : 'Internal Server Error'
+        message: toErrorMessage(error, 'Internal Server Error')
       });
 
       const statusCode = isPoolTimeout ? 503 : 500;

@@ -1,18 +1,12 @@
+import { isEmpty, isNonEmptyString, isString, truncate } from '@zeromttr/utils';
+
 export function truncateLines(lines: string[], maxLines = 100, maxChars = 500): string[] {
   const boundedLines = lines.slice(0, maxLines);
-  return boundedLines.map((line) => {
-    if (line.length <= maxChars) {
-      return line;
-    }
-    return `${line.slice(0, maxChars)}...`;
-  });
+  return boundedLines.map((line) => truncate(line, maxChars));
 }
 
 export function truncateDiff(diff: string, maxChars = 1500): string {
-  if (diff.length <= maxChars) {
-    return diff;
-  }
-  return `${diff.slice(0, maxChars)}\n... [TRUNCATED_DIFF]`;
+  return truncate(diff, maxChars, '\n... [TRUNCATED_DIFF]');
 }
 
 export function sanitizeCommitMessage(message: string): string {
@@ -29,16 +23,16 @@ export function sanitizeCommitMessage(message: string): string {
 export function sanitizeAuthorLogin(
   author: { login?: string; name?: string; email?: string } | string | null | undefined
 ): string {
-  if (!author) {
+  if (isEmpty(author)) {
     return 'unknown';
   }
-  if (typeof author === 'string') {
+  if (isString(author)) {
     return author.trim();
   }
-  if (author.login && typeof author.login === 'string') {
+  if (isNonEmptyString(author.login)) {
     return author.login.trim();
   }
-  if (author.name && typeof author.name === 'string') {
+  if (isNonEmptyString(author.name)) {
     return author.name.trim();
   }
   return 'unknown';

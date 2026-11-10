@@ -1,5 +1,6 @@
 import type { MetricsPort, PromqlQueryInput, MetricsQueryResult } from '../ports/metrics.port.js';
 import type { RawPromSeries } from '../domain/summarize-series.js';
+import { buildUrl } from '@zeromttr/utils/http';
 
 export interface PrometheusAdapterConfig {
   baseUrl: string;
@@ -10,16 +11,15 @@ export class PrometheusHttpAdapter implements MetricsPort {
   constructor(private readonly config: PrometheusAdapterConfig) {}
 
   async queryRange(input: PromqlQueryInput): Promise<MetricsQueryResult> {
-    const params = new URLSearchParams({
-      query: input.query,
-      start: input.start,
-      end: input.end
-    });
     const windowSec = Math.max(1, (Date.parse(input.end) - Date.parse(input.start)) / 1000);
     const defaultStep = `${Math.max(15, Math.ceil(windowSec / 250))}s`;
-    params.append('step', input.step || defaultStep);
 
-    const url = `${this.config.baseUrl.replace(/\/$/, '')}/api/v1/query_range?${params.toString()}`;
+    const url = buildUrl(this.config.baseUrl, '/api/v1/query_range', {
+      query: input.query,
+      start: input.start,
+      end: input.end,
+      step: input.step || defaultStep
+    });
     const response = await fetch(url, {
       headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(this.config.timeoutMs || 10_000)

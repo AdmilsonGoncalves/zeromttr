@@ -52,10 +52,12 @@ export default tseslint.config(
                 '../http/**',
                 '../../adapters/**',
                 '../../transport/**',
-                '../../http/**'
+                '../../http/**',
+                '@zeromttr/utils/http',
+                '**/http.utils*'
               ],
               message:
-                'Hexagonal boundary violation: domain and application layers must not import adapters, transport, or http layers.'
+                'Hexagonal boundary violation: domain and application layers must not import adapters, transport, http layers, or http utils.'
             },
             {
               group: ['express', 'axios', '@modelcontextprotocol/sdk'],

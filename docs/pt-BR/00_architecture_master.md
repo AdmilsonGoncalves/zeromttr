@@ -106,7 +106,7 @@ Para evitar comparações distorcidas com processos que incluem deploy completo 
 
 | Camada | Tecnologia | Papel |
 | :--- | :--- | :--- |
-| Runtime & Monorepo | **Node.js 24 LTS**, **pnpm** (`pnpm-workspace.yaml`), **Nx** (`nx.json`), TypeScript (`strict`, `ES2024`, `NodeNext`) | Orquestração de tarefas, cache de build/testes e pacotes em `apps/*` |
+| Runtime & Monorepo | **Node.js 24 LTS**, **pnpm** (`pnpm-workspace.yaml`), **Nx** (`nx.json`), TypeScript (`strict`, `ES2024`, `NodeNext`) | Orquestração de tarefas, cache de build/testes e pacotes em `apps/*` e `libs/*` |
 | Instrumentação | OpenTelemetry SDK (Node) | Emissão de traces, métricas (com exemplars) e logs estruturados |
 | Ingestão & Sanitização | OTel Collector Contrib 0.114+ | `memory_limiter`, **`transform` (OTTL regex masking no `log.body` e atributos)**, `redaction` (spans), `tail_sampling` |
 | Armazenamento | Prometheus (exemplars), Loki, Tempo | Stack LGTM |
@@ -271,9 +271,9 @@ Ciclo **Red → Green → Refactor** com foco na filosofia *Testing Trophy*:
 ```text
 zeromttr/
 ├── package.json                  # Scripts raiz delegando ao Nx (check:workspace, lint:workspace, test:workspace, build:workspace)
-├── pnpm-workspace.yaml           # packages: ['apps/*']
+├── pnpm-workspace.yaml           # packages: ['apps/*', 'libs/*']
 ├── nx.json                       # Task pipeline, cache e affected (Nx package-based)
-├── tsconfig.base.json            # Strict TS config compartilhado
+├── tsconfig.base.json            # Strict TS config compartilhado com path mapping (@zeromttr/*)
 ├── .mcp.json                     # Configuração pronta para conectar clientes MCP externos (Inspector / Cursor / Claude)
 ├── .nvmrc                        # Node 24
 ├── .dockerignore                 # Mantém contexto de build Docker < 2 MB
@@ -299,6 +299,15 @@ zeromttr/
 │   └── grafana/provisioning/
 │       ├── datasources/datasources.yaml
 │       └── alerting/{rules.yaml,contact-points.yaml,policies.yaml}
+├── libs/
+│   └── utils/                    # Pacote compartilhado de utilitários e Type Guards (@zeromttr/utils)
+│       ├── src/
+│       │   ├── string.utils.ts   # isNonEmptyString, sanitize, truncate, etc.
+│       │   ├── object.utils.ts   # isEmpty, isFilled, omit, pick, etc.
+│       │   ├── array.utils.ts    # compact, chunk, etc.
+│       │   ├── http.utils.ts     # Helpers HTTP (isolado, consumo exclusivo por adapters)
+│       │   └── index.ts          # Barrel export das funções puras
+│       └── test/unit/            # Testes unitários puros com Vitest
 ├── apps/
 │   ├── mcp-server/               # Hexagonal (8 tools + FinOps telemetry + adapters LGTM/GitHub/Resend)
 │   │   ├── src/

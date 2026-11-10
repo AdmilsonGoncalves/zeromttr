@@ -1,5 +1,6 @@
 import type http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { isString, safeJsonParse } from '@zeromttr/utils';
 import { bootstrap } from '../../src/main.js';
 
 export interface HttpResponse<T = unknown> {
@@ -31,18 +32,12 @@ export async function makeRequest<T = unknown>(
   };
 
   if (options.body) {
-    fetchOptions.body =
-      typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+    fetchOptions.body = isString(options.body) ? options.body : JSON.stringify(options.body);
   }
 
   const response = await fetch(url, fetchOptions);
   const text = await response.text();
-  let parsedBody: unknown;
-  try {
-    parsedBody = JSON.parse(text);
-  } catch {
-    parsedBody = text;
-  }
+  const parsedBody = safeJsonParse(text, text);
 
   return {
     status: response.status,

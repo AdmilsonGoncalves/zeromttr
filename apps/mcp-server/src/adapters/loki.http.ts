@@ -1,4 +1,6 @@
 import type { LogsPort, LokiQueryInput, LogsQueryResult } from '../ports/logs.port.js';
+import { isArray, isString } from '@zeromttr/utils';
+import { buildUrl } from '@zeromttr/utils/http';
 
 export interface LokiAdapterConfig {
   baseUrl: string;
@@ -8,16 +10,12 @@ export class LokiHttpAdapter implements LogsPort {
   constructor(private readonly config: LokiAdapterConfig) {}
 
   async queryLogs(input: LokiQueryInput): Promise<LogsQueryResult> {
-    const params = new URLSearchParams({
+    const url = buildUrl(this.config.baseUrl, '/loki/api/v1/query_range', {
       query: input.logql,
       start: input.start,
-      end: input.end
+      end: input.end,
+      limit: input.limit
     });
-    if (input.limit) {
-      params.append('limit', String(input.limit));
-    }
-
-    const url = `${this.config.baseUrl.replace(/\/$/, '')}/loki/api/v1/query_range?${params.toString()}`;
     const response = await fetch(url, {
       headers: { Accept: 'application/json' }
     });
@@ -45,11 +43,11 @@ export class LokiHttpAdapter implements LogsPort {
     }
 
     const lines: string[] = [];
-    if (data.status === 'success' && data.data && Array.isArray(data.data.result)) {
+    if (data.status === 'success' && data.data && isArray(data.data.result)) {
       for (const item of data.data.result) {
-        if (Array.isArray(item.values)) {
+        if (isArray(item.values)) {
           for (const val of item.values) {
-            if (Array.isArray(val) && typeof val[1] === 'string') {
+            if (isArray(val) && isString(val[1])) {
               lines.push(val[1]);
             }
           }

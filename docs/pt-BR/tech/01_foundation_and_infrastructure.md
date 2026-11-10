@@ -10,7 +10,7 @@ Estrutura de pastas, tooling de qualidade, configurações da stack de observabi
 
 ### T1.1 Esqueleto do Monorepo (`pnpm` + `Nx` em `apps/*`)
 Criar a estrutura definida na §7 do documento mestre:
-- **Gerenciador de pacotes:** **pnpm** (`packageManager: "pnpm@10.x"` no `package.json` raiz via Corepack) + `pnpm-workspace.yaml` com `packages: ['apps/*']` (`apps/mcp-server`, `apps/orchestrator`, `apps/target-app-demo`, `apps/dashboard`).
+- **Gerenciador de pacotes:** **pnpm** (`packageManager: "pnpm@10.x"` no `package.json` raiz via Corepack) + `pnpm-workspace.yaml` com `packages: ['apps/*', 'libs/*']` (`apps/mcp-server`, `apps/orchestrator`, `apps/target-app-demo`, `apps/dashboard`, `libs/utils`).
 - **Orquestrador de monorepo:** **Nx (Package-Based)** com `nx.json` enxuto na raiz configurando `targetDefaults` (`build`, `lint`, `typecheck`, `test` com cache local habilitado).
 - **TypeScript & Runtime:** `tsconfig.base.json` na raiz (`strict`, `ES2024`, `NodeNext`), Node 24 em `.nvmrc` e `engines` (`>=24.0.0`).
 - **`.dockerignore` na raiz:** ignorar `node_modules/`, `.nx/`, `dist/`, `coverage/`, `.git/` e `docs/` para manter o contexto de build Docker (`context: .`) abaixo de 2 MB.

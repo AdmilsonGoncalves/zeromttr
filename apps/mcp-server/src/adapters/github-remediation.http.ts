@@ -3,6 +3,7 @@ import type {
   RemediationPrRequest,
   RemediationPrReceipt
 } from '../ports/remediation.port.js';
+import { isSafeRelativePath } from '@zeromttr/utils';
 
 export interface GithubRemediationConfig {
   repo: string;
@@ -37,13 +38,7 @@ export class GithubRemediationHttpAdapter implements RemediationPort {
       );
     }
 
-    const segments = req.file_path.split('/').filter(Boolean);
-    if (
-      segments.length === 0 ||
-      segments.some((seg) => seg === '.' || seg === '..') ||
-      req.file_path.startsWith('/') ||
-      req.file_path.includes('\\')
-    ) {
+    if (!isSafeRelativePath(req.file_path)) {
       throw new Error(
         `Invalid file_path '${req.file_path}'. Must be a safe repository-relative path without dot segments.`
       );

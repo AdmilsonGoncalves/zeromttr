@@ -1,5 +1,6 @@
 import type http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { safeJsonParse } from '@zeromttr/utils';
 
 export interface HttpResponse {
   status: number;
@@ -26,12 +27,7 @@ export async function makeRequest(
     body: options.body
   });
   const text = await response.text();
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    body = text;
-  }
+  const body = safeJsonParse(text, text);
   return {
     status: response.status,
     body,
