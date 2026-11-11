@@ -18,20 +18,22 @@
               [severity]="incidentService.sseConnected() ? 'success' : 'danger'"
               styleClass="text-[10px] py-0"
             />
-            <p-tag
-              [value]="
-                (incidentService.targetStatus()?.service ?? 'api-pagamentos-core') +
-                ': ' +
-                (incidentService.targetStatus()?.status === 'healthy'
-                  ? i18n.t('healthy')
-                  : i18n.t('degraded')) +
-                ' (' +
-                (incidentService.targetStatus()?.version ?? 'v2.14.8') +
-                ')'
-              "
-              [severity]="incidentService.targetStatus()?.status === 'healthy' ? 'success' : 'warn'"
-              styleClass="text-[10px] py-0"
-            />
+            @if (incidentService.targetStatus(); as ts) {
+              <p-tag
+                [value]="
+                  ts.service +
+                  ': ' +
+                  (ts.status === 'healthy' ? i18n.t('healthy') : i18n.t('degraded')) +
+                  ' (' +
+                  ts.version +
+                  ')'
+                "
+                [severity]="ts.status === 'healthy' ? 'success' : 'warn'"
+                styleClass="text-[10px] py-0"
+              />
+            } @else {
+              <p-tag value="Target: --" severity="secondary" styleClass="text-[10px] py-0" />
+            }
           </div>
           <p class="text-[11px] text-slate-400">
             {{ i18n.t('appSubtitle') }}
@@ -119,17 +121,15 @@
       <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
         <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtdLabel') }}</span>
         <span class="text-base font-mono font-bold text-emerald-400">
-          {{
-            incidentService.currentIncident()?.rca?.diagnosisSeconds
-              ? incidentService.currentIncident()!.rca!.diagnosisSeconds + 's'
-              : '4.7s'
-          }}
+          {{ incidentService.ttdDisplay() }}
         </span>
         <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtdTarget') }}</span>
       </div>
       <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
         <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtprLabel') }}</span>
-        <span class="text-base font-mono font-bold text-emerald-400">18.2s</span>
+        <span class="text-base font-mono font-bold text-emerald-400">
+          {{ incidentService.ttprDisplay() }}
+        </span>
         <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtprTarget') }}</span>
       </div>
       <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
@@ -148,12 +148,14 @@
             >
               {{ i18n.t('reasoningSourceLlm') }}
             </span>
-          } @else {
+          } @else if (incidentService.reasoningSource() === 'fallback') {
             <span
               class="bg-amber-950 border border-amber-500 text-amber-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
             >
               {{ i18n.t('reasoningSourceFallback') }}
             </span>
+          } @else {
+            <span class="text-slate-500 font-mono text-[11px]">--</span>
           }
         </div>
         <span class="text-[9px] text-slate-400 mt-0.5">rca.reasoningSource</span>
@@ -319,14 +321,14 @@
             <div class="flex flex-col gap-2.5 pt-1.5">
               <!-- PII Audit Badge -->
               <div class="flex justify-center p-0.5">
-                @if (incidentService.isPiiPassed()) {
+                @if (incidentService.isPiiPassed() === true) {
                   <div
                     class="bg-emerald-950 border border-emerald-500 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
                   >
                     <i class="pi pi-check-circle text-emerald-400"></i>
                     <span>{{ i18n.t('piiGuardVerifiedBadge') }}</span>
                   </div>
-                } @else {
+                } @else if (incidentService.isPiiPassed() === false) {
                   <div
                     class="bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
                   >
@@ -338,6 +340,13 @@
                           .replace('{N}', incidentService.leakedPatternsCount().toString())
                       }}
                     </span>
+                  </div>
+                } @else {
+                  <div
+                    class="bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 shadow"
+                  >
+                    <i class="pi pi-hourglass text-slate-400"></i>
+                    <span>Aguardando auditoria...</span>
                   </div>
                 }
               </div>

@@ -124,6 +124,45 @@ describe('Dashboard Mock Server', () => {
     expect(body.source).toBe('email_hmac');
   });
 
+  it('should reject decision with 404 for unknown incidentId', async () => {
+    const validExp = Math.floor(Date.now() / 1000) + 3600;
+    const res = await fetch(`${baseUrl}/api/incidents/unknown-incident-999/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'approve',
+        sig: 'sig123',
+        exp: validExp
+      })
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('should reject decision with 400 for invalid action', async () => {
+    const validExp = Math.floor(Date.now() / 1000) + 3600;
+    const res = await fetch(`${baseUrl}/api/incidents/inc-20261110-001/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'invalid_action',
+        sig: 'sig123',
+        exp: validExp
+      })
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('should reject request with 400 on malformed JSON payload', async () => {
+    const res = await fetch(`${baseUrl}/api/demo/chaos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{ malformed json'
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('Invalid JSON payload');
+  });
+
   it('should stream events over GET /api/events (SSE)', async () => {
     const response = await fetch(`${baseUrl}/api/events`);
     expect(response.status).toBe(200);

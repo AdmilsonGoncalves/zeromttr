@@ -21,6 +21,13 @@ export interface MockServerOptions {
   heartbeatIntervalMs?: number;
 }
 
+class ClientError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'ClientError';
+  }
+}
+
 export class MockServer {
   private server: http.Server | null = null;
   private sseClients = new Set<ServerResponse>();
@@ -48,8 +55,14 @@ export class MockServer {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => {
         this.handleRequest(req, res).catch((err: unknown) => {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: toErrorMessage(err) }));
+          if (!res.headersSent) {
+            const isClient =
+              err instanceof ClientError || (err instanceof Error && err.name === 'ClientError');
+            res.writeHead(isClient ? 400 : 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: toErrorMessage(err) }));
+          } else {
+            res.end();
+          }
         });
       });
 
@@ -126,7 +139,7 @@ export class MockServer {
         }
         const parsed = safeJsonParse<T>(data);
         if (parsed === null) {
-          reject(new Error('Invalid JSON payload'));
+          reject(new ClientError('Invalid JSON payload'));
           return;
         }
         resolve(parsed);
@@ -326,11 +339,23 @@ export class MockServer {
         return;
       }
       const incidentId = match[1];
+      if (incidentId !== this.currentIncident.id) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `Incident not found: ${incidentId}` }));
+        return;
+      }
+
       const body = await this.parseBody<DecisionPayload>(req);
 
       if (!isNonEmptyString(body.action) || !isNonEmptyString(body.sig) || !isNumber(body.exp)) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Missing decision parameters (action, sig, exp)' }));
+        return;
+      }
+
+      if (body.action !== 'approve' && body.action !== 'reject') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid decision action: must be approve or reject' }));
         return;
       }
 
@@ -370,6 +395,18 @@ export class MockServer {
       if (!isNonEmptyString(body.incidentId) || !isNonEmptyString(body.action)) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Missing incidentId or action' }));
+        return;
+      }
+
+      if (body.incidentId !== this.currentIncident.id) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `Incident not found: ${body.incidentId}` }));
+        return;
+      }
+
+      if (body.action !== 'approve' && body.action !== 'reject') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid decision action: must be approve or reject' }));
         return;
       }
 

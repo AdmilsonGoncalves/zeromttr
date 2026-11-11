@@ -5,7 +5,8 @@ import {
   isNonEmptyString,
   percentage,
   round,
-  safeJsonParse
+  safeJsonParse,
+  toErrorMessage
 } from '@zeromttr/utils';
 import type {
   DecisionPayload,
@@ -50,6 +51,7 @@ export class IncidentService {
   readonly liveDemoKey = signal<string>('');
   readonly isSimulating = signal<boolean>(false);
   readonly decisionStatus = signal<'idle' | 'loading' | 'success' | 'error'>('idle');
+  readonly loadError = signal<string | null>(null);
 
   readonly finopsReduction = computed<number>(() => {
     const finops = this.currentIncident()?.finops;
@@ -86,12 +88,38 @@ export class IncidentService {
     return `${rca.signalsCollected}/${rca.signalsTotal}`;
   });
 
-  readonly reasoningSource = computed<ReasoningSource>(() => {
-    return this.currentIncident()?.rca?.reasoningSource ?? 'llm';
+  readonly reasoningSource = computed<ReasoningSource | null>(() => {
+    return this.currentIncident()?.rca?.reasoningSource ?? null;
   });
 
-  readonly isPiiPassed = computed<boolean>(() => {
-    return this.currentIncident()?.rca?.piiGuardAudit.passed ?? true;
+  readonly isPiiPassed = computed<boolean | null>(() => {
+    const audit = this.currentIncident()?.rca?.piiGuardAudit;
+    return audit ? audit.passed : null;
+  });
+
+  readonly ttdDisplay = computed<string>(() => {
+    const sec = this.currentIncident()?.rca?.diagnosisSeconds;
+    if (typeof sec === 'number') {
+      return `${sec}s`;
+    }
+    return '--';
+  });
+
+  readonly ttprDisplay = computed<string>(() => {
+    const incident = this.currentIncident();
+    if (!incident) {
+      return '--';
+    }
+    const started = incident.startedAt ? new Date(incident.startedAt).getTime() : null;
+    const prTransition = incident.transitions?.find(
+      (t) => t.to === 'AWAITING_PR' || t.to === 'NOTIFIED'
+    );
+    if (started && prTransition) {
+      const prTime = new Date(prTransition.at).getTime();
+      const diffSec = ((prTime - started) / 1000).toFixed(1);
+      return `${diffSec}s`;
+    }
+    return '--';
   });
 
   readonly leakedPatternsCount = computed<number>(() => {
@@ -445,28 +473,49 @@ export class IncidentService {
   }
 
   async fetchIncidents(baseUrl = ''): Promise<void> {
-    const res = await fetch(`${baseUrl}/api/incidents`);
-    if (res.ok) {
-      const incidents = (await res.json()) as IncidentDetail[];
-      if (isNonEmptyArray<IncidentDetail>(incidents)) {
-        await this.fetchIncident(incidents[0].id, baseUrl);
+    try {
+      const res = await fetch(`${baseUrl}/api/incidents`);
+      if (res.ok) {
+        const incidents = (await res.json()) as IncidentDetail[];
+        if (isNonEmptyArray<IncidentDetail>(incidents)) {
+          await this.fetchIncident(incidents[0].id, baseUrl);
+        }
+        this.loadError.set(null);
+      } else {
+        this.loadError.set(`Failed to fetch incidents: HTTP ${res.status}`);
       }
+    } catch (err) {
+      this.loadError.set(toErrorMessage(err));
     }
   }
 
   async fetchIncident(id: string, baseUrl = ''): Promise<void> {
-    const res = await fetch(`${baseUrl}/api/incidents/${encodeURIComponent(id)}`);
-    if (res.ok) {
-      const detail = (await res.json()) as IncidentDetail;
-      this.currentIncident.set(detail);
+    try {
+      const res = await fetch(`${baseUrl}/api/incidents/${encodeURIComponent(id)}`);
+      if (res.ok) {
+        const detail = (await res.json()) as IncidentDetail;
+        this.currentIncident.set(detail);
+        this.loadError.set(null);
+      } else {
+        this.loadError.set(`Failed to fetch incident ${id}: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      this.loadError.set(toErrorMessage(err));
     }
   }
 
   async fetchTargetStatus(baseUrl = ''): Promise<void> {
-    const res = await fetch(`${baseUrl}/api/target/status`);
-    if (res.ok) {
-      const status = (await res.json()) as TargetStatusResponse;
-      this.targetStatus.set(status);
+    try {
+      const res = await fetch(`${baseUrl}/api/target/status`);
+      if (res.ok) {
+        const status = (await res.json()) as TargetStatusResponse;
+        this.targetStatus.set(status);
+        this.loadError.set(null);
+      } else {
+        this.loadError.set(`Failed to fetch target status: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      this.loadError.set(toErrorMessage(err));
     }
   }
 

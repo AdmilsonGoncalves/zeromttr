@@ -5,7 +5,7 @@ import * as path from 'node:path';
 function angularTemplateInlinePlugin() {
   return {
     name: 'angular-template-inline',
-    transform(code: string, id: string) {
+    transform(this: { addWatchFile?: (id: string) => void }, code: string, id: string) {
       if (!id.endsWith('.component.ts')) {
         return null;
       }
@@ -19,6 +19,9 @@ function angularTemplateInlinePlugin() {
         (match, relativePath) => {
           const filePath = path.resolve(dir, relativePath);
           if (fs.existsSync(filePath)) {
+            if (typeof this.addWatchFile === 'function') {
+              this.addWatchFile(filePath);
+            }
             const content = fs.readFileSync(filePath, 'utf-8');
             return `template: ${JSON.stringify(content)}`;
           }
@@ -32,6 +35,9 @@ function angularTemplateInlinePlugin() {
         (match, relativePath) => {
           const filePath = path.resolve(dir, relativePath);
           if (fs.existsSync(filePath)) {
+            if (typeof this.addWatchFile === 'function') {
+              this.addWatchFile(filePath);
+            }
             const content = fs.readFileSync(filePath, 'utf-8');
             return `styles: [${JSON.stringify(content)}]`;
           }
@@ -63,7 +69,7 @@ export default {
     strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: `http://localhost:${process.env.MOCK_SERVER_PORT || process.env.PORT || 8080}`,
         changeOrigin: true
       }
     }

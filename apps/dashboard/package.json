@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "mock": "pnpm dlx tsx mock-server/index.ts",
+    "mock": "pnpm --filter @zeromttr/utils run build && pnpm dlx tsx mock-server/index.ts",
     "dev": "pnpm dlx vite",
     "start": "pnpm run mock & pnpm run dev"
   },
