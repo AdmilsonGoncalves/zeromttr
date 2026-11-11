@@ -55,6 +55,7 @@ function angularTemplateInlinePlugin() {
 
 export default {
   root: '.',
+  envDir: '../../',
   plugins: [tailwindcss(), angularTemplateInlinePlugin()],
   esbuild: {
     tsconfigRaw: {

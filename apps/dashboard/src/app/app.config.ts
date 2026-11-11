@@ -13,7 +13,9 @@ export const appConfig: ApplicationConfig = {
         options: {
           darkModeSelector: '.dark'
         }
-      }
+      },
+      license: (import.meta as unknown as { env?: { VITE_PRIMEUI_LICENSE_KEY?: string } }).env
+        ?.VITE_PRIMEUI_LICENSE_KEY
     })
   ]
 };

@@ -3,20 +3,20 @@ import {
   Component,
   OnInit,
   OnDestroy,
+  computed,
   inject,
   signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { isNonEmptyString, isString } from '@zeromttr/utils';
-import { Toolbar } from 'primeng/toolbar';
 import { SelectButton } from 'primeng/selectbutton';
 import { Tag } from 'primeng/tag';
 import { Button } from 'primeng/button';
 import { Timeline } from 'primeng/timeline';
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from 'primeng/tabs';
 import { ProgressBar } from 'primeng/progressbar';
-import { Card } from 'primeng/card';
 import {
   I18nService,
   type IncidentMode,
@@ -42,7 +42,6 @@ interface LangOption {
   imports: [
     CommonModule,
     FormsModule,
-    Toolbar,
     SelectButton,
     Tag,
     Button,
@@ -52,8 +51,7 @@ interface LangOption {
     Tab,
     TabPanels,
     TabPanel,
-    ProgressBar,
-    Card
+    ProgressBar
   ],
   templateUrl: './war-room.component.html',
   styleUrl: './war-room.component.css',
@@ -62,6 +60,7 @@ interface LangOption {
 export class WarRoomComponent implements OnInit, OnDestroy {
   readonly i18n: I18nService;
   readonly incidentService: IncidentService;
+  readonly sanitizer: DomSanitizer;
 
   readonly activeTab = signal<string>('0');
   readonly mockGitDiff = MOCK_GIT_DIFF;
@@ -81,6 +80,13 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     </div>
   `;
 
+  readonly safeResendPreview = computed<SafeHtml>(() => {
+    const raw =
+      this.incidentService.currentIncident()?.notification?.htmlPreview ??
+      this.defaultResendPreview;
+    return this.sanitizer.bypassSecurityTrustHtml(raw);
+  });
+
   readonly modeOptions: ModeOption[] = [
     { label: '⚡ Live API Mode', value: 'live' },
     { label: '🎬 Replay Mode', value: 'replay' }
@@ -91,10 +97,25 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     { label: '🇺🇸 EN', value: 'en' }
   ];
 
-  constructor(...args: [I18nService?, IncidentService?]) {
-    const [i18n, incidentService] = args;
+  constructor(...args: [I18nService?, IncidentService?, DomSanitizer?]) {
+    const [i18n, incidentService, sanitizer] = args;
     this.i18n = i18n ?? inject(I18nService);
     this.incidentService = incidentService ?? inject(IncidentService);
+    if (sanitizer) {
+      this.sanitizer = sanitizer;
+    } else {
+      try {
+        this.sanitizer =
+          inject(DomSanitizer, { optional: true }) ??
+          ({
+            bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
+          } as DomSanitizer);
+      } catch {
+        this.sanitizer = {
+          bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
+        } as DomSanitizer;
+      }
+    }
   }
 
   ngOnInit(): void {

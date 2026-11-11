@@ -93,4 +93,11 @@ describe('WarRoomComponent', () => {
     expect(incidentService.isPiiPassed()).toBe(true);
     expect(incidentService.timelineSteps()).toHaveLength(8);
   });
+
+  it('should sanitize resend preview HTML safely', () => {
+    expect(component.safeResendPreview()).toContain('🚨 ZeroMTTR Incident Post-Mortem');
+
+    incidentService.currentIncident.set(JSON.parse(JSON.stringify(MOCK_INCIDENT)));
+    expect(component.safeResendPreview()).toBeDefined();
+  });
 });

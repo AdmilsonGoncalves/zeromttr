@@ -53,8 +53,8 @@
         </span>
       </div>
 
-      <!-- Controls: Mode, Demo Key, Language, Chaos Buttons -->
-      <div class="flex flex-wrap items-center gap-1.5">
+      <!-- Controls: Mode, Demo Key, Chaos Buttons, and Language at extreme right -->
+      <div class="w-full flex items-center gap-1.5">
         <!-- Mode Selector -->
         <p-selectbutton
           [options]="modeOptions"
@@ -65,26 +65,19 @@
           styleClass="text-[10px]"
         />
 
-        <!-- Live Key input when Live mode -->
+        <!-- Live Key input when Live mode (wrapped in form to eliminate DOM warning) -->
         @if (incidentService.activeMode() === 'live') {
-          <input
-            type="password"
-            [placeholder]="i18n.t('liveKeyPlaceholder')"
-            [value]="incidentService.liveDemoKey()"
-            (input)="onLiveKeyInput($event)"
-            class="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-32"
-          />
+          <form (submit)="$event.preventDefault()" class="inline-flex m-0 p-0">
+            <input
+              type="password"
+              autocomplete="current-password"
+              [placeholder]="i18n.t('liveKeyPlaceholder')"
+              [value]="incidentService.liveDemoKey()"
+              (input)="onLiveKeyInput($event)"
+              class="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-32"
+            />
+          </form>
         }
-
-        <!-- Language Selector -->
-        <p-selectbutton
-          [options]="langOptions"
-          [ngModel]="i18n.currentLang()"
-          (ngModelChange)="onLangChange($event)"
-          optionLabel="label"
-          optionValue="value"
-          styleClass="text-[10px]"
-        />
 
         <!-- Simulator Buttons -->
         <p-button
@@ -102,6 +95,17 @@
           [disabled]="incidentService.isSimulating()"
           (onClick)="onResetService()"
           styleClass="text-xs py-1"
+        />
+
+        <!-- Language Selector moved to extreme right -->
+        <p-selectbutton
+          [options]="langOptions"
+          [ngModel]="i18n.currentLang()"
+          (ngModelChange)="onLangChange($event)"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="text-[10px]"
+          class="ml-auto"
         />
       </div>
     </div>
@@ -486,9 +490,7 @@
 
         <div
           class="flex-1 min-h-0 overflow-y-auto bg-slate-900 border border-slate-800 rounded p-2 text-xs text-slate-300"
-          [innerHTML]="
-            incidentService.currentIncident()?.notification?.htmlPreview ?? defaultResendPreview
-          "
+          [innerHTML]="safeResendPreview()"
         ></div>
       </div>
 

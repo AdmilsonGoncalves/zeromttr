@@ -59,13 +59,3 @@
 .custom-timeline .p-timeline-event-content {
   padding-left: 0.5rem !important;
 }
-
-/* Hide PrimeUI commercial trial badge */
-#p-license-host,
-.p-license-host,
-div[id*='p-license'] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
