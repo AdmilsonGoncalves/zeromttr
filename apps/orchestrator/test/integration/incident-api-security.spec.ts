@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import type { Express } from 'express';
 import { createApp, SseEventBroadcaster } from '../../src/http/index.js';
 import { IncidentState, Incident, DecisionHmac } from '../../src/domain/index.js';
 import type {
@@ -95,17 +96,30 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
   const broadcaster = new SseEventBroadcaster();
   const recordDecision = new RecordDecision(repo, toolsPort, clock, broadcaster, HMAC_SECRET);
 
-  const app = createApp({
-    repository: repo,
-    targetStatusPort,
-    handleAlert: {} as HandleAlert,
-    orchestratorWorkflow: {} as OrchestratorWorkflow,
-    recordDecision,
-    broadcaster,
-    dashboardApiToken: DASHBOARD_TOKEN
+  let originalLiveDemoKey: string | undefined;
+  let app: Express;
+
+  beforeAll(() => {
+    originalLiveDemoKey = process.env.LIVE_DEMO_KEY;
+    delete process.env.LIVE_DEMO_KEY;
+
+    app = createApp({
+      repository: repo,
+      targetStatusPort,
+      handleAlert: {} as HandleAlert,
+      orchestratorWorkflow: {} as OrchestratorWorkflow,
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN
+    });
   });
 
   afterAll(() => {
+    if (originalLiveDemoKey !== undefined) {
+      process.env.LIVE_DEMO_KEY = originalLiveDemoKey;
+    } else {
+      delete process.env.LIVE_DEMO_KEY;
+    }
     broadcaster.close();
   });
 
