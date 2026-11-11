@@ -295,7 +295,7 @@ describe('Branch Coverage Enhancements', () => {
         rootCause: 'rc',
         evidenceRefs: [],
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
-        patchedContent: 'client.release(); 10',
+        patchedContent: 'client.release(); max: 10',
         explanation: 'exp'
       }))
     };
@@ -409,7 +409,7 @@ describe('Branch Coverage Enhancements', () => {
         rootCause: 'rc',
         evidenceRefs: [],
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
-        patchedContent: 'client.release(); 10',
+        patchedContent: 'client.release(); max: 10',
         explanation: 'exp'
       }))
     };
@@ -475,7 +475,7 @@ describe('Branch Coverage Enhancements', () => {
         rootCause: 'rc',
         evidenceRefs: [],
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
-        patchedContent: 'client.release(); 10',
+        patchedContent: 'client.release(); max: 10',
         explanation: 'exp'
       }))
     };

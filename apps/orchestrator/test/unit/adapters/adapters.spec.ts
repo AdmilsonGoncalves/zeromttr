@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {
   McpClientAdapter,
@@ -12,7 +13,7 @@ import { Incident, IncidentState } from '../../../src/domain/index.js';
 import type { CollectedEvidence } from '../../../src/ports/index.js';
 
 describe('Adapters Unit Tests', () => {
-  const tempDir = path.resolve(import.meta.dirname, '../../temp-adapters-test');
+  const tempDir = path.join(os.tmpdir(), `zeromttr-adapters-test-${process.pid}`);
   const tempFile = path.join(tempDir, 'incidents.json');
 
   beforeEach(() => {
@@ -171,6 +172,141 @@ describe('Adapters Unit Tests', () => {
         adapter.executePromqlRange({ query: 'bad', start: '', end: '' })
       ).rejects.toThrow('Prometheus query syntax error');
     });
+
+    it('should throw an informative error when tool output is empty', async () => {
+      const mockFetchEmpty = vi.fn(async () => ({
+        status: 200,
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            content: [{ type: 'text', text: '   ' }],
+            isError: false
+          }
+        })
+      }));
+      vi.stubGlobal('fetch', mockFetchEmpty);
+
+      const adapter = new McpClientAdapter('http://localhost:8000/mcp', 'token-123');
+      await expect(
+        adapter.executePromqlRange({ query: 'metric', start: '', end: '' })
+      ).rejects.toThrow("MCP tool 'execute_promql_range' returned empty or missing output text");
+    });
+
+    it('should throw an informative error when tool output is invalid JSON', async () => {
+      const mockFetchInvalid = vi.fn(async () => ({
+        status: 200,
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            content: [{ type: 'text', text: 'not valid json {{{' }],
+            isError: false
+          }
+        })
+      }));
+      vi.stubGlobal('fetch', mockFetchInvalid);
+
+      const adapter = new McpClientAdapter('http://localhost:8000/mcp', 'token-123');
+      await expect(
+        adapter.executePromqlRange({ query: 'metric', start: '', end: '' })
+      ).rejects.toThrow(
+        "MCP tool 'execute_promql_range' response could not be parsed as a valid JSON object"
+      );
+    });
+
+    it('should properly map snake_case responses from executePromqlRange, queryLokiLogs and inspectGitDeployDiff', async () => {
+      const mockFetchSnake = vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body));
+        const tool = body.params.name;
+        let responseData = {};
+
+        if (tool === 'execute_promql_range') {
+          responseData = {
+            query: 'http_latency',
+            series_count: 1,
+            series: [
+              {
+                metric: { service: 'payments' },
+                points_count: 5,
+                p95: 3500,
+                avg: 1200,
+                exemplars: [{ labels: { trace_id: 'trace-exemplar-123' } }]
+              }
+            ],
+            finops: {
+              raw_bytes_fetched: 5000,
+              compacted_bytes_sent_to_llm: 500,
+              payload_reduction_percent: 90,
+              estimated_tokens_saved: 1125
+            }
+          };
+        } else if (tool === 'query_loki_logs') {
+          responseData = {
+            logql: '{app="api"}',
+            lines_count: 2,
+            lines: ['log line 1', 'log line 2'],
+            finops: {
+              raw_bytes_fetched: 2000,
+              compacted_bytes_sent_to_llm: 200,
+              payload_reduction_percent: 90,
+              estimated_tokens_saved: 450
+            }
+          };
+        } else if (tool === 'inspect_git_deploy_diff') {
+          responseData = {
+            head_ref: 'commit-sha-abc',
+            author_login: 'engineer1',
+            commit_message: 'feat: pool change',
+            files_changed: [{ filename: 'payment.ts', patch: '+ max: 10' }],
+            suspect_file: { path: 'payment.ts', blob_sha: 'blob-123', content: 'code' },
+            raw_bytes_fetched: 4000,
+            compacted_bytes_sent_to_llm: 400,
+            payload_reduction_percent: 90,
+            estimated_tokens_saved: 900
+          };
+        }
+
+        return {
+          status: 200,
+          ok: true,
+          text: async () => '',
+          json: async () => ({
+            jsonrpc: '2.0',
+            id: 1,
+            result: {
+              content: [{ type: 'text', text: JSON.stringify(responseData) }],
+              isError: false
+            }
+          })
+        };
+      });
+      vi.stubGlobal('fetch', mockFetchSnake);
+
+      const adapter = new McpClientAdapter('http://localhost:8000/mcp', 'token-123');
+
+      const promRes = await adapter.executePromqlRange({ query: 'q', start: '', end: '' });
+      expect(promRes.seriesCount).toBe(1);
+      expect(promRes.exemplarTraceId).toBe('trace-exemplar-123');
+      expect(promRes.summarizedSeries[0].p95).toBe(3500);
+      expect(promRes.finops.rawBytesFetched).toBe(5000);
+
+      const lokiRes = await adapter.queryLokiLogs({ logql: 'l', start: '', end: '' });
+      expect(lokiRes.linesReturned).toBe(2);
+      expect(lokiRes.logs[0].line).toBe('log line 1');
+
+      const gitRes = await adapter.inspectGitDeployDiff({ base_ref: 'v1', head_ref: 'v2' });
+      expect(gitRes.suspectCommitSha).toBe('commit-sha-abc');
+      expect(gitRes.authorLogin).toBe('engineer1');
+      expect(gitRes.suspectFilePath).toBe('payment.ts');
+      expect(gitRes.currentBlobSha).toBe('blob-123');
+      expect(gitRes.truncatedPatch).toBe('+ max: 10');
+      expect(gitRes.finops.rawBytesFetched).toBe(4000);
+    });
   });
 
   describe('HttpTargetStatusAdapter', () => {
@@ -205,6 +341,28 @@ describe('Adapters Unit Tests', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chaos/pool-saturation?enable=false'),
         expect.any(Object)
+      );
+    });
+
+    it('should return unreachable status and throw on trigger/reset failures', async () => {
+      const mockFetchErr = vi.fn(async () => ({
+        status: 500,
+        ok: false,
+        text: async () => 'Internal error',
+        json: async () => ({})
+      }));
+      vi.stubGlobal('fetch', mockFetchErr);
+
+      const adapter = new HttpTargetStatusAdapter('http://localhost:3000');
+      const status = await adapter.getStatus();
+      expect(status.status).toBe('unreachable');
+      expect(status.version).toBe('unknown');
+
+      await expect(adapter.triggerChaos(true)).rejects.toThrow(
+        'Target app chaos trigger failed with status 500'
+      );
+      await expect(adapter.reset()).rejects.toThrow(
+        'Target app chaos reset failed with status 500'
       );
     });
   });

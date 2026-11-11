@@ -47,6 +47,7 @@ describe('DecisionHmac', () => {
       false
     );
     expect(DecisionHmac.verify(incidentId, action, '', exp, now, secret)).toBe(false);
+    expect(DecisionHmac.verify(incidentId, action, 'z'.repeat(64), exp, now, secret)).toBe(false);
   });
 
   it('should reject non-finite or NaN expiration values strictly', () => {

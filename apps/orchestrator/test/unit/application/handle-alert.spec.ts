@@ -82,4 +82,35 @@ describe('HandleAlert Use Case', () => {
 
     await expect(useCase.execute({ alerts: [] } as any)).rejects.toThrow();
   });
+
+  it('should mark expired NOTIFIED incident as FAILED and create new incident for same fingerprint', async () => {
+    const repo = createMockRepo();
+    const broadcaster = createMockBroadcaster();
+    const useCase = new HandleAlert(repo, broadcaster);
+
+    const oldTimestamp = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    const existingExpiredIncident = new Incident({
+      id: 'inc-old-001',
+      service: 'api-pagamentos-core',
+      severity: 'critical',
+      fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
+      state: IncidentState.NOTIFIED,
+      startedAt: oldTimestamp,
+      transitions: [
+        {
+          from: IncidentState.AWAITING_PR,
+          to: IncidentState.NOTIFIED,
+          at: oldTimestamp,
+          reason: 'Notification dispatched'
+        }
+      ]
+    });
+    await repo.save(existingExpiredIncident);
+
+    const result = await useCase.execute(validPayload);
+    expect(result.isDuplicate).toBe(false);
+    expect(result.incident.id).not.toBe('inc-old-001');
+    expect(result.incident.state).toBe(IncidentState.RECEIVED);
+    expect(existingExpiredIncident.state).toBe(IncidentState.FAILED);
+  });
 });

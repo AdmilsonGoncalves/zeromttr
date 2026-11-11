@@ -97,19 +97,22 @@ export function createApiRouter(
         return;
       }
 
+      const previousTimestamp = lastChaosTimestamp;
+      lastChaosTimestamp = now;
+
       try {
         const rawMode = req.body?.mode;
         const mode: IncidentMode = isIncidentMode(rawMode) ? rawMode : 'replay';
         if (mode === 'live') {
           await targetStatusPort.triggerChaos(true);
         }
-        lastChaosTimestamp = Date.now();
         res.status(202).json({
           status: 'accepted',
           mode,
           message: 'Chaos simulation initialized'
         });
       } catch (err) {
+        lastChaosTimestamp = previousTimestamp;
         res.status(500).json({
           error: toErrorMessage(err, 'Failed to initialize chaos')
         });

@@ -1,5 +1,5 @@
 export interface TargetStatus {
-  status: 'healthy' | 'degraded';
+  status: 'healthy' | 'degraded' | 'unreachable';
   service: string;
   version: string;
   previousHealthyVersion: string;

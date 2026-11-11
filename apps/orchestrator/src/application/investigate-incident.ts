@@ -14,7 +14,7 @@ import type {
 export interface InvestigateResult {
   incidentId: string;
   promqlOutput: PromqlRangeOutput;
-  traceId: string;
+  traceId?: string;
   traceAnalysis?: TraceAnalysisOutput;
   criticalSpan: string;
   spans: SpanNode[];
@@ -74,8 +74,8 @@ export class InvestigateIncident {
       promqlOutput.seriesCount > 0 &&
       promqlOutput.summarizedSeries.some((s) => (s.p95 ?? 0) > 2000);
 
-    const exemplarTraceId = promqlOutput.exemplarTraceId || '4bf92f3577b34da6a3ce929d0e0e4736';
-    const hasMetricExemplar = Boolean(promqlOutput.exemplarTraceId);
+    const exemplarTraceId = promqlOutput.exemplarTraceId;
+    const hasMetricExemplar = Boolean(exemplarTraceId);
 
     // 2. Trace Analysis
     let traceAnalysis: TraceAnalysisOutput | undefined;
@@ -84,29 +84,31 @@ export class InvestigateIncident {
     let servicesInvolved = [incident.service, 'postgres'];
     let hasTempoErrorSpan = false;
 
-    try {
-      traceAnalysis = await this.tools.analyzeOtelTrace({ trace_id: exemplarTraceId });
-      servicesInvolved = traceAnalysis.servicesInvolved || servicesInvolved;
-      if (traceAnalysis.criticalSpans && traceAnalysis.criticalSpans.length > 0) {
-        spans = traceAnalysis.criticalSpans.map((cs) => ({
-          spanId: cs.spanId,
-          parentSpanId: cs.parentSpanId,
-          serviceName: cs.serviceName,
-          operationName: cs.operationName,
-          durationMs: cs.durationMs,
-          hasError: cs.hasError,
-          errorMessage: cs.errorMessage
-        }));
-        const errSpan = spans.find((s) => s.hasError);
-        if (errSpan) {
-          criticalSpan = errSpan.operationName;
-          hasTempoErrorSpan = true;
-        } else {
-          criticalSpan = spans[0].operationName;
+    if (exemplarTraceId) {
+      try {
+        traceAnalysis = await this.tools.analyzeOtelTrace({ trace_id: exemplarTraceId });
+        servicesInvolved = traceAnalysis.servicesInvolved || servicesInvolved;
+        if (traceAnalysis.criticalSpans && traceAnalysis.criticalSpans.length > 0) {
+          spans = traceAnalysis.criticalSpans.map((cs) => ({
+            spanId: cs.spanId,
+            parentSpanId: cs.parentSpanId,
+            serviceName: cs.serviceName,
+            operationName: cs.operationName,
+            durationMs: cs.durationMs,
+            hasError: cs.hasError,
+            errorMessage: cs.errorMessage
+          }));
+          const errSpan = spans.find((s) => s.hasError);
+          if (errSpan) {
+            criticalSpan = errSpan.operationName;
+            hasTempoErrorSpan = true;
+          } else {
+            criticalSpan = spans[0].operationName;
+          }
         }
+      } catch {
+        hasTempoErrorSpan = false;
       }
-    } catch {
-      hasTempoErrorSpan = false;
     }
 
     // 3. Loki Logs
@@ -119,7 +121,7 @@ export class InvestigateIncident {
 
     const logSample = isFilled(lokiOutput.logs)
       ? lokiOutput.logs.map((l) => l.line).join('\n')
-      : 'ERROR [api-pagamentos-core] Pool exhausted [REDACTED_CPF]';
+      : '';
 
     // 4. Target Status
     const targetStatus = await this.targetStatusPort.getStatus();

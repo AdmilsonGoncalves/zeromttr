@@ -58,7 +58,10 @@ export class NotifyOnCall {
         evidence_coverage: `${incident.rca?.signalsCollected ?? 4}/${incident.rca?.signalsTotal ?? 4} Signals (${incident.rca?.evidenceCoveragePercent ?? 100}%)`,
         reasoning_source: incident.rca?.reasoningSource || defaultReasoning,
         blast_radius: incident.rca?.blastRadius || [incident.service],
-        regression_commit: '8f14e45fceea167a5a36dedd4bea2543d1a2b3c4',
+        regression_commit:
+          incident.remediation?.suspectCommitSha ||
+          incident.remediation?.commitSha ||
+          '8f14e45fceea167a5a36dedd4bea2543d1a2b3c4',
         pull_request_url:
           incident.remediation?.pullRequestUrl || 'https://github.com/AdmilsonGoncalves/zeromttr',
         approve_url: approveUrl,

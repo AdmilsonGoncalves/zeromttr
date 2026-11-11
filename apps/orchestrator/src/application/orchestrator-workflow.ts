@@ -30,36 +30,49 @@ export class OrchestratorWorkflow {
       // Step 1: Telemetry Investigation
       const investigation = await this.investigateIncident.execute(incidentId);
 
+      const baseRef =
+        (investigation.targetStatus?.status !== 'unreachable' &&
+          investigation.targetStatus?.previousHealthyVersion !== 'unknown' &&
+          investigation.targetStatus?.previousHealthyVersion) ||
+        'v2.14.7';
+      const headRef =
+        (investigation.targetStatus?.status !== 'unreachable' &&
+          investigation.targetStatus?.version !== 'unknown' &&
+          investigation.targetStatus?.version) ||
+        'v2.14.8';
+
       // Step 2: Git Deploy Diff Enrichment
-      const diffOutput = await this.enrichWithDeployDiff.execute(
-        incidentId,
-        investigation.targetStatus?.previousHealthyVersion || 'v2.14.7',
-        investigation.targetStatus?.version || 'v2.14.8'
-      );
+      const diffOutput = await this.enrichWithDeployDiff.execute(incidentId, baseRef, headRef);
 
       // Step 3: Assemble Evidence
       const p95Latency = investigation.promqlOutput.summarizedSeries[0]?.p95 ?? 4600;
+      const errorSpan = investigation.spans.find((s) => s.hasError && s.errorMessage);
+      const traceErrorMessage =
+        errorSpan?.errorMessage ||
+        (investigation.hasTempoErrorSpan
+          ? 'KnexTimeoutError: Knex: Timeout acquiring a connection. The pool is probably full.'
+          : undefined);
+
       const evidence: CollectedEvidence = {
         incidentId,
         service: incident.service,
-        alertName: 'PaymentServicePoolExhaustion',
+        alertName: incident.alertName || 'PaymentServicePoolExhaustion',
         promqlSummary: {
           metric: 'http_server_duration_milliseconds_bucket',
           p95LatencyMs: p95Latency,
           dbPoolWaiting: 15
         },
         traceAnalysis: {
-          traceId: investigation.traceId,
+          traceId: investigation.traceId || 'trace-unknown',
           criticalOperation: investigation.criticalSpan,
           durationMs: investigation.traceAnalysis?.totalDurationMs ?? 4600,
-          errorMessage:
-            'KnexTimeoutError: Knex: Timeout acquiring a connection. The pool is probably full.',
+          errorMessage: traceErrorMessage,
           servicesInvolved: investigation.servicesInvolved
         },
         logSample: investigation.logSample,
         gitDiff: {
-          baseRef: investigation.targetStatus?.previousHealthyVersion ?? 'v2.14.7',
-          headRef: investigation.targetStatus?.version ?? 'v2.14.8',
+          baseRef,
+          headRef,
           suspectCommit: diffOutput.suspectCommitSha,
           authorLogin: diffOutput.authorLogin,
           suspectFilePath: diffOutput.suspectFilePath,

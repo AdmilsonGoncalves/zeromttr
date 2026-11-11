@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { isNonEmptyString } from '@zeromttr/utils';
-import { Incident, computeAlertFingerprint, type IncidentMode } from '../domain/index.js';
+import {
+  Incident,
+  IncidentState,
+  computeAlertFingerprint,
+  type IncidentMode
+} from '../domain/index.js';
 import type { IncidentRepository, EventBroadcasterPort } from '../ports/index.js';
 
 export const GrafanaAlertItemSchema = z
@@ -49,10 +54,34 @@ export class HandleAlert {
 
     const existing = await this.repository.findOpenByFingerprint(fingerprint);
     if (existing) {
-      return {
-        incident: existing,
-        isDuplicate: true
-      };
+      const now = Date.now();
+      const lastTransition = existing.transitions[existing.transitions.length - 1];
+      const lastTimestamp = lastTransition
+        ? new Date(lastTransition.at).getTime()
+        : new Date(existing.startedAt).getTime();
+      const elapsedMs = now - lastTimestamp;
+      const ttlMs = 15 * 60 * 1000;
+
+      if (elapsedMs > ttlMs) {
+        const reason =
+          existing.state === IncidentState.NOTIFIED
+            ? 'Incident decision TTL expired without action'
+            : 'Stale incident processing timed out';
+        const transition = existing.transition(IncidentState.FAILED, reason);
+        await this.repository.save(existing);
+        this.broadcaster.broadcast('incident.transition', {
+          incidentId: existing.id,
+          from: transition.from,
+          to: transition.to,
+          at: transition.at,
+          reason: transition.reason
+        });
+      } else {
+        return {
+          incident: existing,
+          isDuplicate: true
+        };
+      }
     }
 
     const incidentId = `inc-${randomUUID().slice(0, 8)}`;
@@ -66,6 +95,7 @@ export class HandleAlert {
       service: primaryAlert.labels.service,
       severity,
       fingerprint,
+      alertName: primaryAlert.labels.alertname,
       mode
     });
 

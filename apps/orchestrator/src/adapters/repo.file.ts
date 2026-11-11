@@ -9,7 +9,7 @@ export class FileIncidentRepository implements IncidentRepository {
   private readonly filePath?: string;
 
   public constructor(filePath?: string) {
-    this.filePath = filePath;
+    this.filePath = filePath || process.env.INCIDENT_STORE_PATH;
     if (this.filePath && fs.existsSync(this.filePath)) {
       try {
         const raw = fs.readFileSync(this.filePath, 'utf-8');
@@ -60,7 +60,9 @@ export class FileIncidentRepository implements IncidentRepository {
           fs.mkdirSync(dir, { recursive: true });
         }
         const data = Array.from(this.store.values()).map((inc) => inc.toDetail());
-        fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2), 'utf-8');
+        const tmpPath = `${this.filePath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+        fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+        fs.renameSync(tmpPath, this.filePath);
       } catch {
         // Non-fatal file write error
       }

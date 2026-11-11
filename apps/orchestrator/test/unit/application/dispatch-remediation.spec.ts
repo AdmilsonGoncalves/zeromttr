@@ -178,4 +178,65 @@ describe('DispatchRemediation Use Case', () => {
       expect.objectContaining({ reasoning_source: 'fallback' })
     );
   });
+
+  it('should fail-closed to fallback adapter when CPF appears in traceAnalysis.criticalOperation', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-inc-test-001',
+        branchUrl:
+          'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-test-001',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/42',
+        commitSha: 'commit123456'
+      })),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 101, success: true }))
+    };
+
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn()
+    };
+
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Fallback generated summary',
+        rootCause: 'Fallback root cause',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'Fallback patch'
+      }))
+    };
+
+    const broadcaster: EventBroadcasterPort = {
+      broadcast: vi.fn()
+    };
+
+    const piiInTraceEvidence: CollectedEvidence = {
+      ...validEvidence,
+      traceAnalysis: {
+        ...validEvidence.traceAnalysis!,
+        criticalOperation: 'processPayment:cpf:529.982.247-25'
+      }
+    };
+
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+    const result = await useCase.execute(incident.id, piiInTraceEvidence, 'blob123');
+
+    expect(llmAdapter.synthesizeRcaAndPatch).not.toHaveBeenCalled();
+    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalled();
+    expect(result.reasoningSource).toBe('fallback');
+  });
 });

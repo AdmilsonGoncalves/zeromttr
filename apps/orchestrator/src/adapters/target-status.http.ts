@@ -20,37 +20,34 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
     }
 
     return {
-      status: 'healthy',
+      status: 'unreachable',
       service: 'api-pagamentos-core',
-      version: 'v2.14.7',
-      previousHealthyVersion: 'v2.14.7',
+      version: 'unknown',
+      previousHealthyVersion: 'unknown',
       targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
       suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
-      rawEdgeLogPreCollector:
-        'ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig'
+      rawEdgeLogPreCollector: ''
     };
   }
 
   public async triggerChaos(enable: boolean, delayMs = 4600): Promise<void> {
-    try {
-      const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
-        enable: String(enable),
-        delay: String(delayMs)
-      });
-      await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) });
-    } catch {
-      // Non-fatal if offline
+    const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
+      enable: String(enable),
+      delay: String(delayMs)
+    });
+    const response = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) });
+    if (!isHttpSuccess(response.status)) {
+      throw new Error(`Target app chaos trigger failed with status ${response.status}`);
     }
   }
 
   public async reset(): Promise<void> {
-    try {
-      const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
-        enable: 'false'
-      });
-      await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) });
-    } catch {
-      // Non-fatal if offline
+    const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
+      enable: 'false'
+    });
+    const response = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) });
+    if (!isHttpSuccess(response.status)) {
+      throw new Error(`Target app chaos reset failed with status ${response.status}`);
     }
   }
 }

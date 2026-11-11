@@ -32,6 +32,9 @@ export class DecisionHmac {
     if (!isNonEmptyString(sig) || !isNonEmptyString(incidentId)) {
       return false;
     }
+    if (!/^[0-9a-f]{64}$/i.test(sig)) {
+      return false;
+    }
     if (
       typeof exp !== 'number' ||
       !Number.isFinite(exp) ||

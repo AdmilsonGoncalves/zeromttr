@@ -30,9 +30,13 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
     // Initial heartbeat
     res.write(`event: heartbeat\ndata: ${JSON.stringify({ at: nowIso() })}\n\n`);
 
-    req.on('close', () => {
+    const cleanup = (): void => {
       this.clients.delete(res);
-    });
+    };
+
+    req.once('close', cleanup);
+    res.once('close', cleanup);
+    res.once('error', cleanup);
   }
 
   public broadcast(event: string, data: unknown): void {

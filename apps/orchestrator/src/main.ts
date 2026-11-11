@@ -20,7 +20,7 @@ import { SystemClock } from './ports/index.js';
 import { createApp, SseEventBroadcaster } from './http/index.js';
 
 export function bootstrap(port: number = Number(process.env.PORT) || 8080): http.Server {
-  const repository = new FileIncidentRepository();
+  const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH);
   const targetStatusPort = new HttpTargetStatusAdapter();
   const toolsPort = new McpClientAdapter();
   const fallbackAdapter = new DeterministicFallbackReasoningAdapter();
@@ -89,7 +89,9 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
     grafanaWebhookToken: process.env.GRAFANA_WEBHOOK_TOKEN,
     dashboardApiToken: process.env.DASHBOARD_API_TOKEN,
     liveDemoKey: process.env.LIVE_DEMO_KEY,
-    demoCooldownMs: process.env.DEMO_COOLDOWN_MS ? Number(process.env.DEMO_COOLDOWN_MS) : undefined
+    ...(process.env.DEMO_COOLDOWN_MS
+      ? { demoCooldownMs: Number(process.env.DEMO_COOLDOWN_MS) }
+      : {})
   });
 
   const server = http.createServer(app);

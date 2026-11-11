@@ -24,6 +24,7 @@ export interface IncidentRemediation {
   branchUrl: string;
   pullRequestUrl?: string;
   commitSha?: string;
+  suspectCommitSha?: string;
 }
 
 export interface IncidentNotification {
@@ -37,6 +38,7 @@ export interface IncidentProps {
   service: string;
   severity: string;
   fingerprint: string;
+  alertName?: string;
   state?: IncidentState;
   mode?: IncidentMode;
   startedAt?: string;
@@ -55,6 +57,7 @@ export class Incident {
   public readonly service: string;
   public readonly severity: string;
   public readonly fingerprint: string;
+  public readonly alertName?: string;
   public readonly mode: IncidentMode;
   public readonly startedAt: string;
 
@@ -74,6 +77,7 @@ export class Incident {
     this.service = props.service;
     this.severity = props.severity;
     this.fingerprint = props.fingerprint;
+    this.alertName = props.alertName;
     this.mode = props.mode ?? 'live';
     this.startedAt = props.startedAt ?? nowIso();
     this._state = props.state ?? IncidentState.RECEIVED;

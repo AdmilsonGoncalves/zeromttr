@@ -33,7 +33,7 @@ function validatePatchDefensively(synthesis: RcaAndPatchSynthesis): boolean {
   if (!isNonEmptyString(content) || !content.includes('client.release()')) {
     return false;
   }
-  if (!content.includes('10')) {
+  if (!/(?:max\s*:\s*10\b|max:\s*10)/.test(content)) {
     return false;
   }
   return true;
@@ -58,16 +58,8 @@ export class DispatchRemediation {
       throw new Error(`Incident '${incidentId}' not found`);
     }
 
-    // Inspect free text fields before LLM synthesis
-    const promptToAudit = [
-      evidence.logSample || '',
-      evidence.traceAnalysis?.errorMessage || '',
-      evidence.gitDiff?.patch || '',
-      evidence.gitDiff?.suspectCommit || '',
-      evidence.gitDiff?.authorLogin || '',
-      evidence.gitDiff?.suspectFilePath || ''
-    ].join('\n');
-
+    // Inspect complete evidence object before LLM synthesis
+    const promptToAudit = JSON.stringify(evidence);
     const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
 
     let synthesis: RcaAndPatchSynthesis;
@@ -93,11 +85,22 @@ export class DispatchRemediation {
       reasoningSource = 'fallback';
     }
 
-    // Transition to REMEDIATING
-    if (
-      incident.state === IncidentState.ENRICHING ||
-      incident.state === IncidentState.INVESTIGATING
-    ) {
+    // Ensure valid lifecycle transitions before REMEDIATING
+    if (incident.state === IncidentState.INVESTIGATING) {
+      const transitionEnriching = incident.transition(
+        IncidentState.ENRICHING,
+        'Enriching incident state before remediation'
+      );
+      this.broadcaster.broadcast('incident.transition', {
+        incidentId: incident.id,
+        from: transitionEnriching.from,
+        to: transitionEnriching.to,
+        at: transitionEnriching.at,
+        reason: transitionEnriching.reason
+      });
+    }
+
+    if (incident.state === IncidentState.ENRICHING) {
       const transitionRemediating = incident.transition(
         IncidentState.REMEDIATING,
         'Synthesizing RCA and preparing remediation patch'
@@ -214,7 +217,10 @@ export class DispatchRemediation {
       reasoning_source: reasoningSource
     });
 
-    incident.remediation = prResult;
+    incident.remediation = {
+      ...prResult,
+      suspectCommitSha: evidence.gitDiff?.suspectCommit
+    };
     await this.repository.save(incident);
 
     this.broadcaster.broadcast('incident.remediation', {

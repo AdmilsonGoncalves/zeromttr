@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { safeJsonParse } from '@zeromttr/utils';
+import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
 import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
 
 export const GEMINI_SYSTEM_INSTRUCTION = `Você é o ZeroMTTR Autonomous SRE Reasoner, um especialista em diagnóstico de causa raiz (RCA) e engenharia de remediação para microsserviços em produção.
@@ -57,15 +57,20 @@ export const RCA_SYNTHESIS_SCHEMA = {
 
 export class GeminiReasoningAdapter implements ReasoningPort {
   private readonly client: GoogleGenAI;
+  private readonly apiKey: string;
   private readonly modelName: string;
 
   public constructor(apiKey?: string, modelName?: string) {
-    const key = apiKey || process.env.GEMINI_API_KEY || 'test-gemini-key';
-    this.client = new GoogleGenAI({ apiKey: key });
+    this.apiKey = apiKey || process.env.GEMINI_API_KEY || '';
+    this.client = new GoogleGenAI({ apiKey: this.apiKey || 'placeholder-for-instantiation' });
     this.modelName = modelName || process.env.LLM_MODEL || 'gemini-3.5-flash';
   }
 
   public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
+    if (!isNonEmptyString(this.apiKey) || this.apiKey === 'change-me-gemini-api-key') {
+      throw new Error('Gemini API key is not configured');
+    }
+
     const prompt = `Analise as evidências do incidente e sintetize o RCA e o patch cirúrgico:\n${JSON.stringify(evidence, null, 2)}`;
 
     const response = await this.client.models.generateContent({
@@ -86,8 +91,15 @@ export class GeminiReasoningAdapter implements ReasoningPort {
     }
 
     const parsed = safeJsonParse<RcaAndPatchSynthesis>(text);
-    if (!parsed) {
-      throw new Error('Failed to parse structured JSON response from Gemini');
+    if (
+      !parsed ||
+      !isNonEmptyString(parsed.summary) ||
+      !isNonEmptyString(parsed.patchedContent) ||
+      !isNonEmptyString(parsed.suspectFilePath)
+    ) {
+      throw new Error(
+        'Failed to parse structured JSON response from Gemini or missing required schema fields'
+      );
     }
     parsed.reasoningSource = 'llm';
     return parsed;

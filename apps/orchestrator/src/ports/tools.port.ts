@@ -37,7 +37,7 @@ export interface LokiQueryInput {
 export interface LokiQueryOutput {
   linesReturned: number;
   logs: Array<{
-    timestamp: string;
+    timestamp?: string;
     stream?: Record<string, string>;
     line: string;
   }>;
