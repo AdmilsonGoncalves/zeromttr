@@ -1,0 +1,515 @@
+<div
+  class="h-full max-h-full bg-slate-950 text-slate-100 font-sans p-2.5 flex flex-col gap-2.5 overflow-hidden"
+>
+  <!-- Q1: Topo (Header, KPIs, FinOps, Controles) -->
+  <header
+    class="shrink-0 bg-slate-900 border border-slate-800 rounded-lg p-2.5 shadow-md flex flex-col gap-2"
+  >
+    <div class="flex flex-wrap items-center justify-between gap-2.5">
+      <div class="flex items-center gap-2.5">
+        <i class="pi pi-shield text-cyan-400 text-xl"></i>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm font-bold text-white tracking-wide">
+              {{ i18n.t('appTitle') }}
+            </h1>
+            <p-tag
+              [value]="incidentService.sseConnected() ? 'SSE Connected' : 'SSE Offline'"
+              [severity]="incidentService.sseConnected() ? 'success' : 'danger'"
+              styleClass="text-[10px] py-0"
+            />
+            @if (incidentService.targetStatus(); as ts) {
+              <p-tag
+                [value]="
+                  ts.service +
+                  ': ' +
+                  (ts.status === 'healthy' ? i18n.t('healthy') : i18n.t('degraded')) +
+                  ' (' +
+                  ts.version +
+                  ')'
+                "
+                [severity]="ts.status === 'healthy' ? 'success' : 'warn'"
+                styleClass="text-[10px] py-0"
+              />
+            } @else {
+              <p-tag value="Target: --" severity="secondary" styleClass="text-[10px] py-0" />
+            }
+          </div>
+          <p class="text-[11px] text-slate-400">
+            {{ i18n.t('appSubtitle') }}
+          </p>
+        </div>
+      </div>
+
+      <!-- FinOps Badge -->
+      <div
+        class="bg-slate-950/90 border border-cyan-500/50 rounded px-2.5 py-1 flex items-center gap-2 shadow-inner"
+      >
+        <span class="text-xs font-mono text-cyan-300 font-semibold">
+          {{ i18n.t('finopsPayloadReduction') }}: {{ incidentService.finopsReduction() }}% (Est. ~{{
+            incidentService.estimatedTokensSaved()
+          }}
+          {{ i18n.t('finopsTokensSaved') }})
+        </span>
+      </div>
+
+      <!-- Controls: Mode, Demo Key, Chaos Buttons, and Language at extreme right -->
+      <div class="w-full flex items-center gap-1.5">
+        <!-- Mode Selector -->
+        <p-selectbutton
+          [options]="modeOptions"
+          [ngModel]="incidentService.activeMode()"
+          (ngModelChange)="onModeChange($event)"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="text-[10px]"
+        />
+
+        <!-- Live Key input when Live mode (wrapped in form to eliminate DOM warning) -->
+        @if (incidentService.activeMode() === 'live') {
+          <form (submit)="$event.preventDefault()" class="inline-flex m-0 p-0">
+            <input
+              type="password"
+              autocomplete="current-password"
+              [placeholder]="i18n.t('liveKeyPlaceholder')"
+              [value]="incidentService.liveDemoKey()"
+              (input)="onLiveKeyInput($event)"
+              class="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-32"
+            />
+          </form>
+        }
+
+        <!-- Simulator Buttons -->
+        <p-button
+          [label]="i18n.t('simulateIncident')"
+          severity="danger"
+          size="small"
+          [disabled]="incidentService.isSimulating()"
+          (onClick)="onTriggerChaos()"
+          styleClass="text-xs py-1"
+        />
+        <p-button
+          [label]="i18n.t('restoreService')"
+          severity="secondary"
+          size="small"
+          [disabled]="incidentService.isSimulating()"
+          (onClick)="onResetService()"
+          styleClass="text-xs py-1"
+        />
+
+        <!-- Language Selector moved to extreme right -->
+        <p-selectbutton
+          [options]="langOptions"
+          [ngModel]="i18n.currentLang()"
+          (ngModelChange)="onLangChange($event)"
+          optionLabel="label"
+          optionValue="value"
+          styleClass="text-[10px]"
+          class="ml-auto"
+        />
+      </div>
+    </div>
+
+    <!-- Replay Notice if Replay Mode -->
+    @if (incidentService.activeMode() === 'replay') {
+      <div
+        class="bg-amber-950/50 border border-amber-700/60 rounded px-2.5 py-1 text-xs text-amber-200 flex items-center gap-2"
+      >
+        <i class="pi pi-info-circle text-amber-400"></i>
+        <span>{{ i18n.t('replayNotice') }}</span>
+      </div>
+    }
+
+    <!-- Quick KPI Strip -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-slate-800/80">
+      <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+        <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtdLabel') }}</span>
+        <span class="text-base font-mono font-bold text-emerald-400">
+          {{ incidentService.ttdDisplay() }}
+        </span>
+        <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtdTarget') }}</span>
+      </div>
+      <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+        <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtprLabel') }}</span>
+        <span class="text-base font-mono font-bold text-emerald-400">
+          {{ incidentService.ttprDisplay() }}
+        </span>
+        <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtprTarget') }}</span>
+      </div>
+      <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+        <span class="text-[11px] text-slate-400">{{ i18n.t('evidenceCoverageLabel') }}</span>
+        <span class="text-base font-mono font-bold text-cyan-400">
+          {{ incidentService.signalsRatio() }} ({{ incidentService.evidenceCoveragePercent() }}%)
+        </span>
+        <span class="text-[9px] text-slate-400">PromQL + Exemplar + Tempo + Diff</span>
+      </div>
+      <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+        <span class="text-[11px] text-slate-400">{{ i18n.t('reasoningSourceLabel') }}</span>
+        <div class="mt-0.5">
+          @if (incidentService.reasoningSource() === 'llm') {
+            <span
+              class="bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
+            >
+              {{ i18n.t('reasoningSourceLlm') }}
+            </span>
+          } @else if (incidentService.reasoningSource() === 'fallback') {
+            <span
+              class="bg-amber-950 border border-amber-500 text-amber-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
+            >
+              {{ i18n.t('reasoningSourceFallback') }}
+            </span>
+          } @else {
+            <span class="text-slate-500 font-mono text-[11px]">--</span>
+          }
+        </div>
+        <span class="text-[9px] text-slate-400 mt-0.5">rca.reasoningSource</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout: Q2 (Esquerda), Q3 (Centro), Q4 (Direita) -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
+    <!-- Q2: Esquerda (Pipeline ao Vivo 8 etapas) -->
+    <section
+      class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col min-h-0 shadow-md"
+    >
+      <div class="shrink-0 flex items-center justify-between mb-2">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">
+          {{ i18n.t('pipelineTitle') }}
+        </h2>
+        <span class="text-xs text-cyan-400 font-mono font-semibold">
+          {{ incidentService.currentIncident()?.state ?? 'IDLE' }}
+        </span>
+      </div>
+
+      <div class="flex-1 min-h-0 overflow-y-auto pr-1">
+        <p-timeline [value]="incidentService.timelineSteps()" styleClass="w-full custom-timeline">
+          <ng-template #content let-step>
+            <div class="mb-2 pl-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-xs font-bold text-slate-200">
+                  {{ step.id }}. {{ i18n.t(step.titleKey) }}
+                </span>
+                @if (step.badge) {
+                  <p-tag
+                    [value]="step.badge"
+                    [severity]="step.badgeSeverity"
+                    styleClass="text-[9px] py-0 px-1"
+                  />
+                }
+              </div>
+              <p class="text-[11px] text-slate-400 leading-snug mt-0.5">
+                {{ i18n.t(step.descKey) }}
+              </p>
+            </div>
+          </ng-template>
+        </p-timeline>
+      </div>
+    </section>
+
+    <!-- Q3: Centro (Evidências OTel, Mascaramento PII, Git Diff) -->
+    <section
+      class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col min-h-0 shadow-md"
+    >
+      <p-tabs
+        [value]="activeTab()"
+        (valueChange)="onTabChange($event)"
+        class="flex flex-col flex-1 min-h-0"
+      >
+        <p-tablist class="shrink-0">
+          <p-tab value="0"><i class="pi pi-sitemap mr-1"></i> {{ i18n.t('tabTraceTree') }}</p-tab>
+          <p-tab value="1"><i class="pi pi-shield mr-1"></i> {{ i18n.t('tabLokiLogs') }}</p-tab>
+          <p-tab value="2"><i class="pi pi-file-edit mr-1"></i> {{ i18n.t('tabGitDiff') }}</p-tab>
+        </p-tablist>
+
+        <p-tabpanels class="flex-1 min-h-0 overflow-y-auto pr-1">
+          <!-- Aba 1: Trace Tree & Evidence Coverage -->
+          <p-tabpanel value="0">
+            <div class="flex flex-col gap-2.5 pt-1.5">
+              <!-- Evidence Coverage Progress -->
+              <div class="bg-slate-950 border border-slate-800 rounded p-2">
+                <div class="flex justify-between items-center mb-1 text-xs">
+                  <span class="font-bold text-slate-300">
+                    {{ i18n.t('evidenceCoverageLabel') }}:
+                    {{ incidentService.signalsRatio() }} Signals ({{
+                      incidentService.evidenceCoveragePercent()
+                    }}%)
+                  </span>
+                  <span class="font-mono text-cyan-400">
+                    {{ incidentService.evidenceCoveragePercent() }}%
+                  </span>
+                </div>
+                <p-progressbar
+                  [value]="incidentService.evidenceCoveragePercent()"
+                  [showValue]="false"
+                />
+              </div>
+
+              <!-- Blast Radius Tags -->
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-xs font-semibold text-slate-400">
+                  {{ i18n.t('blastRadiusLabel') }}:
+                </span>
+                @for (svc of incidentService.currentIncident()?.rca?.blastRadius ?? []; track svc) {
+                  <span
+                    class="bg-rose-950/70 border border-rose-700/80 text-rose-300 text-xs px-2 py-0.5 rounded font-mono font-semibold"
+                  >
+                    {{ svc }}
+                  </span>
+                }
+              </div>
+
+              <!-- RCA Summary -->
+              @if (incidentService.currentIncident()?.rca?.summary; as summary) {
+                <div class="bg-slate-950 border border-slate-800 rounded p-2">
+                  <div class="text-[11px] font-bold text-slate-400 uppercase mb-0.5">
+                    Root Cause Analysis (RCA)
+                  </div>
+                  <p class="text-xs font-mono text-slate-200 leading-relaxed">
+                    {{ summary }}
+                  </p>
+                </div>
+              }
+
+              <!-- Trace Tree Spans -->
+              <div class="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1">
+                <div
+                  class="flex justify-between items-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-1"
+                >
+                  <span
+                    >Span Hierarchy (Trace ID:
+                    {{ incidentService.currentIncident()?.rca?.traceId }})</span
+                  >
+                  <span>Duration / Status</span>
+                </div>
+
+                <div class="flex flex-col gap-1 font-mono text-xs max-h-56 overflow-y-auto pr-0.5">
+                  @for (
+                    span of incidentService.currentIncident()?.rca?.spans ?? [];
+                    track span.spanId
+                  ) {
+                    <div
+                      class="p-1.5 rounded border transition-colors flex justify-between items-center"
+                      [ngClass]="{
+                        'bg-rose-950/40 border-rose-800/80 text-rose-200': span.hasError,
+                        'bg-slate-900/40 border-slate-800/60 text-slate-300': !span.hasError,
+                        'ml-5 border-l-2 border-l-cyan-500/40': !!span.parentSpanId
+                      }"
+                    >
+                      <div class="flex items-center gap-1.5">
+                        <i
+                          [class]="
+                            span.hasError
+                              ? 'pi pi-times-circle text-rose-400 text-xs'
+                              : 'pi pi-check-circle text-emerald-400 text-xs'
+                          "
+                        ></i>
+                        <span class="font-bold text-xs">{{ span.operationName }}</span>
+                        <span class="text-[10px] text-slate-400">({{ span.serviceName }})</span>
+                      </div>
+                      <span
+                        class="font-mono text-xs font-bold"
+                        [ngClass]="span.hasError ? 'text-rose-400' : 'text-slate-400'"
+                      >
+                        {{ span.durationMs }}ms
+                      </span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          </p-tabpanel>
+
+          <!-- Aba 2: Loki Logs & Mascaramento PII -->
+          <p-tabpanel value="1">
+            <div class="flex flex-col gap-2.5 pt-1.5">
+              <!-- PII Audit Badge -->
+              <div class="flex justify-center p-0.5">
+                @if (incidentService.isPiiPassed() === true) {
+                  <div
+                    class="bg-emerald-950 border border-emerald-500 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
+                  >
+                    <i class="pi pi-check-circle text-emerald-400"></i>
+                    <span>{{ i18n.t('piiGuardVerifiedBadge') }}</span>
+                  </div>
+                } @else if (incidentService.isPiiPassed() === false) {
+                  <div
+                    class="bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
+                  >
+                    <i class="pi pi-exclamation-triangle text-rose-400"></i>
+                    <span>
+                      {{
+                        i18n
+                          .t('piiGuardBlockedBadge')
+                          .replace('{N}', incidentService.leakedPatternsCount().toString())
+                      }}
+                    </span>
+                  </div>
+                } @else {
+                  <div
+                    class="bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 shadow"
+                  >
+                    <i class="pi pi-hourglass text-slate-400"></i>
+                    <span>Aguardando auditoria...</span>
+                  </div>
+                }
+              </div>
+
+              <!-- Side-by-Side Comparison -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <!-- Pre-Collector Raw Log -->
+                <div class="bg-slate-950 border border-rose-900/60 rounded p-2 flex flex-col gap-1">
+                  <span class="text-xs font-bold text-rose-400">
+                    {{ i18n.t('preCollectorLogLabel') }}
+                  </span>
+                  <pre
+                    class="font-mono text-[11px] text-rose-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-rose-950 max-h-64 overflow-y-auto"
+                    >{{
+                      incidentService.currentIncident()?.rca?.rawEdgeLogPreCollector ??
+                        rawPreCollectorLog
+                    }}</pre>
+                </div>
+
+                <!-- Post-OTTL Masked Log -->
+                <div
+                  class="bg-slate-950 border border-emerald-900/60 rounded p-2 flex flex-col gap-1"
+                >
+                  <span class="text-xs font-bold text-emerald-400">
+                    {{ i18n.t('postOttlLogLabel') }}
+                  </span>
+                  <pre
+                    class="font-mono text-[11px] text-emerald-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-emerald-950 max-h-64 overflow-y-auto"
+                    >{{
+                      incidentService.currentIncident()?.rca?.logSample ?? maskedPostOttlLog
+                    }}</pre>
+                </div>
+              </div>
+            </div>
+          </p-tabpanel>
+
+          <!-- Aba 3: Git Deploy Diff & FinOps -->
+          <p-tabpanel value="2">
+            <div class="flex flex-col gap-2.5 pt-1.5">
+              <div class="flex justify-between items-center text-xs text-slate-300">
+                <span class="font-bold font-mono text-cyan-300">
+                  {{ i18n.t('gitDiffTitle') }}
+                </span>
+                <span class="font-mono text-slate-400 text-[11px]">
+                  apps/target-app-demo/src/repositories/payment.repository.ts
+                </span>
+              </div>
+
+              <pre
+                class="bg-slate-950 border border-slate-800 rounded p-2.5 font-mono text-[11px] text-slate-200 overflow-x-auto leading-relaxed max-h-56 overflow-y-auto"
+                >{{ mockGitDiff }}</pre>
+
+              <!-- FinOps Breakdown Box -->
+              <div
+                class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-950 border border-slate-800 rounded p-2"
+              >
+                <div>
+                  <div class="text-[9px] text-slate-400 uppercase">
+                    {{ i18n.t('finopsBytesFetched') }}
+                  </div>
+                  <div class="text-xs font-mono font-bold text-slate-200">
+                    {{ incidentService.currentIncident()?.finops?.rawBytesFetched ?? 48200 }} B
+                  </div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-slate-400 uppercase">
+                    {{ i18n.t('finopsBytesSent') }}
+                  </div>
+                  <div class="text-xs font-mono font-bold text-slate-200">
+                    {{ incidentService.currentIncident()?.finops?.compactedBytesSent ?? 7712 }} B
+                  </div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-slate-400 uppercase">
+                    {{ i18n.t('finopsPayloadReduction') }}
+                  </div>
+                  <div class="text-xs font-mono font-bold text-emerald-400">
+                    {{ incidentService.finopsReduction() }}%
+                  </div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-slate-400 uppercase">
+                    {{ i18n.t('finopsTokensSaved') }}
+                  </div>
+                  <div class="text-xs font-mono font-bold text-cyan-400">
+                    ~{{ incidentService.estimatedTokensSaved() }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
+    </section>
+
+    <!-- Q4: Direita (GitHub PR & Governança Resend) -->
+    <section
+      class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col gap-2 min-h-0 shadow-md"
+    >
+      <!-- GitHub Pull Request Card -->
+      <div class="shrink-0 bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <i class="pi pi-github text-white"></i>
+            {{ i18n.t('githubPrTitle') }}
+          </span>
+          <p-tag value="Open" severity="success" styleClass="text-[10px] py-0" />
+        </div>
+
+        <p class="text-[11px] text-slate-400 leading-snug">
+          Branch:
+          <code class="text-cyan-300 font-mono text-[10px]">hotfix/zeromttr-pool-timeout</code>
+        </p>
+
+        <a
+          [href]="
+            incidentService.currentIncident()?.remediation?.pullRequestUrl ??
+            'https://github.com/AdmilsonGoncalves/zeromttr/pull/42'
+          "
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-1 px-2.5 rounded transition-colors"
+        >
+          <i class="pi pi-external-link text-xs"></i>
+          <span>{{ i18n.t('githubPrViewBtn') }}</span>
+        </a>
+      </div>
+
+      <!-- Resend Email Preview -->
+      <div
+        class="flex-1 min-h-0 bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1"
+      >
+        <span class="shrink-0 text-xs font-bold text-slate-300 flex items-center gap-1.5">
+          <i class="pi pi-envelope text-cyan-400"></i>
+          {{ i18n.t('resendPreviewTitle') }}
+        </span>
+
+        <div
+          class="flex-1 min-h-0 overflow-y-auto bg-slate-900 border border-slate-800 rounded p-2 text-xs text-slate-300"
+          [innerHTML]="safeResendPreview()"
+        ></div>
+      </div>
+
+      <!-- Human-in-the-Loop Awaiting Decision Badge -->
+      <div
+        class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center gap-1.5"
+      >
+        <i class="pi pi-lock text-amber-400 shrink-0"></i>
+        <span class="leading-tight text-[11px]">{{ i18n.t('awaitingDecisionBadge') }}</span>
+      </div>
+
+      <!-- Simulation Button for Demo -->
+      <p-button
+        [label]="i18n.t('simulateDecisionBtn')"
+        severity="warn"
+        size="small"
+        styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
+        (onClick)="onSimulateDecision()"
+      />
+    </section>
+  </div>
+</div>

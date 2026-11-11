@@ -11,7 +11,10 @@
     "check:workspace": "prettier --check . && nx run-many -t lint,typecheck,test,build --parallel=4",
     "lint:workspace": "nx run-many -t lint",
     "test:workspace": "nx run-many -t test",
-    "build:workspace": "nx run-many -t build"
+    "build:workspace": "nx run-many -t build",
+    "dashboard:mock": "pnpm --filter @zeromttr/utils run build && pnpm --filter @zeromttr/dashboard run mock",
+    "dashboard:dev": "pnpm --filter @zeromttr/dashboard run dev",
+    "dashboard:start": "pnpm run dashboard:mock & pnpm run dashboard:dev"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",
