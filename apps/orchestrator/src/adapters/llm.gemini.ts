@@ -73,17 +73,35 @@ export class GeminiReasoningAdapter implements ReasoningPort {
 
     const prompt = `Analise as evidências do incidente e sintetize o RCA e o patch cirúrgico:\n${JSON.stringify(evidence, null, 2)}`;
 
-    const response = await this.client.models.generateContent({
-      model: this.modelName,
-      contents: prompt,
-      config: {
-        systemInstruction: GEMINI_SYSTEM_INSTRUCTION,
-        temperature: 0.1,
-        maxOutputTokens: 4096,
-        responseMimeType: 'application/json',
-        responseSchema: RCA_SYNTHESIS_SCHEMA
-      }
+    const timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS) || 25_000;
+    let timer: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(`Gemini generateContent timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
     });
+
+    let response;
+    try {
+      response = await Promise.race([
+        this.client.models.generateContent({
+          model: this.modelName,
+          contents: prompt,
+          config: {
+            systemInstruction: GEMINI_SYSTEM_INSTRUCTION,
+            temperature: 0.1,
+            maxOutputTokens: 4096,
+            responseMimeType: 'application/json',
+            responseSchema: RCA_SYNTHESIS_SCHEMA
+          }
+        }),
+        timeoutPromise
+      ]);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
 
     const text = response.text;
     if (!text) {

@@ -28,19 +28,21 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
   const clock = new SystemClock();
   const broadcaster = new SseEventBroadcaster();
 
-  if (process.env.NODE_ENV === 'production') {
+  const isTest = process.env.NODE_ENV === 'test';
+  if (!isTest) {
     if (!process.env.DECISION_HMAC_SECRET) {
-      throw new Error('FATAL: DECISION_HMAC_SECRET must be configured in production environment.');
+      throw new Error('FATAL: DECISION_HMAC_SECRET must be configured.');
     }
     if (!process.env.GRAFANA_WEBHOOK_TOKEN) {
-      throw new Error('FATAL: GRAFANA_WEBHOOK_TOKEN must be configured in production environment.');
+      throw new Error('FATAL: GRAFANA_WEBHOOK_TOKEN must be configured.');
     }
     if (!process.env.DASHBOARD_API_TOKEN) {
-      throw new Error('FATAL: DASHBOARD_API_TOKEN must be configured in production environment.');
+      throw new Error('FATAL: DASHBOARD_API_TOKEN must be configured.');
     }
   }
 
-  const hmacSecret = process.env.DECISION_HMAC_SECRET || 'zeromttr-default-hmac-secret-2026';
+  const hmacSecret =
+    process.env.DECISION_HMAC_SECRET || (isTest ? 'test-hmac-secret-zeromttr-2026' : '');
   const dashboardUrl = process.env.PUBLIC_DASHBOARD_URL || 'https://zeromttr.agjworks.com';
 
   const handleAlert = new HandleAlert(repository, broadcaster);

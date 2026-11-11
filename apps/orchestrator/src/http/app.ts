@@ -34,20 +34,24 @@ export function createApp(dependencies: AppDependencies): Express {
 
   app.use(express.json());
 
-  const isProd = process.env.NODE_ENV === 'production';
-  if (isProd) {
-    if (!dependencies.grafanaWebhookToken && !process.env.GRAFANA_WEBHOOK_TOKEN) {
-      throw new Error('FATAL: GRAFANA_WEBHOOK_TOKEN is required in production environment.');
+  const isTest = process.env.NODE_ENV === 'test';
+  const grafanaToken =
+    dependencies.grafanaWebhookToken ||
+    process.env.GRAFANA_WEBHOOK_TOKEN ||
+    (isTest ? 'test-grafana-token' : '');
+  const dashboardToken =
+    dependencies.dashboardApiToken ||
+    process.env.DASHBOARD_API_TOKEN ||
+    (isTest ? 'test-dashboard-token' : '');
+
+  if (!isTest) {
+    if (!grafanaToken) {
+      throw new Error('FATAL: GRAFANA_WEBHOOK_TOKEN must be configured.');
     }
-    if (!dependencies.dashboardApiToken && !process.env.DASHBOARD_API_TOKEN) {
-      throw new Error('FATAL: DASHBOARD_API_TOKEN is required in production environment.');
+    if (!dashboardToken) {
+      throw new Error('FATAL: DASHBOARD_API_TOKEN must be configured.');
     }
   }
-
-  const grafanaToken =
-    dependencies.grafanaWebhookToken || process.env.GRAFANA_WEBHOOK_TOKEN || 'test-grafana-token';
-  const dashboardToken =
-    dependencies.dashboardApiToken || process.env.DASHBOARD_API_TOKEN || 'test-dashboard-token';
 
   const liveDemoKey = dependencies.liveDemoKey ?? process.env.LIVE_DEMO_KEY;
   const demoCooldownMs =

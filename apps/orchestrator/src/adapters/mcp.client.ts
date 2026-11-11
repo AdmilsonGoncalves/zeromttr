@@ -28,9 +28,12 @@ export class McpClientAdapter implements ToolsPort {
 
   public constructor(baseUrl?: string, authToken?: string) {
     this.baseUrl = buildUrl(baseUrl || process.env.MCP_SERVER_URL || 'http://localhost:8000/mcp');
-    this.authToken = sanitizeHeaderValue(
-      authToken || process.env.MCP_AUTH_TOKEN || 'test-mcp-token'
-    );
+    const isTest = process.env.NODE_ENV === 'test';
+    const token = authToken || process.env.MCP_AUTH_TOKEN || (isTest ? 'test-mcp-token' : '');
+    if (!isTest && !token) {
+      throw new Error('FATAL: MCP_AUTH_TOKEN must be configured.');
+    }
+    this.authToken = sanitizeHeaderValue(token);
   }
 
   private mapFinOps(finops: unknown): FinOpsData {

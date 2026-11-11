@@ -238,5 +238,12 @@ describe('DispatchRemediation Use Case', () => {
     expect(llmAdapter.synthesizeRcaAndPatch).not.toHaveBeenCalled();
     expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalled();
     expect(result.reasoningSource).toBe('fallback');
+
+    const rcaBroadcastCall = vi
+      .mocked(broadcaster.broadcast)
+      .mock.calls.find((call) => call[0] === 'incident.rca');
+    expect(rcaBroadcastCall).toBeDefined();
+    expect(JSON.stringify(rcaBroadcastCall?.[1])).not.toContain('529.982.247-25');
+    expect(result.rcaReport.criticalSpan).not.toContain('529.982.247-25');
   });
 });

@@ -238,7 +238,7 @@ describe('Branch Coverage Enhancements', () => {
         headRef: 'v2',
         suspectCommit: 'c1',
         authorLogin: 'a1',
-        suspectFilePath: 'f1',
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
         patch: 'p1'
       }
     };
@@ -277,13 +277,13 @@ describe('Branch Coverage Enhancements', () => {
       annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 1, success: true }))
     };
 
-    // LLM returns patch missing client.release()
+    // LLM returns invalid patch (wrong suspect file path)
     const llmAdapterNoRelease: ReasoningPort = {
       synthesizeRcaAndPatch: vi.fn(async () => ({
         summary: 'No release',
         rootCause: 'rc',
         evidenceRefs: [],
-        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        suspectFilePath: 'wrong/path/file.ts',
         patchedContent: 'const pool = 10;',
         explanation: 'exp'
       }))
@@ -321,7 +321,7 @@ describe('Branch Coverage Enhancements', () => {
         headRef: 'v2',
         suspectCommit: 'c1',
         authorLogin: 'a1',
-        suspectFilePath: 'f1',
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
         patch: 'p1'
       }
     };
@@ -435,7 +435,7 @@ describe('Branch Coverage Enhancements', () => {
         headRef: 'v2',
         suspectCommit: 'c1',
         authorLogin: 'a1',
-        suspectFilePath: 'f1',
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
         patch: 'p1'
       }
     };
@@ -501,7 +501,7 @@ describe('Branch Coverage Enhancements', () => {
         headRef: 'v2',
         suspectCommit: 'c1',
         authorLogin: 'a1',
-        suspectFilePath: 'f1',
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
         patch: 'p1'
       }
     };

@@ -142,6 +142,7 @@ export class Incident {
     service: string;
     severity: string;
     fingerprint: string;
+    alertName?: string;
     state: IncidentState;
     mode: IncidentMode;
     startedAt: string;
@@ -159,6 +160,7 @@ export class Incident {
       service: this.service,
       severity: this.severity,
       fingerprint: this.fingerprint,
+      alertName: this.alertName,
       state: this._state,
       mode: this.mode,
       startedAt: this.startedAt,

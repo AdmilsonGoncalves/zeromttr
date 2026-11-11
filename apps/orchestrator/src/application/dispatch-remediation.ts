@@ -4,7 +4,8 @@ import {
   PiiPromptGuard,
   calculateEvidenceCoverage,
   type RcaReport,
-  type ReasoningSource
+  type ReasoningSource,
+  type SpanNode
 } from '../domain/index.js';
 import type {
   IncidentRepository,
@@ -22,18 +23,18 @@ export interface DispatchRemediationResult {
   reasoningSource: ReasoningSource;
 }
 
-function validatePatchDefensively(synthesis: RcaAndPatchSynthesis): boolean {
-  if (
-    !isNonEmptyString(synthesis.suspectFilePath) ||
-    synthesis.suspectFilePath !== 'apps/target-app-demo/src/repositories/payment.repository.ts'
-  ) {
+function validatePatchDefensively(
+  synthesis: RcaAndPatchSynthesis,
+  expectedSuspectPath?: string
+): boolean {
+  if (!isNonEmptyString(synthesis.suspectFilePath)) {
+    return false;
+  }
+  if (expectedSuspectPath && synthesis.suspectFilePath !== expectedSuspectPath) {
     return false;
   }
   const content = synthesis.patchedContent;
-  if (!isNonEmptyString(content) || !content.includes('client.release()')) {
-    return false;
-  }
-  if (!/(?:max\s*:\s*10\b|max:\s*10)/.test(content)) {
+  if (!isNonEmptyString(content) || content.trim().length === 0) {
     return false;
   }
   return true;
@@ -68,7 +69,7 @@ export class DispatchRemediation {
     if (piiAudit.passed) {
       try {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
-        if (validatePatchDefensively(rawSynthesis)) {
+        if (validatePatchDefensively(rawSynthesis, evidence.gitDiff?.suspectFilePath)) {
           synthesis = rawSynthesis;
           reasoningSource = 'llm';
         } else {
@@ -151,6 +152,34 @@ export class DispatchRemediation {
       hasLokiLogAndGitDiff
     });
 
+    const safeCriticalSpan = piiAudit.passed
+      ? evidence.traceAnalysis?.criticalOperation || 'pg.pool.acquire'
+      : 'pg.pool.acquire';
+
+    const safeSpans: SpanNode[] = piiAudit.passed
+      ? [
+          {
+            spanId: 'span-001',
+            serviceName: incident.service,
+            operationName: evidence.traceAnalysis?.criticalOperation || 'pg.pool.acquire',
+            durationMs: evidence.traceAnalysis?.durationMs || 4600,
+            hasError: true
+          }
+        ]
+      : [
+          {
+            spanId: 'span-001',
+            serviceName: incident.service,
+            operationName: 'pg.pool.acquire',
+            durationMs: 4600,
+            hasError: true
+          }
+        ];
+
+    const safeBlastRadius = piiAudit.passed
+      ? evidence.traceAnalysis?.servicesInvolved || [incident.service]
+      : [incident.service];
+
     const rcaReport: RcaReport = {
       summary: synthesis.summary,
       rootCause: synthesis.rootCause,
@@ -159,19 +188,11 @@ export class DispatchRemediation {
       signalsCollected: coverage.signalsCollected,
       signalsTotal: coverage.signalsTotal,
       evidenceBreakdown: coverage.breakdown,
-      blastRadius: evidence.traceAnalysis?.servicesInvolved || [incident.service],
+      blastRadius: safeBlastRadius,
       diagnosisSeconds: 4,
       traceId: evidence.traceAnalysis?.traceId || 'trace-unknown',
-      criticalSpan: evidence.traceAnalysis?.criticalOperation || 'pg.pool.acquire',
-      spans: [
-        {
-          spanId: 'span-001',
-          serviceName: incident.service,
-          operationName: evidence.traceAnalysis?.criticalOperation || 'pg.pool.acquire',
-          durationMs: evidence.traceAnalysis?.durationMs || 4600,
-          hasError: true
-        }
-      ],
+      criticalSpan: safeCriticalSpan,
+      spans: safeSpans,
       logSample: piiAudit.passed
         ? evidence.logSample
         : `[RETIDO POR VIOLAÇÃO PII: ${piiAudit.detectedTypes.join(', ')}]`,

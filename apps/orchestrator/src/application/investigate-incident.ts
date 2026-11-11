@@ -61,9 +61,9 @@ export class InvestigateIncident {
     const startIso = new Date(nowMs - 5 * 60 * 1000).toISOString();
     const endIso = nowIso();
 
-    // 1. PromQL Query
+    // 1. PromQL Query (TECH 09 requirement: histogram_quantile at 0.95)
     const promqlOutput = await this.tools.executePromqlRange({
-      query: `sum(rate(http_server_duration_milliseconds_bucket{service_name="${incident.service}"}[1m])) by (le)`,
+      query: `histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name="${incident.service}"}[1m])) by (le))`,
       start: startIso,
       end: endIso,
       step: '15s'

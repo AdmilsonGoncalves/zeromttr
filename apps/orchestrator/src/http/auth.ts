@@ -22,10 +22,9 @@ export function extractBearerToken(req: Request, allowQuery = false): string | n
       return token;
     }
   }
+  const pathname = req.originalUrl?.split('?')[0] || req.path || '';
   const isEventsRoute =
-    req.path === '/events' ||
-    req.baseUrl?.endsWith('/events') ||
-    Boolean(req.originalUrl?.includes('/events'));
+    pathname === '/api/events' || pathname === '/events' || req.path === '/events';
   if ((allowQuery || isEventsRoute) && req.query && isNonEmptyString(req.query.token)) {
     return req.query.token.trim();
   }

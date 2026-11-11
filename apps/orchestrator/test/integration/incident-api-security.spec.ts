@@ -192,20 +192,15 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
   });
 
   it('should reject invalid or tampered HMAC signature with 403 Forbidden', async () => {
-    const otherIncident = new Incident({
-      id: 'inc-other',
-      service: 'api-pagamentos-core',
-      severity: 'critical',
-      fingerprint: 'alert:service:2',
-      state: IncidentState.NOTIFIED
-    });
-    vi.spyOn(repo, 'findById').mockResolvedValueOnce(otherIncident);
+    // Generate a valid signature for 'reject', but submit it with 'approve' to simulate tampering
+    const tamperedSig = DecisionHmac.sign('inc-sec-001', 'reject', exp, HMAC_SECRET);
 
     const res = await request(app)
-      .post('/api/incidents/inc-other/decision')
-      .send({ action: 'approve', sig: 'invalid-hex-signature-0000', exp });
+      .post('/api/incidents/inc-sec-001/decision')
+      .send({ action: 'approve', sig: tamperedSig, exp });
 
     expect(res.status).toBe(403);
+    expect(res.body.error).toContain('Invalid or expired decision HMAC signature');
   });
 
   it('should reject invalid decision payload with 400 and Zod details', async () => {
