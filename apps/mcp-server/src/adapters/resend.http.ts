@@ -1,6 +1,12 @@
 import type { NotifierPort, PostMortemNotification, NotificationReceipt } from '../ports/index.js';
-import { escapeHtml } from '@zeromttr/utils';
-import { safeHttpUrl } from '@zeromttr/utils/http';
+import { escapeHtml, isEmpty } from '@zeromttr/utils';
+import {
+  buildUrl,
+  isHttpSuccess,
+  safeHttpUrl,
+  sanitizeHeaderValue,
+  trimTrailingSlash
+} from '@zeromttr/utils/http';
 
 export { escapeHtml, safeHttpUrl };
 
@@ -87,22 +93,22 @@ export class ResendHttpAdapter implements NotifierPort {
   private readonly baseUrl: string;
 
   constructor(private readonly config: ResendAdapterConfig) {
-    this.baseUrl = (config.apiBaseUrl || 'https://api.resend.com').replace(/\/$/, '');
+    this.baseUrl = trimTrailingSlash(config.apiBaseUrl || 'https://api.resend.com');
   }
 
   async sendPostMortem(req: PostMortemNotification): Promise<NotificationReceipt> {
-    if (!this.config.apiKey) {
+    if (isEmpty(this.config.apiKey)) {
       throw new Error('Resend API key is missing or empty');
     }
 
     const html = renderPostMortemHtml(req);
     const recipient = req.recipient_email || 'oncall-sre@example.com';
 
-    const url = `${this.baseUrl}/emails`;
+    const url = buildUrl(this.baseUrl, '/emails');
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${sanitizeHeaderValue(this.config.apiKey)}`,
         'Content-Type': 'application/json',
         'Idempotency-Key': `post-mortem-${req.incident_id}`
       },
@@ -114,7 +120,7 @@ export class ResendHttpAdapter implements NotifierPort {
       })
     });
 
-    if (!response.ok) {
+    if (!isHttpSuccess(response.status)) {
       const errText = await response.text();
       throw new Error(`Resend send email failed: ${response.status} ${errText}`);
     }

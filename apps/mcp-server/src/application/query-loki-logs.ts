@@ -1,3 +1,4 @@
+import { clamp } from '@zeromttr/utils';
 import type { LogsPort, LokiQueryInput } from '../ports/index.js';
 import { LogTruncator, FinOpsCalculator, type FinOpsMetrics } from '../domain/index.js';
 import { validateTimeRange } from './validate-time-range.js';
@@ -15,7 +16,7 @@ export class QueryLokiLogs {
   async execute(input: LokiQueryInput): Promise<QueryLokiLogsOutput> {
     const { startIso, endIso } = validateTimeRange(input.start, input.end);
 
-    const safeLimit = Math.min(100, Math.max(1, input.limit ?? 50));
+    const safeLimit = clamp(input.limit ?? 50, 1, 100);
     const result = await this.logsPort.queryLogs({
       ...input,
       start: startIso,

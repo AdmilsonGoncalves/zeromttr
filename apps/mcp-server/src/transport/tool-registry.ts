@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { toErrorMessage } from '@zeromttr/utils';
 import type {
   ExecutePromqlRange,
   QueryLokiLogs,
@@ -358,7 +359,7 @@ export class ToolRegistry {
       };
     } catch (err) {
       return {
-        content: [{ type: 'text', text: (err as Error).message || 'Tool execution error' }],
+        content: [{ type: 'text', text: toErrorMessage(err, 'Tool execution error') }],
         isError: true
       };
     }

@@ -1,6 +1,7 @@
 import type http from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { isEmpty } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 
 export function verifyAuthToken(req: http.IncomingMessage, expectedToken: string): boolean {
   if (isEmpty(expectedToken)) {
@@ -34,7 +35,7 @@ export function handleAuthMiddleware(
 
   const authorized = verifyAuthToken(req, expectedToken);
   if (!authorized) {
-    res.writeHead(401, {
+    res.writeHead(HTTP_STATUS.UNAUTHORIZED, {
       'Content-Type': 'application/json',
       'WWW-Authenticate': 'Bearer error="invalid_token"'
     });

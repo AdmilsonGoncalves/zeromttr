@@ -1,3 +1,5 @@
+import { clamp, isNumber, round } from '@zeromttr/utils';
+
 export interface PromExemplar {
   timestamp: number;
   value: string;
@@ -26,7 +28,7 @@ function calculatePercentile(sortedValues: number[], p: number): number {
     return 0;
   }
   const index = Math.ceil((p / 100) * sortedValues.length) - 1;
-  const safeIndex = Math.max(0, Math.min(sortedValues.length - 1, index));
+  const safeIndex = clamp(index, 0, sortedValues.length - 1);
   return sortedValues[safeIndex];
 }
 
@@ -38,7 +40,7 @@ export function summarizeSeries(
   const boundedSeries = series.slice(0, maxSeries);
 
   return boundedSeries.map((s) => {
-    const rawValues = s.values.map(([, val]) => Number(val)).filter((v) => !Number.isNaN(v));
+    const rawValues = s.values.map(([, val]) => Number(val)).filter(isNumber);
 
     if (rawValues.length === 0) {
       return {
@@ -56,7 +58,7 @@ export function summarizeSeries(
     const min = Math.min(...rawValues);
     const max = Math.max(...rawValues);
     const sum = rawValues.reduce((acc, curr) => acc + curr, 0);
-    const avg = Number((sum / rawValues.length).toFixed(2));
+    const avg = round(sum / rawValues.length, 2);
     const latest = rawValues[rawValues.length - 1];
 
     const sorted = [...rawValues].sort((a, b) => a - b);

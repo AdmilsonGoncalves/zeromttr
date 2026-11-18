@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { isEmpty, isNonEmptyString, isNumber, toErrorMessage } from '@zeromttr/utils';
+import { isEmpty, isNonEmptyString, parseNumber, toErrorMessage } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { Card } from 'primeng/card';
 import { Tag } from 'primeng/tag';
@@ -67,7 +67,7 @@ export class DecisionComponent implements OnInit {
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     if (isEmpty(hash) || hash.length < 2) {
       this.isValid.set(false);
-      this.errorMessage.set('Fragmento HMAC ausente na URL (#action=...&sig=...&exp=...)');
+      this.errorMessage.set(this.i18n.t('hmacMissingFragmentError'));
       return;
     }
 
@@ -77,23 +77,23 @@ export class DecisionComponent implements OnInit {
     const actionParam = params.get('action');
     const sigParam = params.get('sig');
     const expRaw = params.get('exp');
-    const expParam = isNonEmptyString(expRaw) ? Number(expRaw) : NaN;
+    const expParam = parseNumber(expRaw, 0);
 
     if (!isNonEmptyString(actionParam) || (actionParam !== 'approve' && actionParam !== 'reject')) {
       this.isValid.set(false);
-      this.errorMessage.set('Parâmetro action inválido no hash (esperado approve ou reject)');
+      this.errorMessage.set(this.i18n.t('hmacInvalidActionError'));
       return;
     }
 
     if (!isNonEmptyString(sigParam)) {
       this.isValid.set(false);
-      this.errorMessage.set('Assinatura sig HMAC ausente no hash');
+      this.errorMessage.set(this.i18n.t('hmacMissingSigError'));
       return;
     }
 
-    if (!isNumber(expParam) || expParam <= 0) {
+    if (expParam <= 0) {
       this.isValid.set(false);
-      this.errorMessage.set('Timestamp exp inválido no hash');
+      this.errorMessage.set(this.i18n.t('hmacInvalidExpError'));
       return;
     }
 
@@ -105,7 +105,7 @@ export class DecisionComponent implements OnInit {
     if (expParam < nowSeconds) {
       this.isExpired.set(true);
       this.isValid.set(false);
-      this.errorMessage.set('Link de decisão HMAC expirou');
+      this.errorMessage.set(this.i18n.t('hmacExpiredError'));
       return;
     }
 

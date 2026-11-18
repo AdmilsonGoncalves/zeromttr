@@ -1,4 +1,6 @@
 import type http from 'node:http';
+import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { handleChaosRoutes, handleHealthRoutes, handlePaymentsRoutes } from './routes/index.js';
 import { initTelemetry } from './telemetry/index.js';
 
@@ -31,15 +33,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         req.on('error', (err) => reject(err));
       });
 
-      if (rawBody.trim().length > 0) {
-        try {
-          body = JSON.parse(rawBody);
-        } catch {
-          body = rawBody;
-        }
+      if (isNonEmptyString(rawBody)) {
+        body = safeJsonParse(rawBody, rawBody);
       }
     } catch {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Failed to read request body' }));
       return;
     }
@@ -59,12 +57,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 
   if (req.method === 'GET' && parsedUrl.pathname === '/') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'text/plain' });
     res.end('ZeroMTTR Target Demo Workload Running');
     return;
   }
 
-  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not Found' }));
 }
 
@@ -75,7 +73,7 @@ export function createApp(): http.RequestListener {
     handleRequest(req, res).catch((error: unknown) => {
       console.error('[target-app-demo] unhandled request error', error);
       if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.INTERNAL_SERVER_ERROR, { 'Content-Type': 'application/json' });
       }
       res.end(JSON.stringify({ error: 'Internal Server Error' }));
     });

@@ -1,3 +1,10 @@
+import { isNonEmptyString, unique } from '@zeromttr/utils';
+import {
+  buildUrl,
+  isHttpSuccess,
+  sanitizeHeaderValue,
+  trimTrailingSlash
+} from '@zeromttr/utils/http';
 import type { AnnotationPort, AnnotationRequest, AnnotationReceipt } from '../ports/index.js';
 
 export interface GrafanaAnnotationsConfig {
@@ -9,7 +16,7 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
   private readonly baseUrl: string;
 
   constructor(private readonly config: GrafanaAnnotationsConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, '');
+    this.baseUrl = trimTrailingSlash(config.baseUrl);
   }
 
   private getHeaders(): Record<string, string> {
@@ -17,15 +24,15 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
       'Content-Type': 'application/json',
       Accept: 'application/json'
     };
-    if (this.config.apiToken) {
-      headers.Authorization = `Bearer ${this.config.apiToken}`;
+    if (isNonEmptyString(this.config.apiToken)) {
+      headers.Authorization = `Bearer ${sanitizeHeaderValue(this.config.apiToken)}`;
     }
     return headers;
   }
 
   async createAnnotation(req: AnnotationRequest): Promise<AnnotationReceipt> {
-    const url = `${this.baseUrl}/api/annotations`;
-    const tags = Array.from(new Set([...(req.tags || []), 'aiops-remediation']));
+    const url = buildUrl(this.baseUrl, '/api/annotations');
+    const tags = unique([...(req.tags || []), 'aiops-remediation']);
 
     let text = req.text;
     if (req.pull_request_url) {
@@ -44,7 +51,7 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) {
+    if (!isHttpSuccess(response.status)) {
       const errText = await response.text();
       throw new Error(`Grafana createAnnotation failed: ${response.status} ${errText}`);
     }

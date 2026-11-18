@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { IncidentService } from '../src/app/core/incident.service.js';
 import { createMockServer, type MockServer } from '../mock-server/server.js';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
@@ -70,7 +70,8 @@ describe('IncidentService', () => {
     expect(service.currentIncident()?.id).toBe('inc-20261110-001');
   });
 
-  it('should trigger chaos and reset via server', async () => {
+  it('should trigger chaos, resetChaos, and simulateDecision while forwarding X-Live-Demo-Key when configured', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const service = new IncidentService();
     service.setActiveMode('live');
     service.setLiveDemoKey('test-key');
@@ -80,6 +81,18 @@ describe('IncidentService', () => {
 
     await service.resetChaos(baseUrl);
     expect(service.targetStatus()?.status).toBe('healthy');
+
+    await service.fetchIncidents(baseUrl);
+    await service.simulateDecision('approve', baseUrl);
+
+    const resetCall = fetchSpy.mock.calls.find(([url]) => String(url).endsWith('/api/demo/reset'));
+    const simCall = fetchSpy.mock.calls.find(([url]) =>
+      String(url).endsWith('/api/demo/simulate-decision')
+    );
+
+    expect(resetCall?.[1]?.headers).toMatchObject({ 'X-Live-Demo-Key': 'test-key' });
+    expect(simCall?.[1]?.headers).toMatchObject({ 'X-Live-Demo-Key': 'test-key' });
+    fetchSpy.mockRestore();
   });
 
   it('should execute simulateDecision on current incident', async () => {

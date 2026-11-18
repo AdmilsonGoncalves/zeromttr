@@ -10,7 +10,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { isNonEmptyString, isString } from '@zeromttr/utils';
+import { isFilled, isNonEmptyString, isString } from '@zeromttr/utils';
 import { SelectButton } from 'primeng/selectbutton';
 import { Tag } from 'primeng/tag';
 import { Button } from 'primeng/button';
@@ -68,22 +68,19 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
 
   onTabChange(tab: string | number | undefined): void {
-    if (tab !== undefined && tab !== null) {
+    if (isFilled(tab)) {
       this.activeTab.set(String(tab));
     }
   }
 
-  readonly defaultResendPreview = `
+  readonly safeResendPreview = computed<SafeHtml>(() => {
+    const defaultPreview = `
     <div style="font-family: sans-serif; color: #cbd5e1;">
       <h3 style="color: #ef4444; margin-top: 0;">🚨 ZeroMTTR Incident Post-Mortem</h3>
-      <p style="font-size: 11px;">Aguardando aprovação do plantonista via link seguro exclusivo.</p>
+      <p style="font-size: 11px;">${this.i18n.t('resendDefaultBody')}</p>
     </div>
   `;
-
-  readonly safeResendPreview = computed<SafeHtml>(() => {
-    const raw =
-      this.incidentService.currentIncident()?.notification?.htmlPreview ??
-      this.defaultResendPreview;
+    const raw = this.incidentService.currentIncident()?.notification?.htmlPreview ?? defaultPreview;
     return this.sanitizer.bypassSecurityTrustHtml(raw);
   });
 

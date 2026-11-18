@@ -1,25 +1,26 @@
+import { diffInHours, parseIsoDate, round } from '@zeromttr/utils';
+
 export function validateTimeRange(
   startStr: string,
   endStr: string
 ): { start: Date; end: Date; startIso: string; endIso: string } {
-  const start = new Date(startStr);
-  const end = new Date(endStr);
+  const start = parseIsoDate(startStr);
+  const end = parseIsoDate(endStr);
 
-  if (Number.isNaN(start.getTime())) {
+  if (!start) {
     throw new Error(`Invalid start timestamp: '${startStr}'. Must be valid ISO8601.`);
   }
-  if (Number.isNaN(end.getTime())) {
+  if (!end) {
     throw new Error(`Invalid end timestamp: '${endStr}'. Must be valid ISO8601.`);
   }
   if (start.getTime() >= end.getTime()) {
     throw new Error(`Invalid time window: start (${startStr}) must be before end (${endStr}).`);
   }
 
-  const diffMs = end.getTime() - start.getTime();
-  const maxWindowMs = 24 * 60 * 60 * 1000;
-  if (diffMs > maxWindowMs) {
+  const hours = diffInHours(start, end);
+  if (hours > 24) {
     throw new Error(
-      `Time window exceeds maximum allowed window of 24h (${Math.round(diffMs / (60 * 60 * 1000))}h requested).`
+      `Time window exceeds maximum allowed window of 24h (${round(hours)}h requested).`
     );
   }
 

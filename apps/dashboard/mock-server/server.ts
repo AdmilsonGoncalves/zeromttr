@@ -7,6 +7,7 @@ import {
   safeJsonParse,
   toErrorMessage
 } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 import type {
   DecisionPayload,
   Incident,
@@ -58,7 +59,9 @@ export class MockServer {
           if (!res.headersSent) {
             const isClient =
               err instanceof ClientError || (err instanceof Error && err.name === 'ClientError');
-            res.writeHead(isClient ? 400 : 500, { 'Content-Type': 'application/json' });
+            res.writeHead(isClient ? HTTP_STATUS.BAD_REQUEST : HTTP_STATUS.INTERNAL_SERVER_ERROR, {
+              'Content-Type': 'application/json'
+            });
             res.end(JSON.stringify({ error: toErrorMessage(err) }));
           } else {
             res.end();
@@ -154,7 +157,7 @@ export class MockServer {
     this.setCorsHeaders(res);
 
     if (req.method === 'OPTIONS') {
-      res.writeHead(204);
+      res.writeHead(HTTP_STATUS.NO_CONTENT);
       res.end();
       return;
     }
@@ -164,7 +167,7 @@ export class MockServer {
 
     // GET /api/events (SSE)
     if (req.method === 'GET' && pathname === '/api/events') {
-      res.writeHead(200, {
+      res.writeHead(HTTP_STATUS.OK, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
@@ -234,7 +237,7 @@ export class MockServer {
         mode: this.currentIncident.mode,
         startedAt: this.currentIncident.startedAt
       };
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify([summary]));
       return;
     }
@@ -243,18 +246,18 @@ export class MockServer {
     if (req.method === 'GET' && pathname.startsWith('/api/incidents/')) {
       const id = pathname.replace('/api/incidents/', '');
       if (id !== this.currentIncident.id) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: `Incident ${id} not found` }));
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(this.currentIncident));
       return;
     }
 
     // GET /api/target/status
     if (req.method === 'GET' && pathname === '/api/target/status') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(this.targetStatus));
       return;
     }
@@ -306,7 +309,7 @@ export class MockServer {
         });
       }
 
-      res.writeHead(202, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.ACCEPTED, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'chaos_injected', mode }));
       return;
     }
@@ -325,7 +328,7 @@ export class MockServer {
         reason: 'Target service restored and chaos reset'
       });
 
-      res.writeHead(202, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.ACCEPTED, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'reset_completed' }));
       return;
     }
@@ -334,13 +337,13 @@ export class MockServer {
     if (req.method === 'POST' && pathname.includes('/decision') && !pathname.includes('simulate')) {
       const match = pathname.match(/^\/api\/incidents\/([^/]+)\/decision$/);
       if (!match) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid decision URL pattern' }));
         return;
       }
       const incidentId = match[1];
       if (incidentId !== this.currentIncident.id) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: `Incident not found: ${incidentId}` }));
         return;
       }
@@ -348,20 +351,20 @@ export class MockServer {
       const body = await this.parseBody<DecisionPayload>(req);
 
       if (!isNonEmptyString(body.action) || !isNonEmptyString(body.sig) || !isNumber(body.exp)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Missing decision parameters (action, sig, exp)' }));
         return;
       }
 
       if (body.action !== 'approve' && body.action !== 'reject') {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid decision action: must be approve or reject' }));
         return;
       }
 
       const nowSeconds = Math.floor(Date.now() / 1000);
       if (body.exp < nowSeconds) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Decision link has expired' }));
         return;
       }
@@ -376,7 +379,7 @@ export class MockServer {
         source: 'email_hmac'
       });
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           status: 'recorded',
@@ -393,19 +396,19 @@ export class MockServer {
       const body = await this.parseBody<SimulateDecisionPayload>(req);
 
       if (!isNonEmptyString(body.incidentId) || !isNonEmptyString(body.action)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Missing incidentId or action' }));
         return;
       }
 
       if (body.incidentId !== this.currentIncident.id) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: `Incident not found: ${body.incidentId}` }));
         return;
       }
 
       if (body.action !== 'approve' && body.action !== 'reject') {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid decision action: must be approve or reject' }));
         return;
       }
@@ -420,7 +423,7 @@ export class MockServer {
         source: 'demo_simulation'
       });
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           status: 'simulated',
@@ -432,7 +435,7 @@ export class MockServer {
       return;
     }
 
-    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: `Not found: ${req.method} ${pathname}` }));
   }
 }

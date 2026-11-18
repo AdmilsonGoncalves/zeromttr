@@ -326,7 +326,7 @@ export class TelemetryService {
                     spanId: span.spanId,
                     parentSpanId: span.parentSpanId,
                     name: span.name,
-                    startTimeUnixNano: String(span.startTime * 1_000_000),
+                    startTimeUnixNano: millisToUnixNano(span.startTime),
                     endTimeUnixNano: millisToUnixNano(span.endTime || Date.now()),
                     status: {
                       code: span.status.code,

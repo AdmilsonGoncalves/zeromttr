@@ -1,8 +1,8 @@
 import http from 'node:http';
+import { parseNumber } from '@zeromttr/utils';
 import { createApp } from './app.js';
 
-const defaultPort =
-  process.env.PORT !== undefined && process.env.PORT !== '' ? Number(process.env.PORT) : 3001;
+const defaultPort = parseNumber(process.env.PORT, 3001);
 
 export function startServer(port: number = defaultPort): http.Server {
   const handler = createApp();

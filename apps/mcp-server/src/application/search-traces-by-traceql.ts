@@ -1,3 +1,4 @@
+import { clamp } from '@zeromttr/utils';
 import type { TracesPort, TraceSearchResult } from '../ports/index.js';
 
 export interface SearchTracesByTraceQLInput {
@@ -15,7 +16,7 @@ export class SearchTracesByTraceQL {
   constructor(private readonly tracesPort: TracesPort) {}
 
   async execute(input: SearchTracesByTraceQLInput): Promise<SearchTracesByTraceQLOutput> {
-    const safeLimit = Math.min(20, Math.max(1, input.limit ?? 10));
+    const safeLimit = clamp(input.limit ?? 10, 1, 20);
     const { traces } = await this.tracesPort.searchTraces(input.query, safeLimit);
 
     return {

@@ -54,7 +54,7 @@
       </div>
 
       <!-- Controls: Mode, Demo Key, Chaos Buttons, and Language at extreme right -->
-      <div class="w-full flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5 shrink-0">
         <!-- Mode Selector -->
         <p-selectbutton
           [options]="modeOptions"
@@ -105,7 +105,6 @@
           optionLabel="label"
           optionValue="value"
           styleClass="text-[10px]"
-          class="ml-auto"
         />
       </div>
     </div>
@@ -350,7 +349,7 @@
                     class="bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 shadow"
                   >
                     <i class="pi pi-hourglass text-slate-400"></i>
-                    <span>Aguardando auditoria...</span>
+                    <span>{{ i18n.t('awaitingAuditBadge') }}</span>
                   </div>
                 }
               </div>
@@ -380,7 +379,17 @@
                   <pre
                     class="font-mono text-[11px] text-emerald-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-emerald-950 max-h-64 overflow-y-auto"
                     >{{
-                      incidentService.currentIncident()?.rca?.logSample ?? maskedPostOttlLog
+                      incidentService.isPiiPassed() === false
+                        ? i18n
+                            .t('piiLogWithheldMessage')
+                            .replace(
+                              '{TYPES}',
+                              (
+                                incidentService.currentIncident()?.rca?.piiGuardAudit
+                                  ?.detectedTypes ?? []
+                              ).join(', ')
+                            )
+                        : (incidentService.currentIncident()?.rca?.logSample ?? maskedPostOttlLog)
                     }}</pre>
                 </div>
               </div>

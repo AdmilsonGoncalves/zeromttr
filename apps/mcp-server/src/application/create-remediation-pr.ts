@@ -1,3 +1,4 @@
+import { isNonEmptyString } from '@zeromttr/utils';
 import type {
   RemediationPort,
   RemediationPrRequest,
@@ -8,7 +9,11 @@ export class CreateRemediationPr {
   constructor(private readonly remediationPort: RemediationPort) {}
 
   async execute(input: RemediationPrRequest): Promise<RemediationPrReceipt> {
-    if (!input.incident_id || !input.file_path || !input.patched_content) {
+    if (
+      !isNonEmptyString(input.incident_id) ||
+      !isNonEmptyString(input.file_path) ||
+      !isNonEmptyString(input.patched_content)
+    ) {
       throw new Error('incident_id, file_path, and patched_content are required.');
     }
     if (input.reasoning_source !== 'llm' && input.reasoning_source !== 'fallback') {

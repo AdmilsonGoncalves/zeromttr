@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { chaosManager } from '../chaos/index.js';
 import type { CreatePaymentInput, Payment } from '../models/index.js';
 import { SpanStatusCode, telemetry } from '../telemetry/index.js';
-import { toErrorMessage } from '@zeromttr/utils';
+import { nowIso, parseNumber, toErrorMessage } from '@zeromttr/utils';
 
 export class KnexTimeoutError extends Error {
   public constructor(
@@ -28,7 +28,7 @@ export class PaymentRepository {
   // Pool Configuration (Baseline v2.14.7: max 10)
   private healthyMaxConnections = 10;
   private degradedMaxConnections = 2;
-  private acquireTimeoutMs = Number(process.env.DB_ACQUIRE_TIMEOUT_MS) || 150;
+  private acquireTimeoutMs = parseNumber(process.env.DB_ACQUIRE_TIMEOUT_MS, 150);
 
   public getPoolStats(): { active: number; waiting: number; max: number } {
     const isChaos = chaosManager.isPoolSaturationEnabled();
@@ -233,7 +233,7 @@ export class PaymentRepository {
   ): Promise<Payment> {
     const id = crypto.randomUUID();
     const txId = `TX-${Math.floor(1000 + Math.random() * 9000)}`;
-    const now = new Date().toISOString();
+    const now = nowIso();
 
     const payment: Payment = {
       id,
