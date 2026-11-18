@@ -27,10 +27,10 @@ function validatePatchDefensively(
   synthesis: RcaAndPatchSynthesis,
   expectedSuspectPath?: string
 ): boolean {
-  if (!isNonEmptyString(synthesis.suspectFilePath)) {
+  if (!isNonEmptyString(expectedSuspectPath) || !isNonEmptyString(synthesis.suspectFilePath)) {
     return false;
   }
-  if (expectedSuspectPath && synthesis.suspectFilePath !== expectedSuspectPath) {
+  if (synthesis.suspectFilePath !== expectedSuspectPath) {
     return false;
   }
   const content = synthesis.patchedContent;
@@ -153,15 +153,15 @@ export class DispatchRemediation {
     });
 
     const safeCriticalSpan = piiAudit.passed
-      ? evidence.traceAnalysis?.criticalOperation || 'pg.pool.acquire'
-      : 'pg.pool.acquire';
+      ? evidence.traceAnalysis?.criticalOperation || 'critical.error.span'
+      : 'critical.error.span';
 
     const safeSpans: SpanNode[] = piiAudit.passed
       ? [
           {
             spanId: 'span-001',
             serviceName: incident.service,
-            operationName: evidence.traceAnalysis?.criticalOperation || 'pg.pool.acquire',
+            operationName: evidence.traceAnalysis?.criticalOperation || 'critical.error.span',
             durationMs: evidence.traceAnalysis?.durationMs || 4600,
             hasError: true
           }
@@ -170,7 +170,7 @@ export class DispatchRemediation {
           {
             spanId: 'span-001',
             serviceName: incident.service,
-            operationName: 'pg.pool.acquire',
+            operationName: 'critical.error.span',
             durationMs: 4600,
             hasError: true
           }
@@ -197,11 +197,8 @@ export class DispatchRemediation {
         ? evidence.logSample
         : `[RETIDO POR VIOLAÇÃO PII: ${piiAudit.detectedTypes.join(', ')}]`,
       piiGuardAudit: piiAudit,
-      deployVersion: evidence.gitDiff?.headRef || 'v2.14.8',
-      mitigations: [
-        'Restaurar o bloco finally { client.release(); }',
-        'Restaurar o dimensionamento do pool para max: 10'
-      ],
+      deployVersion: evidence.gitDiff?.headRef || 'unknown',
+      mitigations: [synthesis.explanation || synthesis.rootCause],
       grafanaAnnotationId: annotationId
     };
 
@@ -211,6 +208,11 @@ export class DispatchRemediation {
       incidentId: incident.id,
       ...rcaReport
     });
+
+    const authoritativeSuspectPath = evidence.gitDiff?.suspectFilePath;
+    if (!isNonEmptyString(authoritativeSuspectPath)) {
+      throw new Error('Cannot create remediation PR without an authoritative suspectFilePath');
+    }
 
     // Transition to AWAITING_PR
     if (incident.state === IncidentState.REMEDIATING) {
@@ -228,12 +230,13 @@ export class DispatchRemediation {
     }
 
     // Create Remediation PR
+    const prTitleSummary = synthesis.summary.replace(/\s+/g, ' ').trim().slice(0, 72);
     const prResult = await this.tools.createRemediationPr({
       incident_id: incident.id,
       file_path: synthesis.suspectFilePath,
       patched_content: synthesis.patchedContent,
       blob_sha: blobSha,
-      title: `fix(target-app-demo): release db client in finally block and restore pool size [incident ${incident.id}]`,
+      title: `fix(${incident.service}): ${prTitleSummary || 'remediate incident'} [incident ${incident.id}]`,
       rca_markdown: `## Root Cause Analysis\n\n${synthesis.rootCause}\n\n**Reasoning Source:** \`${reasoningSource}\`\n\n${synthesis.explanation}`,
       reasoning_source: reasoningSource
     });

@@ -379,7 +379,17 @@
                   <pre
                     class="font-mono text-[11px] text-emerald-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-emerald-950 max-h-64 overflow-y-auto"
                     >{{
-                      incidentService.currentIncident()?.rca?.logSample ?? maskedPostOttlLog
+                      incidentService.isPiiPassed() === false
+                        ? i18n
+                            .t('piiLogWithheldMessage')
+                            .replace(
+                              '{TYPES}',
+                              (
+                                incidentService.currentIncident()?.rca?.piiGuardAudit
+                                  ?.detectedTypes ?? []
+                              ).join(', ')
+                            )
+                        : (incidentService.currentIncident()?.rca?.logSample ?? maskedPostOttlLog)
                     }}</pre>
                 </div>
               </div>

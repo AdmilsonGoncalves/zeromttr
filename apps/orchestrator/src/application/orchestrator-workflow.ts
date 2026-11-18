@@ -34,12 +34,14 @@ export class OrchestratorWorkflow {
         (investigation.targetStatus?.status !== 'unreachable' &&
           investigation.targetStatus?.previousHealthyVersion !== 'unknown' &&
           investigation.targetStatus?.previousHealthyVersion) ||
-        'v2.14.7';
+        process.env.TARGET_BASE_REF ||
+        'HEAD~1';
       const headRef =
         (investigation.targetStatus?.status !== 'unreachable' &&
           investigation.targetStatus?.version !== 'unknown' &&
           investigation.targetStatus?.version) ||
-        'v2.14.8';
+        process.env.TARGET_HEAD_REF ||
+        'HEAD';
 
       // Step 2: Git Deploy Diff Enrichment
       const diffOutput = await this.enrichWithDeployDiff.execute(incidentId, baseRef, headRef);
@@ -50,13 +52,13 @@ export class OrchestratorWorkflow {
       const traceErrorMessage =
         errorSpan?.errorMessage ||
         (investigation.hasTempoErrorSpan
-          ? 'KnexTimeoutError: Knex: Timeout acquiring a connection. The pool is probably full.'
+          ? 'Span error detected during trace analysis.'
           : undefined);
 
       const evidence: CollectedEvidence = {
         incidentId,
         service: incident.service,
-        alertName: incident.alertName || 'PaymentServicePoolExhaustion',
+        alertName: incident.alertName || 'ServiceLatencyAnomaly',
         promqlSummary: {
           metric: 'http_server_duration_milliseconds_bucket',
           p95LatencyMs: p95Latency,

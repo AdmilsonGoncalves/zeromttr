@@ -12,7 +12,7 @@ Sua missão:
 
 Regras estritas de segurança e código:
 - O código corrigido em patchedContent deve conter o arquivo COMPLETO (não use reticências, nem trechos parciais).
-- No serviço de pagamentos (payment.repository.ts), garanta impreterivelmente que conexões adquiridas do pool sejam liberadas em um bloco 'finally { client.release(); }' e que o tamanho do pool seja restaurado para safe defaults (max: 10).
+- Preserve o suspectFilePath identificado no diff de deploy e corrija a causa raiz da regressão (como vazamento de recursos, omissão de liberação em blocos finally ou parâmetros de pool/timeout degradados) restaurando os padrões saudáveis da versão base.
 - Nunca invente dependências ou altere assinaturas de métodos públicos.
 - Responda obrigatoriamente no formato JSON estruturado conforme o schema solicitado.`;
 

@@ -49,6 +49,7 @@ export interface TranslationDictionary {
   postOttlLogLabel: string;
   piiGuardVerifiedBadge: string;
   piiGuardBlockedBadge: string;
+  piiLogWithheldMessage: string;
   gitDiffTitle: string;
   finopsBytesFetched: string;
   finopsBytesSent: string;
@@ -118,6 +119,7 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   piiGuardVerifiedBadge: 'PII Masked at Edge — Fail-Closed Guard Verified (0 Leaked Patterns)',
   piiGuardBlockedBadge:
     'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
+  piiLogWithheldMessage: '[RETIDO POR VIOLAÇÃO PII: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
   finopsBytesFetched: 'Bytes Brutos Coletados',
   finopsBytesSent: 'Bytes Compactados Enviados',
@@ -187,6 +189,7 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   piiGuardVerifiedBadge: 'PII Masked at Edge — Fail-Closed Guard Verified (0 Leaked Patterns)',
   piiGuardBlockedBadge:
     'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
+  piiLogWithheldMessage: '[WITHHELD DUE TO PII VIOLATION: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
   finopsBytesFetched: 'Raw Bytes Fetched',
   finopsBytesSent: 'Compacted Bytes Sent',

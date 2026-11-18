@@ -246,4 +246,68 @@ describe('DispatchRemediation Use Case', () => {
     expect(JSON.stringify(rcaBroadcastCall?.[1])).not.toContain('529.982.247-25');
     expect(result.rcaReport.criticalSpan).not.toContain('529.982.247-25');
   });
+
+  it('should reject remediation PR creation when evidence.gitDiff.suspectFilePath is empty', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 101, success: true }))
+    };
+
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => ({
+        summary: 'Hallucinated patch',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'package.json',
+        patchedContent: '{}',
+        explanation: 'exp'
+      }))
+    };
+
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => ({
+        summary: 'Fallback',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'exp'
+      }))
+    };
+
+    const broadcaster: EventBroadcasterPort = {
+      broadcast: vi.fn()
+    };
+
+    const emptySuspectPathEvidence: CollectedEvidence = {
+      ...validEvidence,
+      gitDiff: {
+        ...validEvidence.gitDiff!,
+        suspectFilePath: ''
+      }
+    };
+
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    await expect(useCase.execute(incident.id, emptySuspectPathEvidence, 'blob123')).rejects.toThrow(
+      'Cannot create remediation PR without an authoritative suspectFilePath'
+    );
+
+    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalled();
+    expect(tools.createRemediationPr).not.toHaveBeenCalled();
+  });
 });

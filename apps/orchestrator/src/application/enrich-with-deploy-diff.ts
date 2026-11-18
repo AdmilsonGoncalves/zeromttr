@@ -11,13 +11,14 @@ export class EnrichWithDeployDiff {
   public constructor(
     private readonly repository: IncidentRepository,
     private readonly tools: ToolsPort,
-    private readonly broadcaster: EventBroadcasterPort
+    private readonly broadcaster: EventBroadcasterPort,
+    private readonly servicePath: string = process.env.TARGET_SERVICE_PATH || 'apps/target-app-demo'
   ) {}
 
   public async execute(
     incidentId: string,
-    baseRef = 'v2.14.7',
-    headRef = 'v2.14.8'
+    baseRef = process.env.TARGET_BASE_REF || 'HEAD~1',
+    headRef = process.env.TARGET_HEAD_REF || 'HEAD'
   ): Promise<GitDeployDiffOutput> {
     const incident = await this.repository.findById(incidentId);
     if (!incident) {
@@ -43,7 +44,7 @@ export class EnrichWithDeployDiff {
     const diffOutput = await this.tools.inspectGitDeployDiff({
       base_ref: baseRef,
       head_ref: headRef,
-      service_path: 'apps/target-app-demo'
+      service_path: this.servicePath
     });
 
     incident.finops = {
@@ -55,10 +56,9 @@ export class EnrichWithDeployDiff {
 
     incident.docs = [
       {
-        url: 'https://github.com/AdmilsonGoncalves/zeromttr',
-        title: 'Payment Service Pool Architecture',
-        markdownExcerpt:
-          'Payment service acquires PostgreSQL client from pool and must release in finally block.'
+        url: process.env.TARGET_REPO_URL || 'https://github.com/AdmilsonGoncalves/zeromttr',
+        title: `${incident.service} Deploy & Architecture Reference`,
+        markdownExcerpt: `Deploy diff inspected for ${incident.service} (${baseRef} -> ${headRef}) at ${this.servicePath}.`
       }
     ];
 

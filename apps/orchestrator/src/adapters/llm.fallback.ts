@@ -1,6 +1,6 @@
 import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
 
-export const HEALTHY_PAYMENT_REPOSITORY_PATCH = `import crypto from 'node:crypto';
+export const HEALTHY_PAYMENT_REPOSITORY_PATCH = /* language=text */ `import crypto from 'node:crypto';
 import { chaosManager } from '../chaos/index.js';
 import type { CreatePaymentInput, Payment } from '../models/index.js';
 import { SpanStatusCode, telemetry } from '../telemetry/index.js';
