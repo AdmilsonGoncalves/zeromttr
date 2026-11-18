@@ -8,6 +8,7 @@ export function getIncidentInitialState(): { state: string; version: string } {
 }
 
 export * from './incident-state.js';
+export * from './incident-enums.js';
 export * from './fingerprint.js';
 export * from './pii-prompt-guard.patterns.js';
 export * from './pii-prompt-guard.js';

@@ -1,5 +1,6 @@
 import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess, sanitizeHeaderValue } from '@zeromttr/utils/http';
+import { OrchestratorDefault } from '../domain/index.js';
 import type {
   ToolsPort,
   FinOpsData,
@@ -252,7 +253,7 @@ export class McpClientAdapter implements ToolsPort {
     const authorLogin =
       (typeof raw.authorLogin === 'string' && raw.authorLogin) ||
       (typeof raw.author_login === 'string' && raw.author_login) ||
-      'unknown';
+      OrchestratorDefault.UNKNOWN;
 
     const commitMessage =
       (typeof raw.commitMessage === 'string' && raw.commitMessage) ||

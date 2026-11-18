@@ -1,5 +1,7 @@
+import type { TargetHealthStatus } from '../domain/index.js';
+
 export interface TargetStatus {
-  status: 'healthy' | 'degraded' | 'unreachable';
+  status: TargetHealthStatus | `${TargetHealthStatus}`;
   service: string;
   version: string;
   previousHealthyVersion: string;

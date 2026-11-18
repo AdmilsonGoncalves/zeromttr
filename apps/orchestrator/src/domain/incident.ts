@@ -1,10 +1,16 @@
 import { nowIso } from '@zeromttr/utils';
 import { IncidentState, transitionState, type IncidentTransition } from './incident-state.js';
+import type {
+  DecisionAction,
+  DecisionSource,
+  IncidentExecutionMode,
+  NotificationStatus
+} from './incident-enums.js';
 import type { RcaReport, ReasoningSource } from './rca-report.js';
 
-export type IncidentDecisionAction = 'approve' | 'reject';
-export type IncidentDecisionSource = 'email_hmac' | 'demo_simulation';
-export type IncidentMode = 'live' | 'replay';
+export type IncidentDecisionAction = DecisionAction | `${DecisionAction}`;
+export type IncidentDecisionSource = DecisionSource | `${DecisionSource}`;
+export type IncidentMode = IncidentExecutionMode | `${IncidentExecutionMode}`;
 export type { ReasoningSource };
 
 export interface IncidentFinops {
@@ -30,7 +36,7 @@ export interface IncidentRemediation {
 export interface IncidentNotification {
   emailId: string;
   htmlPreview?: string;
-  status?: 'dispatched' | 'degraded';
+  status?: NotificationStatus | `${NotificationStatus}`;
 }
 
 export interface IncidentProps {

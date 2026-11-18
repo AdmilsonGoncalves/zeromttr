@@ -2,8 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { isNonEmptyString } from '@zeromttr/utils';
 import {
+  AlertSeverity,
   Incident,
+  IncidentEventType,
+  IncidentExecutionMode,
   IncidentState,
+  TransitionReason,
   computeAlertFingerprint,
   type IncidentMode
 } from '../domain/index.js';
@@ -65,11 +69,11 @@ export class HandleAlert {
       if (elapsedMs > ttlMs) {
         const reason =
           existing.state === IncidentState.NOTIFIED
-            ? 'Incident decision TTL expired without action'
-            : 'Stale incident processing timed out';
+            ? TransitionReason.DECISION_TTL_EXPIRED
+            : TransitionReason.STALE_PROCESSING_TIMEOUT;
         const transition = existing.transition(IncidentState.FAILED, reason);
         await this.repository.save(existing);
-        this.broadcaster.broadcast('incident.transition', {
+        this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
           incidentId: existing.id,
           from: transition.from,
           to: transition.to,
@@ -87,8 +91,8 @@ export class HandleAlert {
     const incidentId = `inc-${randomUUID().slice(0, 8)}`;
     const severity = isNonEmptyString(primaryAlert.labels.severity)
       ? primaryAlert.labels.severity
-      : 'critical';
-    const mode: IncidentMode = 'live';
+      : AlertSeverity.CRITICAL;
+    const mode: IncidentMode = IncidentExecutionMode.LIVE;
 
     const incident = new Incident({
       id: incidentId,
@@ -101,7 +105,7 @@ export class HandleAlert {
 
     await this.repository.save(incident);
 
-    this.broadcaster.broadcast('incident.created', {
+    this.broadcaster.broadcast(IncidentEventType.CREATED, {
       incidentId: incident.id,
       service: incident.service,
       severity: incident.severity,

@@ -1,4 +1,5 @@
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
+import { OrchestratorDefault, TargetHealthStatus } from '../domain/index.js';
 import type { TargetStatus, TargetStatusPort } from '../ports/index.js';
 
 export class HttpTargetStatusAdapter implements TargetStatusPort {
@@ -20,12 +21,12 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
     }
 
     return {
-      status: 'unreachable',
-      service: 'api-pagamentos-core',
-      version: 'unknown',
-      previousHealthyVersion: 'unknown',
-      targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
-      suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+      status: TargetHealthStatus.UNREACHABLE,
+      service: process.env.TARGET_SERVICE_NAME || OrchestratorDefault.UNKNOWN_SERVICE,
+      version: OrchestratorDefault.UNKNOWN,
+      previousHealthyVersion: OrchestratorDefault.UNKNOWN,
+      targetRepo: process.env.TARGET_REPO_URL || '',
+      suspectFilePath: process.env.TARGET_SUSPECT_FILE_PATH || '',
       rawEdgeLogPreCollector: ''
     };
   }

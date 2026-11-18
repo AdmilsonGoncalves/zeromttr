@@ -1,5 +1,10 @@
 import { isFilled, nowIso } from '@zeromttr/utils';
-import { IncidentState, type SpanNode } from '../domain/index.js';
+import {
+  IncidentEventType,
+  IncidentState,
+  TransitionReason,
+  type SpanNode
+} from '../domain/index.js';
 import type {
   IncidentRepository,
   ToolsPort,
@@ -44,11 +49,11 @@ export class InvestigateIncident {
     if (incident.state === IncidentState.RECEIVED) {
       const transition = incident.transition(
         IncidentState.INVESTIGATING,
-        'Commencing telemetry investigation'
+        TransitionReason.INVESTIGATING_TELEMETRY
       );
       await this.repository.save(incident);
 
-      this.broadcaster.broadcast('incident.transition', {
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transition.from,
         to: transition.to,

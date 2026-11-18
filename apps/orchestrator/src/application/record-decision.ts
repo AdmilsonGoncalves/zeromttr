@@ -1,7 +1,10 @@
 import {
-  IncidentState,
-  Incident,
+  DecisionAction,
   DecisionHmac,
+  DecisionSource,
+  Incident,
+  IncidentEventType,
+  IncidentState,
   type IncidentDecisionAction,
   type IncidentDecisionSource
 } from '../domain/index.js';
@@ -61,7 +64,8 @@ export class RecordDecision {
       throw new IncidentAlreadyResolvedError(incidentId, incident.state);
     }
 
-    const targetState = action === 'approve' ? IncidentState.RESOLVED : IncidentState.REJECTED;
+    const targetState =
+      action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED;
 
     const transition = incident.transition(
       targetState,
@@ -69,13 +73,13 @@ export class RecordDecision {
     );
 
     incident.decision = action;
-    const source: IncidentDecisionSource = 'email_hmac';
+    const source: IncidentDecisionSource = DecisionSource.EMAIL_HMAC;
     incident.decisionSource = source;
 
     try {
       await this.tools.annotateGrafanaIncident({
         time: Date.now(),
-        text: `[${targetState}] Incidente ${incident.id} ${action === 'approve' ? 'RESOLVED' : 'REJECTED'} por aprovação humana`,
+        text: `[${targetState}] Incident ${incident.id} ${action === DecisionAction.APPROVE ? 'RESOLVED' : 'REJECTED'} via human approval`,
         tags: ['aiops-decision']
       });
     } catch {
@@ -84,13 +88,13 @@ export class RecordDecision {
 
     await this.repository.save(incident);
 
-    this.broadcaster.broadcast('incident.decision', {
+    this.broadcaster.broadcast(IncidentEventType.DECISION, {
       incidentId: incident.id,
       action,
-      source: 'email_hmac'
+      source: DecisionSource.EMAIL_HMAC
     });
 
-    this.broadcaster.broadcast('incident.transition', {
+    this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
       incidentId: incident.id,
       from: transition.from,
       to: transition.to,
@@ -114,7 +118,8 @@ export class RecordDecision {
       throw new IncidentAlreadyResolvedError(incidentId, incident.state);
     }
 
-    const targetState = action === 'approve' ? IncidentState.RESOLVED : IncidentState.REJECTED;
+    const targetState =
+      action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED;
 
     const transition = incident.transition(
       targetState,
@@ -122,13 +127,13 @@ export class RecordDecision {
     );
 
     incident.decision = action;
-    const simSource: IncidentDecisionSource = 'demo_simulation';
+    const simSource: IncidentDecisionSource = DecisionSource.DEMO_SIMULATION;
     incident.decisionSource = simSource;
 
     try {
       await this.tools.annotateGrafanaIncident({
         time: Date.now(),
-        text: `[${targetState}] Incidente ${incident.id} ${action} por simulação interativa de demo`,
+        text: `[${targetState}] Incident ${incident.id} ${action} via interactive demo simulation`,
         tags: ['aiops-demo']
       });
     } catch {
@@ -137,13 +142,13 @@ export class RecordDecision {
 
     await this.repository.save(incident);
 
-    this.broadcaster.broadcast('incident.decision', {
+    this.broadcaster.broadcast(IncidentEventType.DECISION, {
       incidentId: incident.id,
       action,
-      source: 'demo_simulation'
+      source: DecisionSource.DEMO_SIMULATION
     });
 
-    this.broadcaster.broadcast('incident.transition', {
+    this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
       incidentId: incident.id,
       from: transition.from,
       to: transition.to,

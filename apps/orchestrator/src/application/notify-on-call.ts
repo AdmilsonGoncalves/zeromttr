@@ -1,7 +1,11 @@
 import { toErrorMessage } from '@zeromttr/utils';
 import {
-  IncidentState,
   DecisionHmac,
+  IncidentEventType,
+  IncidentState,
+  NotificationStatus,
+  OrchestratorDefault,
+  TransitionReason,
   type IncidentDecisionAction,
   type ReasoningSource
 } from '../domain/index.js';
@@ -53,17 +57,16 @@ export class NotifyOnCall {
     try {
       resendResult = await this.tools.sendPostMortemResend({
         incident_id: incident.id,
-        title: `[Post-Mortem] Incidente Operacional ${incident.id} — ${incident.service}`,
-        rca_summary: incident.rca?.summary || 'Degradação crítica mitigada',
+        title: `[Post-Mortem] Operational Incident ${incident.id} — ${incident.service}`,
+        rca_summary: incident.rca?.summary || OrchestratorDefault.MITIGATION_FALLBACK,
         evidence_coverage: `${incident.rca?.signalsCollected ?? 4}/${incident.rca?.signalsTotal ?? 4} Signals (${incident.rca?.evidenceCoveragePercent ?? 100}%)`,
         reasoning_source: incident.rca?.reasoningSource || defaultReasoning,
         blast_radius: incident.rca?.blastRadius || [incident.service],
         regression_commit:
           incident.remediation?.suspectCommitSha ||
           incident.remediation?.commitSha ||
-          '8f14e45fceea167a5a36dedd4bea2543d1a2b3c4',
-        pull_request_url:
-          incident.remediation?.pullRequestUrl || 'https://github.com/AdmilsonGoncalves/zeromttr',
+          OrchestratorDefault.UNKNOWN,
+        pull_request_url: incident.remediation?.pullRequestUrl || process.env.TARGET_REPO_URL || '',
         approve_url: approveUrl,
         reject_url: rejectUrl,
         leaked_patterns_detected: incident.rca?.piiGuardAudit.leakedPatternsDetected ?? 0
@@ -81,9 +84,9 @@ export class NotifyOnCall {
     if (incident.state === IncidentState.AWAITING_PR) {
       const transitionReason = isDegraded
         ? `Post-mortem notification fallback (degraded: ${failureReason})`
-        : 'Post-mortem notification sent via Resend';
+        : TransitionReason.NOTIFIED_ON_CALL;
       const transition = incident.transition(IncidentState.NOTIFIED, transitionReason);
-      this.broadcaster.broadcast('incident.transition', {
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transition.from,
         to: transition.to,
@@ -92,21 +95,25 @@ export class NotifyOnCall {
       });
     }
 
+    const notificationStatus = isDegraded
+      ? NotificationStatus.DEGRADED
+      : NotificationStatus.DISPATCHED;
+
     incident.notification = {
       emailId: resendResult.emailId,
-      status: isDegraded ? 'degraded' : 'dispatched',
+      status: notificationStatus,
       htmlPreview: isDegraded
-        ? `Aviso: Falha na entrega via Resend (${failureReason}). Notificação em modo degradado.`
+        ? `Warning: Resend delivery failed (${failureReason}). Notification in degraded mode.`
         : 'Post-mortem notification dispatched to on-call engineer via Resend'
     };
 
     await this.repository.save(incident);
 
     // Broadcast SSE incident.notified WITHOUT secret HMAC signatures!
-    this.broadcaster.broadcast('incident.notified', {
+    this.broadcaster.broadcast(IncidentEventType.NOTIFIED, {
       incidentId: incident.id,
       emailId: resendResult.emailId,
-      status: isDegraded ? 'degraded' : 'dispatched',
+      status: notificationStatus,
       htmlPreview: incident.notification.htmlPreview
     });
 

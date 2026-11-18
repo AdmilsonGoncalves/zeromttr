@@ -2,47 +2,47 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
 import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
 
-export const GEMINI_SYSTEM_INSTRUCTION = `Você é o ZeroMTTR Autonomous SRE Reasoner, um especialista em diagnóstico de causa raiz (RCA) e engenharia de remediação para microsserviços em produção.
+export const GEMINI_SYSTEM_INSTRUCTION = `You are the ZeroMTTR Autonomous SRE Reasoner, a specialist in Root Cause Analysis (RCA) and remediation engineering for production microservices.
 
-Sua missão:
-1. Analisar as evidências de telemetria coletadas (Prometheus, Loki, Tempo, Git Diff).
-2. Identificar a causa raiz exata da anomalia, correlacionando a degradação de métricas com a regressão introduzida no diff de código.
-3. Produzir uma explicação concisa em português brasileiro (pt-BR) para engenheiros de plantão.
-4. Gerar o arquivo de código FONTE COMPLETO corrigido (patchedContent), restaurando a estabilidade operacional.
+Your mission:
+1. Analyze the collected telemetry evidence (Prometheus, Loki, Tempo, Git Diff).
+2. Identify the exact root cause of the anomaly, correlating metric degradation with the regression introduced in the code diff.
+3. Produce a concise explanation in English for on-call engineers.
+4. Generate the COMPLETE fixed source code file (patchedContent), restoring operational stability.
 
-Regras estritas de segurança e código:
-- O código corrigido em patchedContent deve conter o arquivo COMPLETO (não use reticências, nem trechos parciais).
-- Preserve o suspectFilePath identificado no diff de deploy e corrija a causa raiz da regressão (como vazamento de recursos, omissão de liberação em blocos finally ou parâmetros de pool/timeout degradados) restaurando os padrões saudáveis da versão base.
-- Nunca invente dependências ou altere assinaturas de métodos públicos.
-- Responda obrigatoriamente no formato JSON estruturado conforme o schema solicitado.`;
+Strict security and coding rules:
+- The fixed code in patchedContent MUST contain the COMPLETE file (never use ellipses or partial snippets).
+- Preserve the suspectFilePath identified in the deploy diff and fix the root cause of the regression (such as resource leaks, missing cleanup in finally blocks, or degraded pool/timeout settings), restoring the healthy baseline behavior.
+- Never invent dependencies or alter public method signatures.
+- You must respond strictly in structured JSON matching the requested schema.`;
 
 export const RCA_SYNTHESIS_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     summary: {
       type: Type.STRING,
-      description: 'Resumo executivo do incidente em 1 parágrafo'
+      description: 'Executive summary of the incident in 1 paragraph'
     },
     rootCause: {
       type: Type.STRING,
-      description: 'Explicação técnica detalhada da causa raiz encontrada no código'
+      description: 'Detailed technical explanation of the root cause found in the code'
     },
     evidenceRefs: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: 'Lista de referências de evidências'
+      description: 'List of evidence references'
     },
     suspectFilePath: {
       type: Type.STRING,
-      description: 'Caminho do arquivo remediado'
+      description: 'Path of the remediated file'
     },
     patchedContent: {
       type: Type.STRING,
-      description: 'Conteúdo integral do arquivo corrigido pronto para commit'
+      description: 'Complete content of the fixed file ready to commit'
     },
     explanation: {
       type: Type.STRING,
-      description: 'Explicação da alteração realizada no patch e como ela resolve o incidente'
+      description: 'Explanation of the change made in the patch and how it resolves the incident'
     }
   },
   required: [
@@ -71,7 +71,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
       throw new Error('Gemini API key is not configured');
     }
 
-    const prompt = `Analise as evidências do incidente e sintetize o RCA e o patch cirúrgico:\n${JSON.stringify(evidence, null, 2)}`;
+    const prompt = `Analyze the incident evidence and synthesize the RCA and surgical patch:\n${JSON.stringify(evidence, null, 2)}`;
 
     const timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS) || 25_000;
     let timer: NodeJS.Timeout | undefined;

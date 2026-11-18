@@ -1,3 +1,4 @@
+import { OrchestratorDefault } from '../domain/index.js';
 import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
 
 export const HEALTHY_PAYMENT_REPOSITORY_PATCH = /* language=text */ `import crypto from 'node:crypto';
@@ -217,20 +218,19 @@ export class DeterministicFallbackReasoningAdapter implements ReasoningPort {
   public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
     const evidenceRefs = [
       evidence.traceAnalysis?.traceId,
-      'http_server_duration_milliseconds_bucket',
+      OrchestratorDefault.DEFAULT_METRIC,
       evidence.gitDiff?.suspectCommit
     ].filter(Boolean) as string[];
 
     return {
-      summary:
-        'Degradação crítica de latência decorrente de saturação do pool de conexões do banco de dados.',
+      summary: 'Critical latency degradation caused by database connection pool exhaustion.',
       rootCause:
-        'A release v2.14.8 reduziu o pool de conexões para max: 2 e omitiu a liberação de conexões via client.release() em transações que sofrem timeout, provocando KnexTimeoutError.',
+        'Release v2.14.8 reduced the connection pool to max: 2 and omitted client.release() in transactions experiencing timeouts, causing KnexTimeoutError.',
       evidenceRefs,
       suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
       patchedContent: HEALTHY_PAYMENT_REPOSITORY_PATCH,
       explanation:
-        "O patch restaura o bloco 'finally { client.release(); }' e o dimensionamento do pool para max: 10 baseado na versão saudável v2.14.7.",
+        "The patch restores the 'finally { client.release(); }' block and restores pool sizing to max: 10 based on healthy baseline v2.14.7.",
       reasoningSource: 'fallback'
     };
   }

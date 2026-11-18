@@ -1,5 +1,11 @@
 import { toErrorMessage } from '@zeromttr/utils';
-import { IncidentState } from '../domain/index.js';
+import {
+  IncidentEventType,
+  IncidentState,
+  OrchestratorDefault,
+  TargetHealthStatus,
+  TransitionReason
+} from '../domain/index.js';
 import type {
   IncidentRepository,
   EventBroadcasterPort,
@@ -31,17 +37,17 @@ export class OrchestratorWorkflow {
       const investigation = await this.investigateIncident.execute(incidentId);
 
       const baseRef =
-        (investigation.targetStatus?.status !== 'unreachable' &&
-          investigation.targetStatus?.previousHealthyVersion !== 'unknown' &&
+        (investigation.targetStatus?.status !== TargetHealthStatus.UNREACHABLE &&
+          investigation.targetStatus?.previousHealthyVersion !== OrchestratorDefault.UNKNOWN &&
           investigation.targetStatus?.previousHealthyVersion) ||
         process.env.TARGET_BASE_REF ||
-        'HEAD~1';
+        OrchestratorDefault.DEFAULT_BASE_REF;
       const headRef =
-        (investigation.targetStatus?.status !== 'unreachable' &&
-          investigation.targetStatus?.version !== 'unknown' &&
+        (investigation.targetStatus?.status !== TargetHealthStatus.UNREACHABLE &&
+          investigation.targetStatus?.version !== OrchestratorDefault.UNKNOWN &&
           investigation.targetStatus?.version) ||
         process.env.TARGET_HEAD_REF ||
-        'HEAD';
+        OrchestratorDefault.DEFAULT_HEAD_REF;
 
       // Step 2: Git Deploy Diff Enrichment
       const diffOutput = await this.enrichWithDeployDiff.execute(incidentId, baseRef, headRef);
@@ -51,21 +57,19 @@ export class OrchestratorWorkflow {
       const errorSpan = investigation.spans.find((s) => s.hasError && s.errorMessage);
       const traceErrorMessage =
         errorSpan?.errorMessage ||
-        (investigation.hasTempoErrorSpan
-          ? 'Span error detected during trace analysis.'
-          : undefined);
+        (investigation.hasTempoErrorSpan ? OrchestratorDefault.SPAN_ERROR_FALLBACK : undefined);
 
       const evidence: CollectedEvidence = {
         incidentId,
         service: incident.service,
-        alertName: incident.alertName || 'ServiceLatencyAnomaly',
+        alertName: incident.alertName || OrchestratorDefault.DEFAULT_ALERT_NAME,
         promqlSummary: {
-          metric: 'http_server_duration_milliseconds_bucket',
+          metric: OrchestratorDefault.DEFAULT_METRIC,
           p95LatencyMs: p95Latency,
           dbPoolWaiting: 15
         },
         traceAnalysis: {
-          traceId: investigation.traceId || 'trace-unknown',
+          traceId: investigation.traceId || OrchestratorDefault.UNKNOWN_TRACE_ID,
           criticalOperation: investigation.criticalSpan,
           durationMs: investigation.traceAnalysis?.totalDurationMs ?? 4600,
           errorMessage: traceErrorMessage,
@@ -103,10 +107,10 @@ export class OrchestratorWorkflow {
         try {
           const transition = incident.transition(
             IncidentState.FAILED,
-            toErrorMessage(err, 'Pipeline execution failed')
+            toErrorMessage(err, TransitionReason.PIPELINE_FAILED)
           );
           await this.repository.save(incident);
-          this.broadcaster.broadcast('incident.transition', {
+          this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
             incidentId: incident.id,
             from: transition.from,
             to: transition.to,

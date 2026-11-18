@@ -1,7 +1,10 @@
 import { isNonEmptyString } from '@zeromttr/utils';
 import {
+  IncidentEventType,
   IncidentState,
+  OrchestratorDefault,
   PiiPromptGuard,
+  TransitionReason,
   calculateEvidenceCoverage,
   type RcaReport,
   type ReasoningSource,
@@ -90,9 +93,9 @@ export class DispatchRemediation {
     if (incident.state === IncidentState.INVESTIGATING) {
       const transitionEnriching = incident.transition(
         IncidentState.ENRICHING,
-        'Enriching incident state before remediation'
+        TransitionReason.ENRICHING_BEFORE_REMEDIATION
       );
-      this.broadcaster.broadcast('incident.transition', {
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transitionEnriching.from,
         to: transitionEnriching.to,
@@ -104,9 +107,9 @@ export class DispatchRemediation {
     if (incident.state === IncidentState.ENRICHING) {
       const transitionRemediating = incident.transition(
         IncidentState.REMEDIATING,
-        'Synthesizing RCA and preparing remediation patch'
+        TransitionReason.REMEDIATING_SYNTHESIS
       );
-      this.broadcaster.broadcast('incident.transition', {
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transitionRemediating.from,
         to: transitionRemediating.to,
@@ -153,15 +156,16 @@ export class DispatchRemediation {
     });
 
     const safeCriticalSpan = piiAudit.passed
-      ? evidence.traceAnalysis?.criticalOperation || 'critical.error.span'
-      : 'critical.error.span';
+      ? evidence.traceAnalysis?.criticalOperation || OrchestratorDefault.CRITICAL_ERROR_SPAN
+      : OrchestratorDefault.CRITICAL_ERROR_SPAN;
 
     const safeSpans: SpanNode[] = piiAudit.passed
       ? [
           {
             spanId: 'span-001',
             serviceName: incident.service,
-            operationName: evidence.traceAnalysis?.criticalOperation || 'critical.error.span',
+            operationName:
+              evidence.traceAnalysis?.criticalOperation || OrchestratorDefault.CRITICAL_ERROR_SPAN,
             durationMs: evidence.traceAnalysis?.durationMs || 4600,
             hasError: true
           }
@@ -170,7 +174,7 @@ export class DispatchRemediation {
           {
             spanId: 'span-001',
             serviceName: incident.service,
-            operationName: 'critical.error.span',
+            operationName: OrchestratorDefault.CRITICAL_ERROR_SPAN,
             durationMs: 4600,
             hasError: true
           }
@@ -190,21 +194,21 @@ export class DispatchRemediation {
       evidenceBreakdown: coverage.breakdown,
       blastRadius: safeBlastRadius,
       diagnosisSeconds: 4,
-      traceId: evidence.traceAnalysis?.traceId || 'trace-unknown',
+      traceId: evidence.traceAnalysis?.traceId || OrchestratorDefault.UNKNOWN_TRACE_ID,
       criticalSpan: safeCriticalSpan,
       spans: safeSpans,
       logSample: piiAudit.passed
         ? evidence.logSample
-        : `[RETIDO POR VIOLAÇÃO PII: ${piiAudit.detectedTypes.join(', ')}]`,
+        : `[WITHHELD DUE TO PII VIOLATION: ${piiAudit.detectedTypes.join(', ')}]`,
       piiGuardAudit: piiAudit,
-      deployVersion: evidence.gitDiff?.headRef || 'unknown',
+      deployVersion: evidence.gitDiff?.headRef || OrchestratorDefault.UNKNOWN,
       mitigations: [synthesis.explanation || synthesis.rootCause],
       grafanaAnnotationId: annotationId
     };
 
     incident.rca = rcaReport;
 
-    this.broadcaster.broadcast('incident.rca', {
+    this.broadcaster.broadcast(IncidentEventType.RCA, {
       incidentId: incident.id,
       ...rcaReport
     });
@@ -218,9 +222,9 @@ export class DispatchRemediation {
     if (incident.state === IncidentState.REMEDIATING) {
       const transitionAwaiting = incident.transition(
         IncidentState.AWAITING_PR,
-        'Opening remediation Pull Request on GitHub'
+        TransitionReason.AWAITING_PR
       );
-      this.broadcaster.broadcast('incident.transition', {
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transitionAwaiting.from,
         to: transitionAwaiting.to,
@@ -236,7 +240,7 @@ export class DispatchRemediation {
       file_path: synthesis.suspectFilePath,
       patched_content: synthesis.patchedContent,
       blob_sha: blobSha,
-      title: `fix(${incident.service}): ${prTitleSummary || 'remediate incident'} [incident ${incident.id}]`,
+      title: `fix(${incident.service}): ${prTitleSummary || OrchestratorDefault.PR_TITLE_FALLBACK} [incident ${incident.id}]`,
       rca_markdown: `## Root Cause Analysis\n\n${synthesis.rootCause}\n\n**Reasoning Source:** \`${reasoningSource}\`\n\n${synthesis.explanation}`,
       reasoning_source: reasoningSource
     });
@@ -247,7 +251,7 @@ export class DispatchRemediation {
     };
     await this.repository.save(incident);
 
-    this.broadcaster.broadcast('incident.remediation', {
+    this.broadcaster.broadcast(IncidentEventType.REMEDIATION, {
       incidentId: incident.id,
       ...prResult
     });

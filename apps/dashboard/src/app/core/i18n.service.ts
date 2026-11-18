@@ -65,6 +65,13 @@ export interface TranslationDictionary {
   decisionErrorMsg: string;
   decisionTokenSecurityNote: string;
   backToWarRoom: string;
+  awaitingAuditBadge: string;
+  resendDefaultBody: string;
+  hmacMissingFragmentError: string;
+  hmacInvalidActionError: string;
+  hmacMissingSigError: string;
+  hmacInvalidExpError: string;
+  hmacExpiredError: string;
 }
 
 const PT_TRANSLATIONS: TranslationDictionary = {
@@ -135,7 +142,14 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   decisionErrorMsg: 'Falha ao validar assinatura HMAC ou link expirado.',
   decisionTokenSecurityNote:
     'Nota de Segurança: O token de decisão trafega exclusivamente pelo hash da URL (#fragment) e nunca é exposto em logs HTTP ou servidores intermediários.',
-  backToWarRoom: 'Voltar ao War Room Dashboard'
+  backToWarRoom: 'Voltar ao War Room Dashboard',
+  awaitingAuditBadge: 'Aguardando auditoria...',
+  resendDefaultBody: 'Aguardando aprovação do plantonista via link seguro exclusivo.',
+  hmacMissingFragmentError: 'Fragmento HMAC ausente na URL (#action=...&sig=...&exp=...)',
+  hmacInvalidActionError: 'Parâmetro action inválido no hash (esperado approve ou reject)',
+  hmacMissingSigError: 'Assinatura sig HMAC ausente no hash',
+  hmacInvalidExpError: 'Timestamp exp inválido no hash',
+  hmacExpiredError: 'Link de decisão HMAC expirou'
 };
 
 const EN_TRANSLATIONS: TranslationDictionary = {
@@ -205,7 +219,14 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   decisionErrorMsg: 'Failed to validate HMAC signature or link has expired.',
   decisionTokenSecurityNote:
     'Security Note: The decision token travels strictly inside the URL hash (#fragment) and is never exposed to HTTP logs or proxy servers.',
-  backToWarRoom: 'Back to War Room Dashboard'
+  backToWarRoom: 'Back to War Room Dashboard',
+  awaitingAuditBadge: 'Awaiting audit...',
+  resendDefaultBody: 'Awaiting on-call approval via exclusive signed link.',
+  hmacMissingFragmentError: 'Missing HMAC fragment in URL (#action=...&sig=...&exp=...)',
+  hmacInvalidActionError: 'Invalid action parameter in hash (expected approve or reject)',
+  hmacMissingSigError: 'Missing HMAC sig signature in hash',
+  hmacInvalidExpError: 'Invalid exp timestamp in hash',
+  hmacExpiredError: 'HMAC decision link has expired'
 };
 
 @Injectable({

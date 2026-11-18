@@ -1,5 +1,10 @@
 import { round } from '@zeromttr/utils';
-import { IncidentState } from '../domain/index.js';
+import {
+  IncidentEventType,
+  IncidentState,
+  OrchestratorDefault,
+  TransitionReason
+} from '../domain/index.js';
 import type {
   IncidentRepository,
   ToolsPort,
@@ -17,8 +22,8 @@ export class EnrichWithDeployDiff {
 
   public async execute(
     incidentId: string,
-    baseRef = process.env.TARGET_BASE_REF || 'HEAD~1',
-    headRef = process.env.TARGET_HEAD_REF || 'HEAD'
+    baseRef = process.env.TARGET_BASE_REF || OrchestratorDefault.DEFAULT_BASE_REF,
+    headRef = process.env.TARGET_HEAD_REF || OrchestratorDefault.DEFAULT_HEAD_REF
   ): Promise<GitDeployDiffOutput> {
     const incident = await this.repository.findById(incidentId);
     if (!incident) {
@@ -28,11 +33,11 @@ export class EnrichWithDeployDiff {
     if (incident.state === IncidentState.INVESTIGATING) {
       const transition = incident.transition(
         IncidentState.ENRICHING,
-        'Inspecting git deploy diff on GitHub'
+        TransitionReason.ENRICHING_GIT_DIFF
       );
       await this.repository.save(incident);
 
-      this.broadcaster.broadcast('incident.transition', {
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transition.from,
         to: transition.to,
@@ -56,7 +61,7 @@ export class EnrichWithDeployDiff {
 
     incident.docs = [
       {
-        url: process.env.TARGET_REPO_URL || 'https://github.com/AdmilsonGoncalves/zeromttr',
+        url: process.env.TARGET_REPO_URL || '',
         title: `${incident.service} Deploy & Architecture Reference`,
         markdownExcerpt: `Deploy diff inspected for ${incident.service} (${baseRef} -> ${headRef}) at ${this.servicePath}.`
       }
@@ -64,12 +69,12 @@ export class EnrichWithDeployDiff {
 
     await this.repository.save(incident);
 
-    this.broadcaster.broadcast('incident.finops', {
+    this.broadcaster.broadcast(IncidentEventType.FINOPS, {
       incidentId: incident.id,
       ...incident.finops
     });
 
-    this.broadcaster.broadcast('incident.docs', {
+    this.broadcaster.broadcast(IncidentEventType.DOCS, {
       incidentId: incident.id,
       sources: incident.docs
     });

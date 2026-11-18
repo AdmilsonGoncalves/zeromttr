@@ -73,17 +73,14 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  readonly defaultResendPreview = `
+  readonly safeResendPreview = computed<SafeHtml>(() => {
+    const defaultPreview = `
     <div style="font-family: sans-serif; color: #cbd5e1;">
       <h3 style="color: #ef4444; margin-top: 0;">🚨 ZeroMTTR Incident Post-Mortem</h3>
-      <p style="font-size: 11px;">Aguardando aprovação do plantonista via link seguro exclusivo.</p>
+      <p style="font-size: 11px;">${this.i18n.t('resendDefaultBody')}</p>
     </div>
   `;
-
-  readonly safeResendPreview = computed<SafeHtml>(() => {
-    const raw =
-      this.incidentService.currentIncident()?.notification?.htmlPreview ??
-      this.defaultResendPreview;
+    const raw = this.incidentService.currentIncident()?.notification?.htmlPreview ?? defaultPreview;
     return this.sanitizer.bypassSecurityTrustHtml(raw);
   });
 
