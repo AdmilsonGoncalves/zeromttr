@@ -1,4 +1,5 @@
 import { isNonEmptyString } from '@zeromttr/utils';
+import { OrchestratorDefault } from './incident-enums.js';
 
 export interface AlertLabels {
   alertname?: string;
@@ -7,7 +8,11 @@ export interface AlertLabels {
 }
 
 export function computeAlertFingerprint(labels: AlertLabels): string {
-  const alertName = isNonEmptyString(labels.alertname) ? labels.alertname : 'unknown-alert';
-  const service = isNonEmptyString(labels.service) ? labels.service : 'unknown-service';
+  const alertName = isNonEmptyString(labels.alertname)
+    ? labels.alertname
+    : OrchestratorDefault.UNKNOWN_ALERT;
+  const service = isNonEmptyString(labels.service)
+    ? labels.service
+    : OrchestratorDefault.UNKNOWN_SERVICE;
   return `${alertName}:${service}`;
 }

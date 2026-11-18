@@ -8,3 +8,4 @@ export * from './target-status.port.js';
 export * from './incident-repository.port.js';
 export * from './clock.port.js';
 export * from './event-broadcaster.port.js';
+export * from './logger.port.js';

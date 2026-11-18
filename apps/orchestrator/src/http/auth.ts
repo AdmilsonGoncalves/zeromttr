@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
-import { isNonEmptyString } from '@zeromttr/utils';
+import { isEmpty, isNonEmptyString, isString } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 
 export function safeTokenCompare(
   tokenA: string | null | undefined,
@@ -16,7 +17,7 @@ export function safeTokenCompare(
 
 export function extractBearerToken(req: Request, allowQuery = false): string | null {
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+  if (isNonEmptyString(authHeader) && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
     if (isNonEmptyString(token)) {
       return token;
@@ -36,20 +37,24 @@ export function createGrafanaAuthMiddleware(grafanaToken: string, dashboardToken
     const token = extractBearerToken(req, false);
 
     if (!token) {
-      res.status(401).json({ error: 'Missing Grafana webhook authorization token' });
+      res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ error: 'Missing Grafana webhook authorization token' });
       return;
     }
 
     // Critical AC: explicitly reject requests trying to use DASHBOARD_API_TOKEN
     if (safeTokenCompare(token, dashboardToken) && !safeTokenCompare(token, grafanaToken)) {
-      res.status(403).json({
+      res.status(HTTP_STATUS.FORBIDDEN).json({
         error: 'Forbidden: DASHBOARD_API_TOKEN is not authorized for Grafana webhook endpoint'
       });
       return;
     }
 
     if (!safeTokenCompare(token, grafanaToken)) {
-      res.status(401).json({ error: 'Invalid Grafana webhook authorization token' });
+      res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ error: 'Invalid Grafana webhook authorization token' });
       return;
     }
 
@@ -62,7 +67,9 @@ export function createDashboardAuthMiddleware(dashboardToken: string) {
     const token = extractBearerToken(req);
 
     if (!token || !safeTokenCompare(token, dashboardToken)) {
-      res.status(401).json({ error: 'Unauthorized: invalid or missing DASHBOARD_API_TOKEN' });
+      res
+        .status(HTTP_STATUS.UNAUTHORIZED)
+        .json({ error: 'Unauthorized: invalid or missing DASHBOARD_API_TOKEN' });
       return;
     }
 
@@ -72,17 +79,15 @@ export function createDashboardAuthMiddleware(dashboardToken: string) {
 
 export function createLiveDemoKeyMiddleware(configuredKey?: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!configuredKey) {
+    if (isEmpty(configuredKey)) {
       next();
       return;
     }
 
-    const liveKeyHeader =
-      typeof req.headers['x-live-demo-key'] === 'string'
-        ? req.headers['x-live-demo-key']
-        : undefined;
+    const rawHeader = req.headers['x-live-demo-key'];
+    const liveKeyHeader = isString(rawHeader) ? rawHeader : undefined;
     if (!liveKeyHeader || !safeTokenCompare(liveKeyHeader, configuredKey)) {
-      res.status(403).json({
+      res.status(HTTP_STATUS.FORBIDDEN).json({
         error: 'Forbidden: Valid X-Live-Demo-Key required for live execution on public host'
       });
       return;

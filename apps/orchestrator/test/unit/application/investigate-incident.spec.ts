@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { InvestigateIncident } from '../../../src/application/index.js';
-import { IncidentState, Incident } from '../../../src/domain/index.js';
+import {
+  AlertSeverity,
+  IncidentEventType,
+  IncidentState,
+  Incident,
+  TargetHealthStatus
+} from '../../../src/domain/index.js';
 import type {
   IncidentRepository,
   ToolsPort,
@@ -13,7 +19,7 @@ describe('InvestigateIncident Use Case', () => {
     new Incident({
       id: 'inc-test-001',
       service: 'api-pagamentos-core',
-      severity: 'critical',
+      severity: AlertSeverity.CRITICAL,
       fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
       state: IncidentState.RECEIVED
     });
@@ -86,16 +92,14 @@ describe('InvestigateIncident Use Case', () => {
 
     const targetStatus: TargetStatusPort = {
       getStatus: vi.fn(async () => ({
-        status: 'degraded' as const,
+        status: TargetHealthStatus.DEGRADED,
         service: 'api-pagamentos-core',
         version: 'v2.14.8',
         previousHealthyVersion: 'v2.14.7',
         targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
         rawEdgeLogPreCollector: 'raw sample'
-      })),
-      triggerChaos: vi.fn(),
-      reset: vi.fn()
+      }))
     };
 
     const broadcaster: EventBroadcasterPort = {
@@ -107,7 +111,7 @@ describe('InvestigateIncident Use Case', () => {
 
     expect(incident.state).toBe(IncidentState.INVESTIGATING);
     expect(broadcaster.broadcast).toHaveBeenCalledWith(
-      'incident.transition',
+      IncidentEventType.TRANSITION,
       expect.objectContaining({ to: IncidentState.INVESTIGATING })
     );
     expect(result.traceId).toBe('4bf92f3577b34da6a3ce929d0e0e4736');

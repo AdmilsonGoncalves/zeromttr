@@ -1,6 +1,5 @@
 import type http from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { safeJsonParse } from '@zeromttr/utils';
+import { isObject, safeJsonParse } from '@zeromttr/utils';
 
 export interface HttpResponse {
   status: number;
@@ -9,7 +8,10 @@ export interface HttpResponse {
 }
 
 export async function makeRequest(server: http.Server, path: string): Promise<HttpResponse> {
-  const address = server.address() as AddressInfo;
+  const address = server.address();
+  if (!address || !isObject(address) || typeof address.port !== 'number') {
+    throw new Error('Server is not listening on an ephemeral TCP port');
+  }
   const url = `http://127.0.0.1:${address.port}${path}`;
   const response = await fetch(url);
   const text = await response.text();

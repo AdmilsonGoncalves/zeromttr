@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/http/index.js';
+import { TargetHealthStatus } from '../../src/domain/index.js';
 import type { IncidentRepository, TargetStatusPort } from '../../src/ports/index.js';
 import { HandleAlert } from '../../src/application/index.js';
 import { createStubRecordDecision, createStubWorkflow } from '../helpers/test-doubles.helper.js';
@@ -18,16 +19,14 @@ describe('Webhook Token Segregation (Acceptance Criterion 1)', () => {
 
   const mockTargetStatus: TargetStatusPort = {
     getStatus: vi.fn(async () => ({
-      status: 'healthy' as const,
+      status: TargetHealthStatus.HEALTHY,
       service: 'api-pagamentos-core',
       version: 'v2.14.7',
       previousHealthyVersion: 'v2.14.7',
       targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
       suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
       rawEdgeLogPreCollector: 'raw'
-    })),
-    triggerChaos: vi.fn(),
-    reset: vi.fn()
+    }))
   };
 
   const mockBroadcaster = { broadcast: vi.fn() };
@@ -95,5 +94,34 @@ describe('Webhook Token Segregation (Acceptance Criterion 1)', () => {
     expect(res.body.status).toBe('accepted');
     expect(res.body.incidentId).toBeDefined();
     expect(mockWorkflow.runFullPipeline).toHaveBeenCalled();
+  });
+
+  it('should ignore Grafana resolved webhook notifications without running remediation workflow', async () => {
+    vi.clearAllMocks();
+
+    const res = await request(app)
+      .post('/webhook/grafana-alert')
+      .set('Authorization', `Bearer ${GRAFANA_TOKEN}`)
+      .send({
+        status: 'resolved',
+        alerts: [
+          {
+            status: 'resolved',
+            labels: {
+              alertname: 'PaymentServicePoolExhaustion',
+              service: 'api-pagamentos-core',
+              severity: 'critical'
+            }
+          }
+        ]
+      });
+
+    expect(res.status).toBe(202);
+    expect(res.body).toEqual({
+      status: 'ignored',
+      ignored: true,
+      isDuplicate: false
+    });
+    expect(mockWorkflow.runFullPipeline).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,21 @@
+import { z } from 'zod';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import { OrchestratorDefault, TargetHealthStatus } from '../domain/index.js';
 import type { TargetStatus, TargetStatusPort } from '../ports/index.js';
+
+const TargetStatusSchema = z.object({
+  status: z.enum([
+    TargetHealthStatus.HEALTHY,
+    TargetHealthStatus.DEGRADED,
+    TargetHealthStatus.UNREACHABLE
+  ]),
+  service: z.string(),
+  version: z.string(),
+  previousHealthyVersion: z.string(),
+  targetRepo: z.string(),
+  suspectFilePath: z.string(),
+  rawEdgeLogPreCollector: z.string()
+});
 
 export class HttpTargetStatusAdapter implements TargetStatusPort {
   private readonly baseUrl: string;
@@ -14,7 +29,10 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
       const url = buildUrl(this.baseUrl, '/chaos/status');
       const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (isHttpSuccess(response.status)) {
-        return (await response.json()) as TargetStatus;
+        const parsed = TargetStatusSchema.safeParse(await response.json());
+        if (parsed.success) {
+          return parsed.data;
+        }
       }
     } catch {
       // Fallback if target app is offline
@@ -29,26 +47,5 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
       suspectFilePath: process.env.TARGET_SUSPECT_FILE_PATH || '',
       rawEdgeLogPreCollector: ''
     };
-  }
-
-  public async triggerChaos(enable: boolean, delayMs = 4600): Promise<void> {
-    const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
-      enable: String(enable),
-      delay: String(delayMs)
-    });
-    const response = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) });
-    if (!isHttpSuccess(response.status)) {
-      throw new Error(`Target app chaos trigger failed with status ${response.status}`);
-    }
-  }
-
-  public async reset(): Promise<void> {
-    const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
-      enable: 'false'
-    });
-    const response = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) });
-    if (!isHttpSuccess(response.status)) {
-      throw new Error(`Target app chaos reset failed with status ${response.status}`);
-    }
   }
 }

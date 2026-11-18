@@ -1,14 +1,17 @@
+import { IncidentState } from './incident-state.js';
+
 export const ORCHESTRATOR_DOMAIN_VERSION = '1.0.0';
 
-export function getIncidentInitialState(): { state: string; version: string } {
+export function getIncidentInitialState(): { state: IncidentState; version: string } {
   return {
-    state: 'RECEIVED',
+    state: IncidentState.RECEIVED,
     version: ORCHESTRATOR_DOMAIN_VERSION
   };
 }
 
 export * from './incident-state.js';
 export * from './incident-enums.js';
+export * from './log-enums.js';
 export * from './fingerprint.js';
 export * from './pii-prompt-guard.patterns.js';
 export * from './pii-prompt-guard.js';

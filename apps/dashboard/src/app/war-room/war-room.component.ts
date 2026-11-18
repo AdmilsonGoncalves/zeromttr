@@ -10,7 +10,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { isNonEmptyString, isString } from '@zeromttr/utils';
+import { isFilled, isNonEmptyString, isString } from '@zeromttr/utils';
 import { SelectButton } from 'primeng/selectbutton';
 import { Tag } from 'primeng/tag';
 import { Button } from 'primeng/button';
@@ -68,7 +68,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
 
   onTabChange(tab: string | number | undefined): void {
-    if (tab !== undefined && tab !== null) {
+    if (isFilled(tab)) {
       this.activeTab.set(String(tab));
     }
   }

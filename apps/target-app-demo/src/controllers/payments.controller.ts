@@ -3,7 +3,8 @@ import { CreatePaymentSchema } from '../models/index.js';
 import { KnexTimeoutError } from '../repositories/index.js';
 import { paymentService, PaymentService } from '../services/index.js';
 import { SpanStatusCode, telemetry } from '../telemetry/index.js';
-import { durationInSeconds, toErrorMessage } from '@zeromttr/utils';
+import { durationInSeconds, isNonEmptyString, toErrorMessage } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 
 export class PaymentsController {
   public constructor(private service: PaymentService = paymentService) {}
@@ -14,7 +15,8 @@ export class PaymentsController {
     body: unknown
   ): Promise<void> {
     const startTime = Date.now();
-    const traceId = (req.headers['x-trace-id'] as string) || telemetry.generateTraceId();
+    const rawTraceHeader = req.headers['x-trace-id'];
+    const traceId = isNonEmptyString(rawTraceHeader) ? rawTraceHeader : telemetry.generateTraceId();
     const span = telemetry.startSpan('HTTP POST /payments', {
       traceId,
       attributes: {
@@ -33,7 +35,7 @@ export class PaymentsController {
           code: SpanStatusCode.ERROR,
           message: 'Validation failed'
         });
-        res.writeHead(400, {
+        res.writeHead(HTTP_STATUS.BAD_REQUEST, {
           'Content-Type': 'application/json',
           'x-trace-id': traceId
         });
@@ -48,7 +50,7 @@ export class PaymentsController {
       telemetry.recordHttpServerDuration(durationSec, traceId);
       telemetry.endSpan(span, { code: SpanStatusCode.OK });
 
-      res.writeHead(201, {
+      res.writeHead(HTTP_STATUS.CREATED, {
         'Content-Type': 'application/json',
         'x-trace-id': traceId
       });
@@ -63,7 +65,9 @@ export class PaymentsController {
         message: toErrorMessage(error, 'Internal Server Error')
       });
 
-      const statusCode = isPoolTimeout ? 503 : 500;
+      const statusCode = isPoolTimeout
+        ? HTTP_STATUS.SERVICE_UNAVAILABLE
+        : HTTP_STATUS.INTERNAL_SERVER_ERROR;
       res.writeHead(statusCode, {
         'Content-Type': 'application/json',
         'x-trace-id': traceId
@@ -86,7 +90,8 @@ export class PaymentsController {
     paymentId: string
   ): Promise<void> {
     const startTime = Date.now();
-    const traceId = (req.headers['x-trace-id'] as string) || telemetry.generateTraceId();
+    const rawTraceHeader = req.headers['x-trace-id'];
+    const traceId = isNonEmptyString(rawTraceHeader) ? rawTraceHeader : telemetry.generateTraceId();
     const span = telemetry.startSpan('HTTP GET /payments/:id', {
       traceId,
       attributes: {
@@ -106,7 +111,7 @@ export class PaymentsController {
           code: SpanStatusCode.ERROR,
           message: 'Payment not found'
         });
-        res.writeHead(404, {
+        res.writeHead(HTTP_STATUS.NOT_FOUND, {
           'Content-Type': 'application/json',
           'x-trace-id': traceId
         });
@@ -115,7 +120,7 @@ export class PaymentsController {
       }
 
       telemetry.endSpan(span, { code: SpanStatusCode.OK });
-      res.writeHead(200, {
+      res.writeHead(HTTP_STATUS.OK, {
         'Content-Type': 'application/json',
         'x-trace-id': traceId
       });
@@ -130,7 +135,9 @@ export class PaymentsController {
         message: toErrorMessage(error, 'Internal Server Error')
       });
 
-      const statusCode = isPoolTimeout ? 503 : 500;
+      const statusCode = isPoolTimeout
+        ? HTTP_STATUS.SERVICE_UNAVAILABLE
+        : HTTP_STATUS.INTERNAL_SERVER_ERROR;
       res.writeHead(statusCode, {
         'Content-Type': 'application/json',
         'x-trace-id': traceId

@@ -1,8 +1,10 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
+  diffInSeconds,
   isFilled,
   isNonEmptyArray,
   isNonEmptyString,
+  isNumber,
   percentage,
   round,
   safeJsonParse,
@@ -82,7 +84,7 @@ export class IncidentService {
 
   readonly signalsRatio = computed<string>(() => {
     const rca = this.currentIncident()?.rca;
-    if (!rca) {
+    if (!isFilled(rca)) {
       return '0/4';
     }
     return `${rca.signalsCollected}/${rca.signalsTotal}`;
@@ -99,7 +101,7 @@ export class IncidentService {
 
   readonly ttdDisplay = computed<string>(() => {
     const sec = this.currentIncident()?.rca?.diagnosisSeconds;
-    if (typeof sec === 'number') {
+    if (isNumber(sec)) {
       return `${sec}s`;
     }
     return '--';
@@ -110,13 +112,11 @@ export class IncidentService {
     if (!incident) {
       return '--';
     }
-    const started = incident.startedAt ? new Date(incident.startedAt).getTime() : null;
     const prTransition = incident.transitions?.find(
       (t) => t.to === 'AWAITING_PR' || t.to === 'NOTIFIED'
     );
-    if (started && prTransition) {
-      const prTime = new Date(prTransition.at).getTime();
-      const diffSec = ((prTime - started) / 1000).toFixed(1);
+    if (isNonEmptyString(incident.startedAt) && prTransition) {
+      const diffSec = diffInSeconds(incident.startedAt, prTransition.at).toFixed(1);
       return `${diffSec}s`;
     }
     return '--';
@@ -519,20 +519,25 @@ export class IncidentService {
     }
   }
 
-  async triggerChaos(baseUrl = ''): Promise<void> {
-    this.isSimulating.set(true);
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
+  private buildDemoHeaders(includeJsonContentType = false): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (includeJsonContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
     const key = this.liveDemoKey();
     if (isNonEmptyString(key)) {
       headers['X-Live-Demo-Key'] = key.trim();
     }
+    return headers;
+  }
+
+  async triggerChaos(baseUrl = ''): Promise<void> {
+    this.isSimulating.set(true);
 
     try {
       await fetch(`${baseUrl}/api/demo/chaos`, {
         method: 'POST',
-        headers,
+        headers: this.buildDemoHeaders(true),
         body: JSON.stringify({ mode: this.activeMode() })
       });
       await this.fetchTargetStatus(baseUrl);
@@ -545,7 +550,8 @@ export class IncidentService {
     this.isSimulating.set(true);
     try {
       await fetch(`${baseUrl}/api/demo/reset`, {
-        method: 'POST'
+        method: 'POST',
+        headers: this.buildDemoHeaders()
       });
       await this.fetchTargetStatus(baseUrl);
       const current = this.currentIncident();
@@ -570,7 +576,7 @@ export class IncidentService {
 
     const res = await fetch(`${baseUrl}/api/demo/simulate-decision`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.buildDemoHeaders(true),
       body: JSON.stringify(payload)
     });
 

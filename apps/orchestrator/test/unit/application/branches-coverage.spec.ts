@@ -10,10 +10,13 @@ import {
   IncidentNotFoundError,
   IncidentAlreadyResolvedError
 } from '../../../src/application/index.js';
+import { SimulateDemoDecision } from '../../../src/demo/index.js';
 import {
   canTransition,
+  DecisionAction,
   IncidentState,
   Incident,
+  TargetHealthStatus,
   computeAlertFingerprint,
   DecisionHmac
 } from '../../../src/domain/index.js';
@@ -40,7 +43,7 @@ describe('Branch Coverage Enhancements', () => {
   });
 
   it('should cover canTransition with unknown state', () => {
-    expect(canTransition('UNKNOWN' as IncidentState, IncidentState.INVESTIGATING)).toBe(false);
+    expect(canTransition('UNKNOWN', IncidentState.INVESTIGATING)).toBe(false);
   });
 
   it('should cover non-existent incident throws in EnrichWithDeployDiff', async () => {
@@ -117,16 +120,14 @@ describe('Branch Coverage Enhancements', () => {
     };
     const targetStatus: TargetStatusPort = {
       getStatus: vi.fn(async () => ({
-        status: 'healthy' as const,
+        status: TargetHealthStatus.HEALTHY,
         service: 'api',
         version: 'v2.14.7',
         previousHealthyVersion: 'v2.14.7',
         targetRepo: 'repo',
         suspectFilePath: 'path',
         rawEdgeLogPreCollector: 'raw'
-      })),
-      triggerChaos: vi.fn(),
-      reset: vi.fn()
+      }))
     };
     const useCase = new InvestigateIncident(repo, tools, targetStatus, { broadcast: vi.fn() });
     const res = await useCase.execute(incident.id);
@@ -171,16 +172,14 @@ describe('Branch Coverage Enhancements', () => {
     };
     const targetStatus: TargetStatusPort = {
       getStatus: vi.fn(async () => ({
-        status: 'healthy' as const,
+        status: TargetHealthStatus.HEALTHY,
         service: 'api',
         version: 'v2.14.7',
         previousHealthyVersion: 'v2.14.7',
         targetRepo: 'repo',
         suspectFilePath: 'path',
         rawEdgeLogPreCollector: 'raw'
-      })),
-      triggerChaos: vi.fn(),
-      reset: vi.fn()
+      }))
     };
     const useCase = new InvestigateIncident(repo, tools, targetStatus, { broadcast: vi.fn() });
     const res = await useCase.execute(incident.id);
@@ -552,7 +551,7 @@ describe('Branch Coverage Enhancements', () => {
     expect(incident.state).toBe(IncidentState.AWAITING_PR);
   });
 
-  it('should cover RecordDecision executeSimulated unhappy paths and grafana annotation errors', async () => {
+  it('should cover SimulateDemoDecision and RecordDecision unhappy paths and grafana annotation errors', async () => {
     const repo: IncidentRepository = {
       findById: vi.fn(async (id: string) => {
         if (id === 'non-existent') {
@@ -595,25 +594,26 @@ describe('Branch Coverage Enhancements', () => {
     const broadcaster = { broadcast: vi.fn() };
 
     const useCase = new RecordDecision(repo, tools, clock, broadcaster, 'test-secret');
+    const simUseCase = new SimulateDemoDecision(repo, tools, broadcaster);
 
     // Simulated: not found
-    await expect(useCase.executeSimulated('non-existent', 'approve')).rejects.toThrow(
+    await expect(simUseCase.execute('non-existent', DecisionAction.APPROVE)).rejects.toThrow(
       IncidentNotFoundError
     );
 
     // Simulated: wrong state
-    await expect(useCase.executeSimulated('inc-wrong-state', 'approve')).rejects.toThrow(
+    await expect(simUseCase.execute('inc-wrong-state', DecisionAction.APPROVE)).rejects.toThrow(
       IncidentAlreadyResolvedError
     );
 
     // Simulated: grafana annotation throws
-    const resSim = await useCase.executeSimulated('inc-notified', 'reject');
+    const resSim = await simUseCase.execute('inc-notified', DecisionAction.REJECT);
     expect(resSim.state).toBe(IncidentState.REJECTED);
 
     // Signed execute: grafana annotation throws
     const exp = Math.floor(clock.now() / 1000) + 900;
-    const sig = DecisionHmac.sign('inc-notified-2', 'approve', exp, 'test-secret');
-    const resSigned = await useCase.execute('inc-notified-2', 'approve', sig, exp);
+    const sig = DecisionHmac.sign('inc-notified-2', DecisionAction.APPROVE, exp, 'test-secret');
+    const resSigned = await useCase.execute('inc-notified-2', DecisionAction.APPROVE, sig, exp);
     expect(resSigned.state).toBe(IncidentState.RESOLVED);
   });
 
@@ -722,7 +722,7 @@ describe('Branch Coverage Enhancements', () => {
       ]
     });
 
-    expect(res.incident.severity).toBe('critical');
+    expect(res.incident?.severity).toBe('critical');
   });
 
   it('should cover InvestigateIncident when seriesCount is 0 and summarizedSeries has p95 <= 2000', async () => {
@@ -763,16 +763,14 @@ describe('Branch Coverage Enhancements', () => {
     };
     const targetStatus: TargetStatusPort = {
       getStatus: vi.fn(async () => ({
-        status: 'healthy' as const,
+        status: TargetHealthStatus.HEALTHY,
         service: 'api',
         version: 'v2.14.7',
         previousHealthyVersion: 'v2.14.7',
         targetRepo: 'repo',
         suspectFilePath: 'path',
         rawEdgeLogPreCollector: 'raw'
-      })),
-      triggerChaos: vi.fn(),
-      reset: vi.fn()
+      }))
     };
 
     const useCase = new InvestigateIncident(repo, tools, targetStatus, { broadcast: vi.fn() });

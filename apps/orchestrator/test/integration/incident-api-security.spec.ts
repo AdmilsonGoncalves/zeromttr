@@ -1,19 +1,33 @@
+import http from 'node:http';
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { createApp, SseEventBroadcaster } from '../../src/http/index.js';
-import { IncidentState, Incident, DecisionHmac } from '../../src/domain/index.js';
+import {
+  createDemoRouterFactory,
+  SimulateDemoDecision,
+  type DemoControlPort
+} from '../../src/demo/index.js';
+import {
+  AlertSeverity,
+  DecisionAction,
+  DecisionSource,
+  IncidentEventType,
+  IncidentExecutionMode,
+  IncidentState,
+  Incident,
+  DecisionHmac,
+  TargetHealthStatus
+} from '../../src/domain/index.js';
 import type {
   IncidentRepository,
   TargetStatusPort,
   Clock,
   ToolsPort
 } from '../../src/ports/index.js';
-import {
-  RecordDecision,
-  type HandleAlert,
-  type OrchestratorWorkflow
-} from '../../src/application/index.js';
+import { RecordDecision } from '../../src/application/index.js';
+import { createStubHandleAlert, createStubWorkflow } from '../helpers/test-doubles.helper.js';
 
 describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 2 & 5)', () => {
   const DASHBOARD_TOKEN = 'test-dashboard-api-token-789';
@@ -25,7 +39,7 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
   const incident = new Incident({
     id: incidentId,
     service: 'api-pagamentos-core',
-    severity: 'critical',
+    severity: AlertSeverity.CRITICAL,
     fingerprint: 'alert:service',
     state: IncidentState.NOTIFIED,
     rca: {
@@ -65,14 +79,17 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
 
   const targetStatusPort: TargetStatusPort = {
     getStatus: vi.fn(async () => ({
-      status: 'healthy' as const,
+      status: TargetHealthStatus.HEALTHY,
       service: 'api-pagamentos-core',
       version: 'v2.14.7',
       previousHealthyVersion: 'v2.14.7',
       targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
       suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
       rawEdgeLogPreCollector: 'raw'
-    })),
+    }))
+  };
+
+  const demoControlPort: DemoControlPort = {
     triggerChaos: vi.fn(),
     reset: vi.fn()
   };
@@ -95,6 +112,7 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
 
   const broadcaster = new SseEventBroadcaster();
   const recordDecision = new RecordDecision(repo, toolsPort, clock, broadcaster, HMAC_SECRET);
+  const simulateDemoDecision = new SimulateDemoDecision(repo, toolsPort, broadcaster);
 
   let originalLiveDemoKey: string | undefined;
   let app: Express;
@@ -106,11 +124,15 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     app = createApp({
       repository: repo,
       targetStatusPort,
-      handleAlert: {} as HandleAlert,
-      orchestratorWorkflow: {} as OrchestratorWorkflow,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
       recordDecision,
       broadcaster,
-      dashboardApiToken: DASHBOARD_TOKEN
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        demoControlPort,
+        simulateDemoDecision
+      })
     });
   });
 
@@ -224,63 +246,237 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     expect(res.body.details).toBeDefined();
   });
 
-  it('should reject demo endpoints with 403 when LIVE_DEMO_KEY is configured and header is missing', async () => {
+  it('should allow replay mode without X-Live-Demo-Key while requiring it for live chaos, live reset, and live simulate-decision', async () => {
+    const replayIncident = new Incident({
+      id: 'inc-replay-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:replay',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.REPLAY
+    });
+    const liveIncident = new Incident({
+      id: 'inc-live-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:live',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.LIVE
+    });
+    const localRepo: IncidentRepository = {
+      findById: vi.fn(async (id: string) => {
+        if (id === replayIncident.id) {
+          return replayIncident;
+        }
+        if (id === liveIncident.id) {
+          return liveIncident;
+        }
+        return null;
+      }),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [replayIncident, liveIncident]),
+      save: vi.fn(async () => {})
+    };
+    const localSimDecision = new SimulateDemoDecision(localRepo, toolsPort, broadcaster);
+
     const protectedApp = createApp({
-      repository: repo,
+      repository: localRepo,
       targetStatusPort,
-      handleAlert: {} as HandleAlert,
-      orchestratorWorkflow: {} as OrchestratorWorkflow,
+      handleAlert: createStubHandleAlert(localRepo),
+      orchestratorWorkflow: createStubWorkflow(),
       recordDecision,
       broadcaster,
       dashboardApiToken: DASHBOARD_TOKEN,
-      liveDemoKey: 'secret-demo-key-123'
+      demoRouter: createDemoRouterFactory({
+        repository: localRepo,
+        demoControlPort,
+        simulateDemoDecision: localSimDecision,
+        liveDemoKey: 'secret-demo-key-123',
+        cooldownMs: 0
+      })
     });
 
-    const res = await request(protectedApp)
+    // Replay chaos works without X-Live-Demo-Key
+    const replayRes = await request(protectedApp)
       .post('/api/demo/chaos')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
-      .send({ mode: 'replay' });
+      .send({ mode: IncidentExecutionMode.REPLAY });
+    expect(replayRes.status).toBe(HTTP_STATUS.ACCEPTED);
 
-    expect(res.status).toBe(403);
-    expect(res.body.error).toContain('X-Live-Demo-Key');
+    // Live chaos requires X-Live-Demo-Key
+    const missingKeyLiveRes = await request(protectedApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(missingKeyLiveRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(missingKeyLiveRes.body.error).toContain('X-Live-Demo-Key');
 
-    // Should succeed with valid key
-    const successRes = await request(protectedApp)
+    const validKeyLiveRes = await request(protectedApp)
       .post('/api/demo/chaos')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
       .set('X-Live-Demo-Key', 'secret-demo-key-123')
-      .send({ mode: 'replay' });
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(validKeyLiveRes.status).toBe(HTTP_STATUS.ACCEPTED);
 
-    expect(successRes.status).toBe(202);
+    // Live reset requires X-Live-Demo-Key
+    const missingKeyResetRes = await request(protectedApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(missingKeyResetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+
+    const validKeyResetRes = await request(protectedApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'secret-demo-key-123');
+    expect(validKeyResetRes.status).toBe(HTTP_STATUS.ACCEPTED);
+
+    // Simulate decision on REPLAY incident works without X-Live-Demo-Key
+    const simReplayRes = await request(protectedApp)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    expect(simReplayRes.status).toBe(HTTP_STATUS.OK);
+    expect(simReplayRes.body).toMatchObject({
+      success: true,
+      simulated: true,
+      incidentId: replayIncident.id,
+      state: IncidentState.RESOLVED,
+      decisionSource: DecisionSource.DEMO_SIMULATION
+    });
+
+    // Simulate decision on LIVE incident requires X-Live-Demo-Key
+    const simLiveDeniedRes = await request(protectedApp)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: liveIncident.id, action: DecisionAction.REJECT });
+    expect(simLiveDeniedRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+
+    const simLiveAllowedRes = await request(protectedApp)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'secret-demo-key-123')
+      .send({ incidentId: liveIncident.id, action: DecisionAction.REJECT });
+    expect(simLiveAllowedRes.status).toBe(HTTP_STATUS.OK);
+    expect(simLiveAllowedRes.body.state).toBe(IncidentState.REJECTED);
+  });
+
+  it('should stream SSE heartbeat and events on GET /api/events with query token', async () => {
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected TCP address');
+      }
+
+      const controller = new AbortController();
+      const response = await fetch(
+        `http://127.0.0.1:${address.port}/api/events?token=${DASHBOARD_TOKEN}`,
+        { signal: controller.signal }
+      );
+      expect(response.status).toBe(HTTP_STATUS.OK);
+      expect(response.headers.get('content-type')).toContain('text/event-stream');
+
+      const reader = response.body?.getReader();
+      expect(reader).toBeDefined();
+      const decoder = new TextDecoder();
+
+      const firstChunk = await reader!.read();
+      const firstText = decoder.decode(firstChunk.value);
+      expect(firstText).toContain('event: heartbeat');
+
+      broadcaster.broadcast(IncidentEventType.TRANSITION, {
+        incidentId,
+        from: IncidentState.AWAITING_PR,
+        to: IncidentState.NOTIFIED
+      });
+
+      const secondChunk = await reader!.read();
+      const secondText = decoder.decode(secondChunk.value);
+      expect(secondText).toContain(`event: ${IncidentEventType.TRANSITION}`);
+      expect(secondText).toContain(incidentId);
+
+      controller.abort();
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
+  });
+
+  it('should return structured 400 JSON when receiving malformed JSON request body', async () => {
+    const res = await request(app)
+      .post(`/api/incidents/${incidentId}/decision`)
+      .set('Content-Type', 'application/json')
+      .send('{"action":');
+
+    expect(res.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(res.body).toEqual({ error: 'Malformed JSON request body' });
   });
 
   it('should enforce cooldown on /api/demo/chaos with 429 Too Many Requests', async () => {
     const cooldownApp = createApp({
       repository: repo,
       targetStatusPort,
-      handleAlert: {} as HandleAlert,
-      orchestratorWorkflow: {} as OrchestratorWorkflow,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
       recordDecision,
       broadcaster,
       dashboardApiToken: DASHBOARD_TOKEN,
-      demoCooldownMs: 5000
+      demoRouter: createDemoRouterFactory({
+        demoControlPort,
+        simulateDemoDecision,
+        cooldownMs: 5000
+      })
     });
 
     const firstRes = await request(cooldownApp)
       .post('/api/demo/chaos')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
-      .send({ mode: 'replay' });
+      .send({ mode: IncidentExecutionMode.REPLAY });
 
-    expect(firstRes.status).toBe(202);
+    expect(firstRes.status).toBe(HTTP_STATUS.ACCEPTED);
 
     const secondRes = await request(cooldownApp)
       .post('/api/demo/chaos')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
-      .send({ mode: 'replay' });
+      .send({ mode: IncidentExecutionMode.REPLAY });
 
-    expect(secondRes.status).toBe(429);
+    expect(secondRes.status).toBe(HTTP_STATUS.TOO_MANY_REQUESTS);
     expect(secondRes.body.error).toContain('cooldown');
     expect(secondRes.body.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it('should leave /api/demo/* unmounted (404) when demoRouter is omitted from core app', async () => {
+    const coreOnlyApp = createApp({
+      repository: repo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN
+    });
+
+    const statusRes = await request(coreOnlyApp)
+      .get('/api/target/status')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(statusRes.status).toBe(HTTP_STATUS.OK);
+
+    const demoChaosRes = await request(coreOnlyApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.REPLAY });
+    expect(demoChaosRes.status).toBe(HTTP_STATUS.NOT_FOUND);
+
+    const simDecisionRes = await request(coreOnlyApp)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId, action: DecisionAction.APPROVE });
+    expect(simDecisionRes.status).toBe(HTTP_STATUS.NOT_FOUND);
   });
 
   it('should reject invalid /api/demo/chaos payload with 400 and Zod details', async () => {

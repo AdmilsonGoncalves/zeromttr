@@ -4,15 +4,24 @@ import {
   InvalidDecisionSignatureError,
   IncidentAlreadyResolvedError
 } from '../../../src/application/index.js';
-import { IncidentState, Incident, DecisionHmac } from '../../../src/domain/index.js';
+import { SimulateDemoDecision } from '../../../src/demo/index.js';
+import {
+  AlertSeverity,
+  DecisionAction,
+  DecisionHmac,
+  DecisionSource,
+  Incident,
+  IncidentState
+} from '../../../src/domain/index.js';
 import type {
   IncidentRepository,
   ToolsPort,
   Clock,
   EventBroadcasterPort
 } from '../../../src/ports/index.js';
+import { createMockToolsPort } from '../../helpers/test-doubles.helper.js';
 
-describe('RecordDecision Use Case', () => {
+describe('RecordDecision & SimulateDemoDecision Use Cases', () => {
   const secret = 'test-secret-hmac-key';
   const incidentId = 'inc-test-001';
   const now = 1730000000;
@@ -22,7 +31,7 @@ describe('RecordDecision Use Case', () => {
     new Incident({
       id: incidentId,
       service: 'api-pagamentos-core',
-      severity: 'critical',
+      severity: AlertSeverity.CRITICAL,
       fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
       state
     });
@@ -85,15 +94,15 @@ describe('RecordDecision Use Case', () => {
       findAll: vi.fn(async () => [incident]),
       save: vi.fn(async () => {})
     };
-    const tools = {} as ToolsPort;
+    const tools = createMockToolsPort();
     const clock: Clock = { now: () => now * 1000, iso: () => '' };
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
 
     const useCase = new RecordDecision(repo, tools, clock, broadcaster, secret);
 
-    await expect(useCase.execute(incidentId, 'approve', 'bad-sig', exp)).rejects.toThrow(
-      InvalidDecisionSignatureError
-    );
+    await expect(
+      useCase.execute(incidentId, DecisionAction.APPROVE, 'bad-sig', exp)
+    ).rejects.toThrow(InvalidDecisionSignatureError);
   });
 
   it('should reject second decision when incident is already in RESOLVED or REJECTED state with 409 Conflict', async () => {
@@ -104,14 +113,14 @@ describe('RecordDecision Use Case', () => {
       findAll: vi.fn(async () => [incident]),
       save: vi.fn(async () => {})
     };
-    const tools = {} as ToolsPort;
+    const tools = createMockToolsPort();
     const clock: Clock = { now: () => now * 1000, iso: () => '' };
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
 
     const useCase = new RecordDecision(repo, tools, clock, broadcaster, secret);
-    const sig = DecisionHmac.sign(incidentId, 'approve', exp, secret);
+    const sig = DecisionHmac.sign(incidentId, DecisionAction.APPROVE, exp, secret);
 
-    await expect(useCase.execute(incidentId, 'approve', sig, exp)).rejects.toThrow(
+    await expect(useCase.execute(incidentId, DecisionAction.APPROVE, sig, exp)).rejects.toThrow(
       IncidentAlreadyResolvedError
     );
   });
@@ -123,18 +132,19 @@ describe('RecordDecision Use Case', () => {
       findAll: vi.fn(async () => []),
       save: vi.fn(async () => {})
     };
-    const tools = {} as ToolsPort;
+    const tools = createMockToolsPort();
     const clock: Clock = { now: () => now * 1000, iso: () => '' };
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
 
     const useCase = new RecordDecision(repo, tools, clock, broadcaster, secret);
-    const sig = DecisionHmac.sign(incidentId, 'approve', exp, secret);
+    const simUseCase = new SimulateDemoDecision(repo, tools, broadcaster);
+    const sig = DecisionHmac.sign(incidentId, DecisionAction.APPROVE, exp, secret);
 
-    await expect(useCase.execute(incidentId, 'approve', sig, exp)).rejects.toThrow();
-    await expect(useCase.executeSimulated(incidentId, 'approve')).rejects.toThrow();
+    await expect(useCase.execute(incidentId, DecisionAction.APPROVE, sig, exp)).rejects.toThrow();
+    await expect(simUseCase.execute(incidentId, DecisionAction.APPROVE)).rejects.toThrow();
   });
 
-  it('should allow simulate-decision for demo mode without HMAC signature', async () => {
+  it('should allow SimulateDemoDecision for demo mode without HMAC signature', async () => {
     const incident = createMockIncident(IncidentState.NOTIFIED);
     const repo: IncidentRepository = {
       findById: vi.fn(async () => incident),
@@ -143,25 +153,17 @@ describe('RecordDecision Use Case', () => {
       save: vi.fn(async () => {})
     };
 
-    const tools: ToolsPort = {
-      executePromqlRange: vi.fn(),
-      queryLokiLogs: vi.fn(),
-      analyzeOtelTrace: vi.fn(),
-      searchTracesByTraceQL: vi.fn(),
-      inspectGitDeployDiff: vi.fn(),
-      createRemediationPr: vi.fn(),
-      sendPostMortemResend: vi.fn(),
+    const tools: ToolsPort = createMockToolsPort({
       annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 202, success: true }))
-    };
+    });
 
-    const clock: Clock = { now: () => now * 1000, iso: () => '' };
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
 
-    const useCase = new RecordDecision(repo, tools, clock, broadcaster, secret);
-    const result = await useCase.executeSimulated(incidentId, 'reject');
+    const useCase = new SimulateDemoDecision(repo, tools, broadcaster);
+    const result = await useCase.execute(incidentId, DecisionAction.REJECT);
 
     expect(result.state).toBe(IncidentState.REJECTED);
-    expect(result.decision).toBe('reject');
-    expect(result.decisionSource).toBe('demo_simulation');
+    expect(result.decision).toBe(DecisionAction.REJECT);
+    expect(result.decisionSource).toBe(DecisionSource.DEMO_SIMULATION);
   });
 });

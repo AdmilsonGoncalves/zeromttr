@@ -1,3 +1,10 @@
+import { isNonEmptyArray, isNonEmptyString, safeJsonParse, toErrorMessage } from '@zeromttr/utils';
+import {
+  buildUrl,
+  isHttpSuccess,
+  sanitizeHeaderValue,
+  trimTrailingSlash
+} from '@zeromttr/utils/http';
 import type {
   RepoInspectorPort,
   DeployDiffRequest,
@@ -21,7 +28,7 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
   private readonly baseUrl: string;
 
   constructor(private readonly config: GithubInspectorConfig) {
-    this.baseUrl = (config.apiBaseUrl || 'https://api.github.com').replace(/\/$/, '');
+    this.baseUrl = trimTrailingSlash(config.apiBaseUrl || 'https://api.github.com');
   }
 
   private getHeaders(): Record<string, string> {
@@ -29,17 +36,20 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'ZeroMTTR-MCP-Server'
     };
-    if (this.config.githubToken) {
-      headers.Authorization = `Bearer ${this.config.githubToken}`;
+    if (isNonEmptyString(this.config.githubToken)) {
+      headers.Authorization = `Bearer ${sanitizeHeaderValue(this.config.githubToken)}`;
     }
     return headers;
   }
 
   async inspectDeployDiff(req: DeployDiffRequest): Promise<DeployDiffBundle> {
-    const compareUrl = `${this.baseUrl}/repos/${this.config.repo}/compare/${encodeURIComponent(req.base_ref)}...${encodeURIComponent(req.head_ref)}`;
+    const compareUrl = buildUrl(
+      this.baseUrl,
+      `/repos/${this.config.repo}/compare/${encodeURIComponent(req.base_ref)}...${encodeURIComponent(req.head_ref)}`
+    );
     const compareRes = await fetch(compareUrl, { headers: this.getHeaders() });
 
-    if (!compareRes.ok) {
+    if (!isHttpSuccess(compareRes.status)) {
       throw new Error(`GitHub compare failed: ${compareRes.status} ${compareRes.statusText}`);
     }
 
@@ -65,18 +75,16 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
     try {
       compareData = JSON.parse(compareText);
     } catch (err) {
-      throw new Error(`Failed to parse GitHub compare JSON: ${(err as Error).message}`);
+      throw new Error(`Failed to parse GitHub compare JSON: ${toErrorMessage(err)}`);
     }
 
     // Extract author and commit message with strict PII sanitization
     let authorLogin = 'unknown';
     let rawCommitMessage = '';
     const commits = compareData.commits || [];
-    if (commits.length > 0) {
+    if (isNonEmptyArray(commits)) {
       const targetCommit = commits[commits.length - 1];
-      authorLogin = targetCommit.author?.login
-        ? sanitizeAuthorLogin(targetCommit.author.login)
-        : 'unknown';
+      authorLogin = sanitizeAuthorLogin(targetCommit.author?.login);
       rawCommitMessage = targetCommit.commit?.message || '';
     }
     const sanitizedCommitMessage = sanitizeCommitMessage(rawCommitMessage);
@@ -115,13 +123,19 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
 
     if (suspectFileItem) {
       const encodedPath = suspectFileItem.filename.split('/').map(encodeURIComponent).join('/');
-      const contentsUrl = `${this.baseUrl}/repos/${this.config.repo}/contents/${encodedPath}?ref=${encodeURIComponent(req.head_ref)}`;
+      const contentsUrl = buildUrl(
+        this.baseUrl,
+        `/repos/${this.config.repo}/contents/${encodedPath}`,
+        {
+          ref: req.head_ref
+        }
+      );
       const contentsRes = await fetch(contentsUrl, { headers: this.getHeaders() });
-      if (contentsRes.ok) {
+      if (isHttpSuccess(contentsRes.status)) {
         const contentsText = await contentsRes.text();
         rawBytesFetched += Buffer.byteLength(contentsText, 'utf-8');
-        try {
-          const contentsData = JSON.parse(contentsText);
+        const contentsData = safeJsonParse<{ content?: string; sha?: string }>(contentsText);
+        if (contentsData) {
           const decoded = contentsData.content
             ? Buffer.from(contentsData.content, 'base64').toString('utf-8')
             : '';
@@ -131,8 +145,6 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
             blob_sha: contentsData.sha || '',
             content: cappedContent
           };
-        } catch {
-          // ignore parsing error for contents fallback
         }
       }
     }

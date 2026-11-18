@@ -1,3 +1,5 @@
+import { isArray, isNumber, isObject, isString, round, toErrorMessage } from '@zeromttr/utils';
+import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import type { TracesPort, TraceSearchResult } from '../ports/index.js';
 import { extractOtelAttributeValue, type RawSpan } from '../domain/index.js';
 
@@ -34,12 +36,12 @@ export class TempoHttpAdapter implements TracesPort {
   constructor(private readonly config: TempoAdapterConfig) {}
 
   async getTrace(traceId: string): Promise<{ rawBytes: number; spans: RawSpan[] }> {
-    const url = `${this.config.baseUrl.replace(/\/$/, '')}/api/traces/${traceId}`;
+    const url = buildUrl(this.config.baseUrl, `/api/traces/${traceId}`);
     const response = await fetch(url, {
       headers: { Accept: 'application/json' }
     });
 
-    if (!response.ok) {
+    if (!isHttpSuccess(response.status)) {
       throw new Error(`Tempo getTrace failed: ${response.status} ${response.statusText}`);
     }
 
@@ -53,7 +55,7 @@ export class TempoHttpAdapter implements TracesPort {
     try {
       data = JSON.parse(text);
     } catch (err) {
-      throw new Error(`Failed to parse Tempo trace JSON: ${(err as Error).message}`);
+      throw new Error(`Failed to parse Tempo trace JSON: ${toErrorMessage(err)}`);
     }
 
     const spans: RawSpan[] = [];
@@ -62,7 +64,7 @@ export class TempoHttpAdapter implements TracesPort {
     for (const batch of resourceSpans) {
       let defaultServiceName = 'unknown-service';
       const resourceAttrs = batch.resource?.attributes || [];
-      if (Array.isArray(resourceAttrs)) {
+      if (isArray(resourceAttrs)) {
         const svcAttr = resourceAttrs.find((a) => a.key === 'service.name' || a.key === 'service');
         if (svcAttr) {
           defaultServiceName = String(
@@ -76,19 +78,21 @@ export class TempoHttpAdapter implements TracesPort {
         const batchSpans = scope.spans || [];
         for (const s of batchSpans) {
           const attributes: Record<string, unknown> = {};
-          if (Array.isArray(s.attributes)) {
+          if (isArray(s.attributes)) {
             for (const attr of s.attributes) {
-              if (attr && typeof attr.key === 'string') {
+              if (attr && isString(attr.key)) {
                 attributes[attr.key] = extractOtelAttributeValue(attr.value);
               }
             }
-          } else if (s.attributes && typeof s.attributes === 'object') {
+          } else if (isObject(s.attributes)) {
             for (const [k, v] of Object.entries(s.attributes)) {
               attributes[k] = extractOtelAttributeValue(v);
             }
           }
 
-          const serviceName = (attributes['service.name'] as string) || defaultServiceName;
+          const serviceName = isString(attributes['service.name'])
+            ? attributes['service.name']
+            : defaultServiceName;
 
           let durationMs = 0;
           if (s.durationMs !== undefined) {
@@ -105,7 +109,7 @@ export class TempoHttpAdapter implements TracesPort {
             parentSpanId: s.parentSpanId || s.parentId,
             name: s.name || s.operationName || 'unnamed-span',
             serviceName,
-            durationMs: Math.round(durationMs),
+            durationMs: round(durationMs),
             statusCode: s.status?.code ?? s.statusCode,
             statusMessage: s.status?.message ?? s.statusMessage,
             attributes
@@ -121,17 +125,15 @@ export class TempoHttpAdapter implements TracesPort {
     query: string,
     limit = 10
   ): Promise<{ rawBytes: number; traces: TraceSearchResult[] }> {
-    const params = new URLSearchParams({
+    const url = buildUrl(this.config.baseUrl, '/api/search', {
       q: query,
-      limit: String(limit)
+      limit
     });
-
-    const url = `${this.config.baseUrl.replace(/\/$/, '')}/api/search?${params.toString()}`;
     const response = await fetch(url, {
       headers: { Accept: 'application/json' }
     });
 
-    if (!response.ok) {
+    if (!isHttpSuccess(response.status)) {
       throw new Error(`Tempo searchTraces failed: ${response.status} ${response.statusText}`);
     }
 
@@ -159,19 +161,19 @@ export class TempoHttpAdapter implements TracesPort {
     try {
       data = JSON.parse(text);
     } catch (err) {
-      throw new Error(`Failed to parse Tempo search JSON: ${(err as Error).message}`);
+      throw new Error(`Failed to parse Tempo search JSON: ${toErrorMessage(err)}`);
     }
 
     const traces: TraceSearchResult[] = [];
     const results = data.traces || data.results || [];
-    if (Array.isArray(results)) {
+    if (isArray(results)) {
       for (const t of results) {
         traces.push({
           traceId: t.traceID || t.traceId || '',
           rootServiceName: t.rootServiceName,
           rootTraceName: t.rootTraceName,
           startTimeUnixNano: t.startTimeUnixNano != null ? String(t.startTimeUnixNano) : undefined,
-          durationMs: t.durationMs ? Math.round(t.durationMs) : undefined
+          durationMs: isNumber(t.durationMs) ? round(t.durationMs) : undefined
         });
       }
     }

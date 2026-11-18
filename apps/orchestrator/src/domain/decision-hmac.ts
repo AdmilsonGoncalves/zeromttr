@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { isNonEmptyString } from '@zeromttr/utils';
+import { isNonEmptyString, isNumber } from '@zeromttr/utils';
 import type { IncidentDecisionAction } from './incident.js';
 
 export class DecisionHmac {
@@ -25,8 +25,8 @@ export class DecisionHmac {
     incidentId: string,
     action: IncidentDecisionAction | string,
     sig: string,
-    exp: number,
-    now: number,
+    exp: unknown,
+    now: unknown,
     secret: string
   ): boolean {
     if (!isNonEmptyString(sig) || !isNonEmptyString(incidentId)) {
@@ -35,13 +35,7 @@ export class DecisionHmac {
     if (!/^[0-9a-f]{64}$/i.test(sig)) {
       return false;
     }
-    if (
-      typeof exp !== 'number' ||
-      !Number.isFinite(exp) ||
-      typeof now !== 'number' ||
-      !Number.isFinite(now) ||
-      exp <= now
-    ) {
+    if (!isNumber(exp) || !isNumber(now) || exp <= now) {
       return false;
     }
 

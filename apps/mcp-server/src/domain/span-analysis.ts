@@ -1,3 +1,5 @@
+import { isArray, isNonEmptyArray, isNonEmptyString, isObject } from '@zeromttr/utils';
+
 export interface RawSpan {
   spanId: string;
   traceId: string;
@@ -21,22 +23,22 @@ export interface TraceSummary {
 }
 
 export function extractOtelAttributeValue(val: unknown): unknown {
-  if (val && typeof val === 'object') {
+  if (isObject(val)) {
     if ('stringValue' in val) {
-      return (val as { stringValue: string }).stringValue;
+      return val.stringValue;
     }
     if ('boolValue' in val) {
-      return (val as { boolValue: boolean }).boolValue;
+      return val.boolValue;
     }
     if ('intValue' in val) {
-      return Number((val as { intValue: string | number }).intValue);
+      return Number(val.intValue);
     }
     if ('doubleValue' in val) {
-      return Number((val as { doubleValue: number }).doubleValue);
+      return Number(val.doubleValue);
     }
-    if ('arrayValue' in val) {
-      const values = (val as { arrayValue: { values?: unknown[] } }).arrayValue?.values;
-      return Array.isArray(values) ? values.map(extractOtelAttributeValue) : [];
+    if ('arrayValue' in val && isObject(val.arrayValue)) {
+      const values = val.arrayValue.values;
+      return isArray(values) ? values.map(extractOtelAttributeValue) : [];
     }
   }
   return val;
@@ -79,7 +81,7 @@ export function analyzeSpans(spans: RawSpan[]): TraceSummary {
   const servicesSet = new Set<string>();
 
   for (const span of spans) {
-    if (span.serviceName) {
+    if (isNonEmptyString(span.serviceName)) {
       servicesSet.add(span.serviceName);
     }
   }
@@ -97,7 +99,7 @@ export function analyzeSpans(spans: RawSpan[]): TraceSummary {
   const top5Slowest = [...spans].sort((a, b) => b.durationMs - a.durationMs).slice(0, 5);
 
   // Critical span: longest error span, or longest span overall
-  const criticalSpan = top5Errors.length > 0 ? top5Errors[0] : top5Slowest[0];
+  const criticalSpan = isNonEmptyArray<RawSpan>(top5Errors) ? top5Errors[0] : top5Slowest[0];
 
   return {
     traceId,

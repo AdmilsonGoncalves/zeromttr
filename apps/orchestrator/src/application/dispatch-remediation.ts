@@ -1,9 +1,20 @@
-import { isNonEmptyString } from '@zeromttr/utils';
 import {
+  diffInSeconds,
+  isNonEmptyString,
+  nowIso,
+  round,
+  sanitizeWhitespace,
+  toErrorMessage,
+  truncate
+} from '@zeromttr/utils';
+import {
+  GrafanaAnnotationTag,
   IncidentEventType,
   IncidentState,
   OrchestratorDefault,
+  OrchestratorLogEvent,
   PiiPromptGuard,
+  ReasoningProvider,
   TransitionReason,
   calculateEvidenceCoverage,
   type RcaReport,
@@ -15,6 +26,7 @@ import type {
   ToolsPort,
   ReasoningPort,
   EventBroadcasterPort,
+  LoggerPort,
   CollectedEvidence,
   RcaAndPatchSynthesis,
   CreateRemediationPrOutput
@@ -37,7 +49,7 @@ function validatePatchDefensively(
     return false;
   }
   const content = synthesis.patchedContent;
-  if (!isNonEmptyString(content) || content.trim().length === 0) {
+  if (!isNonEmptyString(content)) {
     return false;
   }
   return true;
@@ -49,7 +61,8 @@ export class DispatchRemediation {
     private readonly tools: ToolsPort,
     private readonly llmAdapter: ReasoningPort,
     private readonly fallbackAdapter: ReasoningPort,
-    private readonly broadcaster: EventBroadcasterPort
+    private readonly broadcaster: EventBroadcasterPort,
+    private readonly logger?: LoggerPort
   ) {}
 
   public async execute(
@@ -79,19 +92,19 @@ export class DispatchRemediation {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
         if (validatePatchDefensively(rawSynthesis, authoritativeSuspectPath)) {
           synthesis = rawSynthesis;
-          reasoningSource = 'llm';
+          reasoningSource = ReasoningProvider.LLM;
         } else {
           synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-          reasoningSource = 'fallback';
+          reasoningSource = ReasoningProvider.FALLBACK;
         }
       } catch {
         synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-        reasoningSource = 'fallback';
+        reasoningSource = ReasoningProvider.FALLBACK;
       }
     } else {
       // Fail-closed! Route directly to fallback
       synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-      reasoningSource = 'fallback';
+      reasoningSource = ReasoningProvider.FALLBACK;
     }
 
     // Ensure valid lifecycle transitions before REMEDIATING
@@ -129,19 +142,16 @@ export class DispatchRemediation {
       const annRes = await this.tools.annotateGrafanaIncident({
         time: Date.now(),
         text: `[REMEDIATING] Incident ${incident.id}: ${synthesis.summary}`,
-        tags: ['aiops-remediation']
+        tags: [GrafanaAnnotationTag.REMEDIATION]
       });
       annotationId = annRes.annotationId;
     } catch (err) {
       // Ignore non-fatal annotation failure
-      console.warn(
-        JSON.stringify({
-          level: 'warn',
-          event: 'grafana_annotation_failed',
-          incidentId: incident.id,
-          message: err instanceof Error ? err.message : String(err)
-        })
-      );
+      this.logger?.warn({
+        event: OrchestratorLogEvent.GRAFANA_ANNOTATION_FAILED,
+        incidentId: incident.id,
+        message: toErrorMessage(err)
+      });
     }
 
     // Evidence coverage calculation using actual collected signals
@@ -206,7 +216,7 @@ export class DispatchRemediation {
       signalsTotal: coverage.signalsTotal,
       evidenceBreakdown: coverage.breakdown,
       blastRadius: safeBlastRadius,
-      diagnosisSeconds: 4,
+      diagnosisSeconds: Math.max(0, round(diffInSeconds(incident.startedAt, nowIso()), 1)),
       traceId: evidence.traceAnalysis?.traceId || OrchestratorDefault.UNKNOWN_TRACE_ID,
       criticalSpan: safeCriticalSpan,
       spans: safeSpans,
@@ -242,7 +252,7 @@ export class DispatchRemediation {
     }
 
     // Create Remediation PR
-    const prTitleSummary = synthesis.summary.replace(/\s+/g, ' ').trim().slice(0, 72);
+    const prTitleSummary = truncate(sanitizeWhitespace(synthesis.summary), 72, '');
     const prResult = await this.tools.createRemediationPr({
       incident_id: incident.id,
       file_path: synthesis.suspectFilePath,

@@ -39,11 +39,17 @@ const ALLOWED_TRANSITIONS: Record<IncidentState, readonly IncidentState[]> = {
   [IncidentState.FAILED]: []
 };
 
-export function canTransition(from: IncidentState, to: IncidentState): boolean {
-  const allowed = ALLOWED_TRANSITIONS[from];
-  if (!allowed) {
+const INCIDENT_STATE_VALUES: ReadonlySet<string> = new Set(Object.values(IncidentState));
+
+export function isIncidentState(value: unknown): value is IncidentState {
+  return typeof value === 'string' && INCIDENT_STATE_VALUES.has(value);
+}
+
+export function canTransition(from: IncidentState | string, to: IncidentState): boolean {
+  if (!isIncidentState(from)) {
     return false;
   }
+  const allowed = ALLOWED_TRANSITIONS[from];
   return allowed.includes(to);
 }
 

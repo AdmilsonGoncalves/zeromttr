@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { DecisionHmac } from '../../../src/domain/index.js';
+import { DecisionAction, DecisionHmac } from '../../../src/domain/index.js';
 
 describe('DecisionHmac', () => {
   const secret = 'super-secret-hmac-key-zeromttr-2026';
   const incidentId = 'inc-live-demo-golden';
-  const action = 'approve';
+  const action = DecisionAction.APPROVE;
   const now = 1730000000;
   const exp = now + 900; // 15 min TTL
 
@@ -29,7 +29,9 @@ describe('DecisionHmac', () => {
     const sig = DecisionHmac.sign(incidentId, action, exp, secret);
 
     // Tampered action
-    expect(DecisionHmac.verify(incidentId, 'reject', sig, exp, now, secret)).toBe(false);
+    expect(DecisionHmac.verify(incidentId, DecisionAction.REJECT, sig, exp, now, secret)).toBe(
+      false
+    );
 
     // Tampered incidentId
     expect(DecisionHmac.verify('inc-other-id', action, sig, exp, now, secret)).toBe(false);
@@ -56,9 +58,7 @@ describe('DecisionHmac', () => {
     expect(
       DecisionHmac.verify(incidentId, action, sig, Number.POSITIVE_INFINITY, now, secret)
     ).toBe(false);
-    expect(DecisionHmac.verify(incidentId, action, sig, 'not-a-number' as any, now, secret)).toBe(
-      false
-    );
+    expect(DecisionHmac.verify(incidentId, action, sig, 'not-a-number', now, secret)).toBe(false);
     expect(DecisionHmac.verify(incidentId, action, sig, exp, Number.NaN, secret)).toBe(false);
   });
 });

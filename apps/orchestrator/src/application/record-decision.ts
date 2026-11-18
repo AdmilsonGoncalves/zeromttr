@@ -1,38 +1,24 @@
-import { toErrorMessage } from '@zeromttr/utils';
 import {
-  DecisionAction,
   DecisionHmac,
   DecisionSource,
+  GrafanaAnnotationTag,
   Incident,
-  IncidentEventType,
-  IncidentState,
-  type IncidentDecisionAction,
-  type IncidentDecisionSource
+  type IncidentDecisionAction
 } from '../domain/index.js';
-import type { IncidentRepository, ToolsPort, Clock, EventBroadcasterPort } from '../ports/index.js';
+import type {
+  Clock,
+  EventBroadcasterPort,
+  IncidentRepository,
+  LoggerPort,
+  ToolsPort
+} from '../ports/index.js';
+import { applyIncidentDecision, InvalidDecisionSignatureError } from './decision-helpers.js';
 
-export class InvalidDecisionSignatureError extends Error {
-  public constructor(message = 'Invalid or expired decision HMAC signature') {
-    super(message);
-    this.name = 'InvalidDecisionSignatureError';
-  }
-}
-
-export class IncidentNotFoundError extends Error {
-  public constructor(id: string) {
-    super(`Incident '${id}' not found`);
-    this.name = 'IncidentNotFoundError';
-  }
-}
-
-export class IncidentAlreadyResolvedError extends Error {
-  public constructor(id: string, currentState: IncidentState) {
-    super(
-      `Cannot record decision on incident '${id}' because its state is already '${currentState}'`
-    );
-    this.name = 'IncidentAlreadyResolvedError';
-  }
-}
+export {
+  InvalidDecisionSignatureError,
+  IncidentNotFoundError,
+  IncidentAlreadyResolvedError
+} from './decision-helpers.js';
 
 export class RecordDecision {
   public constructor(
@@ -40,7 +26,8 @@ export class RecordDecision {
     private readonly tools: ToolsPort,
     private readonly clock: Clock,
     private readonly broadcaster: EventBroadcasterPort,
-    private readonly hmacSecret: string
+    private readonly hmacSecret: string,
+    private readonly logger?: LoggerPort
   ) {}
 
   public async execute(
@@ -56,123 +43,14 @@ export class RecordDecision {
       throw new InvalidDecisionSignatureError();
     }
 
-    const incident = await this.repository.findById(incidentId);
-    if (!incident) {
-      throw new IncidentNotFoundError(incidentId);
-    }
-
-    if (incident.state !== IncidentState.NOTIFIED) {
-      throw new IncidentAlreadyResolvedError(incidentId, incident.state);
-    }
-
-    const targetState =
-      action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED;
-
-    const transition = incident.transition(
-      targetState,
-      `Decision executed via signed email link: ${action}`
-    );
-
-    incident.decision = action;
-    const source: IncidentDecisionSource = DecisionSource.EMAIL_HMAC;
-    incident.decisionSource = source;
-
-    try {
-      await this.tools.annotateGrafanaIncident({
-        time: Date.now(),
-        text: `[${targetState}] Incident ${incident.id} ${action === DecisionAction.APPROVE ? 'RESOLVED' : 'REJECTED'} via human approval`,
-        tags: ['aiops-decision']
-      });
-    } catch (err) {
-      // Non-fatal annotation
-      console.warn(
-        JSON.stringify({
-          level: 'warn',
-          event: 'grafana_decision_annotation_failed',
-          incidentId: incident.id,
-          message: toErrorMessage(err, 'Failed to annotate Grafana decision')
-        })
-      );
-    }
-
-    await this.repository.save(incident);
-
-    this.broadcaster.broadcast(IncidentEventType.DECISION, {
-      incidentId: incident.id,
+    return applyIncidentDecision(this.repository, this.tools, this.broadcaster, this.logger, {
+      incidentId,
       action,
-      source: DecisionSource.EMAIL_HMAC
+      source: DecisionSource.EMAIL_HMAC,
+      transitionReason: `Decision executed via signed email link: ${action}`,
+      annotationText: (targetState) =>
+        `[${targetState}] Incident ${incidentId} ${targetState} via human approval`,
+      annotationTags: [GrafanaAnnotationTag.DECISION]
     });
-
-    this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-      incidentId: incident.id,
-      from: transition.from,
-      to: transition.to,
-      at: transition.at,
-      reason: transition.reason
-    });
-
-    return incident;
-  }
-
-  public async executeSimulated(
-    incidentId: string,
-    action: IncidentDecisionAction
-  ): Promise<Incident> {
-    const incident = await this.repository.findById(incidentId);
-    if (!incident) {
-      throw new IncidentNotFoundError(incidentId);
-    }
-
-    if (incident.state !== IncidentState.NOTIFIED) {
-      throw new IncidentAlreadyResolvedError(incidentId, incident.state);
-    }
-
-    const targetState =
-      action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED;
-
-    const transition = incident.transition(
-      targetState,
-      `Decision executed via interactive simulation: ${action}`
-    );
-
-    incident.decision = action;
-    const simSource: IncidentDecisionSource = DecisionSource.DEMO_SIMULATION;
-    incident.decisionSource = simSource;
-
-    try {
-      await this.tools.annotateGrafanaIncident({
-        time: Date.now(),
-        text: `[${targetState}] Incident ${incident.id} ${action} via interactive demo simulation`,
-        tags: ['aiops-demo']
-      });
-    } catch (err) {
-      // Non-fatal annotation
-      console.warn(
-        JSON.stringify({
-          level: 'warn',
-          event: 'grafana_decision_annotation_failed',
-          incidentId: incident.id,
-          message: toErrorMessage(err, 'Failed to annotate Grafana decision')
-        })
-      );
-    }
-
-    await this.repository.save(incident);
-
-    this.broadcaster.broadcast(IncidentEventType.DECISION, {
-      incidentId: incident.id,
-      action,
-      source: DecisionSource.DEMO_SIMULATION
-    });
-
-    this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-      incidentId: incident.id,
-      from: transition.from,
-      to: transition.to,
-      at: transition.at,
-      reason: transition.reason
-    });
-
-    return incident;
   }
 }

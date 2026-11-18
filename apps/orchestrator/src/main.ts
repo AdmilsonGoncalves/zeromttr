@@ -1,5 +1,7 @@
 import http from 'node:http';
+import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
 import {
+  ConsoleJsonLogger,
   FileIncidentRepository,
   HttpTargetStatusAdapter,
   McpClientAdapter,
@@ -16,11 +18,18 @@ import {
   RecordDecision,
   OrchestratorWorkflow
 } from './application/index.js';
+import {
+  HttpDemoControlAdapter,
+  SimulateDemoDecision,
+  createDemoRouterFactory
+} from './demo/index.js';
+import { OrchestratorLogEvent } from './domain/index.js';
 import { SystemClock } from './ports/index.js';
 import { createApp, SseEventBroadcaster } from './http/index.js';
 
-export function bootstrap(port: number = Number(process.env.PORT) || 8080): http.Server {
-  const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH);
+export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
+  const logger = new ConsoleJsonLogger();
+  const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH, logger);
   const targetStatusPort = new HttpTargetStatusAdapter();
   const toolsPort = new McpClientAdapter();
   const fallbackAdapter = new DeterministicFallbackReasoningAdapter();
@@ -50,7 +59,8 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
     repository,
     toolsPort,
     targetStatusPort,
-    broadcaster
+    broadcaster,
+    logger
   );
   const enrichWithDeployDiff = new EnrichWithDeployDiff(repository, toolsPort, broadcaster);
   const dispatchRemediation = new DispatchRemediation(
@@ -58,7 +68,8 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
     toolsPort,
     llmAdapter,
     fallbackAdapter,
-    broadcaster
+    broadcaster,
+    logger
   );
   const notifyOnCall = new NotifyOnCall(
     repository,
@@ -66,9 +77,18 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
     clock,
     broadcaster,
     hmacSecret,
-    dashboardUrl
+    dashboardUrl,
+    logger
   );
-  const recordDecision = new RecordDecision(repository, toolsPort, clock, broadcaster, hmacSecret);
+  const recordDecision = new RecordDecision(
+    repository,
+    toolsPort,
+    clock,
+    broadcaster,
+    hmacSecret,
+    logger
+  );
+  const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster, logger);
 
   const orchestratorWorkflow = new OrchestratorWorkflow(
     repository,
@@ -80,6 +100,20 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
   );
 
   const initialIncident = createInitialIncident();
+  const demoCooldownMs = isNonEmptyString(process.env.DEMO_COOLDOWN_MS)
+    ? parseNumber(process.env.DEMO_COOLDOWN_MS, 120_000)
+    : undefined;
+
+  const demoRouter =
+    process.env.ENABLE_DEMO_MODE === 'false'
+      ? undefined
+      : createDemoRouterFactory({
+          repository,
+          demoControlPort: new HttpDemoControlAdapter(),
+          simulateDemoDecision,
+          liveDemoKey: process.env.LIVE_DEMO_KEY,
+          cooldownMs: demoCooldownMs
+        });
 
   const app = createApp({
     repository,
@@ -90,23 +124,17 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
     broadcaster,
     grafanaWebhookToken: process.env.GRAFANA_WEBHOOK_TOKEN,
     dashboardApiToken: process.env.DASHBOARD_API_TOKEN,
-    liveDemoKey: process.env.LIVE_DEMO_KEY,
-    ...(process.env.DEMO_COOLDOWN_MS
-      ? { demoCooldownMs: Number(process.env.DEMO_COOLDOWN_MS) }
-      : {})
+    demoRouter
   });
 
   const server = http.createServer(app);
 
   server.listen(port, () => {
-    console.info(
-      JSON.stringify({
-        level: 'info',
-        event: 'orchestrator_initialized',
-        state: initialIncident.state,
-        port
-      })
-    );
+    logger.info({
+      event: OrchestratorLogEvent.ORCHESTRATOR_INITIALIZED,
+      state: initialIncident.state,
+      port
+    });
   });
 
   return server;

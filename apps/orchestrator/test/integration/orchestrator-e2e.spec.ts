@@ -10,6 +10,8 @@ import {
   HttpTargetStatusAdapter,
   McpClientAdapter
 } from '../../src/adapters/index.js';
+import { isObject, isString } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 import {
   DispatchRemediation,
   EnrichWithDeployDiff,
@@ -19,8 +21,19 @@ import {
   OrchestratorWorkflow,
   RecordDecision
 } from '../../src/application/index.js';
-import { IncidentState } from '../../src/domain/index.js';
+import {
+  AlertSeverity,
+  DecisionAction,
+  DecisionSource,
+  IncidentState,
+  isIncidentState
+} from '../../src/domain/index.js';
 import { createApp, SseEventBroadcaster } from '../../src/http/index.js';
+import {
+  createDemoRouterFactory,
+  HttpDemoControlAdapter,
+  SimulateDemoDecision
+} from '../../src/demo/index.js';
 import {
   cleanOrchestratorNock,
   mockMcpJsonRpcEndpoint,
@@ -48,8 +61,13 @@ async function waitForIncidentState(
       .set('Authorization', `Bearer ${dashboardToken}`);
     lastStatus = res.status;
     lastBody = res.body;
-    if (res.status === 200 && targetStates.includes(res.body.state as IncidentState)) {
-      return res.body as Record<string, unknown>;
+    if (
+      res.status === HTTP_STATUS.OK &&
+      isObject(res.body) &&
+      isIncidentState(res.body.state) &&
+      targetStates.includes(res.body.state)
+    ) {
+      return res.body;
     }
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -134,6 +152,7 @@ describe('Orchestrator End-to-End Integration with Nock (Happy Path & PII Fail-C
       broadcaster,
       HMAC_SECRET
     );
+    const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster);
 
     const workflow = new OrchestratorWorkflow(
       repository,
@@ -153,7 +172,12 @@ describe('Orchestrator End-to-End Integration with Nock (Happy Path & PII Fail-C
       broadcaster,
       grafanaWebhookToken: GRAFANA_TOKEN,
       dashboardApiToken: DASHBOARD_TOKEN,
-      liveDemoKey: ''
+      demoRouter: createDemoRouterFactory({
+        repository,
+        demoControlPort: new HttpDemoControlAdapter(TEST_TARGET_APP_URL),
+        simulateDemoDecision,
+        liveDemoKey: ''
+      })
     });
 
     return { app, llmAdapter };
@@ -174,15 +198,15 @@ describe('Orchestrator End-to-End Integration with Nock (Happy Path & PII Fail-C
             labels: {
               alertname: 'PaymentServicePoolExhaustion',
               service: 'api-pagamentos-core',
-              severity: 'critical'
+              severity: AlertSeverity.CRITICAL
             }
           }
         ]
       });
 
-    expect(webhookRes.status).toBe(202);
-    const incidentId = webhookRes.body.incidentId as string;
-    expect(incidentId).toBeDefined();
+    expect(webhookRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(isString(webhookRes.body.incidentId)).toBe(true);
+    const incidentId = String(webhookRes.body.incidentId);
 
     const detail = await waitForIncidentState(app, DASHBOARD_TOKEN, incidentId, [
       IncidentState.NOTIFIED,
@@ -196,10 +220,13 @@ describe('Orchestrator End-to-End Integration with Nock (Happy Path & PII Fail-C
     expect(detail.alertName).toBe('PaymentServicePoolExhaustion');
     expect(llmAdapter.synthesizeRcaAndPatch).toHaveBeenCalledTimes(1);
 
-    const rca = detail.rca as Record<string, unknown>;
-    expect(rca.reasoningSource).toBe('llm');
-    expect(rca.evidenceCoveragePercent).toBe(100);
-    expect((rca.piiGuardAudit as Record<string, unknown>).passed).toBe(true);
+    expect(isObject(detail.rca)).toBe(true);
+    if (!isObject(detail.rca) || !isObject(detail.rca.piiGuardAudit)) {
+      throw new Error('Expected rca and piiGuardAudit objects in incident detail');
+    }
+    expect(detail.rca.reasoningSource).toBe('llm');
+    expect(detail.rca.evidenceCoveragePercent).toBe(100);
+    expect(detail.rca.piiGuardAudit.passed).toBe(true);
 
     // Ensure HMAC signatures are NEVER leaked in REST detail
     expect(detail.approveSig).toBeUndefined();
@@ -230,18 +257,18 @@ describe('Orchestrator End-to-End Integration with Nock (Happy Path & PII Fail-C
     // Confirm decision with HMAC signature
     const decisionRes = await request(app)
       .post(`/api/incidents/${incidentId}/decision`)
-      .send({ action: 'approve', sig, exp });
+      .send({ action: DecisionAction.APPROVE, sig, exp });
 
-    expect(decisionRes.status).toBe(200);
+    expect(decisionRes.status).toBe(HTTP_STATUS.OK);
     expect(decisionRes.body.state).toBe(IncidentState.RESOLVED);
-    expect(decisionRes.body.decisionSource).toBe('email_hmac');
+    expect(decisionRes.body.decisionSource).toBe(DecisionSource.EMAIL_HMAC);
 
     // Second decision attempt with valid reject HMAC signature must return 409 Conflict
     const replayDecisionRes = await request(app)
       .post(`/api/incidents/${incidentId}/decision`)
-      .send({ action: 'reject', sig: rejectSig, exp: rejectExp });
+      .send({ action: DecisionAction.REJECT, sig: rejectSig, exp: rejectExp });
 
-    expect(replayDecisionRes.status).toBe(409);
+    expect(replayDecisionRes.status).toBe(HTTP_STATUS.CONFLICT);
   });
 
   it('should fail-closed to deterministic fallback via nock when Loki log leaks a valid CPF', async () => {
@@ -262,14 +289,14 @@ describe('Orchestrator End-to-End Integration with Nock (Happy Path & PII Fail-C
             labels: {
               alertname: 'PaymentServicePoolExhaustion',
               service: 'api-pagamentos-core',
-              severity: 'critical'
+              severity: AlertSeverity.CRITICAL
             }
           }
         ]
       });
 
-    expect(webhookRes.status).toBe(202);
-    const incidentId = webhookRes.body.incidentId as string;
+    expect(webhookRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    const incidentId = String(webhookRes.body.incidentId);
 
     const detail = await waitForIncidentState(app, DASHBOARD_TOKEN, incidentId, [
       IncidentState.NOTIFIED,
@@ -283,11 +310,13 @@ describe('Orchestrator End-to-End Integration with Nock (Happy Path & PII Fail-C
     // CRITICAL: LLM adapter must NEVER be called when PII guard triggers
     expect(llmAdapter.synthesizeRcaAndPatch).not.toHaveBeenCalled();
 
-    const rca = detail.rca as Record<string, unknown>;
-    expect(rca.reasoningSource).toBe('fallback');
-    expect(rca.logSample).toBe('[WITHHELD DUE TO PII VIOLATION: cpf_dotted]');
-    expect((rca.piiGuardAudit as Record<string, unknown>).passed).toBe(false);
-    expect((rca.piiGuardAudit as Record<string, unknown>).leakedPatternsDetected).toBe(1);
+    if (!isObject(detail.rca) || !isObject(detail.rca.piiGuardAudit)) {
+      throw new Error('Expected rca and piiGuardAudit objects in incident detail');
+    }
+    expect(detail.rca.reasoningSource).toBe('fallback');
+    expect(detail.rca.logSample).toBe('[WITHHELD DUE TO PII VIOLATION: cpf_dotted]');
+    expect(detail.rca.piiGuardAudit.passed).toBe(false);
+    expect(detail.rca.piiGuardAudit.leakedPatternsDetected).toBe(1);
 
     // Ensure raw CPF never leaks in REST or PR payload
     expect(JSON.stringify(detail)).not.toContain(syntheticCpf);

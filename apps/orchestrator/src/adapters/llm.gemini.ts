@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
+import { isNonEmptyString, parseNumber, safeJsonParse } from '@zeromttr/utils';
+import { ReasoningProvider } from '../domain/index.js';
 import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
 
 export const GEMINI_SYSTEM_INSTRUCTION = `You are the ZeroMTTR Autonomous SRE Reasoner, a specialist in Root Cause Analysis (RCA) and remediation engineering for production microservices.
@@ -73,7 +74,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
 
     const prompt = `Analyze the incident evidence and synthesize the RCA and surgical patch:\n${JSON.stringify(evidence, null, 2)}`;
 
-    const timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS) || 25_000;
+    const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 25_000);
     let timer: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
@@ -104,7 +105,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
     }
 
     const text = response.text;
-    if (!text) {
+    if (!isNonEmptyString(text)) {
       throw new Error('Empty response from Gemini LLM');
     }
 
@@ -119,7 +120,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
         'Failed to parse structured JSON response from Gemini or missing required schema fields'
       );
     }
-    parsed.reasoningSource = 'llm';
+    parsed.reasoningSource = ReasoningProvider.LLM;
     return parsed;
   }
 }

@@ -1,12 +1,14 @@
 import { toErrorMessage } from '@zeromttr/utils';
 import {
+  DecisionAction,
   DecisionHmac,
   IncidentEventType,
   IncidentState,
   NotificationStatus,
   OrchestratorDefault,
+  OrchestratorLogEvent,
+  ReasoningProvider,
   TransitionReason,
-  type IncidentDecisionAction,
   type ReasoningSource
 } from '../domain/index.js';
 import type {
@@ -14,6 +16,7 @@ import type {
   ToolsPort,
   Clock,
   EventBroadcasterPort,
+  LoggerPort,
   SendPostMortemOutput
 } from '../ports/index.js';
 
@@ -30,7 +33,8 @@ export class NotifyOnCall {
     private readonly clock: Clock,
     private readonly broadcaster: EventBroadcasterPort,
     private readonly hmacSecret: string,
-    private readonly dashboardUrl: string
+    private readonly dashboardUrl: string,
+    private readonly logger?: LoggerPort
   ) {}
 
   public async execute(incidentId: string): Promise<NotifyOnCallResult> {
@@ -41,15 +45,15 @@ export class NotifyOnCall {
 
     const exp = Math.floor(this.clock.now() / 1000) + 900; // 15 min TTL
 
-    const approveAction: IncidentDecisionAction = 'approve';
-    const rejectAction: IncidentDecisionAction = 'reject';
+    const approveAction = DecisionAction.APPROVE;
+    const rejectAction = DecisionAction.REJECT;
     const approveSig = DecisionHmac.sign(incident.id, approveAction, exp, this.hmacSecret);
     const rejectSig = DecisionHmac.sign(incident.id, rejectAction, exp, this.hmacSecret);
 
     const approveUrl = `${this.dashboardUrl}/decision/${incident.id}#action=${approveAction}&sig=${approveSig}&exp=${exp}`;
     const rejectUrl = `${this.dashboardUrl}/decision/${incident.id}#action=${rejectAction}&sig=${rejectSig}&exp=${exp}`;
 
-    const defaultReasoning: ReasoningSource = 'llm';
+    const defaultReasoning: ReasoningSource = ReasoningProvider.LLM;
     let resendResult: SendPostMortemOutput;
     let isDegraded = false;
     let failureReason: string | undefined;
@@ -74,14 +78,11 @@ export class NotifyOnCall {
     } catch (err) {
       isDegraded = true;
       failureReason = toErrorMessage(err);
-      console.warn(
-        JSON.stringify({
-          level: 'warn',
-          event: 'resend_notification_degraded',
-          incidentId: incident.id,
-          message: failureReason
-        })
-      );
+      this.logger?.warn({
+        event: OrchestratorLogEvent.RESEND_NOTIFICATION_DEGRADED,
+        incidentId: incident.id,
+        message: failureReason
+      });
       resendResult = {
         emailId: `email-fallback-${incident.id}`,
         sentAt: this.clock.iso()

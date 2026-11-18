@@ -8,6 +8,7 @@ export function createInitialIncident(): { id: string; state: string } {
   };
 }
 
+export * from './decision-helpers.js';
 export * from './handle-alert.js';
 export * from './investigate-incident.js';
 export * from './enrich-with-deploy-diff.js';

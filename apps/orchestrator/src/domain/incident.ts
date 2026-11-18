@@ -1,10 +1,10 @@
-import { nowIso } from '@zeromttr/utils';
+import { isNonEmptyArray, nowIso } from '@zeromttr/utils';
 import { IncidentState, transitionState, type IncidentTransition } from './incident-state.js';
-import type {
-  DecisionAction,
-  DecisionSource,
+import {
   IncidentExecutionMode,
-  NotificationStatus
+  type DecisionAction,
+  type DecisionSource,
+  type NotificationStatus
 } from './incident-enums.js';
 import type { RcaReport, ReasoningSource } from './rca-report.js';
 
@@ -84,11 +84,11 @@ export class Incident {
     this.severity = props.severity;
     this.fingerprint = props.fingerprint;
     this.alertName = props.alertName;
-    this.mode = props.mode ?? 'live';
+    this.mode = props.mode ?? IncidentExecutionMode.LIVE;
     this.startedAt = props.startedAt ?? nowIso();
     this._state = props.state ?? IncidentState.RECEIVED;
 
-    if (props.transitions && props.transitions.length > 0) {
+    if (isNonEmptyArray(props.transitions)) {
       this._transitions = [...props.transitions];
     } else {
       this._transitions = [

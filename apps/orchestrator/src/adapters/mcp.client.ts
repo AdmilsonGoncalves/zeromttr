@@ -1,4 +1,13 @@
-import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
+import { z } from 'zod';
+import {
+  isArray,
+  isNonEmptyString,
+  isNumber,
+  isObject,
+  isString,
+  parseNumber,
+  safeJsonParse
+} from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess, sanitizeHeaderValue } from '@zeromttr/utils/http';
 import { OrchestratorDefault } from '../domain/index.js';
 import type {
@@ -23,6 +32,80 @@ import type {
   AnnotateGrafanaOutput
 } from '../ports/index.js';
 
+const McpJsonRpcPayloadSchema = z.object({
+  result: z
+    .object({
+      content: z
+        .array(
+          z.object({
+            type: z.string(),
+            text: z.string()
+          })
+        )
+        .optional(),
+      isError: z.boolean().optional()
+    })
+    .optional(),
+  error: z
+    .object({
+      code: z.number().optional(),
+      message: z.string()
+    })
+    .optional()
+});
+
+function toStringRecord(value: unknown): Record<string, string> {
+  if (!isObject(value)) {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (isString(entry)) {
+      result[key] = entry;
+    }
+  }
+  return result;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!isArray(value)) {
+    return [];
+  }
+  return value.filter(isString);
+}
+
+function firstNonEmptyString(...candidates: unknown[]): string {
+  for (const candidate of candidates) {
+    if (isNonEmptyString(candidate)) {
+      return candidate;
+    }
+  }
+  return '';
+}
+
+function mapTraceSpanItem(item: unknown): TraceSpanItem {
+  const span = isObject(item) ? item : {};
+  const parentSpanRaw = span.parentSpanId ?? span.parent_span_id;
+  const errorMessageRaw = span.errorMessage ?? span.error_message;
+  return {
+    spanId: String(span.spanId ?? span.span_id ?? ''),
+    parentSpanId: isNonEmptyString(parentSpanRaw)
+      ? parentSpanRaw
+      : parentSpanRaw !== undefined && parentSpanRaw !== null
+        ? String(parentSpanRaw)
+        : undefined,
+    serviceName: String(span.serviceName ?? span.service_name ?? ''),
+    operationName: String(span.operationName ?? span.operation_name ?? ''),
+    durationMs: parseNumber(span.durationMs ?? span.duration_ms, 0),
+    hasError: Boolean(span.hasError ?? span.has_error ?? true),
+    errorMessage: isNonEmptyString(errorMessageRaw)
+      ? errorMessageRaw
+      : errorMessageRaw !== undefined && errorMessageRaw !== null
+        ? String(errorMessageRaw)
+        : undefined
+  };
+}
+
 export class McpClientAdapter implements ToolsPort {
   private readonly baseUrl: string;
   private readonly authToken: string;
@@ -38,7 +121,7 @@ export class McpClientAdapter implements ToolsPort {
   }
 
   private mapFinOps(finops: unknown): FinOpsData {
-    if (!finops || typeof finops !== 'object') {
+    if (!isObject(finops)) {
       return {
         rawBytesFetched: 0,
         compactedBytesSentToLlm: 0,
@@ -46,21 +129,25 @@ export class McpClientAdapter implements ToolsPort {
         estimatedTokensSaved: 0
       };
     }
-    const f = finops as Record<string, unknown>;
     return {
-      rawBytesFetched: Number(f.rawBytesFetched ?? f.raw_bytes_fetched ?? 0),
-      compactedBytesSentToLlm: Number(
-        f.compactedBytesSentToLlm ?? f.compacted_bytes_sent_to_llm ?? 0
+      rawBytesFetched: parseNumber(finops.rawBytesFetched ?? finops.raw_bytes_fetched, 0),
+      compactedBytesSentToLlm: parseNumber(
+        finops.compactedBytesSentToLlm ?? finops.compacted_bytes_sent_to_llm,
+        0
       ),
-      payloadReductionPercent: Number(
-        f.payloadReductionPercent ?? f.payload_reduction_percent ?? 0
+      payloadReductionPercent: parseNumber(
+        finops.payloadReductionPercent ?? finops.payload_reduction_percent,
+        0
       ),
-      estimatedTokensSaved: Number(f.estimatedTokensSaved ?? f.estimated_tokens_saved ?? 0)
+      estimatedTokensSaved: parseNumber(
+        finops.estimatedTokensSaved ?? finops.estimated_tokens_saved,
+        0
+      )
     };
   }
 
-  private async callTool<T>(name: string, args: unknown): Promise<T> {
-    const timeoutMs = Number(process.env.MCP_TIMEOUT_MS) || 30_000;
+  private async callTool(name: string, args: unknown): Promise<Record<string, unknown>> {
+    const timeoutMs = parseNumber(process.env.MCP_TIMEOUT_MS, 30_000);
     const response = await fetch(this.baseUrl, {
       method: 'POST',
       headers: {
@@ -86,13 +173,11 @@ export class McpClientAdapter implements ToolsPort {
       );
     }
 
-    const payload = (await response.json()) as {
-      result?: {
-        content?: Array<{ type: string; text: string }>;
-        isError?: boolean;
-      };
-      error?: { code: number; message: string };
-    };
+    const parsedEnvelope = McpJsonRpcPayloadSchema.safeParse(await response.json());
+    if (!parsedEnvelope.success) {
+      throw new Error(`MCP JSON-RPC returned malformed envelope for tool '${name}'`);
+    }
+    const payload = parsedEnvelope.data;
 
     if (payload.error) {
       throw new Error(`MCP JSON-RPC error for tool '${name}': ${payload.error.message}`);
@@ -108,37 +193,43 @@ export class McpClientAdapter implements ToolsPort {
       throw new Error(`MCP tool '${name}' returned empty or missing output text`);
     }
 
-    const parsed = safeJsonParse<T>(outputText);
-    if (!parsed || typeof parsed !== 'object') {
+    const parsed = safeJsonParse(outputText);
+    if (!isObject(parsed)) {
       throw new Error(`MCP tool '${name}' response could not be parsed as a valid JSON object`);
     }
     return parsed;
   }
 
   public async executePromqlRange(input: PromqlRangeInput): Promise<PromqlRangeOutput> {
-    const raw = await this.callTool<Record<string, unknown>>('execute_promql_range', input);
-    const rawSeries = Array.isArray(raw.series)
+    const raw = await this.callTool('execute_promql_range', input);
+    const rawSeriesInput = isArray(raw.series)
       ? raw.series
-      : (raw.summarizedSeries as Array<Record<string, unknown>>) || [];
-    const summarizedSeries = rawSeries.map((s: Record<string, unknown>) => ({
-      metric: (s.metric as Record<string, string>) || {},
-      p50: typeof s.p50 === 'number' ? s.p50 : typeof s.avg === 'number' ? s.avg : undefined,
-      p95: typeof s.p95 === 'number' ? s.p95 : undefined,
-      max: typeof s.max === 'number' ? s.max : undefined,
-      sampleCount:
-        typeof s.sampleCount === 'number'
-          ? s.sampleCount
-          : typeof s.points_count === 'number'
-            ? s.points_count
-            : undefined
+      : isArray(raw.summarizedSeries)
+        ? raw.summarizedSeries
+        : [];
+    const rawSeries = rawSeriesInput.filter(isObject);
+
+    const summarizedSeries = rawSeries.map((s) => ({
+      metric: toStringRecord(s.metric),
+      p50: isNumber(s.p50) ? s.p50 : isNumber(s.avg) ? s.avg : undefined,
+      p95: isNumber(s.p95) ? s.p95 : undefined,
+      max: isNumber(s.max) ? s.max : undefined,
+      sampleCount: isNumber(s.sampleCount)
+        ? s.sampleCount
+        : isNumber(s.points_count)
+          ? s.points_count
+          : undefined
     }));
 
-    let exemplarTraceId = typeof raw.exemplarTraceId === 'string' ? raw.exemplarTraceId : undefined;
+    let exemplarTraceId = isString(raw.exemplarTraceId) ? raw.exemplarTraceId : undefined;
     if (!exemplarTraceId) {
       for (const s of rawSeries) {
-        if (Array.isArray(s.exemplars)) {
+        if (isArray(s.exemplars)) {
           for (const ex of s.exemplars) {
-            const traceId = ex.labels?.trace_id || ex.labels?.traceId;
+            if (!isObject(ex) || !isObject(ex.labels)) {
+              continue;
+            }
+            const traceId = ex.labels.trace_id ?? ex.labels.traceId;
             if (isNonEmptyString(traceId)) {
               exemplarTraceId = traceId;
               break;
@@ -151,12 +242,11 @@ export class McpClientAdapter implements ToolsPort {
       }
     }
 
-    const seriesCount =
-      typeof raw.seriesCount === 'number'
-        ? raw.seriesCount
-        : typeof raw.series_count === 'number'
-          ? raw.series_count
-          : summarizedSeries.length;
+    const seriesCount = isNumber(raw.seriesCount)
+      ? raw.seriesCount
+      : isNumber(raw.series_count)
+        ? raw.series_count
+        : summarizedSeries.length;
 
     return {
       seriesCount,
@@ -167,27 +257,29 @@ export class McpClientAdapter implements ToolsPort {
   }
 
   public async queryLokiLogs(input: LokiQueryInput): Promise<LokiQueryOutput> {
-    const raw = await this.callTool<Record<string, unknown>>('query_loki_logs', input);
+    const raw = await this.callTool('query_loki_logs', input);
     let logs: Array<{ timestamp?: string; stream?: Record<string, string>; line: string }> = [];
 
-    if (Array.isArray(raw.logs)) {
-      logs = raw.logs.map((item: Record<string, unknown>) => ({
-        timestamp: typeof item.timestamp === 'string' ? item.timestamp : undefined,
-        stream: (item.stream as Record<string, string>) || undefined,
-        line: typeof item.line === 'string' ? item.line : String(item)
-      }));
-    } else if (Array.isArray(raw.lines)) {
-      logs = (raw.lines as string[]).map((line) => ({
+    if (isArray(raw.logs)) {
+      logs = raw.logs.map((entry) => {
+        const item = isObject(entry) ? entry : {};
+        return {
+          timestamp: isString(item.timestamp) ? item.timestamp : undefined,
+          stream: isObject(item.stream) ? toStringRecord(item.stream) : undefined,
+          line: isString(item.line) ? item.line : String(entry)
+        };
+      });
+    } else if (isArray(raw.lines)) {
+      logs = raw.lines.filter(isString).map((line) => ({
         line
       }));
     }
 
-    const linesReturned =
-      typeof raw.linesReturned === 'number'
-        ? raw.linesReturned
-        : typeof raw.lines_count === 'number'
-          ? raw.lines_count
-          : logs.length;
+    const linesReturned = isNumber(raw.linesReturned)
+      ? raw.linesReturned
+      : isNumber(raw.lines_count)
+        ? raw.lines_count
+        : logs.length;
 
     return {
       linesReturned,
@@ -197,78 +289,68 @@ export class McpClientAdapter implements ToolsPort {
   }
 
   public async analyzeOtelTrace(input: TraceAnalysisInput): Promise<TraceAnalysisOutput> {
-    const raw = await this.callTool<Record<string, unknown>>('analyze_otel_trace', input);
-    const traceId = (raw.traceId as string) || (raw.trace_id as string) || input.trace_id;
-    const servicesInvolved =
-      (raw.servicesInvolved as string[]) || (raw.services_involved as string[]) || [];
+    const raw = await this.callTool('analyze_otel_trace', input);
+    const traceId = firstNonEmptyString(raw.traceId, raw.trace_id) || input.trace_id;
+    const servicesInvolved = isArray(raw.servicesInvolved)
+      ? toStringArray(raw.servicesInvolved)
+      : toStringArray(raw.services_involved);
 
     let criticalSpans: TraceSpanItem[] = [];
-    if (Array.isArray(raw.criticalSpans)) {
-      criticalSpans = raw.criticalSpans as TraceSpanItem[];
-    } else if (Array.isArray(raw.top_errors)) {
-      const topErrors = raw.top_errors as Array<Record<string, unknown>>;
-      criticalSpans = topErrors.map((span) => ({
-        spanId: String(span.span_id || span.spanId || ''),
-        parentSpanId: span.parent_span_id ? String(span.parent_span_id) : undefined,
-        serviceName: String(span.service_name || span.serviceName || ''),
-        operationName: String(span.operation_name || span.operationName || ''),
-        durationMs: Number(span.duration_ms || span.durationMs || 0),
-        hasError: Boolean(span.has_error ?? span.hasError ?? true),
-        errorMessage: span.error_message ? String(span.error_message) : undefined
-      }));
+    if (isArray(raw.criticalSpans)) {
+      criticalSpans = raw.criticalSpans.map(mapTraceSpanItem);
+    } else if (isArray(raw.top_errors)) {
+      criticalSpans = raw.top_errors.map(mapTraceSpanItem);
     }
+
+    const rootSpan = isObject(raw.root_span) ? raw.root_span : undefined;
+    const rootServiceName = firstNonEmptyString(raw.rootServiceName, rootSpan?.service_name);
 
     return {
       traceId,
-      rootServiceName:
-        (raw.rootServiceName as string) ||
-        ((raw.root_span as Record<string, unknown>)?.service_name as string | undefined),
-      totalDurationMs: typeof raw.totalDurationMs === 'number' ? raw.totalDurationMs : undefined,
+      rootServiceName: isNonEmptyString(rootServiceName) ? rootServiceName : undefined,
+      totalDurationMs: isNumber(raw.totalDurationMs) ? raw.totalDurationMs : undefined,
       criticalSpans,
       servicesInvolved
     };
   }
 
   public async searchTracesByTraceQL(input: TraceQlInput): Promise<TraceQlOutput> {
-    return this.callTool<TraceQlOutput>('search_traces_by_traceql', input);
+    const raw = await this.callTool('search_traces_by_traceql', input);
+    const traces = isArray(raw.traces)
+      ? raw.traces.filter(isObject).map((trace) => ({
+          traceId: String(trace.traceId ?? trace.traceID ?? ''),
+          durationMs: parseNumber(trace.durationMs, 0),
+          errorCount: parseNumber(trace.errorCount, 0),
+          rootServiceName: String(trace.rootServiceName ?? '')
+        }))
+      : [];
+    return { traces };
   }
 
   public async inspectGitDeployDiff(input: GitDeployDiffInput): Promise<GitDeployDiffOutput> {
-    const raw = await this.callTool<Record<string, unknown>>('inspect_git_deploy_diff', input);
-    const filesChanged = (raw.files_changed as Array<Record<string, unknown>>) || [];
-    const suspectFile = raw.suspect_file as Record<string, unknown> | undefined;
+    const raw = await this.callTool('inspect_git_deploy_diff', input);
+    const filesChanged = isArray(raw.files_changed) ? raw.files_changed.filter(isObject) : [];
+    const suspectFile = isObject(raw.suspect_file) ? raw.suspect_file : undefined;
 
-    const suspectFilePath =
-      (typeof raw.suspectFilePath === 'string' && raw.suspectFilePath) ||
-      (typeof suspectFile?.path === 'string' && suspectFile.path) ||
-      (typeof filesChanged[0]?.filename === 'string' && filesChanged[0].filename) ||
-      '';
+    const suspectFilePath = firstNonEmptyString(
+      raw.suspectFilePath,
+      suspectFile?.path,
+      filesChanged[0]?.filename
+    );
 
-    const suspectCommitSha =
-      (typeof raw.suspectCommitSha === 'string' && raw.suspectCommitSha) ||
-      (typeof raw.head_ref === 'string' && raw.head_ref) ||
-      (typeof raw.headRef === 'string' && raw.headRef) ||
-      '';
+    const suspectCommitSha = firstNonEmptyString(raw.suspectCommitSha, raw.head_ref, raw.headRef);
 
     const authorLogin =
-      (typeof raw.authorLogin === 'string' && raw.authorLogin) ||
-      (typeof raw.author_login === 'string' && raw.author_login) ||
-      OrchestratorDefault.UNKNOWN;
+      firstNonEmptyString(raw.authorLogin, raw.author_login) || OrchestratorDefault.UNKNOWN;
 
-    const commitMessage =
-      (typeof raw.commitMessage === 'string' && raw.commitMessage) ||
-      (typeof raw.commit_message === 'string' && raw.commit_message) ||
-      '';
+    const commitMessage = firstNonEmptyString(raw.commitMessage, raw.commit_message);
 
-    const currentBlobSha =
-      (typeof raw.currentBlobSha === 'string' && raw.currentBlobSha) ||
-      (typeof suspectFile?.blob_sha === 'string' && suspectFile.blob_sha) ||
-      '';
+    const currentBlobSha = firstNonEmptyString(raw.currentBlobSha, suspectFile?.blob_sha);
 
-    let truncatedPatch = (typeof raw.truncatedPatch === 'string' && raw.truncatedPatch) || '';
+    let truncatedPatch = isNonEmptyString(raw.truncatedPatch) ? raw.truncatedPatch : '';
     if (!truncatedPatch && filesChanged.length > 0) {
       const match = filesChanged.find((f) => f.filename === suspectFilePath) || filesChanged[0];
-      truncatedPatch = typeof match?.patch === 'string' ? match.patch : '';
+      truncatedPatch = isString(match?.patch) ? match.patch : '';
     }
 
     const finops = this.mapFinOps(raw.finops || raw);
@@ -287,7 +369,7 @@ export class McpClientAdapter implements ToolsPort {
   public async createRemediationPr(
     input: CreateRemediationPrInput
   ): Promise<CreateRemediationPrOutput> {
-    const raw = await this.callTool<Record<string, unknown>>('create_remediation_pr', input);
+    const raw = await this.callTool('create_remediation_pr', input);
     return {
       branchName: String(raw.branchName ?? raw.branch_name ?? ''),
       branchUrl: String(raw.branchUrl ?? raw.branch_url ?? ''),
@@ -297,24 +379,23 @@ export class McpClientAdapter implements ToolsPort {
   }
 
   public async sendPostMortemResend(input: SendPostMortemInput): Promise<SendPostMortemOutput> {
-    const raw = await this.callTool<Record<string, unknown>>('send_post_mortem_resend', input);
+    const raw = await this.callTool('send_post_mortem_resend', input);
     return {
       emailId: String(raw.emailId ?? raw.id ?? ''),
-      sentAt: typeof raw.sentAt === 'string' ? raw.sentAt : undefined
+      sentAt: isString(raw.sentAt) ? raw.sentAt : undefined
     };
   }
 
   public async annotateGrafanaIncident(
     input: AnnotateGrafanaInput
   ): Promise<AnnotateGrafanaOutput> {
-    const raw = await this.callTool<Record<string, unknown>>('annotate_grafana_incident', input);
+    const raw = await this.callTool('annotate_grafana_incident', input);
     return {
-      annotationId:
-        typeof raw.annotationId === 'number'
-          ? raw.annotationId
-          : typeof raw.id === 'number'
-            ? raw.id
-            : undefined,
+      annotationId: isNumber(raw.annotationId)
+        ? raw.annotationId
+        : isNumber(raw.id)
+          ? raw.id
+          : undefined,
       success: typeof raw.success === 'boolean' ? raw.success : true
     };
   }

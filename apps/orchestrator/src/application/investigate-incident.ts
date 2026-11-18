@@ -1,8 +1,9 @@
-import { isFilled, nowIso } from '@zeromttr/utils';
+import { isFilled, isNonEmptyArray, nowIso, toErrorMessage } from '@zeromttr/utils';
 import {
   IncidentEventType,
   IncidentState,
   OrchestratorDefault,
+  OrchestratorLogEvent,
   TransitionReason,
   type SpanNode
 } from '../domain/index.js';
@@ -11,6 +12,7 @@ import type {
   ToolsPort,
   TargetStatusPort,
   EventBroadcasterPort,
+  LoggerPort,
   TargetStatus,
   PromqlRangeOutput,
   LokiQueryOutput,
@@ -38,7 +40,8 @@ export class InvestigateIncident {
     private readonly repository: IncidentRepository,
     private readonly tools: ToolsPort,
     private readonly targetStatusPort: TargetStatusPort,
-    private readonly broadcaster: EventBroadcasterPort
+    private readonly broadcaster: EventBroadcasterPort,
+    private readonly logger?: LoggerPort
   ) {}
 
   public async execute(incidentId: string): Promise<InvestigateResult> {
@@ -69,7 +72,7 @@ export class InvestigateIncident {
 
     // 1. PromQL Query (TECH 09 requirement: histogram_quantile at 0.95)
     const promqlOutput = await this.tools.executePromqlRange({
-      query: `histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name="${incident.service}"}[1m])) by (le))`,
+      query: `histogram_quantile(0.95, sum(rate(${OrchestratorDefault.DEFAULT_METRIC}{service_name="${incident.service}"}[1m])) by (le))`,
       start: startIso,
       end: endIso,
       step: '15s'
@@ -94,7 +97,7 @@ export class InvestigateIncident {
       try {
         traceAnalysis = await this.tools.analyzeOtelTrace({ trace_id: exemplarTraceId });
         servicesInvolved = traceAnalysis.servicesInvolved || servicesInvolved;
-        if (traceAnalysis.criticalSpans && traceAnalysis.criticalSpans.length > 0) {
+        if (isNonEmptyArray(traceAnalysis.criticalSpans)) {
           spans = traceAnalysis.criticalSpans.map((cs) => ({
             spanId: cs.spanId,
             parentSpanId: cs.parentSpanId,
@@ -114,15 +117,12 @@ export class InvestigateIncident {
         }
       } catch (err) {
         hasTempoErrorSpan = false;
-        console.warn(
-          JSON.stringify({
-            level: 'warn',
-            event: 'trace_analysis_failed',
-            incidentId: incident.id,
-            traceId: exemplarTraceId,
-            message: err instanceof Error ? err.message : String(err)
-          })
-        );
+        this.logger?.warn({
+          event: OrchestratorLogEvent.TRACE_ANALYSIS_FAILED,
+          incidentId: incident.id,
+          traceId: exemplarTraceId,
+          message: toErrorMessage(err)
+        });
       }
     }
 

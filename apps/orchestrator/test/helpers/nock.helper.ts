@@ -1,4 +1,6 @@
 import nock from 'nock';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { TargetHealthStatus } from '../../src/domain/index.js';
 
 export const TEST_MCP_BASE_URL = 'http://mcp-server.test:8000';
 export const TEST_TARGET_APP_URL = 'http://target-app.test:3000';
@@ -48,7 +50,7 @@ function wrapJsonRpcResult(payload: Record<string, unknown>) {
 
 export function mockTargetAppStatusEndpoint(
   overrides: {
-    status?: 'healthy' | 'degraded' | 'unreachable';
+    status?: TargetHealthStatus | `${TargetHealthStatus}`;
     version?: string;
     previousHealthyVersion?: string;
   } = {}
@@ -56,8 +58,8 @@ export function mockTargetAppStatusEndpoint(
   return nock(TEST_TARGET_APP_URL)
     .persist()
     .get('/chaos/status')
-    .reply(200, {
-      status: overrides.status ?? 'degraded',
+    .reply(HTTP_STATUS.OK, {
+      status: overrides.status ?? TargetHealthStatus.DEGRADED,
       service: 'api-pagamentos-core',
       version: overrides.version ?? 'v2.14.8',
       previousHealthyVersion: overrides.previousHealthyVersion ?? 'v2.14.7',
@@ -105,7 +107,7 @@ export function mockMcpJsonRpcEndpoint(
         }
         return true;
       })
-      .reply(200, wrapJsonRpcResult(resultPayload));
+      .reply(HTTP_STATUS.OK, wrapJsonRpcResult(resultPayload));
   };
 
   const rootScope = registerTool('execute_promql_range', {

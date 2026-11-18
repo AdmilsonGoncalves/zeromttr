@@ -6,9 +6,9 @@ import {
   McpClientAdapter,
   FileIncidentRepository,
   HttpTargetStatusAdapter,
-  DeterministicFallbackReasoningAdapter,
-  HEALTHY_PAYMENT_REPOSITORY_PATCH
+  DeterministicFallbackReasoningAdapter
 } from '../../../src/adapters/index.js';
+import { HttpDemoControlAdapter } from '../../../src/demo/index.js';
 import { Incident, IncidentState } from '../../../src/domain/index.js';
 import type { CollectedEvidence } from '../../../src/ports/index.js';
 
@@ -30,18 +30,22 @@ describe('Adapters Unit Tests', () => {
   });
 
   describe('DeterministicFallbackReasoningAdapter', () => {
-    it('should generate fallback synthesis with clean healthy repository code and pool max 10', async () => {
-      const adapter = new DeterministicFallbackReasoningAdapter();
+    it('should synthesize domain-agnostic fallback or use configured patchTemplate without hardcoding target app logic', async () => {
+      const customPatch = 'export const fixed = true;';
+      const configuredAdapter = new DeterministicFallbackReasoningAdapter({
+        patchTemplate: customPatch
+      });
+      const genericAdapter = new DeterministicFallbackReasoningAdapter();
       const evidence: CollectedEvidence = {
         incidentId: 'inc-001',
-        service: 'api-pagamentos-core',
-        alertName: 'Alert',
+        service: 'billing-worker',
+        alertName: 'HighLatency',
         promqlSummary: { metric: 'm' },
         traceAnalysis: {
           traceId: 'trace-456',
           criticalOperation: 'op',
           durationMs: 10,
-          servicesInvolved: ['api']
+          servicesInvolved: ['billing-worker']
         },
         logSample: 'log',
         gitDiff: {
@@ -49,21 +53,23 @@ describe('Adapters Unit Tests', () => {
           headRef: 'v2',
           suspectCommit: 'commit-789',
           authorLogin: 'bot',
-          suspectFilePath: 'path',
-          patch: 'p'
+          suspectFilePath: 'src/worker/pool.ts',
+          patch: '- pool: 10\n+ pool: 2'
         }
       };
 
-      const synthesis = await adapter.synthesizeRcaAndPatch(evidence);
+      const configuredSynthesis = await configuredAdapter.synthesizeRcaAndPatch(evidence);
+      expect(configuredSynthesis.reasoningSource).toBe('fallback');
+      expect(configuredSynthesis.suspectFilePath).toBe('src/worker/pool.ts');
+      expect(configuredSynthesis.patchedContent).toBe(customPatch);
+      expect(configuredSynthesis.evidenceRefs).toContain('trace-456');
 
-      expect(synthesis.reasoningSource).toBe('fallback');
-      expect(synthesis.suspectFilePath).toBe(
-        'apps/target-app-demo/src/repositories/payment.repository.ts'
-      );
-      expect(synthesis.patchedContent).toBe(HEALTHY_PAYMENT_REPOSITORY_PATCH);
-      expect(synthesis.patchedContent).toContain('client.release()');
-      expect(synthesis.patchedContent).toContain('10');
-      expect(synthesis.evidenceRefs).toContain('trace-456');
+      const genericSynthesis = await genericAdapter.synthesizeRcaAndPatch(evidence);
+      expect(genericSynthesis.reasoningSource).toBe('fallback');
+      expect(genericSynthesis.suspectFilePath).toBe('src/worker/pool.ts');
+      expect(genericSynthesis.patchedContent).toContain('src/worker/pool.ts');
+      expect(genericSynthesis.patchedContent).toContain('commit-789');
+      expect(genericSynthesis.patchedContent).not.toContain('api-pagamentos-core');
     });
   });
 
@@ -309,8 +315,8 @@ describe('Adapters Unit Tests', () => {
     });
   });
 
-  describe('HttpTargetStatusAdapter', () => {
-    it('should query target app chaos status and handle fallback if offline', async () => {
+  describe('HttpTargetStatusAdapter & HttpDemoControlAdapter', () => {
+    it('should query target app chaos status and trigger/reset chaos via HttpDemoControlAdapter', async () => {
       const mockFetch = vi.fn(async () => ({
         status: 200,
         ok: true,
@@ -327,17 +333,18 @@ describe('Adapters Unit Tests', () => {
       }));
       vi.stubGlobal('fetch', mockFetch);
 
-      const adapter = new HttpTargetStatusAdapter('http://localhost:3000');
-      const status = await adapter.getStatus();
+      const statusAdapter = new HttpTargetStatusAdapter('http://localhost:3000');
+      const status = await statusAdapter.getStatus();
       expect(status.status).toBe('degraded');
 
-      await adapter.triggerChaos(true);
+      const demoAdapter = new HttpDemoControlAdapter('http://localhost:3000');
+      await demoAdapter.triggerChaos(true);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chaos/pool-saturation?enable=true'),
         expect.any(Object)
       );
 
-      await adapter.reset();
+      await demoAdapter.reset();
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chaos/pool-saturation?enable=false'),
         expect.any(Object)
@@ -353,15 +360,16 @@ describe('Adapters Unit Tests', () => {
       }));
       vi.stubGlobal('fetch', mockFetchErr);
 
-      const adapter = new HttpTargetStatusAdapter('http://localhost:3000');
-      const status = await adapter.getStatus();
+      const statusAdapter = new HttpTargetStatusAdapter('http://localhost:3000');
+      const status = await statusAdapter.getStatus();
       expect(status.status).toBe('unreachable');
       expect(status.version).toBe('unknown');
 
-      await expect(adapter.triggerChaos(true)).rejects.toThrow(
+      const demoAdapter = new HttpDemoControlAdapter('http://localhost:3000');
+      await expect(demoAdapter.triggerChaos(true)).rejects.toThrow(
         'Target app chaos trigger failed with status 500'
       );
-      await expect(adapter.reset()).rejects.toThrow(
+      await expect(demoAdapter.reset()).rejects.toThrow(
         'Target app chaos reset failed with status 500'
       );
     });

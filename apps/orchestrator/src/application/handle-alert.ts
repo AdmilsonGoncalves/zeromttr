@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { isNonEmptyString } from '@zeromttr/utils';
+import { diffInSeconds, isNonEmptyString } from '@zeromttr/utils';
 import {
   AlertSeverity,
+  GrafanaAlertStatus,
   Incident,
   IncidentEventType,
   IncidentExecutionMode,
@@ -20,7 +21,7 @@ export const GrafanaAlertItemSchema = z
       .object({
         alertname: z.string().min(1),
         service: z.string().min(1),
-        severity: z.string().optional().default('critical')
+        severity: z.string().optional().default(AlertSeverity.CRITICAL)
       })
       .passthrough(),
     annotations: z.record(z.unknown()).optional(),
@@ -41,11 +42,14 @@ export const GrafanaWebhookPayloadSchema = z
 export type GrafanaWebhookPayload = z.infer<typeof GrafanaWebhookPayloadSchema>;
 
 export interface HandleAlertResult {
-  incident: Incident;
+  incident: Incident | null;
   isDuplicate: boolean;
+  ignored?: boolean;
 }
 
 export class HandleAlert {
+  private readonly inFlightFingerprints = new Map<string, Promise<HandleAlertResult>>();
+
   public constructor(
     private readonly repository: IncidentRepository,
     private readonly broadcaster: EventBroadcasterPort
@@ -54,19 +58,47 @@ export class HandleAlert {
   public async execute(rawPayload: unknown): Promise<HandleAlertResult> {
     const payload = GrafanaWebhookPayloadSchema.parse(rawPayload);
     const primaryAlert = payload.alerts[0];
-    const fingerprint = computeAlertFingerprint(primaryAlert.labels);
 
+    const isResolvedNotification =
+      payload.status?.toLowerCase() === GrafanaAlertStatus.RESOLVED ||
+      payload.alerts.every((alert) => alert.status?.toLowerCase() === GrafanaAlertStatus.RESOLVED);
+    if (isResolvedNotification) {
+      return {
+        incident: null,
+        isDuplicate: false,
+        ignored: true
+      };
+    }
+
+    const fingerprint = computeAlertFingerprint(primaryAlert.labels);
+    const pending = this.inFlightFingerprints.get(fingerprint);
+    if (pending) {
+      const firstResult = await pending;
+      return {
+        incident: firstResult.incident,
+        isDuplicate: true
+      };
+    }
+
+    const operation = this.processFiringAlert(primaryAlert, fingerprint).finally(() => {
+      this.inFlightFingerprints.delete(fingerprint);
+    });
+    this.inFlightFingerprints.set(fingerprint, operation);
+    return operation;
+  }
+
+  private async processFiringAlert(
+    primaryAlert: GrafanaWebhookPayload['alerts'][number],
+    fingerprint: string
+  ): Promise<HandleAlertResult> {
     const existing = await this.repository.findOpenByFingerprint(fingerprint);
     if (existing) {
-      const now = Date.now();
       const lastTransition = existing.transitions[existing.transitions.length - 1];
-      const lastTimestamp = lastTransition
-        ? new Date(lastTransition.at).getTime()
-        : new Date(existing.startedAt).getTime();
-      const elapsedMs = now - lastTimestamp;
-      const ttlMs = 15 * 60 * 1000;
+      const lastReferenceAt = lastTransition ? lastTransition.at : existing.startedAt;
+      const elapsedSeconds = diffInSeconds(lastReferenceAt, Date.now());
+      const ttlSeconds = 15 * 60;
 
-      if (elapsedMs > ttlMs) {
+      if (elapsedSeconds > ttlSeconds) {
         const reason =
           existing.state === IncidentState.NOTIFIED
             ? TransitionReason.DECISION_TTL_EXPIRED

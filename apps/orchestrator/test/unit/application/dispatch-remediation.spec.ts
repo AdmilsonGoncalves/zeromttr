@@ -247,6 +247,57 @@ describe('DispatchRemediation Use Case', () => {
     expect(result.rcaReport.criticalSpan).not.toContain('529.982.247-25');
   });
 
+  it('should compute diagnosisSeconds dynamically from incident.startedAt rather than a hardcoded constant', async () => {
+    const startedAt = new Date(Date.now() - 12_500).toISOString();
+    const incident = new Incident({
+      id: 'inc-ttd-001',
+      service: 'api-pagamentos-core',
+      severity: 'critical',
+      fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
+      state: IncidentState.ENRICHING,
+      startedAt
+    });
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-inc-ttd-001',
+        branchUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-ttd-001',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/43',
+        commitSha: 'commit789'
+      })),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 102, success: true }))
+    };
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Summary',
+        rootCause: 'Root cause',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'Explanation'
+      }))
+    };
+    const fallbackAdapter: ReasoningPort = { synthesizeRcaAndPatch: vi.fn() };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+    const result = await useCase.execute(incident.id, validEvidence, 'blob123');
+
+    expect(result.rcaReport.diagnosisSeconds).toBeGreaterThanOrEqual(12);
+    expect(result.rcaReport.diagnosisSeconds).not.toBe(4);
+  });
+
   it('should reject remediation PR creation when evidence.gitDiff.suspectFilePath is empty', async () => {
     const incident = createMockIncident();
     const repo: IncidentRepository = {

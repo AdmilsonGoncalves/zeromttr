@@ -12,6 +12,4 @@ export interface TargetStatus {
 
 export interface TargetStatusPort {
   getStatus(): Promise<TargetStatus>;
-  triggerChaos(enable: boolean, delayMs?: number): Promise<void>;
-  reset(): Promise<void>;
 }

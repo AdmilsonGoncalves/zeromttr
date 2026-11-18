@@ -55,9 +55,9 @@ describe('HandleAlert Use Case', () => {
     const result = await useCase.execute(validPayload);
 
     expect(result.isDuplicate).toBe(false);
-    expect(result.incident.service).toBe('api-pagamentos-core');
-    expect(result.incident.severity).toBe('critical');
-    expect(result.incident.state).toBe(IncidentState.RECEIVED);
+    expect(result.incident?.service).toBe('api-pagamentos-core');
+    expect(result.incident?.severity).toBe('critical');
+    expect(result.incident?.state).toBe(IncidentState.RECEIVED);
     expect(repo.save).toHaveBeenCalled();
     expect(broadcaster.broadcast).toHaveBeenCalledWith('incident.created', expect.any(Object));
   });
@@ -72,7 +72,48 @@ describe('HandleAlert Use Case', () => {
 
     const second = await useCase.execute(validPayload);
     expect(second.isDuplicate).toBe(true);
-    expect(second.incident.id).toBe(first.incident.id);
+    expect(second.incident?.id).toBe(first.incident?.id);
+  });
+
+  it('should ignore resolved Grafana notifications without creating an incident', async () => {
+    const repo = createMockRepo();
+    const broadcaster = createMockBroadcaster();
+    const useCase = new HandleAlert(repo, broadcaster);
+
+    const resolvedRes = await useCase.execute({
+      status: 'resolved',
+      alerts: [
+        {
+          status: 'resolved',
+          labels: {
+            alertname: 'PaymentServicePoolExhaustion',
+            service: 'api-pagamentos-core',
+            severity: 'critical'
+          }
+        }
+      ]
+    });
+
+    expect(resolvedRes.ignored).toBe(true);
+    expect(resolvedRes.incident).toBeNull();
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(broadcaster.broadcast).not.toHaveBeenCalled();
+  });
+
+  it('should serialize concurrent firing alerts with the same fingerprint', async () => {
+    const repo = createMockRepo();
+    const broadcaster = createMockBroadcaster();
+    const useCase = new HandleAlert(repo, broadcaster);
+
+    const [first, second] = await Promise.all([
+      useCase.execute(validPayload),
+      useCase.execute(validPayload)
+    ]);
+
+    expect(first.isDuplicate).toBe(false);
+    expect(second.isDuplicate).toBe(true);
+    expect(second.incident?.id).toBe(first.incident?.id);
+    expect(repo.save).toHaveBeenCalledTimes(1);
   });
 
   it('should reject invalid payloads lacking required fields', async () => {
@@ -80,7 +121,7 @@ describe('HandleAlert Use Case', () => {
     const broadcaster = createMockBroadcaster();
     const useCase = new HandleAlert(repo, broadcaster);
 
-    await expect(useCase.execute({ alerts: [] } as any)).rejects.toThrow();
+    await expect(useCase.execute({ alerts: [] })).rejects.toThrow();
   });
 
   it('should mark expired NOTIFIED incident as FAILED and create new incident for same fingerprint', async () => {
@@ -109,8 +150,8 @@ describe('HandleAlert Use Case', () => {
 
     const result = await useCase.execute(validPayload);
     expect(result.isDuplicate).toBe(false);
-    expect(result.incident.id).not.toBe('inc-old-001');
-    expect(result.incident.state).toBe(IncidentState.RECEIVED);
+    expect(result.incident?.id).not.toBe('inc-old-001');
+    expect(result.incident?.state).toBe(IncidentState.RECEIVED);
     expect(existingExpiredIncident.state).toBe(IncidentState.FAILED);
   });
 });

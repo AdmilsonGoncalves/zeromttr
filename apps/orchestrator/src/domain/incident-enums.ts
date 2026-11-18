@@ -40,6 +40,22 @@ export enum AlertSeverity {
   WARNING = 'warning'
 }
 
+export enum GrafanaAlertStatus {
+  FIRING = 'firing',
+  RESOLVED = 'resolved'
+}
+
+export enum GrafanaAnnotationTag {
+  REMEDIATION = 'aiops-remediation',
+  DECISION = 'aiops-decision',
+  DEMO = 'aiops-demo'
+}
+
+export enum ReasoningProvider {
+  LLM = 'llm',
+  FALLBACK = 'fallback'
+}
+
 export enum TransitionReason {
   INVESTIGATING_TELEMETRY = 'Starting autonomous telemetry investigation',
   ENRICHING_GIT_DIFF = 'Inspecting git deploy diff on GitHub',
@@ -54,6 +70,7 @@ export enum TransitionReason {
 
 export enum OrchestratorDefault {
   UNKNOWN = 'unknown',
+  UNKNOWN_ALERT = 'unknown-alert',
   UNKNOWN_SERVICE = 'unknown-service',
   UNKNOWN_TRACE_ID = 'trace-unknown',
   CRITICAL_ERROR_SPAN = 'critical.error.span',

@@ -9,8 +9,9 @@ import type {
   TargetStatusPort,
   ToolsPort
 } from '../../src/ports/index.js';
-import type { Incident } from '../../src/domain/index.js';
+import { TargetHealthStatus, type Incident } from '../../src/domain/index.js';
 import { HandleAlert, OrchestratorWorkflow, RecordDecision } from '../../src/application/index.js';
+import { SimulateDemoDecision, type DemoControlPort } from '../../src/demo/index.js';
 
 export function createMockFinOpsData(overrides: Partial<FinOpsData> = {}): FinOpsData {
   return {
@@ -100,7 +101,7 @@ export function createMockTargetStatusPort(
 ): TargetStatusPort {
   return {
     getStatus: vi.fn(async () => ({
-      status: 'healthy' as const,
+      status: TargetHealthStatus.HEALTHY,
       service: 'api-pagamentos-core',
       version: 'v2.14.7',
       previousHealthyVersion: 'v2.14.7',
@@ -108,9 +109,17 @@ export function createMockTargetStatusPort(
       suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
       rawEdgeLogPreCollector: 'raw',
       ...overrides
-    })),
+    }))
+  };
+}
+
+export function createMockDemoControlPort(
+  overrides: Partial<DemoControlPort> = {}
+): DemoControlPort {
+  return {
     triggerChaos: vi.fn(async () => {}),
-    reset: vi.fn(async () => {})
+    reset: vi.fn(async () => {}),
+    ...overrides
   };
 }
 
@@ -161,10 +170,18 @@ export function createStubRecordDecision(
   );
 }
 
+export function createStubSimulateDemoDecision(repo?: IncidentRepository): SimulateDemoDecision {
+  return new SimulateDemoDecision(
+    repo ?? createMockIncidentRepository(),
+    createMockToolsPort(),
+    createMockBroadcaster()
+  );
+}
+
 export function createStubWorkflow(
   overrides: Partial<OrchestratorWorkflow> = {}
 ): OrchestratorWorkflow {
-  const workflow = Object.create(OrchestratorWorkflow.prototype) as OrchestratorWorkflow;
+  const workflow = Object.create(OrchestratorWorkflow.prototype);
   workflow.runFullPipeline = vi.fn(async () => {});
   return Object.assign(workflow, overrides);
 }

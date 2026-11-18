@@ -1,4 +1,5 @@
 import type http from 'node:http';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/index.js';
 import { paymentRepository } from '../repositories/index.js';
 
@@ -15,7 +16,7 @@ export class ChaosController {
       paymentRepository.resetPool();
     }
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
     res.end(
       JSON.stringify({
         success: true,
@@ -27,7 +28,7 @@ export class ChaosController {
 
   public getStatus(_req: http.IncomingMessage, res: http.ServerResponse): void {
     const status = chaosManager.getStatus();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(status));
   }
 }

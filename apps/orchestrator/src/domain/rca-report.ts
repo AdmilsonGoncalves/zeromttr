@@ -1,7 +1,8 @@
 import type { PiiGuardAudit } from './pii-prompt-guard.js';
 import type { EvidenceCoverageBreakdown } from './evidence-coverage.js';
+import type { ReasoningProvider } from './incident-enums.js';
 
-export type ReasoningSource = 'llm' | 'fallback';
+export type ReasoningSource = ReasoningProvider | `${ReasoningProvider}`;
 
 export interface SpanNode {
   spanId: string;

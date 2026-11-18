@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
+import { isObject } from '@zeromttr/utils';
 import { NotifyOnCall } from '../../../src/application/index.js';
-import { IncidentState, Incident } from '../../../src/domain/index.js';
+import {
+  AlertSeverity,
+  IncidentEventType,
+  IncidentState,
+  Incident
+} from '../../../src/domain/index.js';
 import {
   createMockBroadcaster,
   createMockClock,
@@ -13,7 +19,7 @@ describe('NotifyOnCall Use Case', () => {
     const incident = new Incident({
       id: 'inc-test-001',
       service: 'api-pagamentos-core',
-      severity: 'critical',
+      severity: AlertSeverity.CRITICAL,
       fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
       state: IncidentState.AWAITING_PR,
       remediation: {
@@ -60,10 +66,14 @@ describe('NotifyOnCall Use Case', () => {
 
     // CRITICAL: Ensure approveSig, rejectSig, or sig are NOT present in broadcast
     const notifiedCall = broadcaster.broadcast.mock.calls.find(
-      (call) => call[0] === 'incident.notified'
+      (call) => call[0] === IncidentEventType.NOTIFIED
     );
     expect(notifiedCall).toBeDefined();
-    const payload = notifiedCall?.[1] as Record<string, unknown>;
+    const payload = notifiedCall?.[1];
+    expect(isObject(payload)).toBe(true);
+    if (!isObject(payload)) {
+      throw new Error('Expected broadcast payload object');
+    }
     expect(payload.sig).toBeUndefined();
     expect(payload.approveSig).toBeUndefined();
     expect(payload.rejectSig).toBeUndefined();

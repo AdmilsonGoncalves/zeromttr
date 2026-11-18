@@ -8,6 +8,7 @@ export class BaseIncidentAdapter implements IncidentPort {
 
 export * from './llm.fallback.js';
 export * from './llm.gemini.js';
+export * from './logger.console.js';
 export * from './mcp.client.js';
 export * from './repo.file.js';
 export * from './target-status.http.js';

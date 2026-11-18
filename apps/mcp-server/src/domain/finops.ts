@@ -1,4 +1,4 @@
-import { percentage } from '@zeromttr/utils';
+import { percentage, round } from '@zeromttr/utils';
 
 export interface FinOpsMetrics {
   raw_bytes_fetched: number;
@@ -13,7 +13,7 @@ export function calculateFinOps(rawBytes: number, compactedBytes: number): FinOp
   const reductionBytes = Math.max(0, safeRaw - safeCompacted);
   const payload_reduction_percent = percentage(reductionBytes, safeRaw, 2);
   // Standard LLM FinOps heuristic: ~4 bytes per token
-  const estimated_tokens_saved = Math.round(reductionBytes / 4);
+  const estimated_tokens_saved = round(reductionBytes / 4);
 
   return {
     raw_bytes_fetched: safeRaw,

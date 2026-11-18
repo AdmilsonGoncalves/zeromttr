@@ -65,8 +65,7 @@ export class OrchestratorWorkflow {
         alertName: incident.alertName || OrchestratorDefault.DEFAULT_ALERT_NAME,
         promqlSummary: {
           metric: OrchestratorDefault.DEFAULT_METRIC,
-          p95LatencyMs: p95Latency,
-          dbPoolWaiting: 15
+          p95LatencyMs: p95Latency
         },
         traceAnalysis: {
           traceId: investigation.traceId || OrchestratorDefault.UNKNOWN_TRACE_ID,
