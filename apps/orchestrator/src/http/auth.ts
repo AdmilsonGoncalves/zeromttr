@@ -24,7 +24,7 @@ export function extractBearerToken(req: Request, allowQuery = false): string | n
   }
   const pathname = req.originalUrl?.split('?')[0] || req.path || '';
   const isEventsRoute =
-    pathname === '/api/events' || pathname === '/events' || req.path === '/events';
+    req.method === 'GET' && (pathname === '/api/events' || pathname === '/events');
   if ((allowQuery || isEventsRoute) && req.query && isNonEmptyString(req.query.token)) {
     return req.query.token.trim();
   }

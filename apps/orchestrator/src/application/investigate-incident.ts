@@ -2,6 +2,7 @@ import { isFilled, nowIso } from '@zeromttr/utils';
 import {
   IncidentEventType,
   IncidentState,
+  OrchestratorDefault,
   TransitionReason,
   type SpanNode
 } from '../domain/index.js';
@@ -84,9 +85,9 @@ export class InvestigateIncident {
 
     // 2. Trace Analysis
     let traceAnalysis: TraceAnalysisOutput | undefined;
-    let criticalSpan = 'pg.pool.acquire';
+    let criticalSpan: string = OrchestratorDefault.CRITICAL_ERROR_SPAN;
     let spans: SpanNode[] = [];
-    let servicesInvolved = [incident.service, 'postgres'];
+    let servicesInvolved = [incident.service];
     let hasTempoErrorSpan = false;
 
     if (exemplarTraceId) {
@@ -111,8 +112,17 @@ export class InvestigateIncident {
             criticalSpan = spans[0].operationName;
           }
         }
-      } catch {
+      } catch (err) {
         hasTempoErrorSpan = false;
+        console.warn(
+          JSON.stringify({
+            level: 'warn',
+            event: 'trace_analysis_failed',
+            incidentId: incident.id,
+            traceId: exemplarTraceId,
+            message: err instanceof Error ? err.message : String(err)
+          })
+        );
       }
     }
 

@@ -282,4 +282,25 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     expect(secondRes.body.error).toContain('cooldown');
     expect(secondRes.body.retryAfterSeconds).toBeGreaterThan(0);
   });
+
+  it('should reject invalid /api/demo/chaos payload with 400 and Zod details', async () => {
+    const res = await request(app)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: 'invalid-mode' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('Invalid demo chaos payload');
+    expect(res.body.details).toBeDefined();
+  });
+
+  it('should reject query-string token on non-SSE routes even with /events in query or POST /api/events', async () => {
+    const queryBypassRes = await request(app).get(
+      `/api/incidents?filter=/events&token=${DASHBOARD_TOKEN}`
+    );
+    expect(queryBypassRes.status).toBe(401);
+
+    const postEventsRes = await request(app).post(`/api/events?token=${DASHBOARD_TOKEN}`);
+    expect(postEventsRes.status).toBe(401);
+  });
 });

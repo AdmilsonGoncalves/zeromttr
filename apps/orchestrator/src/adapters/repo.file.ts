@@ -1,8 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { safeJsonParse } from '@zeromttr/utils';
+import { z } from 'zod';
+import { safeJsonParse, toErrorMessage } from '@zeromttr/utils';
 import { Incident, IncidentState, type IncidentProps } from '../domain/index.js';
 import type { IncidentRepository } from '../ports/index.js';
+
+const PersistedIncidentSchema = z
+  .object({
+    id: z.string().min(1),
+    service: z.string().min(1),
+    severity: z.string().min(1),
+    fingerprint: z.string().min(1)
+  })
+  .passthrough();
 
 export class FileIncidentRepository implements IncidentRepository {
   private readonly store = new Map<string, Incident>();
@@ -13,15 +23,25 @@ export class FileIncidentRepository implements IncidentRepository {
     if (this.filePath && fs.existsSync(this.filePath)) {
       try {
         const raw = fs.readFileSync(this.filePath, 'utf-8');
-        const parsed = safeJsonParse<Array<Record<string, unknown>>>(raw, []);
+        const parsed = safeJsonParse<unknown[]>(raw, []);
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
-            const inc = new Incident(item as unknown as IncidentProps);
-            this.store.set(inc.id, inc);
+            const validated = PersistedIncidentSchema.safeParse(item);
+            if (validated.success) {
+              const inc = new Incident(validated.data as IncidentProps);
+              this.store.set(inc.id, inc);
+            }
           }
         }
-      } catch {
-        // Fallback to empty store if corrupted
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            level: 'warn',
+            event: 'incident_store_load_failed',
+            filePath: this.filePath,
+            message: toErrorMessage(err, 'Failed to load persisted incidents')
+          })
+        );
       }
     }
   }
@@ -63,8 +83,16 @@ export class FileIncidentRepository implements IncidentRepository {
         const tmpPath = `${this.filePath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
         fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
         fs.renameSync(tmpPath, this.filePath);
-      } catch {
-        // Non-fatal file write error
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            level: 'warn',
+            event: 'incident_store_save_failed',
+            incidentId: incident.id,
+            filePath: this.filePath,
+            message: toErrorMessage(err, 'Failed to persist incidents')
+          })
+        );
       }
     }
   }

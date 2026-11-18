@@ -25,6 +25,14 @@ import type {
   Clock,
   CollectedEvidence
 } from '../../../src/ports/index.js';
+import {
+  createMockBroadcaster,
+  createMockClock,
+  createMockFinOpsData,
+  createMockReasoningPort,
+  createMockTargetStatusPort,
+  createMockToolsPort
+} from '../../helpers/test-doubles.helper.js';
 
 describe('Branch Coverage Enhancements', () => {
   it('should cover computeAlertFingerprint fallback defaults when labels are empty', () => {
@@ -32,7 +40,7 @@ describe('Branch Coverage Enhancements', () => {
   });
 
   it('should cover canTransition with unknown state', () => {
-    expect(canTransition('UNKNOWN' as any, IncidentState.INVESTIGATING)).toBe(false);
+    expect(canTransition('UNKNOWN' as IncidentState, IncidentState.INVESTIGATING)).toBe(false);
   });
 
   it('should cover non-existent incident throws in EnrichWithDeployDiff', async () => {
@@ -42,7 +50,7 @@ describe('Branch Coverage Enhancements', () => {
       findAll: vi.fn(async () => []),
       save: vi.fn(async () => {})
     };
-    const useCase = new EnrichWithDeployDiff(repo, {} as any, { broadcast: vi.fn() });
+    const useCase = new EnrichWithDeployDiff(repo, createMockToolsPort(), createMockBroadcaster());
     await expect(useCase.execute('none')).rejects.toThrow();
   });
 
@@ -53,7 +61,12 @@ describe('Branch Coverage Enhancements', () => {
       findAll: vi.fn(async () => []),
       save: vi.fn(async () => {})
     };
-    const useCase = new InvestigateIncident(repo, {} as any, {} as any, { broadcast: vi.fn() });
+    const useCase = new InvestigateIncident(
+      repo,
+      createMockToolsPort(),
+      createMockTargetStatusPort(),
+      createMockBroadcaster()
+    );
     await expect(useCase.execute('none')).rejects.toThrow();
   });
 
@@ -76,9 +89,13 @@ describe('Branch Coverage Enhancements', () => {
         seriesCount: 1,
         summarizedSeries: [{ metric: {}, p95: 1000 }],
         exemplarTraceId: '4bf92f3577b34da6a3ce929d0e0e4736',
-        finops: {} as any
+        finops: createMockFinOpsData()
       })),
-      queryLokiLogs: vi.fn(async () => ({ linesReturned: 0, logs: [], finops: {} as any })),
+      queryLokiLogs: vi.fn(async () => ({
+        linesReturned: 0,
+        logs: [],
+        finops: createMockFinOpsData()
+      })),
       analyzeOtelTrace: vi.fn(async () => ({
         traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
         criticalSpans: [
@@ -136,9 +153,13 @@ describe('Branch Coverage Enhancements', () => {
         seriesCount: 1,
         summarizedSeries: [{ metric: {} }],
         exemplarTraceId: '4bf92f3577b34da6a3ce929d0e0e4736',
-        finops: {} as any
+        finops: createMockFinOpsData()
       })),
-      queryLokiLogs: vi.fn(async () => ({ linesReturned: 0, logs: [], finops: {} as any })),
+      queryLokiLogs: vi.fn(async () => ({
+        linesReturned: 0,
+        logs: [],
+        finops: createMockFinOpsData()
+      })),
       analyzeOtelTrace: vi.fn(async () => {
         throw new Error('Tempo unavailable');
       }),
@@ -187,7 +208,12 @@ describe('Branch Coverage Enhancements', () => {
       analyzeOtelTrace: vi.fn(),
       searchTracesByTraceQL: vi.fn(),
       inspectGitDeployDiff: vi.fn(),
-      createRemediationPr: vi.fn(async () => ({}) as any),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-test',
+        branchUrl: 'https://github.com/example/repo/tree/hotfix/zeromttr-test',
+        pullRequestUrl: 'https://github.com/example/repo/pull/1',
+        commitSha: 'sha-test'
+      })),
       sendPostMortemResend: vi.fn(),
       annotateGrafanaIncident: vi.fn(async () => {
         throw new Error('Grafana down');
@@ -272,7 +298,12 @@ describe('Branch Coverage Enhancements', () => {
       analyzeOtelTrace: vi.fn(),
       searchTracesByTraceQL: vi.fn(),
       inspectGitDeployDiff: vi.fn(),
-      createRemediationPr: vi.fn(async () => ({}) as any),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-test',
+        branchUrl: 'https://github.com/example/repo/tree/hotfix/zeromttr-test',
+        pullRequestUrl: 'https://github.com/example/repo/pull/1',
+        commitSha: 'sha-test'
+      })),
       sendPostMortemResend: vi.fn(),
       annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 1, success: true }))
     };
@@ -394,7 +425,12 @@ describe('Branch Coverage Enhancements', () => {
       analyzeOtelTrace: vi.fn(),
       searchTracesByTraceQL: vi.fn(),
       inspectGitDeployDiff: vi.fn(),
-      createRemediationPr: vi.fn(async () => ({}) as any),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-test',
+        branchUrl: 'https://github.com/example/repo/tree/hotfix/zeromttr-test',
+        pullRequestUrl: 'https://github.com/example/repo/pull/1',
+        commitSha: 'sha-test'
+      })),
       sendPostMortemResend: vi.fn(),
       annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 1, success: true }))
     };
@@ -465,7 +501,12 @@ describe('Branch Coverage Enhancements', () => {
       analyzeOtelTrace: vi.fn(),
       searchTracesByTraceQL: vi.fn(),
       inspectGitDeployDiff: vi.fn(),
-      createRemediationPr: vi.fn(async () => ({}) as any),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-test',
+        branchUrl: 'https://github.com/example/repo/tree/hotfix/zeromttr-test',
+        pullRequestUrl: 'https://github.com/example/repo/pull/1',
+        commitSha: 'sha-test'
+      })),
       sendPostMortemResend: vi.fn(),
       annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 1, success: true }))
     };
@@ -595,19 +636,22 @@ describe('Branch Coverage Enhancements', () => {
       save: vi.fn(async () => {})
     };
 
-    const investigateIncident = {
-      execute: vi.fn(async () => {
-        throw new Error('Pipeline error');
-      })
-    } as any;
+    const broadcaster = createMockBroadcaster();
+    const tools = createMockToolsPort();
+    const targetStatus = createMockTargetStatusPort();
+    const llm = createMockReasoningPort();
+    const clock = createMockClock();
+
+    const investigateIncident = new InvestigateIncident(repo, tools, targetStatus, broadcaster);
+    vi.spyOn(investigateIncident, 'execute').mockRejectedValue(new Error('Pipeline error'));
 
     const workflow = new OrchestratorWorkflow(
       repo,
       investigateIncident,
-      {} as any,
-      {} as any,
-      {} as any,
-      { broadcast: vi.fn() }
+      new EnrichWithDeployDiff(repo, tools, broadcaster),
+      new DispatchRemediation(repo, tools, llm, llm, broadcaster),
+      new NotifyOnCall(repo, tools, clock, broadcaster, 'secret', 'https://dash'),
+      broadcaster
     );
 
     // Case 1: non-existent incident returns early
@@ -636,19 +680,22 @@ describe('Branch Coverage Enhancements', () => {
       save: vi.fn(async () => {})
     };
 
-    const investigateIncident = {
-      execute: vi.fn(async () => {
-        throw new Error('Pipeline error');
-      })
-    } as any;
+    const broadcaster = createMockBroadcaster();
+    const tools = createMockToolsPort();
+    const targetStatus = createMockTargetStatusPort();
+    const llm = createMockReasoningPort();
+    const clock = createMockClock();
+
+    const investigateIncident = new InvestigateIncident(repo, tools, targetStatus, broadcaster);
+    vi.spyOn(investigateIncident, 'execute').mockRejectedValue(new Error('Pipeline error'));
 
     const workflow = new OrchestratorWorkflow(
       repo,
       investigateIncident,
-      {} as any,
-      {} as any,
-      {} as any,
-      { broadcast: vi.fn() }
+      new EnrichWithDeployDiff(repo, tools, broadcaster),
+      new DispatchRemediation(repo, tools, llm, llm, broadcaster),
+      new NotifyOnCall(repo, tools, clock, broadcaster, 'secret', 'https://dash'),
+      broadcaster
     );
 
     await expect(workflow.runFullPipeline(incident.id)).resolves.toBeUndefined();
@@ -697,9 +744,13 @@ describe('Branch Coverage Enhancements', () => {
         seriesCount: 0,
         summarizedSeries: [{ metric: {}, p95: 500 }],
         exemplarTraceId: '',
-        finops: {} as any
+        finops: createMockFinOpsData()
       })),
-      queryLokiLogs: vi.fn(async () => ({ linesReturned: 0, logs: [], finops: {} as any })),
+      queryLokiLogs: vi.fn(async () => ({
+        linesReturned: 0,
+        logs: [],
+        finops: createMockFinOpsData()
+      })),
       analyzeOtelTrace: vi.fn(async () => ({
         traceId: 'trace-1',
         servicesInvolved: ['svc']

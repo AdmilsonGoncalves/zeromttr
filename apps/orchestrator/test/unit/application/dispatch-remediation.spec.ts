@@ -307,7 +307,9 @@ describe('DispatchRemediation Use Case', () => {
       'Cannot create remediation PR without an authoritative suspectFilePath'
     );
 
-    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalled();
+    expect(llmAdapter.synthesizeRcaAndPatch).not.toHaveBeenCalled();
+    expect(fallbackAdapter.synthesizeRcaAndPatch).not.toHaveBeenCalled();
+    expect(broadcaster.broadcast).not.toHaveBeenCalled();
     expect(tools.createRemediationPr).not.toHaveBeenCalled();
   });
 });

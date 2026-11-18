@@ -1,12 +1,19 @@
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { toErrorMessage } from '@zeromttr/utils';
-import type { IncidentMode } from '../domain/index.js';
+import { IncidentExecutionMode, type IncidentMode } from '../domain/index.js';
 import type { IncidentRepository, TargetStatusPort } from '../ports/index.js';
 import type { SseEventBroadcaster } from './events.sse.js';
 
-function isIncidentMode(val: unknown): val is IncidentMode {
-  return val === 'live' || val === 'replay';
-}
+export const DemoChaosPayloadSchema = z
+  .object({
+    mode: z
+      .enum([IncidentExecutionMode.LIVE, IncidentExecutionMode.REPLAY])
+      .optional()
+      .default(IncidentExecutionMode.REPLAY)
+  })
+  .optional()
+  .default({ mode: IncidentExecutionMode.REPLAY });
 
 export function createApiRouter(
   repository: IncidentRepository,
@@ -87,6 +94,15 @@ export function createApiRouter(
   // Trigger demo chaos (live or replay)
   router.post('/demo/chaos', ...demoMiddlewares, (req: Request, res: Response): void => {
     void (async () => {
+      const parsed = DemoChaosPayloadSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: 'Invalid demo chaos payload',
+          details: parsed.error.format()
+        });
+        return;
+      }
+
       const now = Date.now();
       if (lastChaosTimestamp > 0 && now - lastChaosTimestamp < cooldownMs) {
         const remainingSeconds = Math.ceil((cooldownMs - (now - lastChaosTimestamp)) / 1000);
@@ -101,9 +117,8 @@ export function createApiRouter(
       lastChaosTimestamp = now;
 
       try {
-        const rawMode = req.body?.mode;
-        const mode: IncidentMode = isIncidentMode(rawMode) ? rawMode : 'replay';
-        if (mode === 'live') {
+        const mode: IncidentMode = parsed.data.mode;
+        if (mode === IncidentExecutionMode.LIVE) {
           await targetStatusPort.triggerChaos(true);
         }
         res.status(202).json({

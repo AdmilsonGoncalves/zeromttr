@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/http/index.js';
 import type { IncidentRepository, TargetStatusPort } from '../../src/ports/index.js';
-import { HandleAlert, OrchestratorWorkflow, RecordDecision } from '../../src/application/index.js';
+import { HandleAlert } from '../../src/application/index.js';
+import { createStubRecordDecision, createStubWorkflow } from '../helpers/test-doubles.helper.js';
 
 describe('Webhook Token Segregation (Acceptance Criterion 1)', () => {
   const GRAFANA_TOKEN = 'secret-grafana-webhook-token-123';
@@ -31,10 +32,8 @@ describe('Webhook Token Segregation (Acceptance Criterion 1)', () => {
 
   const mockBroadcaster = { broadcast: vi.fn() };
   const handleAlert = new HandleAlert(mockRepo, mockBroadcaster);
-  const mockWorkflow = {
-    runFullPipeline: vi.fn(async () => {})
-  } as unknown as OrchestratorWorkflow;
-  const mockRecordDecision = {} as unknown as RecordDecision;
+  const mockWorkflow = createStubWorkflow();
+  const mockRecordDecision = createStubRecordDecision(mockRepo);
 
   const app = createApp({
     repository: mockRepo,

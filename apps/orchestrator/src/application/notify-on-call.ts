@@ -74,6 +74,14 @@ export class NotifyOnCall {
     } catch (err) {
       isDegraded = true;
       failureReason = toErrorMessage(err);
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          event: 'resend_notification_degraded',
+          incidentId: incident.id,
+          message: failureReason
+        })
+      );
       resendResult = {
         emailId: `email-fallback-${incident.id}`,
         sentAt: this.clock.iso()

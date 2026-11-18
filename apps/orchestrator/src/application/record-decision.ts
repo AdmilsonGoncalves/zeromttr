@@ -1,3 +1,4 @@
+import { toErrorMessage } from '@zeromttr/utils';
 import {
   DecisionAction,
   DecisionHmac,
@@ -82,8 +83,16 @@ export class RecordDecision {
         text: `[${targetState}] Incident ${incident.id} ${action === DecisionAction.APPROVE ? 'RESOLVED' : 'REJECTED'} via human approval`,
         tags: ['aiops-decision']
       });
-    } catch {
+    } catch (err) {
       // Non-fatal annotation
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          event: 'grafana_decision_annotation_failed',
+          incidentId: incident.id,
+          message: toErrorMessage(err, 'Failed to annotate Grafana decision')
+        })
+      );
     }
 
     await this.repository.save(incident);
@@ -136,8 +145,16 @@ export class RecordDecision {
         text: `[${targetState}] Incident ${incident.id} ${action} via interactive demo simulation`,
         tags: ['aiops-demo']
       });
-    } catch {
+    } catch (err) {
       // Non-fatal annotation
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          event: 'grafana_decision_annotation_failed',
+          incidentId: incident.id,
+          message: toErrorMessage(err, 'Failed to annotate Grafana decision')
+        })
+      );
     }
 
     await this.repository.save(incident);

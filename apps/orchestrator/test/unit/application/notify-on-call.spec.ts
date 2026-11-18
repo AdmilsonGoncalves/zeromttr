@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NotifyOnCall } from '../../../src/application/index.js';
 import { IncidentState, Incident } from '../../../src/domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  Clock,
-  EventBroadcasterPort
-} from '../../../src/ports/index.js';
+import {
+  createMockBroadcaster,
+  createMockClock,
+  createMockIncidentRepository,
+  createMockToolsPort
+} from '../../helpers/test-doubles.helper.js';
 
 describe('NotifyOnCall Use Case', () => {
   it('should send post-mortem via Resend with HMAC links in fragment, transition to NOTIFIED, and NEVER leak sig in SSE', async () => {
@@ -24,35 +24,15 @@ describe('NotifyOnCall Use Case', () => {
       }
     });
 
-    const repo: IncidentRepository = {
-      findById: vi.fn(async () => incident),
-      findOpenByFingerprint: vi.fn(async () => null),
-      findAll: vi.fn(async () => [incident]),
-      save: vi.fn(async () => {})
-    };
-
-    const tools: ToolsPort = {
-      executePromqlRange: vi.fn(),
-      queryLokiLogs: vi.fn(),
-      analyzeOtelTrace: vi.fn(),
-      searchTracesByTraceQL: vi.fn(),
-      inspectGitDeployDiff: vi.fn(),
-      createRemediationPr: vi.fn(),
+    const repo = createMockIncidentRepository([incident]);
+    const tools = createMockToolsPort({
       sendPostMortemResend: vi.fn(async () => ({
         emailId: 'email-resend-999',
         sentAt: '2026-11-10T12:00:00.000Z'
-      })),
-      annotateGrafanaIncident: vi.fn()
-    };
-
-    const clock: Clock = {
-      now: vi.fn(() => 1730000000000), // ms
-      iso: vi.fn(() => '2026-11-10T12:00:00.000Z')
-    };
-
-    const broadcaster: EventBroadcasterPort = {
-      broadcast: vi.fn()
-    };
+      }))
+    });
+    const clock = createMockClock();
+    const broadcaster = createMockBroadcaster();
 
     const hmacSecret = 'test-secret-key-123';
     const dashboardUrl = 'https://zeromttr.agjworks.com';
@@ -79,10 +59,11 @@ describe('NotifyOnCall Use Case', () => {
     );
 
     // CRITICAL: Ensure approveSig, rejectSig, or sig are NOT present in broadcast
-    const broadcastCalls = (broadcaster.broadcast as any).mock.calls;
-    const notifiedCall = broadcastCalls.find((call: any[]) => call[0] === 'incident.notified');
+    const notifiedCall = broadcaster.broadcast.mock.calls.find(
+      (call) => call[0] === 'incident.notified'
+    );
     expect(notifiedCall).toBeDefined();
-    const payload = notifiedCall[1];
+    const payload = notifiedCall?.[1] as Record<string, unknown>;
     expect(payload.sig).toBeUndefined();
     expect(payload.approveSig).toBeUndefined();
     expect(payload.rejectSig).toBeUndefined();

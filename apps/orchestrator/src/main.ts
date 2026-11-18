@@ -99,7 +99,14 @@ export function bootstrap(port: number = Number(process.env.PORT) || 8080): http
   const server = http.createServer(app);
 
   server.listen(port, () => {
-    console.log(`[orchestrator] Initialized with state ${initialIncident.state} on port ${port}`);
+    console.info(
+      JSON.stringify({
+        level: 'info',
+        event: 'orchestrator_initialized',
+        state: initialIncident.state,
+        port
+      })
+    );
   });
 
   return server;

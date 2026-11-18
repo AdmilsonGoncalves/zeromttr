@@ -62,6 +62,11 @@ export class DispatchRemediation {
       throw new Error(`Incident '${incidentId}' not found`);
     }
 
+    const authoritativeSuspectPath = evidence.gitDiff?.suspectFilePath;
+    if (!isNonEmptyString(authoritativeSuspectPath)) {
+      throw new Error('Cannot create remediation PR without an authoritative suspectFilePath');
+    }
+
     // Inspect complete evidence object before LLM synthesis
     const promptToAudit = JSON.stringify(evidence);
     const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
@@ -72,7 +77,7 @@ export class DispatchRemediation {
     if (piiAudit.passed) {
       try {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
-        if (validatePatchDefensively(rawSynthesis, evidence.gitDiff?.suspectFilePath)) {
+        if (validatePatchDefensively(rawSynthesis, authoritativeSuspectPath)) {
           synthesis = rawSynthesis;
           reasoningSource = 'llm';
         } else {
@@ -127,8 +132,16 @@ export class DispatchRemediation {
         tags: ['aiops-remediation']
       });
       annotationId = annRes.annotationId;
-    } catch {
+    } catch (err) {
       // Ignore non-fatal annotation failure
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          event: 'grafana_annotation_failed',
+          incidentId: incident.id,
+          message: err instanceof Error ? err.message : String(err)
+        })
+      );
     }
 
     // Evidence coverage calculation using actual collected signals
@@ -212,11 +225,6 @@ export class DispatchRemediation {
       incidentId: incident.id,
       ...rcaReport
     });
-
-    const authoritativeSuspectPath = evidence.gitDiff?.suspectFilePath;
-    if (!isNonEmptyString(authoritativeSuspectPath)) {
-      throw new Error('Cannot create remediation PR without an authoritative suspectFilePath');
-    }
 
     // Transition to AWAITING_PR
     if (incident.state === IncidentState.REMEDIATING) {
