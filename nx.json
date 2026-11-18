@@ -17,5 +17,6 @@
       "cache": true,
       "dependsOn": ["^build"]
     }
-  }
+  },
+  "nxCloudId": "6afe2c3c84fa90fbcc0bddbb"
 }
