@@ -360,13 +360,14 @@ export class IncidentService {
         if (!payload) {
           return;
         }
+        const { incidentId: _incidentId, ...rca } = payload;
         this.currentIncident.update((curr) => {
           if (!curr) {
             return null;
           }
           return {
             ...curr,
-            rca: payload
+            rca
           };
         });
       });
@@ -376,13 +377,14 @@ export class IncidentService {
         if (!payload) {
           return;
         }
+        const { incidentId: _incidentId, ...finops } = payload;
         this.currentIncident.update((curr) => {
           if (!curr) {
             return null;
           }
           return {
             ...curr,
-            finops: payload
+            finops
           };
         });
       });
@@ -415,9 +417,11 @@ export class IncidentService {
           return {
             ...curr,
             remediation: {
+              branchName: payload.branchName,
               branchUrl: payload.branchUrl,
               pullRequestUrl: payload.pullRequestUrl,
-              commitSha: payload.commitSha
+              commitSha: payload.commitSha,
+              suspectCommitSha: payload.suspectCommitSha
             }
           };
         });
@@ -436,7 +440,8 @@ export class IncidentService {
             ...curr,
             notification: {
               emailId: payload.emailId,
-              htmlPreview: payload.htmlPreview
+              htmlPreview: payload.htmlPreview,
+              status: payload.status
             }
           };
         });

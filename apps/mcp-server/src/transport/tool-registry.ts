@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CreateRemediationPrInputSchema, ReasoningSourceSchema } from '@zeromttr/contracts';
 import { toErrorMessage } from '@zeromttr/utils';
 import type {
   ExecutePromqlRange,
@@ -59,7 +60,7 @@ export class ToolRegistry {
       description:
         'Executes a PromQL range query against Prometheus, returns statistical summary (min/max/avg/latest/p95) for up to 5 series and FinOps payload reduction metrics.',
       schema: z.object({
-        query: z.string().describe('The PromQL expression to evaluate'),
+        query: z.string().min(1).describe('The PromQL expression to evaluate'),
         start: z.string().describe('Start time in ISO8601 format'),
         end: z.string().describe('End time in ISO8601 format (max window 24h)'),
         step: z.string().optional().describe('Query resolution step duration (e.g. 15s)')
@@ -83,7 +84,7 @@ export class ToolRegistry {
       description:
         'Queries Grafana Loki logs with LogQL, enforcing defensive truncation (up to 100 lines, 500 chars per line) and FinOps metrics.',
       schema: z.object({
-        logql: z.string().describe('The LogQL query expression'),
+        logql: z.string().min(1).describe('The LogQL query expression'),
         start: z.string().describe('Start time in ISO8601 format'),
         end: z.string().describe('End time in ISO8601 format (max window 24h)'),
         limit: z
@@ -134,7 +135,7 @@ export class ToolRegistry {
       description:
         'Searches traces in Tempo using TraceQL, returning matching traces up to limit 20.',
       schema: z.object({
-        query: z.string().describe('TraceQL query string'),
+        query: z.string().min(1).describe('TraceQL query string'),
         limit: z
           .number()
           .int()
@@ -161,8 +162,8 @@ export class ToolRegistry {
       description:
         'Inspects real Git deploy diff between two releases/tags (e.g. v2.14.7...v2.14.8), strictly sanitizing PII (no author email, stripping Co-authored-by), limiting to 3 files and 1500 chars/diff, and returning FinOps metrics.',
       schema: z.object({
-        base_ref: z.string().describe('Base git reference or tag (e.g. v2.14.7)'),
-        head_ref: z.string().describe('Head git reference or tag (e.g. v2.14.8)'),
+        base_ref: z.string().min(1).describe('Base git reference or tag (e.g. v2.14.7)'),
+        head_ref: z.string().min(1).describe('Head git reference or tag (e.g. v2.14.8)'),
         service_path: z
           .string()
           .optional()
@@ -196,17 +197,7 @@ export class ToolRegistry {
       name: 'create_remediation_pr',
       description:
         'Autonomously and idempotently creates or updates a hotfix branch and opens a Pull Request on GitHub with RCA markdown and reasoning source (llm or fallback). Never auto-merges.',
-      schema: z.object({
-        incident_id: z.string().describe('Identifier of the incident being remediated'),
-        file_path: z.string().describe('Target repository file path to patch'),
-        patched_content: z.string().describe('Full patched code content'),
-        blob_sha: z.string().optional().describe('Current blob SHA of target file'),
-        title: z.string().describe('Pull Request title'),
-        rca_markdown: z.string().describe('Root Cause Analysis and diagnosis summary in Markdown'),
-        reasoning_source: z
-          .enum(['llm', 'fallback'])
-          .describe("Source of the remediation reasoning ('llm' | 'fallback')")
-      }),
+      schema: CreateRemediationPrInputSchema,
       inputSchema: {
         type: 'object',
         properties: {
@@ -245,7 +236,7 @@ export class ToolRegistry {
         title: z.string(),
         rca_summary: z.string(),
         evidence_coverage: z.string(),
-        reasoning_source: z.enum(['llm', 'fallback']),
+        reasoning_source: ReasoningSourceSchema,
         blast_radius: z.array(z.string()),
         regression_commit: z.string(),
         pull_request_url: z.string(),

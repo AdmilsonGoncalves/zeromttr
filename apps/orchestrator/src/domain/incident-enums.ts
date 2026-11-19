@@ -1,44 +1,13 @@
-export enum IncidentEventType {
-  CREATED = 'incident.created',
-  TRANSITION = 'incident.transition',
-  FINOPS = 'incident.finops',
-  DOCS = 'incident.docs',
-  RCA = 'incident.rca',
-  REMEDIATION = 'incident.remediation',
-  NOTIFIED = 'incident.notified',
-  DECISION = 'incident.decision'
-}
-
-export enum TargetHealthStatus {
-  HEALTHY = 'healthy',
-  DEGRADED = 'degraded',
-  UNREACHABLE = 'unreachable'
-}
-
-export enum NotificationStatus {
-  DISPATCHED = 'dispatched',
-  DEGRADED = 'degraded'
-}
-
-export enum DecisionAction {
-  APPROVE = 'approve',
-  REJECT = 'reject'
-}
-
-export enum DecisionSource {
-  EMAIL_HMAC = 'email_hmac',
-  DEMO_SIMULATION = 'demo_simulation'
-}
-
-export enum IncidentExecutionMode {
-  LIVE = 'live',
-  REPLAY = 'replay'
-}
-
-export enum AlertSeverity {
-  CRITICAL = 'critical',
-  WARNING = 'warning'
-}
+export {
+  AlertSeverity,
+  DecisionAction,
+  DecisionSource,
+  IncidentEventType,
+  IncidentExecutionMode,
+  NotificationStatus,
+  ReasoningProvider,
+  TargetHealthStatus
+} from '@zeromttr/contracts';
 
 export enum GrafanaAlertStatus {
   FIRING = 'firing',
@@ -49,11 +18,6 @@ export enum GrafanaAnnotationTag {
   REMEDIATION = 'aiops-remediation',
   DECISION = 'aiops-decision',
   DEMO = 'aiops-demo'
-}
-
-export enum ReasoningProvider {
-  LLM = 'llm',
-  FALLBACK = 'fallback'
 }
 
 export enum TransitionReason {

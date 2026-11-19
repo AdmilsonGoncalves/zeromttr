@@ -1,3 +1,4 @@
+import { FinOpsMetricsSchema } from '@zeromttr/contracts';
 import { percentage, round } from '@zeromttr/utils';
 
 export interface FinOpsMetrics {
@@ -15,11 +16,18 @@ export function calculateFinOps(rawBytes: number, compactedBytes: number): FinOp
   // Standard LLM FinOps heuristic: ~4 bytes per token
   const estimated_tokens_saved = round(reductionBytes / 4);
 
+  const validated = FinOpsMetricsSchema.parse({
+    rawBytesFetched: Math.round(safeRaw),
+    compactedBytesSentToLlm: Math.round(safeCompacted),
+    payloadReductionPercent: payload_reduction_percent,
+    estimatedTokensSaved: estimated_tokens_saved
+  });
+
   return {
-    raw_bytes_fetched: safeRaw,
-    compacted_bytes_sent_to_llm: safeCompacted,
-    payload_reduction_percent,
-    estimated_tokens_saved
+    raw_bytes_fetched: validated.rawBytesFetched,
+    compacted_bytes_sent_to_llm: validated.compactedBytesSentToLlm,
+    payload_reduction_percent: validated.payloadReductionPercent,
+    estimated_tokens_saved: validated.estimatedTokensSaved
   };
 }
 

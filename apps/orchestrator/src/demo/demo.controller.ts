@@ -13,6 +13,7 @@ import { DecisionAction, IncidentExecutionMode, type IncidentMode } from '../dom
 import { createLiveDemoKeyMiddleware, HttpResponseStatus } from '../http/index.js';
 import type { IncidentRepository } from '../ports/index.js';
 import type { DemoControlPort } from './demo-control.port.js';
+import type { ReplayRunner } from './replay-runner.js';
 import type { SimulateDemoDecision } from './simulate-demo-decision.js';
 
 export const DemoChaosPayloadSchema = z
@@ -33,6 +34,7 @@ export const SimulateDecisionPayloadSchema = z.object({
 export interface DemoRouterDependencies {
   demoControlPort: DemoControlPort;
   simulateDemoDecision: SimulateDemoDecision;
+  replayRunner?: ReplayRunner;
   repository?: IncidentRepository;
   dashboardAuthMiddleware?: RequestHandler;
   liveDemoKey?: string;
@@ -120,12 +122,17 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
       lastChaosMode = mode;
 
       try {
+        let incidentId: string | undefined;
         if (mode === IncidentExecutionMode.LIVE) {
+          dependencies.replayRunner?.stop();
           await dependencies.demoControlPort.triggerChaos(true);
+        } else if (dependencies.replayRunner) {
+          incidentId = await dependencies.replayRunner.trigger();
         }
         res.status(HTTP_STATUS.ACCEPTED).json({
           status: HttpResponseStatus.ACCEPTED,
           mode,
+          ...(incidentId ? { incidentId } : {}),
           message: 'Chaos simulation initialized'
         });
       } catch (err) {
@@ -151,6 +158,7 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
       try {
         lastChaosTimestamp = 0;
         lastChaosMode = IncidentExecutionMode.REPLAY;
+        dependencies.replayRunner?.stop();
         await dependencies.demoControlPort.reset();
         res.status(HTTP_STATUS.ACCEPTED).json({
           status: HttpResponseStatus.ACCEPTED,

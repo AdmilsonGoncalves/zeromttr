@@ -12,5 +12,6 @@ export enum OrchestratorLogEvent {
   TRACE_ANALYSIS_FAILED = 'trace_analysis_failed',
   GRAFANA_ANNOTATION_FAILED = 'grafana_annotation_failed',
   RESEND_NOTIFICATION_DEGRADED = 'resend_notification_degraded',
-  GRAFANA_DECISION_ANNOTATION_FAILED = 'grafana_decision_annotation_failed'
+  GRAFANA_DECISION_ANNOTATION_FAILED = 'grafana_decision_annotation_failed',
+  REPLAY_PLAYBACK_FAILED = 'replay_playback_failed'
 }

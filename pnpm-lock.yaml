@@ -95,6 +95,9 @@ importers:
       '@primeuix/themes':
         specifier: ^1.0.0
         version: 1.2.5
+      '@zeromttr/contracts':
+        specifier: workspace:^
+        version: link:../../libs/contracts
       '@zeromttr/utils':
         specifier: workspace:^
         version: link:../../libs/utils
@@ -132,6 +135,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.2
         version: 1.32.2(zod@3.25.76)
+      '@zeromttr/contracts':
+        specifier: workspace:^
+        version: link:../../libs/contracts
       '@zeromttr/utils':
         specifier: workspace:*
         version: link:../../libs/utils
@@ -163,12 +169,18 @@ importers:
       '@google/genai':
         specifier: ^0.2.0
         version: 0.2.0
+      '@zeromttr/contracts':
+        specifier: workspace:^
+        version: link:../../libs/contracts
       '@zeromttr/utils':
         specifier: workspace:*
         version: link:../../libs/utils
       express:
         specifier: ^4.21.2
         version: 4.22.3
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -191,9 +203,6 @@ importers:
       supertest:
         specifier: ^7.0.0
         version: 7.3.2
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
       vitest:
         specifier: 'catalog:'
         version: 5.1.0(@types/node@22.20.5)(@vitest/coverage-v8@5.1.0)(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
@@ -203,6 +212,22 @@ importers:
       '@zeromttr/utils':
         specifier: workspace:*
         version: link:../../libs/utils
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.1.0(@types/node@22.20.5)(@vitest/coverage-v8@5.1.0)(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+
+  libs/contracts:
+    dependencies:
       zod:
         specifier: 'catalog:'
         version: 3.25.76

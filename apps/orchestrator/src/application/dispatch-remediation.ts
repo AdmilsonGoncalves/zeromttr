@@ -27,6 +27,7 @@ import type {
   ReasoningPort,
   EventBroadcasterPort,
   LoggerPort,
+  PatchSyntaxValidatorPort,
   CollectedEvidence,
   RcaAndPatchSynthesis,
   CreateRemediationPrOutput
@@ -38,9 +39,15 @@ export interface DispatchRemediationResult {
   reasoningSource: ReasoningSource;
 }
 
+export interface DispatchRemediationOptions {
+  syntaxValidator?: PatchSyntaxValidatorPort;
+  requiredContentPatterns?: RegExp[];
+}
+
 function validatePatchDefensively(
   synthesis: RcaAndPatchSynthesis,
-  expectedSuspectPath?: string
+  expectedSuspectPath?: string,
+  options: DispatchRemediationOptions = {}
 ): boolean {
   if (!isNonEmptyString(expectedSuspectPath) || !isNonEmptyString(synthesis.suspectFilePath)) {
     return false;
@@ -52,6 +59,22 @@ function validatePatchDefensively(
   if (!isNonEmptyString(content)) {
     return false;
   }
+  if (
+    options.syntaxValidator &&
+    !options.syntaxValidator.isValidSyntax(synthesis.suspectFilePath, content)
+  ) {
+    return false;
+  }
+  if (options.requiredContentPatterns) {
+    for (const pattern of options.requiredContentPatterns) {
+      if (pattern.global || pattern.sticky) {
+        pattern.lastIndex = 0;
+      }
+      if (!pattern.test(content)) {
+        return false;
+      }
+    }
+  }
   return true;
 }
 
@@ -62,7 +85,8 @@ export class DispatchRemediation {
     private readonly llmAdapter: ReasoningPort,
     private readonly fallbackAdapter: ReasoningPort,
     private readonly broadcaster: EventBroadcasterPort,
-    private readonly logger?: LoggerPort
+    private readonly logger?: LoggerPort,
+    private readonly options: DispatchRemediationOptions = {}
   ) {}
 
   public async execute(
@@ -90,7 +114,7 @@ export class DispatchRemediation {
     if (piiAudit.passed) {
       try {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
-        if (validatePatchDefensively(rawSynthesis, authoritativeSuspectPath)) {
+        if (validatePatchDefensively(rawSynthesis, authoritativeSuspectPath, this.options)) {
           synthesis = rawSynthesis;
           reasoningSource = ReasoningProvider.LLM;
         } else {
@@ -105,6 +129,13 @@ export class DispatchRemediation {
       // Fail-closed! Route directly to fallback
       synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
       reasoningSource = ReasoningProvider.FALLBACK;
+    }
+
+    if (
+      reasoningSource === ReasoningProvider.FALLBACK &&
+      !validatePatchDefensively(synthesis, authoritativeSuspectPath, this.options)
+    ) {
+      throw new Error('Fallback remediation patch failed defensive validation');
     }
 
     // Ensure valid lifecycle transitions before REMEDIATING
