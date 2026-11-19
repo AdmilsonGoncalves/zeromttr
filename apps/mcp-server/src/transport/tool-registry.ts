@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import {
   AnalyzeOtelTraceInputSchema,
+  AnnotateGrafanaIncidentInputSchema,
   CreateRemediationPrInputSchema,
+  ExecutePromqlRangeInputSchema,
+  InspectGitDeployDiffInputSchema,
+  QueryLokiLogsInputSchema,
+  SearchTracesByTraceqlInputSchema,
   SendPostMortemResendInputSchema
 } from '@zeromttr/contracts';
 import { toErrorMessage } from '@zeromttr/utils';
@@ -63,12 +68,7 @@ export class ToolRegistry {
       name: 'execute_promql_range',
       description:
         'Executes a PromQL range query against Prometheus, returns statistical summary (min/max/avg/latest/p95) for up to 5 series and FinOps payload reduction metrics.',
-      schema: z.object({
-        query: z.string().min(1).describe('The PromQL expression to evaluate'),
-        start: z.string().describe('Start time in ISO8601 format'),
-        end: z.string().describe('End time in ISO8601 format (max window 24h)'),
-        step: z.string().optional().describe('Query resolution step duration (e.g. 15s)')
-      }),
+      schema: ExecutePromqlRangeInputSchema,
       inputSchema: {
         type: 'object',
         properties: {
@@ -87,18 +87,7 @@ export class ToolRegistry {
       name: 'query_loki_logs',
       description:
         'Queries Grafana Loki logs with LogQL, enforcing defensive truncation (up to 100 lines, 500 chars per line) and FinOps metrics.',
-      schema: z.object({
-        logql: z.string().min(1).describe('The LogQL query expression'),
-        start: z.string().describe('Start time in ISO8601 format'),
-        end: z.string().describe('End time in ISO8601 format (max window 24h)'),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(100)
-          .optional()
-          .describe('Maximum number of log lines (1-100)')
-      }),
+      schema: QueryLokiLogsInputSchema,
       inputSchema: {
         type: 'object',
         properties: {
@@ -133,16 +122,7 @@ export class ToolRegistry {
       name: 'search_traces_by_traceql',
       description:
         'Searches traces in Tempo using TraceQL, returning matching traces up to limit 20.',
-      schema: z.object({
-        query: z.string().min(1).describe('TraceQL query string'),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(20)
-          .optional()
-          .describe('Maximum traces to return (<= 20)')
-      }),
+      schema: SearchTracesByTraceqlInputSchema,
       inputSchema: {
         type: 'object',
         properties: {
@@ -160,18 +140,7 @@ export class ToolRegistry {
       name: 'inspect_git_deploy_diff',
       description:
         'Inspects real Git deploy diff between two releases/tags (e.g. v2.14.7...v2.14.8), strictly sanitizing PII (no author email, stripping Co-authored-by), limiting to 3 files and 1500 chars/diff, and returning FinOps metrics.',
-      schema: z.object({
-        base_ref: z.string().min(1).describe('Base git reference or tag (e.g. v2.14.7)'),
-        head_ref: z.string().min(1).describe('Head git reference or tag (e.g. v2.14.8)'),
-        service_path: z
-          .string()
-          .optional()
-          .describe('Path prefix filter (e.g. apps/target-app-demo)'),
-        suspect_keyword: z
-          .string()
-          .optional()
-          .describe('Keyword or filename to target suspect file')
-      }),
+      schema: InspectGitDeployDiffInputSchema,
       inputSchema: {
         type: 'object',
         properties: {
@@ -267,15 +236,7 @@ export class ToolRegistry {
       name: 'annotate_grafana_incident',
       description:
         'Injects an incident remediation annotation into Grafana POST /api/annotations with tag aiops-remediation.',
-      schema: z.object({
-        time: z.number().optional().describe('Epoch millisecond timestamp of the incident'),
-        text: z
-          .string()
-          .min(1, 'Annotation text must not be empty')
-          .describe('Annotation message text'),
-        tags: z.array(z.string()).optional().describe('Optional additional tags'),
-        pull_request_url: z.string().optional().describe('URL to the opened Pull Request')
-      }),
+      schema: AnnotateGrafanaIncidentInputSchema,
       inputSchema: {
         type: 'object',
         properties: {

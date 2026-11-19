@@ -6,8 +6,8 @@ const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
 // 1. execute_promql_range
 export const ExecutePromqlRangeInputSchema = z.object({
   query: z.string().min(1),
-  start: z.string().datetime(),
-  end: z.string().datetime(),
+  start: z.string().datetime({ offset: true }),
+  end: z.string().datetime({ offset: true }),
   step: z.string().optional().default('15s')
 });
 
@@ -69,8 +69,8 @@ export const SearchTracesByTraceqlOutputSchema = z.object({
 // 4. query_loki_logs
 export const QueryLokiLogsInputSchema = z.object({
   logql: z.string().min(1),
-  start: z.string().datetime(),
-  end: z.string().datetime(),
+  start: z.string().datetime({ offset: true }),
+  end: z.string().datetime({ offset: true }),
   limit: z.number().int().min(1).max(100).optional().default(50)
 });
 
@@ -145,10 +145,10 @@ export const SendPostMortemResendOutputSchema = z.object({
 
 // 8. annotate_grafana_incident
 export const AnnotateGrafanaIncidentInputSchema = z.object({
-  time: z.number().int(),
+  time: z.number().int().optional(),
   text: z.string().min(1),
-  tags: z.array(z.string()),
-  pullRequestUrl: z.string().url().optional()
+  tags: z.array(z.string()).optional(),
+  pull_request_url: z.string().url().optional()
 });
 
 export const AnnotateGrafanaIncidentOutputSchema = z.object({

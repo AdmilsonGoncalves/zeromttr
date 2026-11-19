@@ -140,9 +140,14 @@ describe('@zeromttr/contracts Zod schemas', () => {
       AnnotateGrafanaIncidentInputSchema.safeParse({
         time: 1795000000,
         text: 'Hotfix opened',
-        tags: ['aiops-remediation']
+        tags: ['aiops-remediation'],
+        pull_request_url: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/1'
       }).success
     ).toBe(true);
+    expect(
+      AnnotateGrafanaIncidentInputSchema.safeParse({ text: 'Incident resolved' }).success
+    ).toBe(true);
+    expect(AnnotateGrafanaIncidentInputSchema.safeParse({ text: '' }).success).toBe(false);
   });
 
   it('should_validate_llm_collected_evidence_and_rca_patch_synthesis', () => {

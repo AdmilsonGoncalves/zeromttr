@@ -208,4 +208,72 @@ describe('Demo Replay Mode Integration (TECH 09 §6)', () => {
     expect(secondTriggerRes.body.incidentId).not.toBe(firstIncidentId);
     replayRunner.stop();
   });
+
+  it('should cancel pending replay timers immediately when stop() is called', async () => {
+    const snapshotPath = path.join(tempDir, 'slow-replay.json');
+    fs.writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        recordedAt: '2026-11-07T18:00:00.000Z',
+        incidentId: 'inc-live-demo-slow',
+        service: 'api-pagamentos-core',
+        severity: 'critical',
+        evidenceCoverage: {
+          score: 100,
+          signalsCollected: 4,
+          signalsTotal: 4,
+          signals: ['promql_anomaly', 'metric_exemplar', 'tempo_error_span', 'loki_log_diff']
+        },
+        blastRadius: {
+          servicesInvolved: ['api-pagamentos-core']
+        },
+        finops: {
+          rawBytesFetched: 1000,
+          compactedBytesSentToLlm: 100,
+          payloadReductionPercent: 90,
+          estimatedTokensSaved: 225
+        },
+        piiGuardAudit: {
+          leakedPatternsDetected: 0,
+          detectedTypes: [],
+          edgeRedactedTokensVerified: 1,
+          passed: true
+        },
+        rca: {
+          summary: 'Pool exhausted',
+          rootCause: 'Missing client.release()',
+          reasoningSource: 'llm',
+          suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts'
+        },
+        remediation: {
+          branchUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-slow',
+          pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/2',
+          commitSha: '1234567'
+        },
+        eventsTimeline: [
+          { event: 'incident.created', delayMs: 30_000 },
+          { event: 'incident.transition', state: 'NOTIFIED', delayMs: 30_000 }
+        ]
+      }),
+      'utf-8'
+    );
+
+    const storePath = path.join(tempDir, 'incidents-slow.json');
+    const repository = new FileIncidentRepository(storePath);
+    const replayRunner = new ReplayRunner(repository, broadcaster, {
+      snapshotPath,
+      speedFactor: 1
+    });
+
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    const incidentId = await replayRunner.trigger();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    replayRunner.stop();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    const saved = await repository.findById(incidentId);
+    expect(saved?.state).toBe(IncidentState.RECEIVED);
+  });
 });

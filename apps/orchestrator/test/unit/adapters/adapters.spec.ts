@@ -469,12 +469,26 @@ describe('Adapters Unit Tests', () => {
   });
 
   describe('TypeScriptPatchSyntaxValidator', () => {
-    it('should validate TS, JSX, ambient TS declarations, and reject JS early/grammar errors', () => {
+    it('should validate TS, JSX, ambient TS declarations, and reject JS early/grammar errors and duplicate exports', () => {
       const validator = new TypeScriptPatchSyntaxValidator();
 
-      expect(validator.isValidSyntax('worker.js', 'export const x = 1;\nexport { x };')).toBe(true);
+      expect(validator.isValidSyntax('worker.js', 'const x = 1;\nexport { x };')).toBe(true);
+      expect(validator.isValidSyntax('worker.js', 'export const x = 1;\nexport { x };')).toBe(
+        false
+      );
       expect(validator.isValidSyntax('worker.js', 'export const x;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// @ts-ignore\nexport const x;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// @ts-expect-error\nexport const x;')).toBe(
+        false
+      );
+      expect(validator.isValidSyntax('worker.js', '// @ts-nocheck\nexport const x;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// @ts-ignore\nexport const x = 1;')).toBe(true);
+      expect(validator.isValidSyntax('worker.js', '// @ts-nocheck\nexport const x = 1;')).toBe(
+        true
+      );
       expect(validator.isValidSyntax('worker.js', 'const count: number = 1;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// comment only')).toBe(false);
+      expect(validator.isValidSyntax('payment.repository.ts', '/* comment only */')).toBe(false);
       expect(validator.isValidSyntax('ambient.ts', 'declare const x: number;')).toBe(true);
       expect(validator.isValidSyntax('view.jsx', 'export const View = () => <div />;')).toBe(true);
       expect(validator.isValidSyntax('view.jsx', 'export const View = () => <div>;')).toBe(false);

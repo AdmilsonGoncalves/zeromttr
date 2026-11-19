@@ -53,7 +53,7 @@ export const CollectedEvidenceSchema = z.object({
 export type CollectedEvidence = z.infer<typeof CollectedEvidenceSchema>;
 
 /**
-/ * Structured output schema required from LLM synthesis (6 canonical fields).
+ * Structured output schema required from LLM synthesis (6 canonical fields).
  */
 export const RcaAndPatchSynthesisSchema = z
   .object({

@@ -36,6 +36,8 @@ export class ReplayRunner {
   private readonly snapshotPath: string;
   private readonly speedFactor: number;
   private activeRunId = 0;
+  private activeDelayTimer: NodeJS.Timeout | undefined;
+  private activeDelayResolve: (() => void) | undefined;
 
   public constructor(
     private readonly repository: IncidentRepository,
@@ -71,11 +73,21 @@ export class ReplayRunner {
 
   public stop(): void {
     this.activeRunId++;
+    if (this.activeDelayTimer) {
+      clearTimeout(this.activeDelayTimer);
+      this.activeDelayTimer = undefined;
+    }
+    if (this.activeDelayResolve) {
+      const resolve = this.activeDelayResolve;
+      this.activeDelayResolve = undefined;
+      resolve();
+    }
   }
 
   public async trigger(): Promise<string> {
     const snapshot = this.loadSnapshot();
-    const runId = ++this.activeRunId;
+    this.stop();
+    const runId = this.activeRunId;
     const replayIncidentId = `${snapshot.incidentId}-${Date.now()}-${runId}`;
     const startedAt = nowIso();
 
@@ -106,7 +118,14 @@ export class ReplayRunner {
     if (scaledMs === 0) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, scaledMs));
+    await new Promise<void>((resolve) => {
+      this.activeDelayResolve = resolve;
+      this.activeDelayTimer = setTimeout(() => {
+        this.activeDelayTimer = undefined;
+        this.activeDelayResolve = undefined;
+        resolve();
+      }, scaledMs);
+    });
   }
 
   private buildFinops(snapshot: ReplaySnapshot): IncidentFinops {
