@@ -41,15 +41,22 @@ describe('@zeromttr/contracts Zod schemas', () => {
     const promql = ExecutePromqlRangeInputSchema.parse({
       query: 'up',
       start: '2026-11-18T00:00:00Z',
-      end: 1795000000
+      end: '2026-11-18T01:00:00Z'
     });
     expect(promql.step).toBe('15s');
+    expect(
+      ExecutePromqlRangeInputSchema.safeParse({
+        query: 'up',
+        start: 1795000000,
+        end: 1795003600
+      }).success
+    ).toBe(false);
 
     const trace = AnalyzeOtelTraceInputSchema.safeParse({
-      traceId: '4bf92f3577b34da6a3ce929d0e0e4736'
+      trace_id: '4bf92f3577b34da6a3ce929d0e0e4736'
     });
     expect(trace.success).toBe(true);
-    expect(AnalyzeOtelTraceInputSchema.safeParse({ traceId: 'short' }).success).toBe(false);
+    expect(AnalyzeOtelTraceInputSchema.safeParse({ trace_id: 'short' }).success).toBe(false);
 
     const traceql = SearchTracesByTraceqlInputSchema.parse({ query: '{status=error}' });
     expect(traceql.limit).toBe(5);
@@ -60,6 +67,13 @@ describe('@zeromttr/contracts Zod schemas', () => {
       end: '2026-11-18T00:05:00Z'
     });
     expect(loki.limit).toBe(50);
+    expect(
+      QueryLokiLogsInputSchema.safeParse({
+        logql: '{service="api-pagamentos-core"}',
+        start: 1795000000,
+        end: 1795003600
+      }).success
+    ).toBe(false);
 
     const diff = InspectGitDeployDiffInputSchema.parse({
       base_ref: 'v2.14.7',
@@ -80,16 +94,45 @@ describe('@zeromttr/contracts Zod schemas', () => {
 
     expect(
       SendPostMortemResendInputSchema.safeParse({
-        incidentId: 'inc-1',
-        recipientEmail: 'sre@example.com',
-        htmlBody: '<p>Done</p>'
+        incident_id: 'inc-1',
+        recipient_email: 'sre@example.com',
+        title: '[Post-Mortem] inc-1',
+        rca_summary: 'Pool exhausted',
+        evidence_coverage: '4/4 Signals (100%)',
+        reasoning_source: 'llm',
+        blast_radius: ['api-pagamentos-core'],
+        regression_commit: 'v2.14.7...v2.14.8',
+        pull_request_url: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/1',
+        approve_url: 'http://localhost:4200/decision/inc-1#action=approve&sig=abc&exp=1',
+        reject_url: 'http://localhost:4200/decision/inc-1#action=reject&sig=def&exp=1',
+        leaked_patterns_detected: 0
       }).success
     ).toBe(true);
     expect(
       SendPostMortemResendInputSchema.safeParse({
-        incidentId: 'inc-1',
-        recipientEmail: 'not-an-email',
-        htmlBody: '<p>Done</p>'
+        incident_id: 'inc-1',
+        title: '[Post-Mortem] inc-1',
+        rca_summary: 'Pool exhausted',
+        evidence_coverage: '4/4',
+        reasoning_source: 'llm',
+        blast_radius: ['api-pagamentos-core'],
+        regression_commit: 'v2.14.7...v2.14.8',
+        pull_request_url: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/1',
+        approve_url: 'not-a-valid-url',
+        reject_url: 'http://localhost:4200/decision/inc-1#action=reject&sig=def&exp=1'
+      }).success
+    ).toBe(false);
+    expect(
+      SendPostMortemResendInputSchema.safeParse({
+        incident_id: 'inc-1',
+        title: '[Post-Mortem] inc-1',
+        rca_summary: 'Pool exhausted',
+        evidence_coverage: '4/4',
+        reasoning_source: 'llm',
+        blast_radius: ['api-pagamentos-core'],
+        regression_commit: 'v2.14.7...v2.14.8',
+        pull_request_url: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/1',
+        approve_url: 'http://localhost:4200/decision/inc-1#action=approve&sig=abc&exp=1'
       }).success
     ).toBe(false);
 
@@ -144,6 +187,20 @@ describe('@zeromttr/contracts Zod schemas', () => {
     expect(
       RcaAndPatchSynthesisSchema.safeParse({
         summary: 'Only summary'
+      }).success
+    ).toBe(false);
+
+    // Reject extra unexpected fields (strict 6-field contract)
+    expect(
+      RcaAndPatchSynthesisSchema.safeParse({
+        summary: 'Saturação do pool de conexões.',
+        rootCause: 'Falta client.release() no timeout.',
+        evidenceRefs: ['4bf92f3577b34da6a3ce929d0e0e4736'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: 'const pool = { max: 10 };',
+        explanation: 'Restaura max: 10.',
+        reasoningSource: 'llm',
+        extraField: 'unexpected'
       }).success
     ).toBe(false);
   });
@@ -250,5 +307,17 @@ describe('@zeromttr/contracts Zod schemas', () => {
       ]
     });
     expect(validReplay.success).toBe(true);
+
+    const invalidEventName = ReplaySnapshotSchema.safeParse({
+      ...(validReplay.success ? validReplay.data : {}),
+      eventsTimeline: [{ event: 'incident.rac', delayMs: 500 }]
+    });
+    expect(invalidEventName.success).toBe(false);
+
+    const missingTransitionState = ReplaySnapshotSchema.safeParse({
+      ...(validReplay.success ? validReplay.data : {}),
+      eventsTimeline: [{ event: 'incident.transition', delayMs: 500 }]
+    });
+    expect(missingTransitionState.success).toBe(false);
   });
 });

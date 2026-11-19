@@ -23,6 +23,23 @@ import {
   createStubWorkflow
 } from '../helpers/test-doubles.helper.js';
 
+async function waitForActiveSseClients(
+  broadcaster: SseEventBroadcaster,
+  expectedCount: number,
+  timeoutMs = 1500
+): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (broadcaster.getActiveClientsCount() >= expectedCount) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(
+    `Timed out waiting for active SSE clients >= ${expectedCount} (current: ${broadcaster.getActiveClientsCount()})`
+  );
+}
+
 describe('Demo Replay Mode Integration (TECH 09 §6)', () => {
   const DASHBOARD_TOKEN = 'replay-dashboard-token';
   let tempDir: string;
@@ -149,7 +166,7 @@ describe('Demo Replay Mode Integration (TECH 09 §6)', () => {
       1500
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    await waitForActiveSseClients(broadcaster, 1, 1500);
 
     const triggerRes = await request(app)
       .post('/api/demo/chaos')

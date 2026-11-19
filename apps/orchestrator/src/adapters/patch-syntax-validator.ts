@@ -5,6 +5,13 @@ import type { PatchSyntaxValidatorPort } from '../ports/index.js';
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const JS_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs']);
+const JS_EARLY_ERROR_CODES = new Set([
+  1100, // Invalid use of 'eval' or 'arguments' in strict mode
+  1155, // 'const' declarations must be initialized
+  1212, // Identifier expected. Strict-mode reserved word
+  1359, // Identifier expected. Reserved word
+  2451 // Cannot redeclare block-scoped variable
+]);
 
 interface SourceFileWithDiagnostics extends ts.SourceFile {
   parseDiagnostics?: readonly ts.Diagnostic[];
@@ -55,10 +62,10 @@ export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort 
       return true;
     }
 
-    // For JS/JSX files, run Program.getSyntacticDiagnostics to catch TypeScript-only syntax
+    // For JS/JSX files, run Program diagnostics to catch TypeScript-only syntax and JS early errors
     const compilerOptions: ts.CompilerOptions = {
       allowJs: true,
-      checkJs: false,
+      checkJs: true,
       jsx: ext === '.jsx' ? ts.JsxEmit.Preserve : ts.JsxEmit.None,
       target: ts.ScriptTarget.ES2024,
       noLib: true
@@ -75,6 +82,13 @@ export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort 
       readFile: (name) => (name === filePath ? content : undefined)
     };
     const program = ts.createProgram([filePath], compilerOptions, host);
-    return program.getSyntacticDiagnostics(sourceFile).length === 0;
+    if (program.getSyntacticDiagnostics(sourceFile).length > 0) {
+      return false;
+    }
+
+    const earlyErrors = program
+      .getSemanticDiagnostics(sourceFile)
+      .filter((diag) => JS_EARLY_ERROR_CODES.has(diag.code));
+    return earlyErrors.length === 0;
   }
 }

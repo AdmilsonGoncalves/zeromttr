@@ -53,27 +53,30 @@ export const CollectedEvidenceSchema = z.object({
 export type CollectedEvidence = z.infer<typeof CollectedEvidenceSchema>;
 
 /**
- * Structured output schema required from LLM and deterministic fallback reasoners.
+/ * Structured output schema required from LLM synthesis (6 canonical fields).
  */
-export const RcaAndPatchSynthesisSchema = z.object({
-  summary: z.string().min(1).describe('Resumo executivo do incidente em 1 parágrafo'),
-  rootCause: z
-    .string()
-    .min(1)
-    .describe('Explicação técnica detalhada da causa raiz encontrada no código'),
-  evidenceRefs: z
-    .array(z.string())
-    .describe('Lista de referências de evidências (ex: trace_id, métrica, commit)'),
-  suspectFilePath: z.string().min(1).describe('Caminho do arquivo remediado'),
-  patchedContent: z
-    .string()
-    .min(1)
-    .describe('Conteúdo integral do arquivo corrigido pronto para commit'),
-  explanation: z
-    .string()
-    .min(1)
-    .describe('Explicação da alteração realizada no patch e como ela resolve o incidente'),
-  reasoningSource: ReasoningSourceSchema.optional()
-});
+export const RcaAndPatchSynthesisSchema = z
+  .object({
+    summary: z.string().min(1).describe('Resumo executivo do incidente em 1 parágrafo'),
+    rootCause: z
+      .string()
+      .min(1)
+      .describe('Explicação técnica detalhada da causa raiz encontrada no código'),
+    evidenceRefs: z
+      .array(z.string())
+      .describe('Lista de referências de evidências (ex: trace_id, métrica, commit)'),
+    suspectFilePath: z.string().min(1).describe('Caminho do arquivo remediado'),
+    patchedContent: z
+      .string()
+      .min(1)
+      .describe('Conteúdo integral do arquivo corrigido pronto para commit'),
+    explanation: z
+      .string()
+      .min(1)
+      .describe('Explicação da alteração realizada no patch e como ela resolve o incidente')
+  })
+  .strict();
 
-export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
+export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema> & {
+  reasoningSource?: ReasoningSource;
+};

@@ -112,6 +112,22 @@ describe('GeminiReasoningAdapter', () => {
     await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
       'Failed to parse structured JSON response from Gemini'
     );
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        summary: 'Pool exhausted due to max=1',
+        rootCause: 'Connection pool cap reduced from 10 to 1',
+        evidenceRefs: ['trace-abc'],
+        suspectFilePath: 'src/db.ts',
+        patchedContent: 'export const max = 10;',
+        explanation: 'Restores max connections',
+        reasoningSource: 'fallback',
+        extraHallucinatedField: 'unexpected'
+      })
+    });
+    await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
+      'Failed to parse structured JSON response from Gemini'
+    );
   });
 
   it('should retry once with backoff and fall back to gemini-3.5-flash-lite before failing', async () => {

@@ -18,6 +18,21 @@ describe('Adapters Unit Tests', () => {
   const tempDir = path.join(os.tmpdir(), `zeromttr-adapters-test-${process.pid}`);
   const tempFile = path.join(tempDir, 'incidents.json');
 
+  const savedEnv: Partial<Record<string, string | undefined>> = {};
+
+  function setIsolatedEnv(overrides: Record<string, string | undefined>): void {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!(key in savedEnv)) {
+        savedEnv[key] = process.env[key];
+      }
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+
   beforeEach(() => {
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
@@ -29,8 +44,15 @@ describe('Adapters Unit Tests', () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
     nock.cleanAll();
-    delete process.env.TARGET_GITHUB_REPO;
-    delete process.env.GITHUB_TOKEN;
+    nock.enableNetConnect();
+    for (const [key, original] of Object.entries(savedEnv)) {
+      if (original === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = original;
+      }
+      delete savedEnv[key];
+    }
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -79,6 +101,7 @@ describe('Adapters Unit Tests', () => {
     });
 
     it('should fetch healthy baseline source from GitHub Contents API with preserved slashes and TARGET_GITHUB_REPO fallback', async () => {
+      nock.disableNetConnect();
       const healthySource = 'export const pool = { max: 10 };\n';
       const encoded = Buffer.from(healthySource, 'utf-8').toString('base64');
 
@@ -93,8 +116,13 @@ describe('Adapters Unit Tests', () => {
           content: encoded
         });
 
-      process.env.TARGET_GITHUB_REPO = 'https://github.com/AdmilsonGoncalves/zeromttr';
-      process.env.GITHUB_TOKEN = 'ghp_test_token';
+      setIsolatedEnv({
+        GITHUB_OWNER: undefined,
+        GITHUB_REPO: undefined,
+        GITHUB_API_BASE_URL: undefined,
+        TARGET_GITHUB_REPO: 'https://github.com/AdmilsonGoncalves/zeromttr',
+        GITHUB_TOKEN: 'ghp_test_token'
+      });
 
       const adapter = new DeterministicFallbackReasoningAdapter();
 
@@ -441,13 +469,13 @@ describe('Adapters Unit Tests', () => {
   });
 
   describe('TypeScriptPatchSyntaxValidator', () => {
-    it('should validate TS, JSX, and reject TS-only type annotations inside .js files', () => {
+    it('should validate TS, JSX, ambient TS declarations, and reject JS early/grammar errors', () => {
       const validator = new TypeScriptPatchSyntaxValidator();
 
-      expect(validator.isValidSyntax('worker.js', 'const count = 1;\nexport { count };')).toBe(
-        true
-      );
+      expect(validator.isValidSyntax('worker.js', 'export const x = 1;\nexport { x };')).toBe(true);
+      expect(validator.isValidSyntax('worker.js', 'export const x;')).toBe(false);
       expect(validator.isValidSyntax('worker.js', 'const count: number = 1;')).toBe(false);
+      expect(validator.isValidSyntax('ambient.ts', 'declare const x: number;')).toBe(true);
       expect(validator.isValidSyntax('view.jsx', 'export const View = () => <div />;')).toBe(true);
       expect(validator.isValidSyntax('view.jsx', 'export const View = () => <div>;')).toBe(false);
     });

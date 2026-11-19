@@ -365,7 +365,7 @@ describe('DispatchRemediation Use Case', () => {
     expect(tools.createRemediationPr).not.toHaveBeenCalled();
   });
 
-  it('should fall back when LLM returns syntactically invalid TypeScript or violates defensive policy', async () => {
+  it('should fall back when LLM returns syntactically invalid TypeScript even if required patterns are present', async () => {
     const incident = createMockIncident();
     const repo: IncidentRepository = {
       findById: vi.fn(async () => incident),
@@ -396,14 +396,88 @@ describe('DispatchRemediation Use Case', () => {
         rootCause: 'rc',
         evidenceRefs: ['trace1'],
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
-        patchedContent: 'export function broken( { const x = ;;;',
-        explanation: 'invalid ts'
+        patchedContent: 'export function broken( { const pool = { max: 10 }; client.release(); ;;;',
+        explanation: 'invalid ts despite containing required patterns'
       }))
     };
 
     const fallbackAdapter: ReasoningPort = {
       synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
         summary: 'Fallback valid TS',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'fallback'
+      }))
+    };
+
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const syntaxValidator = new TypeScriptPatchSyntaxValidator();
+
+    const useCase = new DispatchRemediation(
+      repo,
+      tools,
+      llmAdapter,
+      fallbackAdapter,
+      broadcaster,
+      undefined,
+      {
+        syntaxValidator,
+        requiredContentPatterns: [/client\.release\(/, /max:\s*10/]
+      }
+    );
+
+    const result = await useCase.execute(incident.id, validEvidence, 'blob123');
+    expect(result.reasoningSource).toBe('fallback');
+    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalledTimes(1);
+    expect(tools.createRemediationPr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patched_content: validPatch,
+        reasoning_source: 'fallback'
+      })
+    );
+  });
+
+  it('should fall back when LLM returns syntactically valid TypeScript missing a required content pattern', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-inc-test-001',
+        branchUrl:
+          'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-test-001',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/46',
+        commitSha: 'commit-pattern'
+      })),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 105, success: true }))
+    };
+
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Valid TS missing required pool size',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: 'export function ok(client: { release: () => void }) { client.release(); }',
+        explanation: 'valid ts missing max: 10'
+      }))
+    };
+
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Fallback valid TS with pattern',
         rootCause: 'rc',
         evidenceRefs: ['trace1'],
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
@@ -509,11 +583,13 @@ describe('DispatchRemediation Use Case', () => {
     expect(second.reasoningSource).toBe('llm');
 
     // When both LLM and fallback violate requiredContentPatterns, abort before opening PR
+    const prCallsBefore = vi.mocked(tools.createRemediationPr).mock.calls.length;
     const incidentInvalid = createMockIncident();
     vi.mocked(repo.findById).mockResolvedValueOnce(incidentInvalid);
     vi.mocked(llmAdapter.synthesizeRcaAndPatch).mockRejectedValueOnce(new Error('LLM down'));
     await expect(useCase.execute(incidentInvalid.id, validEvidence, 'blob123')).rejects.toThrow(
       'Fallback remediation patch failed defensive validation'
     );
+    expect(tools.createRemediationPr).toHaveBeenCalledTimes(prCallsBefore);
   });
 });

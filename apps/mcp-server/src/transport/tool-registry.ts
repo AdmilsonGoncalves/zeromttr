@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { CreateRemediationPrInputSchema, ReasoningSourceSchema } from '@zeromttr/contracts';
+import {
+  AnalyzeOtelTraceInputSchema,
+  CreateRemediationPrInputSchema,
+  SendPostMortemResendInputSchema
+} from '@zeromttr/contracts';
 import { toErrorMessage } from '@zeromttr/utils';
 import type {
   ExecutePromqlRange,
@@ -113,12 +117,7 @@ export class ToolRegistry {
       name: 'analyze_otel_trace',
       description:
         'Analyzes an OpenTelemetry distributed trace, returning Blast Radius (services_involved), top 5 error spans, and top 5 slowest spans.',
-      schema: z.object({
-        trace_id: z
-          .string()
-          .regex(/^[0-9a-fA-F]{32}$/, 'Must be a 32-character hexadecimal string')
-          .describe('The 32-character hexadecimal trace ID')
-      }),
+      schema: AnalyzeOtelTraceInputSchema,
       inputSchema: {
         type: 'object',
         properties: {
@@ -230,20 +229,7 @@ export class ToolRegistry {
       name: 'send_post_mortem_resend',
       description:
         'Dispatches post-mortem notification via Resend with escaped HTML and signed HMAC decision links in the URI fragment (#).',
-      schema: z.object({
-        incident_id: z.string(),
-        recipient_email: z.string().optional(),
-        title: z.string(),
-        rca_summary: z.string(),
-        evidence_coverage: z.string(),
-        reasoning_source: ReasoningSourceSchema,
-        blast_radius: z.array(z.string()),
-        regression_commit: z.string(),
-        pull_request_url: z.string(),
-        approve_url: z.string(),
-        reject_url: z.string(),
-        leaked_patterns_detected: z.number().int().optional()
-      }),
+      schema: SendPostMortemResendInputSchema,
       inputSchema: {
         type: 'object',
         properties: {

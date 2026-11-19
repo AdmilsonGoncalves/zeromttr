@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   IncidentDocSchema,
+  IncidentEventType,
   IncidentNotificationSchema,
   IncidentStateSchema,
   PiiGuardAuditSchema,
@@ -9,11 +10,37 @@ import {
 import { ReasoningSourceSchema } from '../llm/reasoning.schema.js';
 import { FinOpsMetricsSchema } from '../tools/finops.schema.js';
 
-export const ReplayTimelineEventSchema = z.object({
-  event: z.string().min(1),
-  state: IncidentStateSchema.optional(),
-  delayMs: z.number().int().nonnegative()
-});
+export const ReplayTimelineEventSchema = z.discriminatedUnion('event', [
+  z.object({
+    event: z.literal(IncidentEventType.CREATED),
+    delayMs: z.number().int().nonnegative()
+  }),
+  z.object({
+    event: z.literal(IncidentEventType.TRANSITION),
+    state: IncidentStateSchema,
+    delayMs: z.number().int().nonnegative()
+  }),
+  z.object({
+    event: z.literal(IncidentEventType.FINOPS),
+    delayMs: z.number().int().nonnegative()
+  }),
+  z.object({
+    event: z.literal(IncidentEventType.DOCS),
+    delayMs: z.number().int().nonnegative()
+  }),
+  z.object({
+    event: z.literal(IncidentEventType.RCA),
+    delayMs: z.number().int().nonnegative()
+  }),
+  z.object({
+    event: z.literal(IncidentEventType.REMEDIATION),
+    delayMs: z.number().int().nonnegative()
+  }),
+  z.object({
+    event: z.literal(IncidentEventType.NOTIFIED),
+    delayMs: z.number().int().nonnegative()
+  })
+]);
 export type ReplayTimelineEvent = z.infer<typeof ReplayTimelineEventSchema>;
 
 /**

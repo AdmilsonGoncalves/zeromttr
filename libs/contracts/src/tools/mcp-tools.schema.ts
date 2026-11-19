@@ -6,8 +6,8 @@ const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
 // 1. execute_promql_range
 export const ExecutePromqlRangeInputSchema = z.object({
   query: z.string().min(1),
-  start: z.string().datetime().or(z.number()),
-  end: z.string().datetime().or(z.number()),
+  start: z.string().datetime(),
+  end: z.string().datetime(),
   step: z.string().optional().default('15s')
 });
 
@@ -28,7 +28,7 @@ export const ExecutePromqlRangeOutputSchema = z.object({
 
 // 2. analyze_otel_trace
 export const AnalyzeOtelTraceInputSchema = z.object({
-  traceId: z.string().regex(TRACE_ID_REGEX)
+  trace_id: z.string().regex(TRACE_ID_REGEX, 'Must be a 32-character hexadecimal string')
 });
 
 export const CriticalTraceSpanSchema = z.object({
@@ -69,8 +69,8 @@ export const SearchTracesByTraceqlOutputSchema = z.object({
 // 4. query_loki_logs
 export const QueryLokiLogsInputSchema = z.object({
   logql: z.string().min(1),
-  start: z.string().datetime().or(z.number()),
-  end: z.string().datetime().or(z.number()),
+  start: z.string().datetime(),
+  end: z.string().datetime(),
   limit: z.number().int().min(1).max(100).optional().default(50)
 });
 
@@ -124,9 +124,18 @@ export const CreateRemediationPrOutputSchema = z.object({
 
 // 7. send_post_mortem_resend
 export const SendPostMortemResendInputSchema = z.object({
-  incidentId: z.string().min(1),
-  recipientEmail: z.string().email(),
-  htmlBody: z.string().min(1)
+  incident_id: z.string().min(1),
+  recipient_email: z.string().email().optional(),
+  title: z.string().min(1),
+  rca_summary: z.string().min(1),
+  evidence_coverage: z.string().min(1),
+  reasoning_source: z.enum(['llm', 'fallback']),
+  blast_radius: z.array(z.string()),
+  regression_commit: z.string().min(1),
+  pull_request_url: z.string(),
+  approve_url: z.string().url(),
+  reject_url: z.string().url(),
+  leaked_patterns_detected: z.number().int().nonnegative().optional()
 });
 
 export const SendPostMortemResendOutputSchema = z.object({
