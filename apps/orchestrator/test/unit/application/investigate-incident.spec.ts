@@ -1,18 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { InvestigateIncident } from '../../../src/application/index.js';
+import { InvestigateIncident } from '../../../src/application/investigate-incident.js';
 import {
   AlertSeverity,
   IncidentEventType,
-  IncidentState,
-  Incident,
   TargetHealthStatus
-} from '../../../src/domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  TargetStatusPort,
-  EventBroadcasterPort
-} from '../../../src/ports/index.js';
+} from '../../../src/domain/incident-enums.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { ToolsPort } from '../../../src/ports/tools.port.js';
+import type { TargetStatusPort } from '../../../src/ports/target-status.port.js';
+import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 
 describe('InvestigateIncident Use Case', () => {
   const createMockIncident = () =>

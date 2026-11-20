@@ -1,5 +1,9 @@
 import { isNonEmptyString } from '@zeromttr/utils';
-import type { RepoInspectorPort, DeployDiffRequest, DeployDiffBundle } from '../ports/index.js';
+import type {
+  RepoInspectorPort,
+  DeployDiffRequest,
+  DeployDiffBundle
+} from '../ports/repo-inspector.port.js';
 
 export class InspectGitDeployDiff {
   constructor(private readonly repoInspectorPort: RepoInspectorPort) {}

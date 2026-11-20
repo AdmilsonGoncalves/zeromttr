@@ -10,28 +10,25 @@ import {
 import {
   GrafanaAnnotationTag,
   IncidentEventType,
-  IncidentState,
   OrchestratorDefault,
-  OrchestratorLogEvent,
-  PiiPromptGuard,
   ReasoningProvider,
-  TransitionReason,
-  calculateEvidenceCoverage,
-  type RcaReport,
-  type ReasoningSource,
-  type SpanNode
-} from '../domain/index.js';
+  TransitionReason
+} from '../domain/incident-enums.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
+import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
+import { calculateEvidenceCoverage } from '../domain/evidence-coverage.js';
+import type { RcaReport, ReasoningSource, SpanNode } from '../domain/rca-report.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { ToolsPort, CreateRemediationPrOutput } from '../ports/tools.port.js';
 import type {
-  IncidentRepository,
-  ToolsPort,
   ReasoningPort,
-  EventBroadcasterPort,
-  LoggerPort,
   PatchSyntaxValidatorPort,
   CollectedEvidence,
-  RcaAndPatchSynthesis,
-  CreateRemediationPrOutput
-} from '../ports/index.js';
+  RcaAndPatchSynthesis
+} from '../ports/reasoning.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 
 export interface DispatchRemediationResult {
   rcaReport: RcaReport;

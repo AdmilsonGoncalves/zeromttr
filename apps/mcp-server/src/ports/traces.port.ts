@@ -1,4 +1,4 @@
-import type { RawSpan } from '../domain/index.js';
+import type { RawSpan } from '../domain/span-analysis.js';
 
 export interface TraceSearchResult {
   traceId: string;

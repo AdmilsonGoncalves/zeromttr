@@ -1,5 +1,5 @@
-import type { MetricsPort, PromqlQueryInput, MetricsQueryResult } from '../ports/index.js';
-import type { RawPromSeries } from '../domain/index.js';
+import type { MetricsPort, PromqlQueryInput, MetricsQueryResult } from '../ports/metrics.port.js';
+import type { RawPromSeries } from '../domain/summarize-series.js';
 import { diffInSeconds, isArray, toErrorMessage } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 

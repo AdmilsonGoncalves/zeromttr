@@ -1,16 +1,13 @@
 import { round } from '@zeromttr/utils';
 import {
   IncidentEventType,
-  IncidentState,
   OrchestratorDefault,
   TransitionReason
-} from '../domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  EventBroadcasterPort,
-  GitDeployDiffOutput
-} from '../ports/index.js';
+} from '../domain/incident-enums.js';
+import { IncidentState } from '../domain/incident-state.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { ToolsPort, GitDeployDiffOutput } from '../ports/tools.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
 export class EnrichWithDeployDiff {
   public constructor(

@@ -1,6 +1,6 @@
 import { isArray, isObject, isString, nowIso } from '@zeromttr/utils';
-import { LogLevel } from '../domain/index.js';
-import type { LogContext, LoggerPort } from '../ports/index.js';
+import { LogLevel } from '../domain/log-enums.js';
+import type { LogContext, LoggerPort } from '../ports/logger.port.js';
 
 const LOG_LEVEL_WEIGHT: Record<LogLevel, number> = {
   [LogLevel.DEBUG]: 10,

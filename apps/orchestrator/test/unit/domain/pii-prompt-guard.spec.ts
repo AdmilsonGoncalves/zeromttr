@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PiiPromptGuard } from '../../../src/domain/index.js';
+import { PiiPromptGuard } from '../../../src/domain/pii-prompt-guard.js';
 
 describe('PiiPromptGuard (Fail-Closed)', () => {
   it('should pass cleanly with zero leaked patterns for sanitized logs with REDACTED tokens', () => {

@@ -1,5 +1,9 @@
 import { isNonEmptyString } from '@zeromttr/utils';
-import type { NotifierPort, PostMortemNotification, NotificationReceipt } from '../ports/index.js';
+import type {
+  NotifierPort,
+  PostMortemNotification,
+  NotificationReceipt
+} from '../ports/notifier.port.js';
 
 export class SendPostMortemResend {
   constructor(private readonly notifierPort: NotifierPort) {}

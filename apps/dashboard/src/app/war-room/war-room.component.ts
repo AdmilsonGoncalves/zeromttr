@@ -17,15 +17,10 @@ import { Button } from 'primeng/button';
 import { Timeline } from 'primeng/timeline';
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from 'primeng/tabs';
 import { ProgressBar } from 'primeng/progressbar';
-import {
-  I18nService,
-  type IncidentMode,
-  IncidentService,
-  type Language,
-  MASKED_POST_OTTL_LOG,
-  MOCK_GIT_DIFF,
-  RAW_PRE_COLLECTOR_LOG
-} from '../core/index.js';
+import { I18nService, type Language } from '../core/i18n.service.js';
+import type { IncidentMode } from '../core/contract.js';
+import { IncidentService } from '../core/incident.service.js';
+import { MASKED_POST_OTTL_LOG, MOCK_GIT_DIFF, RAW_PRE_COLLECTOR_LOG } from '../core/constants.js';
 
 interface ModeOption {
   label: string;

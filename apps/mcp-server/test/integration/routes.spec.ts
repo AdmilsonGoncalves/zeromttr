@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type http from 'node:http';
 import { bootstrap } from '../../src/main.js';
 import { makeRequest } from '../helpers/http.js';
-import { mcpConfig } from '../../src/config/index.js';
+import { mcpConfig } from '../../src/config/env.js';
 
 describe('mcp-server routes integration', () => {
   let server: http.Server;

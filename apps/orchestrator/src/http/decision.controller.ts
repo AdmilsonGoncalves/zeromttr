@@ -2,13 +2,13 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { isArray, toErrorMessage } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
+import type { RecordDecision } from '../application/record-decision.js';
 import {
-  type RecordDecision,
   InvalidDecisionSignatureError,
   IncidentNotFoundError,
   IncidentAlreadyResolvedError
-} from '../application/index.js';
-import { DecisionAction } from '../domain/index.js';
+} from '../application/decision-helpers.js';
+import { DecisionAction } from '../domain/incident-enums.js';
 
 export const DecisionPayloadSchema = z.object({
   action: z.enum([DecisionAction.APPROVE, DecisionAction.REJECT]),

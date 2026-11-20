@@ -1,8 +1,10 @@
 import type http from 'node:http';
 import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import { handleChaosRoutes, handleHealthRoutes, handlePaymentsRoutes } from './routes/index.js';
-import { initTelemetry } from './telemetry/index.js';
+import { handleChaosRoutes } from './routes/chaos.routes.js';
+import { handleHealthRoutes } from './routes/health.routes.js';
+import { handlePaymentsRoutes } from './routes/payments.routes.js';
+import { initTelemetry } from './telemetry/otel.js';
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // Basic response defaults

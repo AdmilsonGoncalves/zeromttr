@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import nock from 'nock';
-import { getMcpDomainStatus } from '../../src/domain/index.js';
-import { checkMcpApplicationHealth } from '../../src/application/index.js';
+import { getMcpDomainStatus } from '../../src/domain/mcp-domain-status.js';
+import { checkMcpApplicationHealth } from '../../src/application/check-mcp-health.js';
 import { GrafanaAnnotationsHttpAdapter } from '../../src/adapters/grafana-annotations.http.js';
 import { ResendHttpAdapter } from '../../src/adapters/resend.http.js';
 import { TempoHttpAdapter } from '../../src/adapters/tempo.http.js';

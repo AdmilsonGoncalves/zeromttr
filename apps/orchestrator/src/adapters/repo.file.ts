@@ -5,14 +5,15 @@ import { diffInSeconds, isArray, isObject, safeJsonParse, toErrorMessage } from 
 import {
   DecisionAction,
   DecisionSource,
-  Incident,
   IncidentExecutionMode,
-  IncidentState,
-  NotificationStatus,
-  OrchestratorLogEvent,
-  type RcaReport
-} from '../domain/index.js';
-import type { IncidentRepository, LoggerPort } from '../ports/index.js';
+  NotificationStatus
+} from '../domain/incident-enums.js';
+import { Incident } from '../domain/incident.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
+import type { RcaReport } from '../domain/rca-report.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 
 const PersistedTransitionSchema = z.object({
   from: z.nativeEnum(IncidentState).nullable(),

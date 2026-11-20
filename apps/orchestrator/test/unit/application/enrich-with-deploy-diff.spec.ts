@@ -1,11 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EnrichWithDeployDiff } from '../../../src/application/index.js';
-import { IncidentState, Incident } from '../../../src/domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  EventBroadcasterPort
-} from '../../../src/ports/index.js';
+import { EnrichWithDeployDiff } from '../../../src/application/enrich-with-deploy-diff.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { ToolsPort } from '../../../src/ports/tools.port.js';
+import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 
 describe('EnrichWithDeployDiff Use Case', () => {
   it('should transition to ENRICHING, call inspectGitDeployDiff, emit finops and docs events', async () => {

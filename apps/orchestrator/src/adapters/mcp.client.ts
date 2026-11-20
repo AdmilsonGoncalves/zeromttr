@@ -9,7 +9,7 @@ import {
   safeJsonParse
 } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess, sanitizeHeaderValue } from '@zeromttr/utils/http';
-import { OrchestratorDefault } from '../domain/index.js';
+import { OrchestratorDefault } from '../domain/incident-enums.js';
 import type {
   ToolsPort,
   FinOpsData,
@@ -30,7 +30,7 @@ import type {
   SendPostMortemOutput,
   AnnotateGrafanaInput,
   AnnotateGrafanaOutput
-} from '../ports/index.js';
+} from '../ports/tools.port.js';
 
 const McpJsonRpcPayloadSchema = z.object({
   result: z

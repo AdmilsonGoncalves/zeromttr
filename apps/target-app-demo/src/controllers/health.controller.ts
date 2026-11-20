@@ -1,6 +1,6 @@
 import type http from 'node:http';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import { paymentService, PaymentService } from '../services/index.js';
+import { paymentService, PaymentService } from '../services/payment.service.js';
 
 export class HealthController {
   public constructor(private service: PaymentService = paymentService) {}

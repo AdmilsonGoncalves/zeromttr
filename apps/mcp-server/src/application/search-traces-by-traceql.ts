@@ -1,5 +1,5 @@
 import { clamp, isEmpty, isFilled, nowIso } from '@zeromttr/utils';
-import type { TracesPort, TraceSearchResult } from '../ports/index.js';
+import type { TracesPort, TraceSearchResult } from '../ports/traces.port.js';
 import { validateTimeRange } from './validate-time-range.js';
 
 export interface SearchTracesByTraceQLInput {

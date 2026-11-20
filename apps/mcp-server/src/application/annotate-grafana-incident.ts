@@ -1,5 +1,9 @@
 import { isArray, isNonEmptyString, unique } from '@zeromttr/utils';
-import type { AnnotationPort, AnnotationRequest, AnnotationReceipt } from '../ports/index.js';
+import type {
+  AnnotationPort,
+  AnnotationRequest,
+  AnnotationReceipt
+} from '../ports/annotation.port.js';
 
 export class AnnotateGrafanaIncident {
   constructor(private readonly annotationPort: AnnotationPort) {}

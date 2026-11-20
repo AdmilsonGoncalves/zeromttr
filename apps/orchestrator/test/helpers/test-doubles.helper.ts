@@ -1,17 +1,17 @@
 import { vi } from 'vitest';
-import type {
-  Clock,
-  EventBroadcasterPort,
-  FinOpsData,
-  IncidentRepository,
-  ReasoningPort,
-  TargetStatus,
-  TargetStatusPort,
-  ToolsPort
-} from '../../src/ports/index.js';
-import { TargetHealthStatus, type Incident } from '../../src/domain/index.js';
-import { HandleAlert, OrchestratorWorkflow, RecordDecision } from '../../src/application/index.js';
-import { SimulateDemoDecision, type DemoControlPort } from '../../src/demo/index.js';
+import type { Clock } from '../../src/ports/clock.port.js';
+import type { EventBroadcasterPort } from '../../src/ports/event-broadcaster.port.js';
+import type { FinOpsData, ToolsPort } from '../../src/ports/tools.port.js';
+import type { IncidentRepository } from '../../src/ports/incident-repository.port.js';
+import type { ReasoningPort } from '../../src/ports/reasoning.port.js';
+import type { TargetStatus, TargetStatusPort } from '../../src/ports/target-status.port.js';
+import { TargetHealthStatus } from '../../src/domain/incident-enums.js';
+import type { Incident } from '../../src/domain/incident.js';
+import { HandleAlert } from '../../src/application/handle-alert.js';
+import { OrchestratorWorkflow } from '../../src/application/orchestrator-workflow.js';
+import { RecordDecision } from '../../src/application/record-decision.js';
+import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
+import type { DemoControlPort } from '../../src/demo/demo-control.port.js';
 
 export function createMockFinOpsData(overrides: Partial<FinOpsData> = {}): FinOpsData {
   return {

@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { nowIso } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import type { EventBroadcasterPort } from '../ports/index.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
 export class SseEventBroadcaster implements EventBroadcasterPort {
   private readonly clients = new Set<Response>();

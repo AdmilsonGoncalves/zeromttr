@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { healthController } from '../controllers/index.js';
+import { healthController } from '../controllers/health.controller.js';
 
 export async function handleHealthRoutes(
   req: http.IncomingMessage,

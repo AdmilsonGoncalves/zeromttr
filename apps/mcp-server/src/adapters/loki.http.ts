@@ -1,4 +1,4 @@
-import type { LogsPort, LokiQueryInput, LogsQueryResult } from '../ports/index.js';
+import type { LogsPort, LokiQueryInput, LogsQueryResult } from '../ports/logs.port.js';
 import { isArray, isString, toErrorMessage } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 

@@ -1,7 +1,8 @@
 import '@angular/compiler';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WarRoomComponent } from '../src/app/war-room/war-room.component.js';
-import { I18nService, IncidentService } from '../src/app/core/index.js';
+import { I18nService } from '../src/app/core/i18n.service.js';
+import { IncidentService } from '../src/app/core/incident.service.js';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
 
 describe('WarRoomComponent', () => {

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import ts from 'typescript';
 import { isNonEmptyString } from '@zeromttr/utils';
-import type { PatchSyntaxValidatorPort } from '../ports/index.js';
+import type { PatchSyntaxValidatorPort } from '../ports/reasoning.port.js';
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const JS_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs']);

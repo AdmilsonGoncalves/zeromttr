@@ -1,15 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { TypeScriptPatchSyntaxValidator } from '../../../src/adapters/index.js';
-import { DispatchRemediation } from '../../../src/application/index.js';
-import { IncidentState, Incident } from '../../../src/domain/index.js';
+import { TypeScriptPatchSyntaxValidator } from '../../../src/adapters/patch-syntax-validator.js';
+import { DispatchRemediation } from '../../../src/application/dispatch-remediation.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { ToolsPort } from '../../../src/ports/tools.port.js';
 import type {
-  IncidentRepository,
-  ToolsPort,
   ReasoningPort,
-  EventBroadcasterPort,
   CollectedEvidence,
   RcaAndPatchSynthesis
-} from '../../../src/ports/index.js';
+} from '../../../src/ports/reasoning.port.js';
+import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 
 describe('DispatchRemediation Use Case', () => {
   const createMockIncident = () =>

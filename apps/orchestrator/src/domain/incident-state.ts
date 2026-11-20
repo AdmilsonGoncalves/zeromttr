@@ -55,3 +55,12 @@ export function transitionState(
     ...(reason ? { reason } : {})
   };
 }
+
+export const ORCHESTRATOR_DOMAIN_VERSION = '1.0.0';
+
+export function getIncidentInitialState(): { state: IncidentState; version: string } {
+  return {
+    state: IncidentState.RECEIVED,
+    version: ORCHESTRATOR_DOMAIN_VERSION
+  };
+}

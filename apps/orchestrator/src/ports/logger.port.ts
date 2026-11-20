@@ -1,4 +1,4 @@
-import type { OrchestratorLogEvent } from '../domain/index.js';
+import type { OrchestratorLogEvent } from '../domain/log-enums.js';
 
 export interface LogContext {
   event: OrchestratorLogEvent | string;

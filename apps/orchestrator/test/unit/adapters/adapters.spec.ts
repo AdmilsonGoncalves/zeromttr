@@ -3,16 +3,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import nock from 'nock';
-import {
-  McpClientAdapter,
-  FileIncidentRepository,
-  HttpTargetStatusAdapter,
-  DeterministicFallbackReasoningAdapter,
-  TypeScriptPatchSyntaxValidator
-} from '../../../src/adapters/index.js';
-import { HttpDemoControlAdapter } from '../../../src/demo/index.js';
-import { Incident, IncidentState } from '../../../src/domain/index.js';
-import type { CollectedEvidence } from '../../../src/ports/index.js';
+import { McpClientAdapter } from '../../../src/adapters/mcp.client.js';
+import { FileIncidentRepository } from '../../../src/adapters/repo.file.js';
+import { HttpTargetStatusAdapter } from '../../../src/adapters/target-status.http.js';
+import { DeterministicFallbackReasoningAdapter } from '../../../src/adapters/llm.fallback.js';
+import { TypeScriptPatchSyntaxValidator } from '../../../src/adapters/patch-syntax-validator.js';
+import { HttpDemoControlAdapter } from '../../../src/demo/demo-control.http.js';
+import { Incident } from '../../../src/domain/incident.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import type { CollectedEvidence } from '../../../src/ports/reasoning.port.js';
 
 describe('Adapters Unit Tests', () => {
   const tempDir = path.join(os.tmpdir(), `zeromttr-adapters-test-${process.pid}`);

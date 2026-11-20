@@ -1,17 +1,11 @@
-import {
-  DecisionHmac,
-  DecisionSource,
-  GrafanaAnnotationTag,
-  Incident,
-  type IncidentDecisionAction
-} from '../domain/index.js';
-import type {
-  Clock,
-  EventBroadcasterPort,
-  IncidentRepository,
-  LoggerPort,
-  ToolsPort
-} from '../ports/index.js';
+import { DecisionHmac } from '../domain/decision-hmac.js';
+import { DecisionSource, GrafanaAnnotationTag } from '../domain/incident-enums.js';
+import { Incident, type IncidentDecisionAction } from '../domain/incident.js';
+import type { Clock } from '../ports/clock.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
+import type { ToolsPort } from '../ports/tools.port.js';
 import { applyIncidentDecision, InvalidDecisionSignatureError } from './decision-helpers.js';
 
 export {

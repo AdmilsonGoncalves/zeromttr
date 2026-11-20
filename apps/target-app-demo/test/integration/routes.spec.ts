@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type http from 'node:http';
-import { chaosManager } from '../../src/chaos/index.js';
+import { chaosManager } from '../../src/chaos/chaos.manager.js';
 import { paymentRepository } from '../../src/repositories/payment.repository.js';
 import {
   createTestServer,

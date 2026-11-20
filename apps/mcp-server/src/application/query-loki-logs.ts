@@ -1,6 +1,7 @@
 import { clamp } from '@zeromttr/utils';
-import type { LogsPort, LokiQueryInput } from '../ports/index.js';
-import { LogTruncator, FinOpsCalculator, type FinOpsMetrics } from '../domain/index.js';
+import type { LogsPort, LokiQueryInput } from '../ports/logs.port.js';
+import { LogTruncator } from '../domain/truncate.js';
+import { FinOpsCalculator, type FinOpsMetrics } from '../domain/finops.js';
 import { validateTimeRange } from './validate-time-range.js';
 
 export interface QueryLokiLogsOutput {

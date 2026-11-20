@@ -5,7 +5,11 @@ import {
   sanitizeHeaderValue,
   trimTrailingSlash
 } from '@zeromttr/utils/http';
-import type { AnnotationPort, AnnotationRequest, AnnotationReceipt } from '../ports/index.js';
+import type {
+  AnnotationPort,
+  AnnotationRequest,
+  AnnotationReceipt
+} from '../ports/annotation.port.js';
 
 export interface GrafanaAnnotationsConfig {
   baseUrl: string;

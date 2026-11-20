@@ -5,14 +5,14 @@ import http from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import { FileIncidentRepository } from '../../src/adapters/index.js';
-import {
-  createDemoRouterFactory,
-  ReplayRunner,
-  SimulateDemoDecision
-} from '../../src/demo/index.js';
-import { IncidentEventType, IncidentExecutionMode, IncidentState } from '../../src/domain/index.js';
-import { createApp, SseEventBroadcaster } from '../../src/http/index.js';
+import { FileIncidentRepository } from '../../src/adapters/repo.file.js';
+import { createDemoRouterFactory } from '../../src/demo/demo.controller.js';
+import { ReplayRunner } from '../../src/demo/replay-runner.js';
+import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
+import { IncidentEventType, IncidentExecutionMode } from '../../src/domain/incident-enums.js';
+import { IncidentState } from '../../src/domain/incident-state.js';
+import { createApp } from '../../src/http/app.js';
+import { SseEventBroadcaster } from '../../src/http/events.sse.js';
 import { collectSseEventsUntil } from '../helpers/http.js';
 import {
   createMockDemoControlPort,

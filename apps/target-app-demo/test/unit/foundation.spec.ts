@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { chaosManager, ChaosManager } from '../../src/chaos/index.js';
+import { chaosManager, ChaosManager } from '../../src/chaos/chaos.manager.js';
 import { CreatePaymentSchema } from '../../src/models/payment.model.js';
 import { KnexTimeoutError } from '../../src/repositories/payment.repository.js';
 import {

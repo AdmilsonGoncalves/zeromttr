@@ -12,12 +12,9 @@ import { isEmpty, isNonEmptyString, parseNumber, toErrorMessage } from '@zeromtt
 import { Button } from 'primeng/button';
 import { Card } from 'primeng/card';
 import { Tag } from 'primeng/tag';
-import {
-  type DecisionPayload,
-  I18nService,
-  type IncidentDecisionAction,
-  IncidentService
-} from '../core/index.js';
+import type { DecisionPayload, IncidentDecisionAction } from '../core/contract.js';
+import { I18nService } from '../core/i18n.service.js';
+import { IncidentService } from '../core/incident.service.js';
 
 @Component({
   selector: 'app-decision',

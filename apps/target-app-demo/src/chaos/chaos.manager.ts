@@ -1,8 +1,6 @@
 import { clamp, isNumber } from '@zeromttr/utils';
 import { TargetReleaseVersion, TargetServiceIdentity } from './target-metadata-enums.js';
 
-export * from './target-metadata-enums.js';
-
 export interface ChaosStatus {
   status: 'healthy' | 'degraded';
   service: string;

@@ -8,8 +8,8 @@ import {
   toErrorMessage
 } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
-import type { TracesPort, TraceSearchResult, TraceSearchWindow } from '../ports/index.js';
-import { extractOtelAttributeValue, type RawSpan } from '../domain/index.js';
+import type { TracesPort, TraceSearchResult, TraceSearchWindow } from '../ports/traces.port.js';
+import { extractOtelAttributeValue, type RawSpan } from '../domain/span-analysis.js';
 
 export interface TempoAdapterConfig {
   baseUrl: string;

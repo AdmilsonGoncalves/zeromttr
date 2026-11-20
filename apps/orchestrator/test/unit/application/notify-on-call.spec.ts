@@ -1,12 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { isObject } from '@zeromttr/utils';
-import { NotifyOnCall } from '../../../src/application/index.js';
-import {
-  AlertSeverity,
-  IncidentEventType,
-  IncidentState,
-  Incident
-} from '../../../src/domain/index.js';
+import { NotifyOnCall } from '../../../src/application/notify-on-call.js';
+import { AlertSeverity, IncidentEventType } from '../../../src/domain/incident-enums.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
 import {
   createMockBroadcaster,
   createMockClock,

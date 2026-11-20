@@ -8,7 +8,7 @@ import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { ToolRegistry } from './tool-registry.js';
 import { handleAuthMiddleware } from './auth.js';
 import { logger } from './logger.js';
-import { checkMcpApplicationHealth } from '../application/index.js';
+import { checkMcpApplicationHealth } from '../application/check-mcp-health.js';
 
 export interface McpServerOptions {
   authToken: string;

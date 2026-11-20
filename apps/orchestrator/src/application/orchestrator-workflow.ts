@@ -1,16 +1,14 @@
 import { toErrorMessage } from '@zeromttr/utils';
 import {
   IncidentEventType,
-  IncidentState,
   OrchestratorDefault,
   TargetHealthStatus,
   TransitionReason
-} from '../domain/index.js';
-import type {
-  IncidentRepository,
-  EventBroadcasterPort,
-  CollectedEvidence
-} from '../ports/index.js';
+} from '../domain/incident-enums.js';
+import { IncidentState } from '../domain/incident-state.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
+import type { CollectedEvidence } from '../ports/reasoning.port.js';
 import type { InvestigateIncident } from './investigate-incident.js';
 import type { EnrichWithDeployDiff } from './enrich-with-deploy-diff.js';
 import type { DispatchRemediation } from './dispatch-remediation.js';

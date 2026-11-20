@@ -10,13 +10,9 @@ import type {
   DeployDiffRequest,
   DeployDiffBundle,
   DeployDiffFile
-} from '../ports/index.js';
-import {
-  truncateDiff,
-  sanitizeAuthorLogin,
-  sanitizeCommitMessage,
-  calculateFinOps
-} from '../domain/index.js';
+} from '../ports/repo-inspector.port.js';
+import { truncateDiff, sanitizeAuthorLogin, sanitizeCommitMessage } from '../domain/truncate.js';
+import { calculateFinOps } from '../domain/finops.js';
 
 export interface GithubInspectorConfig {
   repo: string;

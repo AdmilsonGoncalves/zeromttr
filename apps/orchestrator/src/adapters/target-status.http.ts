@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
-import { OrchestratorDefault, TargetHealthStatus } from '../domain/index.js';
-import type { TargetStatus, TargetStatusPort } from '../ports/index.js';
+import { OrchestratorDefault, TargetHealthStatus } from '../domain/incident-enums.js';
+import type { TargetStatus, TargetStatusPort } from '../ports/target-status.port.js';
 
 const TargetStatusSchema = z.object({
   status: z.enum([

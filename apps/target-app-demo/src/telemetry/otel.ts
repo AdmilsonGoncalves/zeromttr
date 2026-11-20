@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { chaosManager, TargetReleaseVersion, TargetServiceIdentity } from '../chaos/index.js';
+import { chaosManager } from '../chaos/chaos.manager.js';
+import { TargetReleaseVersion, TargetServiceIdentity } from '../chaos/target-metadata-enums.js';
 import { millisToUnixNano, nowIso, nowUnixNano } from '@zeromttr/utils';
 import { buildUrl } from '@zeromttr/utils/http';
 import {

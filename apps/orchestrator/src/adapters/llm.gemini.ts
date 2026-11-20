@@ -1,8 +1,12 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { RcaAndPatchSynthesisSchema } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber, safeJsonParse } from '@zeromttr/utils';
-import { ReasoningProvider } from '../domain/index.js';
-import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
+import { ReasoningProvider } from '../domain/incident-enums.js';
+import type {
+  ReasoningPort,
+  CollectedEvidence,
+  RcaAndPatchSynthesis
+} from '../ports/reasoning.port.js';
 
 export const GEMINI_SYSTEM_INSTRUCTION = `You are the ZeroMTTR Autonomous SRE Reasoner, a specialist in Root Cause Analysis (RCA) and remediation engineering for production microservices.
 

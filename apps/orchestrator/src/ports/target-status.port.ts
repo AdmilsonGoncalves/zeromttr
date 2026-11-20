@@ -1,4 +1,4 @@
-import type { TargetHealthStatus } from '../domain/index.js';
+import type { TargetHealthStatus } from '../domain/incident-enums.js';
 
 export interface TargetStatus {
   status: TargetHealthStatus | `${TargetHealthStatus}`;

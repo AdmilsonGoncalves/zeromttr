@@ -8,13 +8,12 @@ import express, {
 } from 'express';
 import { isEmpty } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import type { IncidentRepository, TargetStatusPort } from '../ports/index.js';
-import {
-  type HandleAlert,
-  type OrchestratorWorkflow,
-  type RecordDecision,
-  createInitialIncident
-} from '../application/index.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { TargetStatusPort } from '../ports/target-status.port.js';
+import type { HandleAlert } from '../application/handle-alert.js';
+import type { OrchestratorWorkflow } from '../application/orchestrator-workflow.js';
+import type { RecordDecision } from '../application/record-decision.js';
+import { createInitialIncident } from '../application/create-initial-incident.js';
 import { createGrafanaAuthMiddleware, createDashboardAuthMiddleware } from './auth.js';
 import { SseEventBroadcaster } from './events.sse.js';
 import { createWebhookRouter } from './webhook.controller.js';

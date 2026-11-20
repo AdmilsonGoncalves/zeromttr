@@ -1,6 +1,7 @@
-import { chaosManager, TargetReleaseVersion, TargetServiceIdentity } from '../chaos/index.js';
-import type { CreatePaymentInput, Payment } from '../models/index.js';
-import { paymentRepository, PaymentRepository } from '../repositories/index.js';
+import { chaosManager } from '../chaos/chaos.manager.js';
+import { TargetReleaseVersion, TargetServiceIdentity } from '../chaos/target-metadata-enums.js';
+import type { CreatePaymentInput, Payment } from '../models/payment.model.js';
+import { paymentRepository, PaymentRepository } from '../repositories/payment.repository.js';
 
 export interface ServiceHealth {
   status: 'ok' | 'degraded';

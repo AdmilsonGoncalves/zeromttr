@@ -1,25 +1,23 @@
 import type http from 'node:http';
-import { mcpConfig, type McpEnv } from './config/index.js';
-import {
-  PrometheusHttpAdapter,
-  LokiHttpAdapter,
-  TempoHttpAdapter,
-  GithubInspectorHttpAdapter,
-  GithubRemediationHttpAdapter,
-  ResendHttpAdapter,
-  GrafanaAnnotationsHttpAdapter
-} from './adapters/index.js';
-import {
-  ExecutePromqlRange,
-  QueryLokiLogs,
-  AnalyzeOtelTrace,
-  SearchTracesByTraceQL,
-  InspectGitDeployDiff,
-  CreateRemediationPr,
-  SendPostMortemResend,
-  AnnotateGrafanaIncident
-} from './application/index.js';
-import { ToolRegistry, createMcpHttpServer, logger } from './transport/index.js';
+import { mcpConfig, type McpEnv } from './config/env.js';
+import { PrometheusHttpAdapter } from './adapters/prometheus.http.js';
+import { LokiHttpAdapter } from './adapters/loki.http.js';
+import { TempoHttpAdapter } from './adapters/tempo.http.js';
+import { GithubInspectorHttpAdapter } from './adapters/github-inspector.http.js';
+import { GithubRemediationHttpAdapter } from './adapters/github-remediation.http.js';
+import { ResendHttpAdapter } from './adapters/resend.http.js';
+import { GrafanaAnnotationsHttpAdapter } from './adapters/grafana-annotations.http.js';
+import { ExecutePromqlRange } from './application/execute-promql-range.js';
+import { QueryLokiLogs } from './application/query-loki-logs.js';
+import { AnalyzeOtelTrace } from './application/analyze-otel-trace.js';
+import { SearchTracesByTraceQL } from './application/search-traces-by-traceql.js';
+import { InspectGitDeployDiff } from './application/inspect-git-deploy-diff.js';
+import { CreateRemediationPr } from './application/create-remediation-pr.js';
+import { SendPostMortemResend } from './application/send-post-mortem-resend.js';
+import { AnnotateGrafanaIncident } from './application/annotate-grafana-incident.js';
+import { ToolRegistry } from './transport/tool-registry.js';
+import { createMcpHttpServer } from './transport/mcp-server.js';
+import { logger } from './transport/logger.js';
 
 export interface BootstrapOverrides {
   env?: Partial<McpEnv>;

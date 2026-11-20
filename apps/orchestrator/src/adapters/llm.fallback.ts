@@ -6,8 +6,12 @@ import {
   sanitizeHeaderValue,
   trimTrailingSlash
 } from '@zeromttr/utils/http';
-import { OrchestratorDefault, ReasoningProvider } from '../domain/index.js';
-import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
+import { OrchestratorDefault, ReasoningProvider } from '../domain/incident-enums.js';
+import type {
+  ReasoningPort,
+  CollectedEvidence,
+  RcaAndPatchSynthesis
+} from '../ports/reasoning.port.js';
 
 export interface FallbackReasoningOptions {
   patchTemplate?: string;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateEvidenceCoverage } from '../../../src/domain/index.js';
+import { calculateEvidenceCoverage } from '../../../src/domain/evidence-coverage.js';
 
 describe('EvidenceCoverage Calculator', () => {
   it('should return 100% (4/4 signals) when all four signals are verified', () => {

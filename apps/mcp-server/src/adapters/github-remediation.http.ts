@@ -3,7 +3,7 @@ import type {
   RemediationPort,
   RemediationPrRequest,
   RemediationPrReceipt
-} from '../ports/index.js';
+} from '../ports/remediation.port.js';
 import { isNonEmptyArray, isNonEmptyString, isSafeRelativePath } from '@zeromttr/utils';
 import {
   HTTP_STATUS,

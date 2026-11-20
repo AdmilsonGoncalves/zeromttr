@@ -10,26 +10,23 @@ import {
   SendPostMortemResendInputSchema
 } from '@zeromttr/contracts';
 import { toErrorMessage } from '@zeromttr/utils';
+import type { ExecutePromqlRange } from '../application/execute-promql-range.js';
+import type { QueryLokiLogs } from '../application/query-loki-logs.js';
+import type { AnalyzeOtelTrace, AnalyzeOtelTraceInput } from '../application/analyze-otel-trace.js';
 import type {
-  ExecutePromqlRange,
-  QueryLokiLogs,
-  AnalyzeOtelTrace,
-  AnalyzeOtelTraceInput,
   SearchTracesByTraceQL,
-  SearchTracesByTraceQLInput,
-  InspectGitDeployDiff,
-  CreateRemediationPr,
-  SendPostMortemResend,
-  AnnotateGrafanaIncident
-} from '../application/index.js';
-import type {
-  AnnotationRequest,
-  DeployDiffRequest,
-  LokiQueryInput,
-  PostMortemNotification,
-  PromqlQueryInput,
-  RemediationPrRequest
-} from '../ports/index.js';
+  SearchTracesByTraceQLInput
+} from '../application/search-traces-by-traceql.js';
+import type { InspectGitDeployDiff } from '../application/inspect-git-deploy-diff.js';
+import type { CreateRemediationPr } from '../application/create-remediation-pr.js';
+import type { SendPostMortemResend } from '../application/send-post-mortem-resend.js';
+import type { AnnotateGrafanaIncident } from '../application/annotate-grafana-incident.js';
+import type { AnnotationRequest } from '../ports/annotation.port.js';
+import type { DeployDiffRequest } from '../ports/repo-inspector.port.js';
+import type { LokiQueryInput } from '../ports/logs.port.js';
+import type { PostMortemNotification } from '../ports/notifier.port.js';
+import type { PromqlQueryInput } from '../ports/metrics.port.js';
+import type { RemediationPrRequest } from '../ports/remediation.port.js';
 
 export interface McpToolDefinition {
   name: string;

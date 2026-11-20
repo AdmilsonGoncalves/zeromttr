@@ -1,33 +1,28 @@
 import http from 'node:http';
 import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
-import {
-  ConsoleJsonLogger,
-  FileIncidentRepository,
-  HttpTargetStatusAdapter,
-  McpClientAdapter,
-  DeterministicFallbackReasoningAdapter,
-  GeminiReasoningAdapter,
-  TypeScriptPatchSyntaxValidator
-} from './adapters/index.js';
-import {
-  createInitialIncident,
-  HandleAlert,
-  InvestigateIncident,
-  EnrichWithDeployDiff,
-  DispatchRemediation,
-  NotifyOnCall,
-  RecordDecision,
-  OrchestratorWorkflow
-} from './application/index.js';
-import {
-  HttpDemoControlAdapter,
-  ReplayRunner,
-  SimulateDemoDecision,
-  createDemoRouterFactory
-} from './demo/index.js';
-import { OrchestratorLogEvent } from './domain/index.js';
-import { SystemClock } from './ports/index.js';
-import { createApp, SseEventBroadcaster } from './http/index.js';
+import { ConsoleJsonLogger } from './adapters/logger.console.js';
+import { FileIncidentRepository } from './adapters/repo.file.js';
+import { HttpTargetStatusAdapter } from './adapters/target-status.http.js';
+import { McpClientAdapter } from './adapters/mcp.client.js';
+import { DeterministicFallbackReasoningAdapter } from './adapters/llm.fallback.js';
+import { GeminiReasoningAdapter } from './adapters/llm.gemini.js';
+import { TypeScriptPatchSyntaxValidator } from './adapters/patch-syntax-validator.js';
+import { createInitialIncident } from './application/create-initial-incident.js';
+import { HandleAlert } from './application/handle-alert.js';
+import { InvestigateIncident } from './application/investigate-incident.js';
+import { EnrichWithDeployDiff } from './application/enrich-with-deploy-diff.js';
+import { DispatchRemediation } from './application/dispatch-remediation.js';
+import { NotifyOnCall } from './application/notify-on-call.js';
+import { RecordDecision } from './application/record-decision.js';
+import { OrchestratorWorkflow } from './application/orchestrator-workflow.js';
+import { HttpDemoControlAdapter } from './demo/demo-control.http.js';
+import { ReplayRunner } from './demo/replay-runner.js';
+import { SimulateDemoDecision } from './demo/simulate-demo-decision.js';
+import { createDemoRouterFactory } from './demo/demo.controller.js';
+import { OrchestratorLogEvent } from './domain/log-enums.js';
+import { SystemClock } from './ports/clock.port.js';
+import { createApp } from './http/app.js';
+import { SseEventBroadcaster } from './http/events.sse.js';
 
 export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
   const logger = new ConsoleJsonLogger();

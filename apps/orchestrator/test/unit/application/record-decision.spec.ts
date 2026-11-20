@@ -1,24 +1,22 @@
 import { describe, it, expect, vi } from 'vitest';
+import { RecordDecision } from '../../../src/application/record-decision.js';
 import {
-  RecordDecision,
   InvalidDecisionSignatureError,
   IncidentAlreadyResolvedError
-} from '../../../src/application/index.js';
-import { SimulateDemoDecision } from '../../../src/demo/index.js';
+} from '../../../src/application/decision-helpers.js';
+import { SimulateDemoDecision } from '../../../src/demo/simulate-demo-decision.js';
 import {
   AlertSeverity,
   DecisionAction,
-  DecisionHmac,
-  DecisionSource,
-  Incident,
-  IncidentState
-} from '../../../src/domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  Clock,
-  EventBroadcasterPort
-} from '../../../src/ports/index.js';
+  DecisionSource
+} from '../../../src/domain/incident-enums.js';
+import { DecisionHmac } from '../../../src/domain/decision-hmac.js';
+import { Incident } from '../../../src/domain/incident.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { ToolsPort } from '../../../src/ports/tools.port.js';
+import type { Clock } from '../../../src/ports/clock.port.js';
+import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 import { createMockToolsPort } from '../../helpers/test-doubles.helper.js';
 
 describe('RecordDecision & SimulateDemoDecision Use Cases', () => {
