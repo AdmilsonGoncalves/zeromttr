@@ -276,4 +276,119 @@ describe('Demo Replay Mode Integration (TECH 09 §6)', () => {
     const saved = await repository.findById(incidentId);
     expect(saved?.state).toBe(IncidentState.RECEIVED);
   });
+
+  it('should prevent a stale concurrent trigger from registering replay timers after stop()', async () => {
+    const snapshotPath = path.join(tempDir, 'concurrent-replay.json');
+    fs.writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        recordedAt: '2026-11-07T18:00:00.000Z',
+        incidentId: 'inc-live-demo-concurrent',
+        service: 'api-pagamentos-core',
+        severity: 'critical',
+        evidenceCoverage: {
+          score: 100,
+          signalsCollected: 4,
+          signalsTotal: 4,
+          signals: ['promql_anomaly', 'metric_exemplar', 'tempo_error_span', 'loki_log_diff']
+        },
+        blastRadius: {
+          servicesInvolved: ['api-pagamentos-core']
+        },
+        finops: {
+          rawBytesFetched: 1000,
+          compactedBytesSentToLlm: 100,
+          payloadReductionPercent: 90,
+          estimatedTokensSaved: 225
+        },
+        piiGuardAudit: {
+          leakedPatternsDetected: 0,
+          detectedTypes: [],
+          edgeRedactedTokensVerified: 1,
+          passed: true
+        },
+        rca: {
+          summary: 'Pool exhausted',
+          rootCause: 'Missing client.release()',
+          reasoningSource: 'llm',
+          suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts'
+        },
+        remediation: {
+          branchUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-conc',
+          pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/3',
+          commitSha: '1234567'
+        },
+        eventsTimeline: [
+          { event: 'incident.created', delayMs: 30_000 },
+          { event: 'incident.transition', state: 'NOTIFIED', delayMs: 30_000 }
+        ]
+      }),
+      'utf-8'
+    );
+
+    const storePath = path.join(tempDir, 'incidents-concurrent.json');
+    const repository = new FileIncidentRepository(storePath);
+
+    let releaseFirstSave: (() => void) | undefined;
+    const firstSaveBlocked = new Promise<void>((resolve) => {
+      releaseFirstSave = resolve;
+    });
+
+    const originalSave = repository.save.bind(repository);
+    let saveCalls = 0;
+    vi.spyOn(repository, 'save').mockImplementation(async (incident) => {
+      saveCalls++;
+      if (saveCalls === 1) {
+        await firstSaveBlocked;
+      }
+      await originalSave(incident);
+    });
+
+    const activeReplayTimers = new Set<ReturnType<typeof setTimeout>>();
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: (...args: unknown[]) => void,
+      ms?: number,
+      ...args: unknown[]
+    ) => {
+      const handle = realSetTimeout(
+        (...cbArgs: unknown[]) => {
+          activeReplayTimers.delete(handle);
+          fn(...cbArgs);
+        },
+        ms,
+        ...args
+      );
+      if (ms === 30_000) {
+        activeReplayTimers.add(handle);
+      }
+      return handle;
+    }) as typeof setTimeout);
+    vi.spyOn(globalThis, 'clearTimeout').mockImplementation(((
+      handle?: ReturnType<typeof setTimeout>
+    ) => {
+      if (handle) {
+        activeReplayTimers.delete(handle);
+      }
+      return realClearTimeout(handle);
+    }) as typeof clearTimeout);
+
+    const replayRunner = new ReplayRunner(repository, broadcaster, {
+      snapshotPath,
+      speedFactor: 1
+    });
+
+    const firstTriggerPromise = replayRunner.trigger();
+    const secondTriggerId = await replayRunner.trigger();
+    await new Promise((resolve) => realSetTimeout(resolve, 10));
+
+    replayRunner.stop();
+    releaseFirstSave?.();
+    const firstTriggerId = await firstTriggerPromise;
+    await new Promise((resolve) => realSetTimeout(resolve, 10));
+
+    expect(firstTriggerId).not.toBe(secondTriggerId);
+    expect(activeReplayTimers.size).toBe(0);
+  });
 });

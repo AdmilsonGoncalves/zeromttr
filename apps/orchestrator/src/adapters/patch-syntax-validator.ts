@@ -31,65 +31,7 @@ interface SourceFileWithDiagnostics extends ts.SourceFile {
   >;
 }
 
-function collectSuppressionRanges(sourceFile: SourceFileWithDiagnostics): TextRangeWithOffsets[] {
-  const ranges: TextRangeWithOffsets[] = [];
-
-  if (sourceFile.checkJsDirective && sourceFile.checkJsDirective.enabled === false) {
-    ranges.push({ pos: sourceFile.checkJsDirective.pos, end: sourceFile.checkJsDirective.end });
-  }
-
-  if (sourceFile.commentDirectives) {
-    for (const directive of sourceFile.commentDirectives) {
-      ranges.push(directive.range);
-    }
-  }
-
-  const nocheckPragmas = sourceFile.pragmas?.get('ts-nocheck');
-  if (nocheckPragmas) {
-    const entries = Array.isArray(nocheckPragmas) ? nocheckPragmas : [nocheckPragmas];
-    for (const entry of entries) {
-      ranges.push(entry.range);
-    }
-  }
-
-  return ranges;
-}
-
-function stripDiagnosticSuppressionDirectives(
-  sourceFile: SourceFileWithDiagnostics,
-  content: string
-): string {
-  const ranges = collectSuppressionRanges(sourceFile);
-  if (ranges.length === 0) {
-    return content;
-  }
-
-  const chars = content.split('');
-  for (const range of ranges) {
-    const start = Math.max(0, range.pos);
-    const end = Math.min(chars.length, range.end);
-    for (let i = start; i < end; i++) {
-      if (chars[i] !== '\n' && chars[i] !== '\r') {
-        chars[i] = ' ';
-      }
-    }
-  }
-
-  return chars.join('');
-}
-
-function getScriptKind(ext: string): ts.ScriptKind {
-  if (ext === '.tsx') {
-    return ts.ScriptKind.TSX;
-  }
-  if (ext === '.jsx') {
-    return ts.ScriptKind.JSX;
-  }
-  if (JS_EXTENSIONS.has(ext)) {
-    return ts.ScriptKind.JS;
-  }
-  return ts.ScriptKind.TS;
-}
+const SUPPRESSION_DIRECTIVE_PATTERN = /@ts-(?:ignore|expect-error|nocheck)/gi;
 
 /**
  * Validates TypeScript/JavaScript/JSX patch syntax using the TypeScript Compiler API.
@@ -106,7 +48,7 @@ export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort 
       return true;
     }
 
-    const scriptKind = getScriptKind(ext);
+    const scriptKind = this.getScriptKind(ext);
     const sourceFile = ts.createSourceFile(
       filePath,
       content,
@@ -130,7 +72,7 @@ export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort 
 
     // For JS/JSX files, run Program diagnostics on a directive-stripped validation view
     // to catch TypeScript-only syntax and JS early errors without mutating the original patch.
-    const validationContent = stripDiagnosticSuppressionDirectives(sourceFile, content);
+    const validationContent = this.stripDiagnosticSuppressionDirectives(sourceFile, content);
     const validationSourceFile =
       validationContent === content
         ? sourceFile
@@ -169,5 +111,72 @@ export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort 
       .getSemanticDiagnostics(validationSourceFile)
       .filter((diag) => JS_EARLY_ERROR_CODES.has(diag.code));
     return earlyErrors.length === 0;
+  }
+
+  /**
+   * Neutralizes `@ts-ignore`, `@ts-expect-error`, and `@ts-nocheck` directives within TypeScript-parsed
+   * comment ranges of a validation-only copy so semantic checks cannot be suppressed in JS patches,
+   * while preserving block-comment delimiters, line structure, and the original patch text.
+   */
+  private stripDiagnosticSuppressionDirectives(
+    sourceFile: SourceFileWithDiagnostics,
+    content: string
+  ): string {
+    const ranges = this.collectSuppressionRanges(sourceFile);
+    if (ranges.length === 0) {
+      return content;
+    }
+
+    const chars = content.split('');
+    for (const range of ranges) {
+      const start = Math.max(0, range.pos);
+      const end = Math.min(chars.length, range.end);
+      const slice = content.slice(start, end);
+      const neutralized = slice.replace(SUPPRESSION_DIRECTIVE_PATTERN, (match) =>
+        ' '.repeat(match.length)
+      );
+      for (let i = 0; i < neutralized.length; i++) {
+        chars[start + i] = neutralized[i];
+      }
+    }
+
+    return chars.join('');
+  }
+
+  private collectSuppressionRanges(sourceFile: SourceFileWithDiagnostics): TextRangeWithOffsets[] {
+    const ranges: TextRangeWithOffsets[] = [];
+
+    if (sourceFile.checkJsDirective && sourceFile.checkJsDirective.enabled === false) {
+      ranges.push({ pos: sourceFile.checkJsDirective.pos, end: sourceFile.checkJsDirective.end });
+    }
+
+    if (sourceFile.commentDirectives) {
+      for (const directive of sourceFile.commentDirectives) {
+        ranges.push(directive.range);
+      }
+    }
+
+    const nocheckPragmas = sourceFile.pragmas?.get('ts-nocheck');
+    if (nocheckPragmas) {
+      const entries = Array.isArray(nocheckPragmas) ? nocheckPragmas : [nocheckPragmas];
+      for (const entry of entries) {
+        ranges.push(entry.range);
+      }
+    }
+
+    return ranges;
+  }
+
+  private getScriptKind(ext: string): ts.ScriptKind {
+    if (ext === '.tsx') {
+      return ts.ScriptKind.TSX;
+    }
+    if (ext === '.jsx') {
+      return ts.ScriptKind.JSX;
+    }
+    if (JS_EXTENSIONS.has(ext)) {
+      return ts.ScriptKind.JS;
+    }
+    return ts.ScriptKind.TS;
   }
 }

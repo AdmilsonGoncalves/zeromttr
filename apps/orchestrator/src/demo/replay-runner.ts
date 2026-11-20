@@ -102,6 +102,10 @@ export class ReplayRunner {
     });
     await this.repository.save(incident);
 
+    if (runId !== this.activeRunId) {
+      return replayIncidentId;
+    }
+
     void this.playTimeline(runId, incident, snapshot).catch((err: unknown) => {
       this.logger?.error({
         event: OrchestratorLogEvent.REPLAY_PLAYBACK_FAILED,
@@ -113,16 +117,25 @@ export class ReplayRunner {
     return replayIncidentId;
   }
 
-  private async delay(ms: number): Promise<void> {
+  private async delay(runId: number, ms: number): Promise<void> {
+    if (runId !== this.activeRunId) {
+      return;
+    }
     const scaledMs = Math.max(0, Math.round(ms * this.speedFactor));
     if (scaledMs === 0) {
       return;
     }
     await new Promise<void>((resolve) => {
+      if (runId !== this.activeRunId) {
+        resolve();
+        return;
+      }
       this.activeDelayResolve = resolve;
       this.activeDelayTimer = setTimeout(() => {
-        this.activeDelayTimer = undefined;
-        this.activeDelayResolve = undefined;
+        if (runId === this.activeRunId) {
+          this.activeDelayTimer = undefined;
+          this.activeDelayResolve = undefined;
+        }
         resolve();
       }, scaledMs);
     });
@@ -218,12 +231,19 @@ export class ReplayRunner {
     incident: Incident,
     snapshot: ReplaySnapshot
   ): Promise<void> {
+    if (runId !== this.activeRunId) {
+      return;
+    }
+
     let finopsEmitted = false;
     let docsEmitted = false;
     let notifiedEmitted = false;
 
     for (const step of snapshot.eventsTimeline) {
-      await this.delay(step.delayMs);
+      if (runId !== this.activeRunId) {
+        return;
+      }
+      await this.delay(runId, step.delayMs);
       if (runId !== this.activeRunId) {
         return;
       }

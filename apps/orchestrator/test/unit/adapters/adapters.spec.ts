@@ -486,6 +486,18 @@ describe('Adapters Unit Tests', () => {
       expect(validator.isValidSyntax('worker.js', '// @ts-nocheck\nexport const x = 1;')).toBe(
         true
       );
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-expect-error */\nexport const x;')
+      ).toBe(false);
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-expect-error */\nexport const x = 1;')
+      ).toBe(true);
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-ignore */\nexport const x;')
+      ).toBe(false);
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-ignore */\nexport const x = 1;')
+      ).toBe(true);
       expect(validator.isValidSyntax('worker.js', 'const count: number = 1;')).toBe(false);
       expect(validator.isValidSyntax('worker.js', '// comment only')).toBe(false);
       expect(validator.isValidSyntax('payment.repository.ts', '/* comment only */')).toBe(false);
