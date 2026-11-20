@@ -1,14 +1,20 @@
 import type http from 'node:http';
-import { CreatePaymentSchema } from '../models/index.js';
-import { KnexTimeoutError } from '../repositories/index.js';
-import { paymentService, PaymentService } from '../services/index.js';
-import { SpanStatusCode, telemetry } from '../telemetry/index.js';
+import { CreatePaymentSchema } from '../models/payment.model.js';
+import { KnexTimeoutError } from '../repositories/payment.repository.js';
+import { paymentService, PaymentService } from '../services/payment.service.js';
+import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
 import { durationInSeconds, isNonEmptyString, toErrorMessage } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 
+/**
+ * HTTP controller handling PIX payment creation/lookup with OpenTelemetry spans and latency metrics.
+ */
 export class PaymentsController {
   public constructor(private service: PaymentService = paymentService) {}
 
+  /**
+   * Validates the payment request body, delegates creation, and records trace spans and HTTP latency metrics.
+   */
   public async createPayment(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -84,6 +90,9 @@ export class PaymentsController {
     }
   }
 
+  /**
+   * Looks up a payment by ID while recording OpenTelemetry spans and request duration metrics.
+   */
   public async getPayment(
     req: http.IncomingMessage,
     res: http.ServerResponse,

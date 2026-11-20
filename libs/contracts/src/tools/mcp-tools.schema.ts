@@ -52,7 +52,9 @@ export const AnalyzeOtelTraceOutputSchema = z.object({
 // 3. search_traces_by_traceql
 export const SearchTracesByTraceqlInputSchema = z.object({
   query: z.string().min(1),
-  limit: z.number().int().min(1).max(20).optional().default(5)
+  limit: z.number().int().min(1).max(20).optional().default(5),
+  start: z.string().datetime({ offset: true }).optional(),
+  end: z.string().datetime({ offset: true }).optional()
 });
 
 export const TraceqlSearchHitSchema = z.object({

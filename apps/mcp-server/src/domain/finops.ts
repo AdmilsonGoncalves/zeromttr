@@ -8,6 +8,9 @@ export interface FinOpsMetrics {
   estimated_tokens_saved: number;
 }
 
+/**
+ * Computes byte and estimated LLM token savings between raw and compacted tool payloads.
+ */
 export function calculateFinOps(rawBytes: number, compactedBytes: number): FinOpsMetrics {
   const safeRaw = Math.max(0, rawBytes);
   const safeCompacted = Math.max(0, compactedBytes);
@@ -31,7 +34,13 @@ export function calculateFinOps(rawBytes: number, compactedBytes: number): FinOp
   };
 }
 
+/**
+ * Domain helper facade computing schema-validated FinOps byte and token reduction metrics.
+ */
 export class FinOpsCalculator {
+  /**
+   * Calculates validated FinOps payload reduction metrics.
+   */
   static calculate(rawBytes: number, compactedBytes: number): FinOpsMetrics {
     return calculateFinOps(rawBytes, compactedBytes);
   }

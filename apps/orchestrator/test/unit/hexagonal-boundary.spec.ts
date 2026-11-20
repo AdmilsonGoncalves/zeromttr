@@ -9,7 +9,7 @@ describe('Hexagonal Boundary Architecture Guard', () => {
     try {
       fs.writeFileSync(
         filePath,
-        "import { BaseIncidentAdapter } from '../adapters/index.js';\nexport const x = BaseIncidentAdapter;\n"
+        "import { ConsoleJsonLogger } from '../adapters/logger.console.js';\nexport const x = ConsoleJsonLogger;\n"
       );
       const eslint = new ESLint({ ignore: false });
       const results = await eslint.lintFiles([filePath]);

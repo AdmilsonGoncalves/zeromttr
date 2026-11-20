@@ -1,27 +1,26 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
   inject,
+  OnInit,
   signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { isEmpty, isNonEmptyString, parseNumber, toErrorMessage } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
-import { Card } from 'primeng/card';
 import { Tag } from 'primeng/tag';
-import {
-  type DecisionPayload,
-  I18nService,
-  type IncidentDecisionAction,
-  IncidentService
-} from '../core/index.js';
+import type { DecisionPayload, IncidentDecisionAction } from '../core/contract.js';
+import { I18nService } from '../core/i18n.service.js';
+import { IncidentService } from '../core/incident.service.js';
 
+/**
+ * Standalone human-in-the-loop view parsing HMAC decision tokens from the URL fragment.
+ */
 @Component({
   selector: 'app-decision',
-  imports: [CommonModule, RouterModule, Button, Card, Tag],
+  imports: [CommonModule, RouterModule, Button, Tag],
   templateUrl: './decision.component.html',
   styleUrl: './decision.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -63,6 +62,9 @@ export class DecisionComponent implements OnInit {
     this.parseFragment();
   }
 
+  /**
+   * Extracts and validates `action`, `sig`, and `exp` from `window.location.hash`.
+   */
   parseFragment(): void {
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     if (isEmpty(hash) || hash.length < 2) {
@@ -113,6 +115,9 @@ export class DecisionComponent implements OnInit {
     this.isValid.set(true);
   }
 
+  /**
+   * Submits the validated HMAC decision payload to the orchestrator API.
+   */
   async executeDecision(): Promise<void> {
     if (!this.isValid() || this.isExpired()) {
       return;

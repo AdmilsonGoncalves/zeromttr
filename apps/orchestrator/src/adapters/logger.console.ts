@@ -1,6 +1,6 @@
 import { isArray, isObject, isString, nowIso } from '@zeromttr/utils';
-import { LogLevel } from '../domain/index.js';
-import type { LogContext, LoggerPort } from '../ports/index.js';
+import { LogLevel } from '../domain/log-enums.js';
+import type { LogContext, LoggerPort } from '../ports/logger.port.js';
 
 const LOG_LEVEL_WEIGHT: Record<LogLevel, number> = {
   [LogLevel.DEBUG]: 10,
@@ -70,6 +70,9 @@ function redactValue(value: unknown, seen = new WeakSet<object>()): unknown {
   return value;
 }
 
+/**
+ * Structured JSON console logger enforcing log-level filtering and automatic secret redaction.
+ */
 export class ConsoleJsonLogger implements LoggerPort {
   private readonly minLevel: LogLevel;
 
@@ -77,18 +80,30 @@ export class ConsoleJsonLogger implements LoggerPort {
     this.minLevel = resolveMinLevel(minLevel ?? process.env.LOG_LEVEL);
   }
 
+  /**
+   * Emits a debug-level structured JSON log entry with automatic secret redaction.
+   */
   public debug(context: LogContext): void {
     this.write(LogLevel.DEBUG, context);
   }
 
+  /**
+   * Emits an info-level structured JSON log entry with automatic secret redaction.
+   */
   public info(context: LogContext): void {
     this.write(LogLevel.INFO, context);
   }
 
+  /**
+   * Emits a warn-level structured JSON log entry with automatic secret redaction.
+   */
   public warn(context: LogContext): void {
     this.write(LogLevel.WARN, context);
   }
 
+  /**
+   * Emits an error-level structured JSON log entry with automatic secret redaction.
+   */
   public error(context: LogContext): void {
     this.write(LogLevel.ERROR, context);
   }

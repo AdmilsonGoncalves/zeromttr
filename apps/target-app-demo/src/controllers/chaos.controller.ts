@@ -1,9 +1,15 @@
 import type http from 'node:http';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import { chaosManager } from '../chaos/index.js';
-import { paymentRepository } from '../repositories/index.js';
+import { chaosManager } from '../chaos/chaos.manager.js';
+import { paymentRepository } from '../repositories/payment.repository.js';
 
+/**
+ * HTTP controller exposing chaos pool-saturation toggles and target status inspection endpoints.
+ */
 export class ChaosController {
+  /**
+   * Toggles pool saturation chaos mode, resets the pool on recovery, and responds with updated status.
+   */
   public togglePoolSaturation(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -26,6 +32,9 @@ export class ChaosController {
     );
   }
 
+  /**
+   * Responds with the current target app chaos status JSON payload.
+   */
   public getStatus(_req: http.IncomingMessage, res: http.ServerResponse): void {
     const status = chaosManager.getStatus();
     res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });

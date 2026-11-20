@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConsoleJsonLogger } from '../../src/adapters/logger.console.js';
-import { LogLevel, OrchestratorLogEvent } from '../../src/domain/index.js';
+import { LogLevel, OrchestratorLogEvent } from '../../src/domain/log-enums.js';
 
 describe('ConsoleJsonLogger', () => {
   afterEach(() => {

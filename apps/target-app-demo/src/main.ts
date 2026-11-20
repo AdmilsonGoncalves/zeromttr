@@ -7,6 +7,9 @@ export { createApp, startServer };
 
 const defaultPort = parseNumber(process.env.PORT, 3001);
 
+/**
+ * Starts the `target-app-demo` HTTP server on the given port.
+ */
 export function bootstrap(port: number = defaultPort): http.Server {
   return startServer(port);
 }

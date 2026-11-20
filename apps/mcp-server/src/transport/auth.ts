@@ -3,6 +3,9 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { isEmpty } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 
+/**
+ * Validates the HTTP Bearer authorization header using constant-time SHA-256 comparison.
+ */
 export function verifyAuthToken(req: http.IncomingMessage, expectedToken: string): boolean {
   if (isEmpty(expectedToken)) {
     return false;
@@ -23,6 +26,9 @@ export function verifyAuthToken(req: http.IncomingMessage, expectedToken: string
   return timingSafeEqual(digest(token), digest(expectedToken));
 }
 
+/**
+ * Enforces Bearer token authentication on protected MCP endpoints, writing HTTP 401 on failure.
+ */
 export function handleAuthMiddleware(
   req: http.IncomingMessage,
   res: http.ServerResponse,

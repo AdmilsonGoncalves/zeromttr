@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { DecisionAction, DecisionHmac } from '../../../src/domain/index.js';
+import { DecisionAction } from '../../../src/domain/incident-enums.js';
+import { DecisionHmac } from '../../../src/domain/decision-hmac.js';
 
 describe('DecisionHmac', () => {
   const secret = 'super-secret-hmac-key-zeromttr-2026';

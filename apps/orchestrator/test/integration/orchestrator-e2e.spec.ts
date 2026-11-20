@@ -4,36 +4,26 @@ import path from 'node:path';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
-import {
-  DeterministicFallbackReasoningAdapter,
-  FileIncidentRepository,
-  HttpTargetStatusAdapter,
-  McpClientAdapter
-} from '../../src/adapters/index.js';
+import { DeterministicFallbackReasoningAdapter } from '../../src/adapters/llm.fallback.js';
+import { FileIncidentRepository } from '../../src/adapters/repo.file.js';
+import { HttpTargetStatusAdapter } from '../../src/adapters/target-status.http.js';
+import { McpClientAdapter } from '../../src/adapters/mcp.client.js';
 import { isObject, isString } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import {
-  DispatchRemediation,
-  EnrichWithDeployDiff,
-  HandleAlert,
-  InvestigateIncident,
-  NotifyOnCall,
-  OrchestratorWorkflow,
-  RecordDecision
-} from '../../src/application/index.js';
-import {
-  AlertSeverity,
-  DecisionAction,
-  DecisionSource,
-  IncidentState,
-  isIncidentState
-} from '../../src/domain/index.js';
-import { createApp, SseEventBroadcaster } from '../../src/http/index.js';
-import {
-  createDemoRouterFactory,
-  HttpDemoControlAdapter,
-  SimulateDemoDecision
-} from '../../src/demo/index.js';
+import { DispatchRemediation } from '../../src/application/dispatch-remediation.js';
+import { EnrichWithDeployDiff } from '../../src/application/enrich-with-deploy-diff.js';
+import { HandleAlert } from '../../src/application/handle-alert.js';
+import { InvestigateIncident } from '../../src/application/investigate-incident.js';
+import { NotifyOnCall } from '../../src/application/notify-on-call.js';
+import { OrchestratorWorkflow } from '../../src/application/orchestrator-workflow.js';
+import { RecordDecision } from '../../src/application/record-decision.js';
+import { AlertSeverity, DecisionAction, DecisionSource } from '../../src/domain/incident-enums.js';
+import { IncidentState, isIncidentState } from '../../src/domain/incident-state.js';
+import { createApp } from '../../src/http/app.js';
+import { SseEventBroadcaster } from '../../src/http/events.sse.js';
+import { createDemoRouterFactory } from '../../src/demo/demo.controller.js';
+import { HttpDemoControlAdapter } from '../../src/demo/demo-control.http.js';
+import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
 import {
   cleanOrchestratorNock,
   mockMcpJsonRpcEndpoint,

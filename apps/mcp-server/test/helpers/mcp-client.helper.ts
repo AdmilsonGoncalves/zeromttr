@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type http from 'node:http';
 import { makeRequest } from './http.js';
-import { mcpConfig } from '../../src/config/index.js';
+import { mcpConfig } from '../../src/config/env.js';
 
 export interface McpCallResult {
   status: number;

@@ -1,5 +1,6 @@
 const DDD = '(?:1[1-9]|2[12478]|3[1-578]|4[1-9]|5[1345]|6[1-9]|7[13-579]|8[1-9]|9[1-9])'; // Valid ANATEL area codes (DDD)
 
+// Regexes detecting unmasked Brazilian PII and auth secrets before LLM dispatch
 export const PII_PATTERNS = {
   cpfDotted: /(?<![0-9a-zA-Z])\d{3}\.\d{3}\.\d{3}-\d{2}(?![0-9a-zA-Z])/,
   cnpjDotted: /(?<![0-9a-zA-Z])\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}(?![0-9a-zA-Z])/,
@@ -17,4 +18,5 @@ export const PII_PATTERNS = {
     /\b(?:pix(?:_?key)?|chave_?pix|evp)\b["':=\s]+[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i
 };
 
+// Matches edge-redaction placeholders injected by the OTel Collector OTTL processor
 export const EDGE_REDACTED_PATTERN = /\[REDACTED_[A-Z0-9_]+\]/g;

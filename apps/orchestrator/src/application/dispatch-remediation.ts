@@ -10,28 +10,25 @@ import {
 import {
   GrafanaAnnotationTag,
   IncidentEventType,
-  IncidentState,
   OrchestratorDefault,
-  OrchestratorLogEvent,
-  PiiPromptGuard,
   ReasoningProvider,
-  TransitionReason,
-  calculateEvidenceCoverage,
-  type RcaReport,
-  type ReasoningSource,
-  type SpanNode
-} from '../domain/index.js';
+  TransitionReason
+} from '../domain/incident-enums.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
+import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
+import { calculateEvidenceCoverage } from '../domain/evidence-coverage.js';
+import type { RcaReport, ReasoningSource, SpanNode } from '../domain/rca-report.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { ToolsPort, CreateRemediationPrOutput } from '../ports/tools.port.js';
 import type {
-  IncidentRepository,
-  ToolsPort,
   ReasoningPort,
-  EventBroadcasterPort,
-  LoggerPort,
   PatchSyntaxValidatorPort,
   CollectedEvidence,
-  RcaAndPatchSynthesis,
-  CreateRemediationPrOutput
-} from '../ports/index.js';
+  RcaAndPatchSynthesis
+} from '../ports/reasoning.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 
 export interface DispatchRemediationResult {
   rcaReport: RcaReport;
@@ -78,6 +75,9 @@ function validatePatchDefensively(
   return true;
 }
 
+/**
+ * Use case enforcing fail-closed PII checks, LLM/fallback synthesis, patch validation, and PR creation.
+ */
 export class DispatchRemediation {
   public constructor(
     private readonly repository: IncidentRepository,
@@ -89,6 +89,9 @@ export class DispatchRemediation {
     private readonly options: DispatchRemediationOptions = {}
   ) {}
 
+  /**
+   * Enforces PII guardrails, synthesizes RCA/patch, opens the remediation PR, and persists state.
+   */
   public async execute(
     incidentId: string,
     evidence: CollectedEvidence,
@@ -267,22 +270,7 @@ export class DispatchRemediation {
       ...rcaReport
     });
 
-    // Transition to AWAITING_PR
-    if (incident.state === IncidentState.REMEDIATING) {
-      const transitionAwaiting = incident.transition(
-        IncidentState.AWAITING_PR,
-        TransitionReason.AWAITING_PR
-      );
-      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-        incidentId: incident.id,
-        from: transitionAwaiting.from,
-        to: transitionAwaiting.to,
-        at: transitionAwaiting.at,
-        reason: transitionAwaiting.reason
-      });
-    }
-
-    // Create Remediation PR
+    // Create Remediation PR while incident remains in REMEDIATING so TTPR includes PR latency
     const prTitleSummary = truncate(sanitizeWhitespace(synthesis.summary), 72, '');
     const prResult = await this.tools.createRemediationPr({
       incident_id: incident.id,
@@ -298,6 +286,22 @@ export class DispatchRemediation {
       ...prResult,
       suspectCommitSha: evidence.gitDiff?.suspectCommit
     };
+
+    // Transition to AWAITING_PR only after createRemediationPr succeeds
+    if (incident.state === IncidentState.REMEDIATING) {
+      const transitionAwaiting = incident.transition(
+        IncidentState.AWAITING_PR,
+        TransitionReason.AWAITING_PR
+      );
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
+        incidentId: incident.id,
+        from: transitionAwaiting.from,
+        to: transitionAwaiting.to,
+        at: transitionAwaiting.at,
+        reason: transitionAwaiting.reason
+      });
+    }
+
     await this.repository.save(incident);
 
     this.broadcaster.broadcast(IncidentEventType.REMEDIATION, {

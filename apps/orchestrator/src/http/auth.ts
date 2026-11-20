@@ -3,6 +3,9 @@ import type { Request, Response, NextFunction } from 'express';
 import { isEmpty, isNonEmptyString, isString } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 
+/**
+ * Performs a constant-time SHA-256 comparison between two secret token strings.
+ */
 export function safeTokenCompare(
   tokenA: string | null | undefined,
   tokenB: string | null | undefined
@@ -15,6 +18,9 @@ export function safeTokenCompare(
   return crypto.timingSafeEqual(hashA, hashB);
 }
 
+/**
+ * Extracts a Bearer token from the `Authorization` header or permitted SSE query parameters.
+ */
 export function extractBearerToken(req: Request, allowQuery = false): string | null {
   const authHeader = req.headers.authorization;
   if (isNonEmptyString(authHeader) && authHeader.startsWith('Bearer ')) {
@@ -32,6 +38,9 @@ export function extractBearerToken(req: Request, allowQuery = false): string | n
   return null;
 }
 
+/**
+ * Creates Express middleware enforcing `GRAFANA_WEBHOOK_TOKEN` while rejecting `DASHBOARD_API_TOKEN`.
+ */
 export function createGrafanaAuthMiddleware(grafanaToken: string, dashboardToken: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const token = extractBearerToken(req, false);
@@ -62,6 +71,9 @@ export function createGrafanaAuthMiddleware(grafanaToken: string, dashboardToken
   };
 }
 
+/**
+ * Creates Express middleware requiring a valid `DASHBOARD_API_TOKEN` on `/api/*` routes.
+ */
 export function createDashboardAuthMiddleware(dashboardToken: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const token = extractBearerToken(req);
@@ -77,6 +89,9 @@ export function createDashboardAuthMiddleware(dashboardToken: string) {
   };
 }
 
+/**
+ * Creates Express middleware validating `X-Live-Demo-Key` when configured for public hosts.
+ */
 export function createLiveDemoKeyMiddleware(configuredKey?: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (isEmpty(configuredKey)) {

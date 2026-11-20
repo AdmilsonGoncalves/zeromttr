@@ -58,6 +58,9 @@ export interface IncidentProps {
   decisionSource?: IncidentDecisionSource;
 }
 
+/**
+ * Core incident aggregate enforcing valid FSM state transitions and encapsulating RCA and remediation state.
+ */
 export class Incident {
   public readonly id: string;
   public readonly service: string;
@@ -110,14 +113,23 @@ export class Incident {
     this.decisionSource = props.decisionSource;
   }
 
+  /**
+   * Returns the current lifecycle state of the incident.
+   */
   public get state(): IncidentState {
     return this._state;
   }
 
+  /**
+   * Returns the ordered history of state transitions for this incident.
+   */
   public get transitions(): readonly IncidentTransition[] {
     return this._transitions;
   }
 
+  /**
+   * Advances the incident to a valid next state and appends the transition record.
+   */
   public transition(to: IncidentState, reason?: string, at?: string): IncidentTransition {
     const record = transitionState(this._state, to, reason, at);
     this._state = to;
@@ -125,6 +137,9 @@ export class Incident {
     return record;
   }
 
+  /**
+   * Serializes the incident into a compact summary DTO for list endpoints.
+   */
   public toSummary(): {
     id: string;
     service: string;
@@ -143,6 +158,9 @@ export class Incident {
     };
   }
 
+  /**
+   * Serializes the complete incident record including RCA, FinOps, remediation, and decision metadata.
+   */
   public toDetail(): {
     id: string;
     service: string;

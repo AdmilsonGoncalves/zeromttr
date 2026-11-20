@@ -6,8 +6,12 @@ import {
   sanitizeHeaderValue,
   trimTrailingSlash
 } from '@zeromttr/utils/http';
-import { OrchestratorDefault, ReasoningProvider } from '../domain/index.js';
-import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
+import { OrchestratorDefault, ReasoningProvider } from '../domain/incident-enums.js';
+import type {
+  ReasoningPort,
+  CollectedEvidence,
+  RcaAndPatchSynthesis
+} from '../ports/reasoning.port.js';
 
 export interface FallbackReasoningOptions {
   patchTemplate?: string;
@@ -21,6 +25,9 @@ export interface FallbackReasoningOptions {
   defaultExplanation?: string;
 }
 
+/**
+ * Deterministic reasoning fallback generating RCA and baseline-restoration patches without external LLMs.
+ */
 export class DeterministicFallbackReasoningAdapter implements ReasoningPort {
   public constructor(private readonly options: FallbackReasoningOptions = {}) {}
 
@@ -149,6 +156,9 @@ export class DeterministicFallbackReasoningAdapter implements ReasoningPort {
     ].join('\n');
   }
 
+  /**
+   * Produces a deterministic RCA and fallback patch without calling external LLMs.
+   */
   public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
     const suspectFilePath = isNonEmptyString(evidence.gitDiff?.suspectFilePath)
       ? evidence.gitDiff.suspectFilePath

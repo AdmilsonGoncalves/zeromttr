@@ -22,6 +22,9 @@ export interface TraceSummary {
   criticalSpan?: RawSpan;
 }
 
+/**
+ * Unwraps OpenTelemetry attribute value wrappers (`stringValue`, `intValue`, `arrayValue`, etc.) into primitives.
+ */
 export function extractOtelAttributeValue(val: unknown): unknown {
   if (isObject(val)) {
     if ('stringValue' in val) {
@@ -44,6 +47,9 @@ export function extractOtelAttributeValue(val: unknown): unknown {
   return val;
 }
 
+/**
+ * Determines whether a normalized span represents an error or HTTP 4xx/5xx failure.
+ */
 export function isErrorSpan(span: RawSpan): boolean {
   if (
     span.statusCode === 2 ||
@@ -66,6 +72,9 @@ export function isErrorSpan(span: RawSpan): boolean {
   return false;
 }
 
+/**
+ * Summarizes a trace's spans into involved services, root/critical spans, and top error/slowest lists.
+ */
 export function analyzeSpans(spans: RawSpan[]): TraceSummary {
   if (spans.length === 0) {
     return {
@@ -112,7 +121,13 @@ export function analyzeSpans(spans: RawSpan[]): TraceSummary {
   };
 }
 
+/**
+ * Domain analyzer extracting service blast radius, error spans, and critical paths from raw spans.
+ */
 export class SpanAnalyzer {
+  /**
+   * Analyzes raw trace spans into a structured trace summary.
+   */
   static analyze(spans: RawSpan[]): TraceSummary {
     return analyzeSpans(spans);
   }

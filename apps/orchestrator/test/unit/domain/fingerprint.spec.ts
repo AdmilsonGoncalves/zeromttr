@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeAlertFingerprint } from '../../../src/domain/index.js';
+import { computeAlertFingerprint } from '../../../src/domain/fingerprint.js';
 
 describe('computeAlertFingerprint', () => {
   it('should generate deterministic fingerprint for given alert labels', () => {

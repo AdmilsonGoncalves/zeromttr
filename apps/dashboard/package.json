@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "catalog:",
     "typescript": "catalog:",
+    "vite": "^7.3.7",
     "vitest": "catalog:"
   },
   "dependencies": {

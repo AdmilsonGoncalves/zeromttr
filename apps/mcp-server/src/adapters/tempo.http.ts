@@ -1,7 +1,15 @@
-import { isArray, isNumber, isObject, isString, round, toErrorMessage } from '@zeromttr/utils';
+import {
+  isArray,
+  isFilled,
+  isNumber,
+  isObject,
+  isString,
+  round,
+  toErrorMessage
+} from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
-import type { TracesPort, TraceSearchResult } from '../ports/index.js';
-import { extractOtelAttributeValue, type RawSpan } from '../domain/index.js';
+import type { TracesPort, TraceSearchResult, TraceSearchWindow } from '../ports/traces.port.js';
+import { extractOtelAttributeValue, type RawSpan } from '../domain/span-analysis.js';
 
 export interface TempoAdapterConfig {
   baseUrl: string;
@@ -32,9 +40,15 @@ interface BatchSpanHolder {
   instrumentationLibrarySpans?: ScopeSpanHolder[];
 }
 
+/**
+ * Grafana Tempo HTTP adapter fetching OpenTelemetry trace spans and running TraceQL searches.
+ */
 export class TempoHttpAdapter implements TracesPort {
   constructor(private readonly config: TempoAdapterConfig) {}
 
+  /**
+   * Fetches and normalizes all OpenTelemetry spans for a trace ID from Tempo.
+   */
   async getTrace(traceId: string): Promise<{ rawBytes: number; spans: RawSpan[] }> {
     const url = buildUrl(this.config.baseUrl, `/api/traces/${traceId}`);
     const response = await fetch(url, {
@@ -121,13 +135,37 @@ export class TempoHttpAdapter implements TracesPort {
     return { rawBytes, spans };
   }
 
+  private toEpochSeconds(iso?: string): number | undefined {
+    if (!iso) {
+      return undefined;
+    }
+    const ms = Date.parse(iso);
+    if (!isNumber(ms)) {
+      return undefined;
+    }
+    return Math.floor(ms / 1000);
+  }
+
+  /**
+   * Searches traces in Tempo using TraceQL and an optional bounded time window.
+   */
   async searchTraces(
     query: string,
-    limit = 10
+    limit = 10,
+    window?: TraceSearchWindow
   ): Promise<{ rawBytes: number; traces: TraceSearchResult[] }> {
+    let startSec = this.toEpochSeconds(window?.start);
+    let endSec = this.toEpochSeconds(window?.end);
+    if (isNumber(startSec) && !isNumber(endSec)) {
+      endSec = Math.floor(Date.now() / 1000);
+    } else if (!isNumber(startSec) && isNumber(endSec)) {
+      startSec = Math.max(0, endSec - 300);
+    }
     const url = buildUrl(this.config.baseUrl, '/api/search', {
       q: query,
-      limit
+      limit,
+      start: startSec,
+      end: endSec
     });
     const response = await fetch(url, {
       headers: { Accept: 'application/json' }
@@ -168,11 +206,17 @@ export class TempoHttpAdapter implements TracesPort {
     const results = data.traces || data.results || [];
     if (isArray(results)) {
       for (const t of results) {
+        const rawTraceId = t.traceID || t.traceId || '';
+        const traceId = /^[0-9a-fA-F]{1,32}$/.test(rawTraceId)
+          ? rawTraceId.toLowerCase().padStart(32, '0')
+          : rawTraceId;
         traces.push({
-          traceId: t.traceID || t.traceId || '',
+          traceId,
           rootServiceName: t.rootServiceName,
           rootTraceName: t.rootTraceName,
-          startTimeUnixNano: t.startTimeUnixNano != null ? String(t.startTimeUnixNano) : undefined,
+          startTimeUnixNano: isFilled(t.startTimeUnixNano)
+            ? String(t.startTimeUnixNano)
+            : undefined,
           durationMs: isNumber(t.durationMs) ? round(t.durationMs) : undefined
         });
       }

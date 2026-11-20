@@ -1,9 +1,19 @@
 import { isNonEmptyString } from '@zeromttr/utils';
-import type { NotifierPort, PostMortemNotification, NotificationReceipt } from '../ports/index.js';
+import type {
+  NotifierPort,
+  PostMortemNotification,
+  NotificationReceipt
+} from '../ports/notifier.port.js';
 
+/**
+ * MCP use case validating decision URLs and dispatching post-mortem notifications via Resend.
+ */
 export class SendPostMortemResend {
   constructor(private readonly notifierPort: NotifierPort) {}
 
+  /**
+   * Validates required notification URLs and dispatches the post-mortem email via the notifier port.
+   */
   async execute(input: PostMortemNotification): Promise<NotificationReceipt> {
     if (
       !isNonEmptyString(input.incident_id) ||

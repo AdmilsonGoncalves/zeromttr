@@ -1,6 +1,6 @@
 import nock from 'nock';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import { TargetHealthStatus } from '../../src/domain/index.js';
+import { TargetHealthStatus } from '../../src/domain/incident-enums.js';
 
 export const TEST_MCP_BASE_URL = 'http://mcp-server.test:8000';
 export const TEST_TARGET_APP_URL = 'http://target-app.test:3000';

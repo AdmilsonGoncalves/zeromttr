@@ -8,7 +8,7 @@ import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { ToolRegistry } from './tool-registry.js';
 import { handleAuthMiddleware } from './auth.js';
 import { logger } from './logger.js';
-import { checkMcpApplicationHealth } from '../application/index.js';
+import { checkMcpApplicationHealth } from '../application/check-mcp-health.js';
 
 export interface McpServerOptions {
   authToken: string;
@@ -25,6 +25,9 @@ export interface McpSession {
   lastAccessedAt: number;
 }
 
+/**
+ * Creates the HTTP server hosting health endpoints and Streamable HTTP/SSE MCP sessions.
+ */
 export function createMcpHttpServer(options: McpServerOptions): http.Server {
   const { authToken, toolRegistry } = options;
   const sessions = new Map<string, McpSession>();

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GeminiReasoningAdapter } from '../../../src/adapters/llm.gemini.js';
-import type { CollectedEvidence } from '../../../src/ports/index.js';
+import type { CollectedEvidence } from '../../../src/ports/reasoning.port.js';
 
 const mockGenerateContent = vi.fn();
 

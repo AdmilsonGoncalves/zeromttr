@@ -8,6 +8,9 @@ export interface PiiGuardAudit {
   passed: boolean;
 }
 
+/**
+ * Validates an 11-digit Brazilian CPF using Modulo-11 check digits.
+ */
 export function isValidCpf(digits: string): boolean {
   if (digits.length !== 11) {
     return false;
@@ -43,6 +46,9 @@ export function isValidCpf(digits: string): boolean {
   return true;
 }
 
+/**
+ * Validates a 14-digit Brazilian CNPJ using Modulo-11 check digits.
+ */
 export function isValidCnpj(digits: string): boolean {
   if (digits.length !== 14) {
     return false;
@@ -76,7 +82,13 @@ export function isValidCnpj(digits: string): boolean {
   return true;
 }
 
+/**
+ * Fail-closed pre-LLM security guard blocking prompts containing unmasked Brazilian PII or auth tokens.
+ */
 export class PiiPromptGuard {
+  /**
+   * Scans prompt text for leaked PII patterns (fail-closed) and counts verified edge redaction tokens.
+   */
   public static inspectAndEnforceFailClosed(promptText: string): PiiGuardAudit {
     if (!isNonEmptyString(promptText)) {
       return {

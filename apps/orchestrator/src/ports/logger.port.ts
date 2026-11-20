@@ -1,4 +1,4 @@
-import type { OrchestratorLogEvent } from '../domain/index.js';
+import type { OrchestratorLogEvent } from '../domain/log-enums.js';
 
 export interface LogContext {
   event: OrchestratorLogEvent | string;
@@ -14,19 +14,34 @@ export interface LoggerPort {
   error(context: LogContext): void;
 }
 
+/**
+ * Silent LoggerPort implementation used when structured logging is disabled or injected in tests.
+ */
 export class NoopLogger implements LoggerPort {
+  /**
+   * Discards debug log messages.
+   */
   public debug(_context: LogContext): void {
     // Intentional no-op
   }
 
+  /**
+   * Discards info log messages.
+   */
   public info(_context: LogContext): void {
     // Intentional no-op
   }
 
+  /**
+   * Discards warn log messages.
+   */
   public warn(_context: LogContext): void {
     // Intentional no-op
   }
 
+  /**
+   * Discards error log messages.
+   */
   public error(_context: LogContext): void {
     // Intentional no-op
   }

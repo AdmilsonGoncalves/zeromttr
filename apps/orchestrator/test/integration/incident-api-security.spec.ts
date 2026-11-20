@@ -3,30 +3,27 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import type { Express } from 'express';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import { createApp, SseEventBroadcaster } from '../../src/http/index.js';
-import {
-  createDemoRouterFactory,
-  SimulateDemoDecision,
-  type DemoControlPort
-} from '../../src/demo/index.js';
+import { createApp } from '../../src/http/app.js';
+import { SseEventBroadcaster } from '../../src/http/events.sse.js';
+import { createDemoRouterFactory } from '../../src/demo/demo.controller.js';
+import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
+import type { DemoControlPort } from '../../src/demo/demo-control.port.js';
 import {
   AlertSeverity,
   DecisionAction,
   DecisionSource,
   IncidentEventType,
   IncidentExecutionMode,
-  IncidentState,
-  Incident,
-  DecisionHmac,
   TargetHealthStatus
-} from '../../src/domain/index.js';
-import type {
-  IncidentRepository,
-  TargetStatusPort,
-  Clock,
-  ToolsPort
-} from '../../src/ports/index.js';
-import { RecordDecision } from '../../src/application/index.js';
+} from '../../src/domain/incident-enums.js';
+import { IncidentState } from '../../src/domain/incident-state.js';
+import { Incident } from '../../src/domain/incident.js';
+import { DecisionHmac } from '../../src/domain/decision-hmac.js';
+import type { IncidentRepository } from '../../src/ports/incident-repository.port.js';
+import type { TargetStatusPort } from '../../src/ports/target-status.port.js';
+import type { Clock } from '../../src/ports/clock.port.js';
+import type { ToolsPort } from '../../src/ports/tools.port.js';
+import { RecordDecision } from '../../src/application/record-decision.js';
 import { createStubHandleAlert, createStubWorkflow } from '../helpers/test-doubles.helper.js';
 
 describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 2 & 5)', () => {

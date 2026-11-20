@@ -5,14 +5,15 @@ import { diffInSeconds, isArray, isObject, safeJsonParse, toErrorMessage } from 
 import {
   DecisionAction,
   DecisionSource,
-  Incident,
   IncidentExecutionMode,
-  IncidentState,
-  NotificationStatus,
-  OrchestratorLogEvent,
-  type RcaReport
-} from '../domain/index.js';
-import type { IncidentRepository, LoggerPort } from '../ports/index.js';
+  NotificationStatus
+} from '../domain/incident-enums.js';
+import { Incident } from '../domain/incident.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
+import type { RcaReport } from '../domain/rca-report.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 
 const PersistedTransitionSchema = z.object({
   from: z.nativeEnum(IncidentState).nullable(),
@@ -71,6 +72,9 @@ const PersistedIncidentSchema = z
   })
   .passthrough();
 
+/**
+ * In-memory incident repository with optional atomic JSON file persistence for replay and restart recovery.
+ */
 export class FileIncidentRepository implements IncidentRepository {
   private readonly store = new Map<string, Incident>();
   private readonly filePath?: string;
@@ -103,11 +107,17 @@ export class FileIncidentRepository implements IncidentRepository {
     }
   }
 
+  /**
+   * Finds an incident by its unique ID.
+   */
   public async findById(id: string): Promise<Incident | null> {
     const inc = this.store.get(id);
     return inc || null;
   }
 
+  /**
+   * Finds an active (non-terminal) incident matching the alert fingerprint.
+   */
   public async findOpenByFingerprint(fingerprint: string): Promise<Incident | null> {
     for (const inc of this.store.values()) {
       if (
@@ -122,10 +132,16 @@ export class FileIncidentRepository implements IncidentRepository {
     return null;
   }
 
+  /**
+   * Returns all stored incidents sorted chronologically by start timestamp.
+   */
   public async findAll(): Promise<Incident[]> {
     return Array.from(this.store.values()).sort((a, b) => diffInSeconds(a.startedAt, b.startedAt));
   }
 
+  /**
+   * Saves an incident in memory and atomically persists the store to disk when configured.
+   */
   public async save(incident: Incident): Promise<void> {
     this.store.set(incident.id, incident);
     if (this.filePath) {
@@ -149,6 +165,9 @@ export class FileIncidentRepository implements IncidentRepository {
     }
   }
 
+  /**
+   * Clears all incidents from the in-memory store.
+   */
   public clear(): void {
     this.store.clear();
   }

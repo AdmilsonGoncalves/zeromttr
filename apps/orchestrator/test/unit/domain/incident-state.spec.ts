@@ -4,7 +4,7 @@ import {
   InvalidTransitionError,
   canTransition,
   transitionState
-} from '../../../src/domain/index.js';
+} from '../../../src/domain/incident-state.js';
 
 describe('IncidentState FSM', () => {
   it('should allow valid transitions according to the lifecycle', () => {

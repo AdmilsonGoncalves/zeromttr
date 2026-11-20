@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { bootstrap } from '../../src/main.js';
-import { mcpConfig } from '../../src/config/index.js';
+import { mcpConfig } from '../../src/config/env.js';
 
 interface McpTestServer extends http.Server {
   getActiveSessionsCount?: () => number;

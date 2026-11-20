@@ -229,6 +229,9 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   hmacExpiredError: 'HMAC decision link has expired'
 };
 
+/**
+ * Signal-based internationalization service switching dashboard copy between Portuguese and English.
+ */
 @Injectable({
   providedIn: 'root'
 })
@@ -242,10 +245,16 @@ export class I18nService {
     return EN_TRANSLATIONS;
   });
 
+  /**
+   * Switches the active UI language signal.
+   */
   setLang(lang: Language): void {
     this.currentLang.set(lang);
   }
 
+  /**
+   * Resolves a localized string for the given translation key.
+   */
   t(key: keyof TranslationDictionary): string {
     return this.dict()[key];
   }

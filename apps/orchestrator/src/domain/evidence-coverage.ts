@@ -22,6 +22,9 @@ export interface EvidenceCoverageResult {
   breakdown: EvidenceCoverageBreakdown;
 }
 
+/**
+ * Computes weighted 4-signal observability coverage (PromQL, exemplar, Tempo span, Loki+Git diff).
+ */
 export function calculateEvidenceCoverage(inputs: EvidenceCoverageInputs): EvidenceCoverageResult {
   const signals: string[] = [];
 

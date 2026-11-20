@@ -79,6 +79,7 @@ processors:
       - context: datapoint
         statements:
           - set(attributes["service"], resource.attributes["service.name"]) where resource.attributes["service.name"] != nil
+          - set(attributes["service_name"], resource.attributes["service.name"]) where resource.attributes["service.name"] != nil
 
   redaction:
     allow_all_keys: true

@@ -4,15 +4,15 @@ import { diffInSeconds, isNonEmptyString } from '@zeromttr/utils';
 import {
   AlertSeverity,
   GrafanaAlertStatus,
-  Incident,
   IncidentEventType,
   IncidentExecutionMode,
-  IncidentState,
-  TransitionReason,
-  computeAlertFingerprint,
-  type IncidentMode
-} from '../domain/index.js';
-import type { IncidentRepository, EventBroadcasterPort } from '../ports/index.js';
+  TransitionReason
+} from '../domain/incident-enums.js';
+import { Incident, type IncidentMode } from '../domain/incident.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { computeAlertFingerprint } from '../domain/fingerprint.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
 export const GrafanaAlertItemSchema = z
   .object({
@@ -47,6 +47,9 @@ export interface HandleAlertResult {
   ignored?: boolean;
 }
 
+/**
+ * Use case ingesting Grafana alert webhooks with fingerprint deduplication and concurrency coalescing.
+ */
 export class HandleAlert {
   private readonly inFlightFingerprints = new Map<string, Promise<HandleAlertResult>>();
 
@@ -55,6 +58,9 @@ export class HandleAlert {
     private readonly broadcaster: EventBroadcasterPort
   ) {}
 
+  /**
+   * Parses Grafana webhook alerts, ignores resolved notices, deduplicates active fingerprints, and creates an incident.
+   */
   public async execute(rawPayload: unknown): Promise<HandleAlertResult> {
     const payload = GrafanaWebhookPayloadSchema.parse(rawPayload);
     const primaryAlert = payload.alerts[0];

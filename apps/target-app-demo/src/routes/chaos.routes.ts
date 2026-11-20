@@ -1,6 +1,9 @@
 import type http from 'node:http';
-import { chaosController } from '../controllers/index.js';
+import { chaosController } from '../controllers/chaos.controller.js';
 
+/**
+ * Dispatches `/chaos/pool-saturation` and `/chaos/status` HTTP routes to `ChaosController`.
+ */
 export function handleChaosRoutes(
   req: http.IncomingMessage,
   res: http.ServerResponse,

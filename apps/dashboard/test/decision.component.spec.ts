@@ -2,7 +2,8 @@ import '@angular/compiler';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { ActivatedRoute } from '@angular/router';
 import { DecisionComponent } from '../src/app/decision/decision.component.js';
-import { I18nService, IncidentService } from '../src/app/core/index.js';
+import { I18nService } from '../src/app/core/i18n.service.js';
+import { IncidentService } from '../src/app/core/incident.service.js';
 
 describe('DecisionComponent', () => {
   let component: DecisionComponent;

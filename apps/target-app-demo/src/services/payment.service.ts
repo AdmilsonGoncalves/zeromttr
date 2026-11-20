@@ -1,6 +1,7 @@
-import { chaosManager } from '../chaos/index.js';
-import type { CreatePaymentInput, Payment } from '../models/index.js';
-import { paymentRepository, PaymentRepository } from '../repositories/index.js';
+import { chaosManager } from '../chaos/chaos.manager.js';
+import { TargetReleaseVersion, TargetServiceIdentity } from '../chaos/target-metadata-enums.js';
+import type { CreatePaymentInput, Payment } from '../models/payment.model.js';
+import { paymentRepository, PaymentRepository } from '../repositories/payment.repository.js';
 
 export interface ServiceHealth {
   status: 'ok' | 'degraded';
@@ -14,9 +15,15 @@ export interface ServiceHealth {
   };
 }
 
+/**
+ * Service layer coordinating PIX payment persistence and aggregated database pool health reporting.
+ */
 export class PaymentService {
   public constructor(private repository: PaymentRepository = paymentRepository) {}
 
+  /**
+   * Delegates payment creation to the repository with optional trace context.
+   */
   public async createPayment(
     input: CreatePaymentInput,
     context?: { traceId?: string }
@@ -24,10 +31,16 @@ export class PaymentService {
     return this.repository.createPayment(input, context);
   }
 
+  /**
+   * Retrieves a payment record by ID from the repository.
+   */
   public async getPayment(id: string, traceId?: string): Promise<Payment | null> {
     return this.repository.getPaymentById(id, traceId);
   }
 
+  /**
+   * Aggregates chaos state and pool saturation metrics into a service health snapshot.
+   */
   public async getHealth(): Promise<ServiceHealth> {
     const isChaos = chaosManager.isPoolSaturationEnabled();
     const stats = this.repository.getPoolStats();
@@ -35,8 +48,8 @@ export class PaymentService {
 
     return {
       status: isPoolSaturated ? 'degraded' : 'ok',
-      service: 'api-pagamentos-core',
-      version: isChaos ? 'v2.14.8' : 'v2.14.7',
+      service: TargetServiceIdentity.SERVICE_NAME,
+      version: isChaos ? TargetReleaseVersion.DEGRADED : TargetReleaseVersion.HEALTHY,
       database: isPoolSaturated ? 'pool_saturated' : 'connected',
       pool: stats
     };

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getIncidentInitialState } from '../../src/domain/index.js';
-import { createInitialIncident } from '../../src/application/index.js';
+import { getIncidentInitialState } from '../../src/domain/incident-state.js';
+import { createInitialIncident } from '../../src/application/create-initial-incident.js';
 
 describe('orchestrator foundation', () => {
   it('should return initial state from domain', () => {

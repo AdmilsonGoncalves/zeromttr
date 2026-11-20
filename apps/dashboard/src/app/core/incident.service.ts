@@ -40,6 +40,9 @@ export interface TimelineStepItem {
   badgeSeverity?: 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast';
 }
 
+/**
+ * Signal-based state manager handling SSE incident streaming, polling, demo triggers, and signed decisions.
+ */
 @Injectable({
   providedIn: 'root'
 })
@@ -285,14 +288,23 @@ export class IncidentService {
     return steps;
   });
 
+  /**
+   * Updates the active demo execution mode (`live` or `replay`).
+   */
   setActiveMode(mode: IncidentMode): void {
     this.activeMode.set(mode);
   }
 
+  /**
+   * Stores the live demo authorization key used for protected chaos triggers.
+   */
   setLiveDemoKey(key: string): void {
     this.liveDemoKey.set(key);
   }
 
+  /**
+   * Opens an SSE subscription to stream real-time incident lifecycle updates.
+   */
   connectSse(baseUrl = ''): void {
     if (this.eventSource) {
       this.disconnectSse();
@@ -469,6 +481,9 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Closes the active SSE connection and marks the stream as disconnected.
+   */
   disconnectSse(): void {
     if (this.eventSource) {
       this.eventSource.close();
@@ -477,6 +492,9 @@ export class IncidentService {
     this.sseConnected.set(false);
   }
 
+  /**
+   * Fetches the incident list and loads details for the most recent incident.
+   */
   async fetchIncidents(baseUrl = ''): Promise<void> {
     try {
       const res = await fetch(`${baseUrl}/api/incidents`);
@@ -494,6 +512,9 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Fetches full details for a specific incident by ID.
+   */
   async fetchIncident(id: string, baseUrl = ''): Promise<void> {
     try {
       const res = await fetch(`${baseUrl}/api/incidents/${encodeURIComponent(id)}`);
@@ -509,6 +530,9 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Polls the current health and version status of the target service.
+   */
   async fetchTargetStatus(baseUrl = ''): Promise<void> {
     try {
       const res = await fetch(`${baseUrl}/api/target/status`);
@@ -536,6 +560,9 @@ export class IncidentService {
     return headers;
   }
 
+  /**
+   * Triggers a chaos or replay simulation on the orchestrator demo API.
+   */
   async triggerChaos(baseUrl = ''): Promise<void> {
     this.isSimulating.set(true);
 
@@ -551,6 +578,9 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Resets target service chaos state and refreshes incident and target signals.
+   */
   async resetChaos(baseUrl = ''): Promise<void> {
     this.isSimulating.set(true);
     try {
@@ -568,6 +598,9 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Simulates an on-call decision on the current incident in demo mode.
+   */
   async simulateDecision(action: IncidentDecisionAction, baseUrl = ''): Promise<void> {
     const incident = this.currentIncident();
     if (!incident) {
@@ -600,6 +633,9 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Submits a signed human-in-the-loop incident decision to the backend API.
+   */
   async submitDecision(
     incidentId: string,
     payload: DecisionPayload,

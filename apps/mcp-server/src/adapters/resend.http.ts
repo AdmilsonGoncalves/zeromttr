@@ -1,4 +1,8 @@
-import type { NotifierPort, PostMortemNotification, NotificationReceipt } from '../ports/index.js';
+import type {
+  NotifierPort,
+  PostMortemNotification,
+  NotificationReceipt
+} from '../ports/notifier.port.js';
 import { escapeHtml, isEmpty } from '@zeromttr/utils';
 import {
   buildUrl,
@@ -14,8 +18,12 @@ export interface ResendAdapterConfig {
   apiKey: string;
   from: string;
   apiBaseUrl?: string;
+  defaultRecipient?: string;
 }
 
+/**
+ * Renders an HTML post-mortem email body with escaped fields and signed decision links.
+ */
 export function renderPostMortemHtml(req: PostMortemNotification): string {
   const safeTitle = escapeHtml(req.title);
   const safeRca = escapeHtml(req.rca_summary);
@@ -89,6 +97,9 @@ export function renderPostMortemHtml(req: PostMortemNotification): string {
 </html>`;
 }
 
+/**
+ * Resend API adapter delivering idempotent HTML post-mortem notifications with signed decision links.
+ */
 export class ResendHttpAdapter implements NotifierPort {
   private readonly baseUrl: string;
 
@@ -96,13 +107,17 @@ export class ResendHttpAdapter implements NotifierPort {
     this.baseUrl = trimTrailingSlash(config.apiBaseUrl || 'https://api.resend.com');
   }
 
+  /**
+   * Sends an idempotent post-mortem notification email with HMAC decision buttons via Resend.
+   */
   async sendPostMortem(req: PostMortemNotification): Promise<NotificationReceipt> {
     if (isEmpty(this.config.apiKey)) {
       throw new Error('Resend API key is missing or empty');
     }
 
     const html = renderPostMortemHtml(req);
-    const recipient = req.recipient_email || 'oncall-sre@example.com';
+    const recipient =
+      req.recipient_email || this.config.defaultRecipient || 'oncall-sre@example.com';
 
     const url = buildUrl(this.baseUrl, '/emails');
     const response = await fetch(url, {

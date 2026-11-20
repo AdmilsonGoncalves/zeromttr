@@ -1,10 +1,6 @@
-import type { MetricsPort, PromqlQueryInput } from '../ports/index.js';
-import {
-  SeriesSummarizer,
-  type SeriesSummary,
-  FinOpsCalculator,
-  type FinOpsMetrics
-} from '../domain/index.js';
+import type { MetricsPort, PromqlQueryInput } from '../ports/metrics.port.js';
+import { SeriesSummarizer, type SeriesSummary } from '../domain/summarize-series.js';
+import { FinOpsCalculator, type FinOpsMetrics } from '../domain/finops.js';
 import { validateTimeRange } from './validate-time-range.js';
 
 export interface ExecutePromqlRangeOutput {
@@ -14,9 +10,15 @@ export interface ExecutePromqlRangeOutput {
   finops: FinOpsMetrics;
 }
 
+/**
+ * MCP use case running bounded PromQL range queries with series summarization and FinOps accounting.
+ */
 export class ExecutePromqlRange {
   constructor(private readonly metricsPort: MetricsPort) {}
 
+  /**
+   * Validates the time window, queries Prometheus range metrics, and summarizes series with FinOps stats.
+   */
   async execute(input: PromqlQueryInput): Promise<ExecutePromqlRangeOutput> {
     const { startIso, endIso } = validateTimeRange(input.start, input.end);
 

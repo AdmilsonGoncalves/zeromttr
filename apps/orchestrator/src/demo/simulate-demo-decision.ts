@@ -1,17 +1,14 @@
-import { applyIncidentDecision } from '../application/index.js';
-import {
-  DecisionSource,
-  GrafanaAnnotationTag,
-  Incident,
-  type IncidentDecisionAction
-} from '../domain/index.js';
-import type {
-  EventBroadcasterPort,
-  IncidentRepository,
-  LoggerPort,
-  ToolsPort
-} from '../ports/index.js';
+import { applyIncidentDecision } from '../application/decision-helpers.js';
+import { DecisionSource, GrafanaAnnotationTag } from '../domain/incident-enums.js';
+import { Incident, type IncidentDecisionAction } from '../domain/incident.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
+import type { ToolsPort } from '../ports/tools.port.js';
 
+/**
+ * Demo use case recording interactive dashboard decisions without requiring email HMAC links.
+ */
 export class SimulateDemoDecision {
   public constructor(
     private readonly repository: IncidentRepository,
@@ -20,6 +17,9 @@ export class SimulateDemoDecision {
     private readonly logger?: LoggerPort
   ) {}
 
+  /**
+   * Records a simulated on-call approve or reject decision for interactive dashboard demos.
+   */
   public async execute(incidentId: string, action: IncidentDecisionAction): Promise<Incident> {
     return applyIncidentDecision(this.repository, this.tools, this.broadcaster, this.logger, {
       incidentId,

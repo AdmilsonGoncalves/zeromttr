@@ -9,7 +9,7 @@ import {
   safeJsonParse
 } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess, sanitizeHeaderValue } from '@zeromttr/utils/http';
-import { OrchestratorDefault } from '../domain/index.js';
+import { OrchestratorDefault } from '../domain/incident-enums.js';
 import type {
   ToolsPort,
   FinOpsData,
@@ -30,7 +30,7 @@ import type {
   SendPostMortemOutput,
   AnnotateGrafanaInput,
   AnnotateGrafanaOutput
-} from '../ports/index.js';
+} from '../ports/tools.port.js';
 
 const McpJsonRpcPayloadSchema = z.object({
   result: z
@@ -103,7 +103,7 @@ function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: bool
       return true;
     }
     const httpStatus = Number(attrs['http.status_code'] ?? attrs['http.response.status_code']);
-    if (Number.isFinite(httpStatus) && httpStatus >= 500) {
+    if (isNumber(httpStatus) && httpStatus >= 500) {
       return true;
     }
   }
@@ -135,12 +135,34 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
   };
 }
 
+function normalizeMcpUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    if (cleanPath.endsWith('/mcp')) {
+      parsed.pathname = cleanPath;
+      return parsed.toString();
+    }
+    parsed.pathname = `${cleanPath}/mcp`;
+    return parsed.toString();
+  } catch {
+    const clean = rawUrl.replace(/\/+$/, '');
+    return `${clean}${clean.endsWith('/mcp') ? '' : '/mcp'}`;
+  }
+}
+
+/**
+ * Streamable HTTP JSON-RPC client invoking the 8 MCP server tools behind ToolsPort.
+ */
 export class McpClientAdapter implements ToolsPort {
   private readonly baseUrl: string;
   private readonly authToken: string;
 
   public constructor(baseUrl?: string, authToken?: string) {
-    this.baseUrl = buildUrl(baseUrl || process.env.MCP_SERVER_URL || 'http://localhost:8000/mcp');
+    const envBaseUrl =
+      process.env.MCP_SERVER_URL ||
+      (process.env.MCP_URL ? normalizeMcpUrl(process.env.MCP_URL) : undefined);
+    this.baseUrl = buildUrl(baseUrl || envBaseUrl || 'http://localhost:8000/mcp');
     const isTest = process.env.NODE_ENV === 'test';
     const token = authToken || process.env.MCP_AUTH_TOKEN || (isTest ? 'test-mcp-token' : '');
     if (!isTest && !token) {
@@ -229,6 +251,9 @@ export class McpClientAdapter implements ToolsPort {
     return parsed;
   }
 
+  /**
+   * Queries Prometheus metrics over a time range via the MCP server and normalizes the series summary.
+   */
   public async executePromqlRange(input: PromqlRangeInput): Promise<PromqlRangeOutput> {
     const raw = await this.callTool('execute_promql_range', input);
     const rawSeriesInput = isArray(raw.series)
@@ -285,6 +310,9 @@ export class McpClientAdapter implements ToolsPort {
     };
   }
 
+  /**
+   * Queries Loki logs via the MCP server and maps returned log entries and FinOps metrics.
+   */
   public async queryLokiLogs(input: LokiQueryInput): Promise<LokiQueryOutput> {
     const raw = await this.callTool('query_loki_logs', input);
     let logs: Array<{ timestamp?: string; stream?: Record<string, string>; line: string }> = [];
@@ -317,6 +345,9 @@ export class McpClientAdapter implements ToolsPort {
     };
   }
 
+  /**
+   * Analyzes an OpenTelemetry trace via MCP and extracts involved services and critical spans.
+   */
   public async analyzeOtelTrace(input: TraceAnalysisInput): Promise<TraceAnalysisOutput> {
     const raw = await this.callTool('analyze_otel_trace', input);
     const traceId = firstNonEmptyString(raw.traceId, raw.trace_id) || input.trace_id;
@@ -354,6 +385,9 @@ export class McpClientAdapter implements ToolsPort {
     };
   }
 
+  /**
+   * Searches Tempo traces matching a TraceQL query via the MCP server.
+   */
   public async searchTracesByTraceQL(input: TraceQlInput): Promise<TraceQlOutput> {
     const raw = await this.callTool('search_traces_by_traceql', input);
     const traces = isArray(raw.traces)
@@ -367,6 +401,9 @@ export class McpClientAdapter implements ToolsPort {
     return { traces };
   }
 
+  /**
+   * Fetches commit metadata and truncated diffs between two Git refs via the MCP server.
+   */
   public async inspectGitDeployDiff(input: GitDeployDiffInput): Promise<GitDeployDiffOutput> {
     const raw = await this.callTool('inspect_git_deploy_diff', input);
     const filesChanged = isArray(raw.files_changed) ? raw.files_changed.filter(isObject) : [];
@@ -406,6 +443,9 @@ export class McpClientAdapter implements ToolsPort {
     };
   }
 
+  /**
+   * Opens or reuses a remediation hotfix Pull Request on GitHub via the MCP server.
+   */
   public async createRemediationPr(
     input: CreateRemediationPrInput
   ): Promise<CreateRemediationPrOutput> {
@@ -418,6 +458,9 @@ export class McpClientAdapter implements ToolsPort {
     };
   }
 
+  /**
+   * Sends the post-mortem email with signed decision links via the MCP Resend tool.
+   */
   public async sendPostMortemResend(input: SendPostMortemInput): Promise<SendPostMortemOutput> {
     const raw = await this.callTool('send_post_mortem_resend', input);
     return {
@@ -426,6 +469,9 @@ export class McpClientAdapter implements ToolsPort {
     };
   }
 
+  /**
+   * Creates an incident timeline annotation in Grafana via the MCP server.
+   */
   public async annotateGrafanaIncident(
     input: AnnotateGrafanaInput
   ): Promise<AnnotateGrafanaOutput> {
