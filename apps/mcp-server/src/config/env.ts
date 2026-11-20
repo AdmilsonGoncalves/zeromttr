@@ -7,6 +7,8 @@ const envSchema = z.object({
   LOKI_URL: z.string().default('http://localhost:3100'),
   TEMPO_URL: z.string().default('http://localhost:3200'),
   GRAFANA_URL: z.string().default('http://localhost:3000'),
+  GRAFANA_ADMIN_USER: z.string().default('admin'),
+  GRAFANA_ADMIN_PASSWORD: z.string().default(''),
   GRAFANA_API_TOKEN: z.string().default(''),
   GRAFANA_SA_TOKEN: z.string().default(''),
   GITHUB_TOKEN: z.string().default(''),
@@ -15,6 +17,7 @@ const envSchema = z.object({
   TARGET_SERVICE_PATH: z.string().default('apps/target-app-demo'),
   RESEND_API_KEY: z.string().default(''),
   RESEND_FROM: z.string().default('ZeroMTTR - AGJ Works <sre@send.zeromttr.agjworks.com>'),
+  ON_CALL_ENGINEER_EMAIL: z.string().default('oncall-sre@example.com'),
   PUBLIC_DASHBOARD_URL: z.string().default('http://localhost:4200'),
   NODE_ENV: z.string().default('development')
 });

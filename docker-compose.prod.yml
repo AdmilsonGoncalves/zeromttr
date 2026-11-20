@@ -109,6 +109,8 @@ services:
     container_name: zeromttr-otel-collector
     restart: unless-stopped
     command: ['--config=/etc/otelcol-contrib/config.yaml']
+    environment:
+      - GOMEMLIMIT=200MiB
     volumes:
       - ./infra/otel-collector-config.prod.yaml:/etc/otelcol-contrib/config.yaml:ro
     expose:
@@ -178,6 +180,18 @@ services:
       - PROMETHEUS_URL=http://prometheus:9090
       - LOKI_URL=http://loki:3100
       - TEMPO_URL=http://tempo:3200
+      - GRAFANA_URL=http://grafana:3000
+      - GRAFANA_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GRAFANA_SA_TOKEN=${GRAFANA_SA_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - TARGET_GITHUB_REPO=${TARGET_GITHUB_REPO}
+      - TARGET_BASE_BRANCH=${TARGET_BASE_BRANCH:-release/target-v2.14.8}
+      - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH:-apps/target-app-demo}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_FROM=${RESEND_FROM}
+      - ON_CALL_ENGINEER_EMAIL=${ON_CALL_ENGINEER_EMAIL}
+      - PUBLIC_DASHBOARD_URL=${PUBLIC_DASHBOARD_URL}
     depends_on:
       prometheus:
         condition: service_healthy
@@ -202,21 +216,23 @@ services:
       - PORT=8080
       - GRAFANA_WEBHOOK_TOKEN=${GRAFANA_WEBHOOK_TOKEN}
       - DASHBOARD_API_TOKEN=${DASHBOARD_API_TOKEN}
-      - MCP_URL=http://mcp-server:8000
-      - TARGET_DEMO_URL=http://target-app-demo:3001
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - MCP_SERVER_URL=http://mcp-server:8000/mcp
+      - TARGET_APP_URL=http://target-app-demo:3001
+      - PUBLIC_DASHBOARD_URL=${PUBLIC_DASHBOARD_URL}
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - LLM_MODEL=${LLM_MODEL:-gemini-3.5-flash}
-      - LLM_API_KEY=${LLM_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-${LLM_API_KEY:-}}
       - DECISION_HMAC_SECRET=${DECISION_HMAC_SECRET}
       - LIVE_DEMO_KEY=${LIVE_DEMO_KEY}
-      - SIMULATION_COOLDOWN_MS=${SIMULATION_COOLDOWN_MS:-120000}
-      - RESEND_API_KEY=${RESEND_API_KEY}
-      - RESEND_FROM=${RESEND_FROM}
-      - ON_CALL_ENGINEER_EMAIL=${ON_CALL_ENGINEER_EMAIL}
+      - DEMO_COOLDOWN_MS=${DEMO_COOLDOWN_MS:-${SIMULATION_COOLDOWN_MS:-120000}}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - TARGET_GITHUB_REPO=${TARGET_GITHUB_REPO}
-      - TARGET_BASE_BRANCH=${TARGET_BASE_BRANCH}
-      - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH}
+      - TARGET_REPO_URL=${TARGET_GITHUB_REPO}
+      - TARGET_BASE_REF=v2.14.7
+      - TARGET_HEAD_REF=v2.14.8
+      - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH:-apps/target-app-demo}
+      - ON_CALL_ENGINEER_EMAIL=${ON_CALL_ENGINEER_EMAIL}
     depends_on:
       - mcp-server
     networks:

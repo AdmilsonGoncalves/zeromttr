@@ -1,6 +1,6 @@
 import { isArray, isNumber, isObject, isString, round, toErrorMessage } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
-import type { TracesPort, TraceSearchResult } from '../ports/index.js';
+import type { TracesPort, TraceSearchResult, TraceSearchWindow } from '../ports/index.js';
 import { extractOtelAttributeValue, type RawSpan } from '../domain/index.js';
 
 export interface TempoAdapterConfig {
@@ -121,13 +121,32 @@ export class TempoHttpAdapter implements TracesPort {
     return { rawBytes, spans };
   }
 
+  private toEpochSeconds(iso?: string): number | undefined {
+    if (!iso) {
+      return undefined;
+    }
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) {
+      return undefined;
+    }
+    return Math.floor(ms / 1000);
+  }
+
   async searchTraces(
     query: string,
-    limit = 10
+    limit = 10,
+    window?: TraceSearchWindow
   ): Promise<{ rawBytes: number; traces: TraceSearchResult[] }> {
+    const startSec = this.toEpochSeconds(window?.start);
+    let endSec = this.toEpochSeconds(window?.end);
+    if (startSec !== undefined && endSec === undefined) {
+      endSec = Math.floor(Date.now() / 1000);
+    }
     const url = buildUrl(this.config.baseUrl, '/api/search', {
       q: query,
-      limit
+      limit,
+      start: startSec,
+      end: endSec
     });
     const response = await fetch(url, {
       headers: { Accept: 'application/json' }
@@ -168,8 +187,12 @@ export class TempoHttpAdapter implements TracesPort {
     const results = data.traces || data.results || [];
     if (isArray(results)) {
       for (const t of results) {
+        const rawTraceId = t.traceID || t.traceId || '';
+        const traceId = /^[0-9a-fA-F]{1,32}$/.test(rawTraceId)
+          ? rawTraceId.toLowerCase().padStart(32, '0')
+          : rawTraceId;
         traces.push({
-          traceId: t.traceID || t.traceId || '',
+          traceId,
           rootServiceName: t.rootServiceName,
           rootTraceName: t.rootTraceName,
           startTimeUnixNano: t.startTimeUnixNano != null ? String(t.startTimeUnixNano) : undefined,

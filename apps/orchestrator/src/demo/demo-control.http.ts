@@ -5,7 +5,11 @@ export class HttpDemoControlAdapter implements DemoControlPort {
   private readonly baseUrl: string;
 
   public constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || process.env.TARGET_APP_URL || 'http://localhost:3000';
+    this.baseUrl =
+      baseUrl ||
+      process.env.TARGET_APP_URL ||
+      process.env.TARGET_DEMO_URL ||
+      'http://localhost:3000';
   }
 
   public async triggerChaos(enable: boolean, delayMs = 4600): Promise<void> {

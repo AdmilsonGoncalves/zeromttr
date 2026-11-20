@@ -75,6 +75,7 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     logger,
     { syntaxValidator: patchSyntaxValidator }
   );
+  const onCallEmail = process.env.ON_CALL_ENGINEER_EMAIL || process.env.ONCALL_TO_EMAIL;
   const notifyOnCall = new NotifyOnCall(
     repository,
     toolsPort,
@@ -82,7 +83,8 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     broadcaster,
     hmacSecret,
     dashboardUrl,
-    logger
+    logger,
+    onCallEmail
   );
   const recordDecision = new RecordDecision(
     repository,
@@ -104,8 +106,9 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
   );
 
   const initialIncident = createInitialIncident();
-  const demoCooldownMs = isNonEmptyString(process.env.DEMO_COOLDOWN_MS)
-    ? parseNumber(process.env.DEMO_COOLDOWN_MS, 120_000)
+  const rawCooldown = process.env.DEMO_COOLDOWN_MS ?? process.env.SIMULATION_COOLDOWN_MS;
+  const demoCooldownMs = isNonEmptyString(rawCooldown)
+    ? parseNumber(rawCooldown, 120_000)
     : undefined;
 
   const replayRunner = new ReplayRunner(repository, broadcaster, {}, logger);

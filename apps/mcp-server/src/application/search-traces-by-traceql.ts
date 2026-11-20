@@ -4,6 +4,8 @@ import type { TracesPort, TraceSearchResult } from '../ports/index.js';
 export interface SearchTracesByTraceQLInput {
   query: string;
   limit?: number;
+  start?: string;
+  end?: string;
 }
 
 export interface SearchTracesByTraceQLOutput {
@@ -17,7 +19,13 @@ export class SearchTracesByTraceQL {
 
   async execute(input: SearchTracesByTraceQLInput): Promise<SearchTracesByTraceQLOutput> {
     const safeLimit = clamp(input.limit ?? 10, 1, 20);
-    const { traces } = await this.tracesPort.searchTraces(input.query, safeLimit);
+    const hasWindow = input.start !== undefined || input.end !== undefined;
+    const { traces } = hasWindow
+      ? await this.tracesPort.searchTraces(input.query, safeLimit, {
+          start: input.start,
+          end: input.end
+        })
+      : await this.tracesPort.searchTraces(input.query, safeLimit);
 
     return {
       query: input.query,

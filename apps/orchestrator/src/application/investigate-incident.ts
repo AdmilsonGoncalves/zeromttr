@@ -83,15 +83,32 @@ export class InvestigateIncident {
       promqlOutput.seriesCount > 0 &&
       promqlOutput.summarizedSeries.some((s) => (s.p95 ?? 0) > 2000);
 
-    const exemplarTraceId = promqlOutput.exemplarTraceId;
+    let exemplarTraceId = promqlOutput.exemplarTraceId;
     const hasMetricExemplar = Boolean(exemplarTraceId);
 
-    // 2. Trace Analysis
+    // 2. Trace Analysis (with TraceQL fallback if PromQL returned no exemplar)
     let traceAnalysis: TraceAnalysisOutput | undefined;
     let criticalSpan: string = OrchestratorDefault.CRITICAL_ERROR_SPAN;
     let spans: SpanNode[] = [];
     let servicesInvolved = [incident.service];
     let hasTempoErrorSpan = false;
+
+    if (!exemplarTraceId) {
+      try {
+        const searchRes = await this.tools.searchTracesByTraceQL({
+          query: `{resource.service.name="${incident.service}" && status=error}`,
+          limit: 5,
+          start: startIso,
+          end: endIso
+        });
+        const firstHit = searchRes?.traces?.[0]?.traceId;
+        if (firstHit) {
+          exemplarTraceId = firstHit;
+        }
+      } catch {
+        // Non-fatal TraceQL fallback failure
+      }
+    }
 
     if (exemplarTraceId) {
       try {

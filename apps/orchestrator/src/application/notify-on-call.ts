@@ -1,4 +1,4 @@
-import { toErrorMessage } from '@zeromttr/utils';
+import { isNonEmptyString, toErrorMessage } from '@zeromttr/utils';
 import {
   DecisionAction,
   DecisionHmac,
@@ -34,7 +34,8 @@ export class NotifyOnCall {
     private readonly broadcaster: EventBroadcasterPort,
     private readonly hmacSecret: string,
     private readonly dashboardUrl: string,
-    private readonly logger?: LoggerPort
+    private readonly logger?: LoggerPort,
+    private readonly recipientEmail?: string
   ) {}
 
   public async execute(incidentId: string): Promise<NotifyOnCallResult> {
@@ -61,6 +62,7 @@ export class NotifyOnCall {
     try {
       resendResult = await this.tools.sendPostMortemResend({
         incident_id: incident.id,
+        ...(isNonEmptyString(this.recipientEmail) ? { recipient_email: this.recipientEmail } : {}),
         title: `[Post-Mortem] Operational Incident ${incident.id} — ${incident.service}`,
         rca_summary: incident.rca?.summary || OrchestratorDefault.MITIGATION_FALLBACK,
         evidence_coverage: `${incident.rca?.signalsCollected ?? 4}/${incident.rca?.signalsTotal ?? 4} Signals (${incident.rca?.evidenceCoveragePercent ?? 100}%)`,

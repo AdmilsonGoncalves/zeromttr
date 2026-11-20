@@ -50,11 +50,15 @@ export function buildMcpServer(overrides?: BootstrapOverrides): {
   });
   const resendAdapter = new ResendHttpAdapter({
     apiKey: env.RESEND_API_KEY,
-    from: env.RESEND_FROM
+    from: env.RESEND_FROM,
+    defaultRecipient: env.ON_CALL_ENGINEER_EMAIL
   });
   const grafanaAdapter = new GrafanaAnnotationsHttpAdapter({
     baseUrl: env.GRAFANA_URL,
-    apiToken: env.GRAFANA_TOKEN
+    apiToken: env.GRAFANA_TOKEN,
+    basicAuth: env.GRAFANA_ADMIN_PASSWORD
+      ? { username: env.GRAFANA_ADMIN_USER, password: env.GRAFANA_ADMIN_PASSWORD }
+      : undefined
   });
 
   // 2. Application Use Cases

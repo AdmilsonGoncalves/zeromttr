@@ -1,9 +1,21 @@
+FROM node:24-alpine AS builder
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.5.2 --activate
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json nx.json ./
+COPY libs ./libs
+COPY apps/dashboard ./apps/dashboard
+
+RUN pnpm install --frozen-lockfile --filter @zeromttr/dashboard...
+RUN pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build
+RUN pnpm --filter @zeromttr/dashboard exec vite build
+
 FROM nginx:alpine
 
 ENV NGINX_ENVSUBST_FILTER=^DASHBOARD_API_TOKEN$
 
 COPY apps/dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
-COPY apps/dashboard/src /usr/share/nginx/html
+COPY --from=builder /app/apps/dashboard/dist /usr/share/nginx/html
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

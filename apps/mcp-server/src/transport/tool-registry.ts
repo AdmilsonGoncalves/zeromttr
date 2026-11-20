@@ -127,7 +127,9 @@ export class ToolRegistry {
         type: 'object',
         properties: {
           query: { type: 'string', description: 'TraceQL query string' },
-          limit: { type: 'number', description: 'Maximum traces to return (<= 20)' }
+          limit: { type: 'number', description: 'Maximum traces to return (<= 20)' },
+          start: { type: 'string', description: 'Start time in ISO8601 format (optional)' },
+          end: { type: 'string', description: 'End time in ISO8601 format (optional)' }
         },
         required: ['query']
       },

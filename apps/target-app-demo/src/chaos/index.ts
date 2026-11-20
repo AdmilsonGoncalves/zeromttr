@@ -1,4 +1,7 @@
 import { clamp, isNumber } from '@zeromttr/utils';
+import { TargetReleaseVersion, TargetServiceIdentity } from './target-metadata-enums.js';
+
+export * from './target-metadata-enums.js';
 
 export interface ChaosStatus {
   status: 'healthy' | 'degraded';
@@ -44,9 +47,9 @@ export class ChaosManager {
     const isDegraded = this.poolSaturation;
     return {
       status: isDegraded ? 'degraded' : 'healthy',
-      service: 'api-pagamentos-core',
-      version: isDegraded ? 'v2.14.8' : 'v2.14.7',
-      previousHealthyVersion: 'v2.14.7',
+      service: TargetServiceIdentity.SERVICE_NAME,
+      version: isDegraded ? TargetReleaseVersion.DEGRADED : TargetReleaseVersion.HEALTHY,
+      previousHealthyVersion: TargetReleaseVersion.HEALTHY,
       targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
       suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
       rawEdgeLogPreCollector: RAW_EDGE_LOG_SAMPLE

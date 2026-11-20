@@ -74,7 +74,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
   private readonly retryDelayMs: number;
 
   public constructor(apiKey?: string, modelName?: string, options: GeminiAdapterOptions = {}) {
-    this.apiKey = apiKey || process.env.GEMINI_API_KEY || '';
+    this.apiKey = apiKey || process.env.GEMINI_API_KEY || process.env.LLM_API_KEY || '';
     this.client = new GoogleGenAI({ apiKey: this.apiKey || 'placeholder-for-instantiation' });
     this.modelName = modelName || process.env.LLM_MODEL || 'gemini-3.5-flash';
     this.fallbackModelName =

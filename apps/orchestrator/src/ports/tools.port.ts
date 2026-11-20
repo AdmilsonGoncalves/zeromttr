@@ -69,6 +69,8 @@ export interface TraceAnalysisOutput {
 export interface TraceQlInput {
   query: string;
   limit?: number;
+  start?: string;
+  end?: string;
 }
 
 export interface TraceQlOutput {

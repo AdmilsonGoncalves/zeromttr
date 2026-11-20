@@ -140,7 +140,12 @@ export class McpClientAdapter implements ToolsPort {
   private readonly authToken: string;
 
   public constructor(baseUrl?: string, authToken?: string) {
-    this.baseUrl = buildUrl(baseUrl || process.env.MCP_SERVER_URL || 'http://localhost:8000/mcp');
+    const envBaseUrl =
+      process.env.MCP_SERVER_URL ||
+      (process.env.MCP_URL
+        ? `${process.env.MCP_URL.replace(/\/+$/, '')}${process.env.MCP_URL.replace(/\/+$/, '').endsWith('/mcp') ? '' : '/mcp'}`
+        : undefined);
+    this.baseUrl = buildUrl(baseUrl || envBaseUrl || 'http://localhost:8000/mcp');
     const isTest = process.env.NODE_ENV === 'test';
     const token = authToken || process.env.MCP_AUTH_TOKEN || (isTest ? 'test-mcp-token' : '');
     if (!isTest && !token) {

@@ -1,4 +1,4 @@
-import { chaosManager } from '../chaos/index.js';
+import { chaosManager, TargetReleaseVersion, TargetServiceIdentity } from '../chaos/index.js';
 import type { CreatePaymentInput, Payment } from '../models/index.js';
 import { paymentRepository, PaymentRepository } from '../repositories/index.js';
 
@@ -35,8 +35,8 @@ export class PaymentService {
 
     return {
       status: isPoolSaturated ? 'degraded' : 'ok',
-      service: 'api-pagamentos-core',
-      version: isChaos ? 'v2.14.8' : 'v2.14.7',
+      service: TargetServiceIdentity.SERVICE_NAME,
+      version: isChaos ? TargetReleaseVersion.DEGRADED : TargetReleaseVersion.HEALTHY,
       database: isPoolSaturated ? 'pool_saturated' : 'connected',
       pool: stats
     };

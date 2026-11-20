@@ -14,6 +14,7 @@ export interface ResendAdapterConfig {
   apiKey: string;
   from: string;
   apiBaseUrl?: string;
+  defaultRecipient?: string;
 }
 
 export function renderPostMortemHtml(req: PostMortemNotification): string {
@@ -102,7 +103,8 @@ export class ResendHttpAdapter implements NotifierPort {
     }
 
     const html = renderPostMortemHtml(req);
-    const recipient = req.recipient_email || 'oncall-sre@example.com';
+    const recipient =
+      req.recipient_email || this.config.defaultRecipient || 'oncall-sre@example.com';
 
     const url = buildUrl(this.baseUrl, '/emails');
     const response = await fetch(url, {

@@ -10,6 +10,10 @@ import type { AnnotationPort, AnnotationRequest, AnnotationReceipt } from '../po
 export interface GrafanaAnnotationsConfig {
   baseUrl: string;
   apiToken?: string;
+  basicAuth?: {
+    username: string;
+    password: string;
+  };
 }
 
 export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
@@ -19,6 +23,32 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
     this.baseUrl = trimTrailingSlash(config.baseUrl);
   }
 
+  private assertSafeBasicAuthTransport(): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(this.baseUrl);
+    } catch {
+      throw new Error(`Invalid Grafana baseUrl for Basic auth: '${this.baseUrl}'`);
+    }
+    if (parsed.protocol === 'https:') {
+      return;
+    }
+    const localHosts = new Set([
+      'localhost',
+      '127.0.0.1',
+      '::1',
+      '[::1]',
+      'grafana',
+      'zeromttr-grafana'
+    ]);
+    if (parsed.protocol === 'http:' && localHosts.has(parsed.hostname.toLowerCase())) {
+      return;
+    }
+    throw new Error(
+      `Refusing to send Grafana Basic credentials over insecure HTTP host '${parsed.hostname}'`
+    );
+  }
+
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -26,6 +56,17 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
     };
     if (isNonEmptyString(this.config.apiToken)) {
       headers.Authorization = `Bearer ${sanitizeHeaderValue(this.config.apiToken)}`;
+    } else if (
+      this.config.basicAuth &&
+      isNonEmptyString(this.config.basicAuth.username) &&
+      isNonEmptyString(this.config.basicAuth.password)
+    ) {
+      this.assertSafeBasicAuthTransport();
+      const encoded = Buffer.from(
+        `${this.config.basicAuth.username}:${this.config.basicAuth.password}`,
+        'utf-8'
+      ).toString('base64');
+      headers.Authorization = `Basic ${encoded}`;
     }
     return headers;
   }
