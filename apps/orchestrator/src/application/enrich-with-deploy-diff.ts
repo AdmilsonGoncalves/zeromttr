@@ -5,6 +5,7 @@ import {
   TransitionReason
 } from '../domain/incident-enums.js';
 import { IncidentState } from '../domain/incident-state.js';
+import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
 import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { ToolsPort, GitDeployDiffOutput } from '../ports/tools.port.js';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
@@ -61,7 +62,7 @@ export class EnrichWithDeployDiff {
 
     incident.docs = [
       {
-        url: process.env.TARGET_REPO_URL || '',
+        url: resolveTargetRepoUrl(),
         title: `${incident.service} Deploy & Architecture Reference`,
         markdownExcerpt: `Deploy diff inspected for ${incident.service} (${baseRef} -> ${headRef}) at ${this.servicePath}.`
       }

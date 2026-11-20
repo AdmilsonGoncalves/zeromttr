@@ -71,8 +71,8 @@ if [ -z "$INCIDENT_ID" ]; then
     HEADERS+=(-H "X-Live-Demo-Key: ${LIVE_KEY}")
   fi
 
-  curl -fsS --max-time 15 -X POST "${ORCH_URL}/api/demo/chaos" "${HEADERS[@]}" -d '{"mode":"live"}' > /dev/null
   CHAOS_ENABLED_BY_RUN=1
+  curl -fsS --max-time 15 -X POST "${ORCH_URL}/api/demo/chaos" "${HEADERS[@]}" -d '{"mode":"live"}' > /dev/null
 
   echo "Gerando tráfego concorrente limitado em ${TARGET_URL}/payments e aguardando alerta Grafana (<= ${MAX_WAIT_SECONDS}s)..."
   TRAFFIC_PAYLOAD='{
@@ -186,8 +186,19 @@ const target = JSON.parse(process.argv[2] || '{}');
 const outputPath = process.argv[3];
 const triggeredLive = process.argv[4] === '1';
 
-if (!inc.rca || !inc.finops || !inc.remediation) {
-  throw new Error('Incident is missing required rca, finops, or remediation fields');
+if (
+  !inc.rca ||
+  !inc.finops ||
+  !inc.remediation ||
+  !inc.remediation.branchUrl ||
+  !inc.remediation.pullRequestUrl ||
+  !inc.remediation.commitSha
+) {
+  throw new Error(
+    'Incident (state=' +
+      String(inc.state || 'unknown') +
+      ') is missing required rca, finops, or remediation PR fields (branchUrl, pullRequestUrl, commitSha)'
+  );
 }
 if (!inc.rca.piiGuardAudit || inc.rca.piiGuardAudit.passed !== true) {
   throw new Error('Incident failed PII guard audit; refusing to persist replay snapshot');

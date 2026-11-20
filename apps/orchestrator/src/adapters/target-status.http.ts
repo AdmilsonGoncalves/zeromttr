@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import { OrchestratorDefault, TargetHealthStatus } from '../domain/incident-enums.js';
+import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
 import type { TargetStatus, TargetStatusPort } from '../ports/target-status.port.js';
 
 const TargetStatusSchema = z.object({
@@ -50,7 +51,7 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
       service: process.env.TARGET_SERVICE_NAME || OrchestratorDefault.UNKNOWN_SERVICE,
       version: OrchestratorDefault.UNKNOWN,
       previousHealthyVersion: OrchestratorDefault.UNKNOWN,
-      targetRepo: process.env.TARGET_REPO_URL || '',
+      targetRepo: resolveTargetRepoUrl(),
       suspectFilePath: process.env.TARGET_SUSPECT_FILE_PATH || '',
       rawEdgeLogPreCollector: ''
     };

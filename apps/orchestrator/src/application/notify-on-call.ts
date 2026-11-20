@@ -10,6 +10,7 @@ import {
 import { DecisionHmac } from '../domain/decision-hmac.js';
 import { IncidentState } from '../domain/incident-state.js';
 import { OrchestratorLogEvent } from '../domain/log-enums.js';
+import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
 import type { ReasoningSource } from '../domain/rca-report.js';
 import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { ToolsPort, SendPostMortemOutput } from '../ports/tools.port.js';
@@ -72,7 +73,7 @@ export class NotifyOnCall {
           incident.remediation?.suspectCommitSha ||
           incident.remediation?.commitSha ||
           OrchestratorDefault.UNKNOWN,
-        pull_request_url: incident.remediation?.pullRequestUrl || process.env.TARGET_REPO_URL || '',
+        pull_request_url: incident.remediation?.pullRequestUrl || resolveTargetRepoUrl(),
         approve_url: approveUrl,
         reject_url: rejectUrl,
         leaked_patterns_detected: incident.rca?.piiGuardAudit.leakedPatternsDetected ?? 0
