@@ -22,6 +22,7 @@ CONCURRENCY="${LOAD_CONCURRENCY:-10}"
 DURATION="${LOAD_DURATION:-20}"
 MAX_RAM_MIB="${MAX_TOTAL_RAM_MIB:-2200}"
 MIN_SUCCESS_RATE="${LOAD_MIN_SUCCESS_RATE:-95}"
+DOCKER_TIMEOUT="${DOCKER_CMD_TIMEOUT_SECONDS:-10}"
 TARGET_URL="${CALLER_TARGET_URL:-http://127.0.0.1:3001}"
 ORCH_URL="${CALLER_ORCH_URL:-http://127.0.0.1:8080}"
 DASHBOARD_URL="${CALLER_DASHBOARD_URL:-http://127.0.0.1:4200}"
@@ -41,6 +42,7 @@ validate_positive_int() {
 validate_positive_int "LOAD_CONCURRENCY" "$CONCURRENCY"
 validate_positive_int "LOAD_DURATION" "$DURATION"
 validate_positive_int "MAX_TOTAL_RAM_MIB" "$MAX_RAM_MIB"
+validate_positive_int "DOCKER_CMD_TIMEOUT_SECONDS" "$DOCKER_TIMEOUT"
 if [[ ! "$MIN_SUCCESS_RATE" =~ ^(100|[1-9]?[0-9])$ ]]; then
   echo "❌ LOAD_MIN_SUCCESS_RATE deve ser um inteiro entre 0 e 100 (recebido: '${MIN_SUCCESS_RATE}')." >&2
   exit 1
@@ -98,11 +100,15 @@ echo "🔥 ZeroMTTR — Teste de Carga LGTM & Verificação de RAM"
 echo "Concorrência: ${CONCURRENCY} | Duração: ${DURATION}s | Limite RAM: ${MAX_RAM_MIB} MiB"
 echo "=========================================================="
 
+check_endpoints_health() {
+  curl -fsS --max-time 10 "${TARGET_URL}/health" > /dev/null
+  curl -fsS --max-time 10 "${ORCH_URL}/health" > /dev/null
+  curl -fsS --max-time 10 "${MCP_HEALTH_BASE}/health" > /dev/null
+  curl -fsS --max-time 10 "${DASHBOARD_URL}/" | grep -q "ZeroMTTR"
+}
+
 echo "[1/4] Verificando saúde dos endpoints principais..."
-curl -fsS --max-time 10 "${TARGET_URL}/health" > /dev/null
-curl -fsS --max-time 10 "${ORCH_URL}/health" > /dev/null
-curl -fsS --max-time 10 "${MCP_HEALTH_BASE}/health" > /dev/null
-curl -fsS --max-time 10 "${DASHBOARD_URL}/" | grep -q "ZeroMTTR"
+check_endpoints_health
 echo "✅ target-app-demo, orchestrator, mcp-server e dashboard respondendo HTTP 200."
 
 BEFORE_HIST_COUNT=$(query_hist_count)
@@ -127,7 +133,7 @@ sample_ram_during_load() {
   while [ ! -f "${TMP_DIR}/load_done" ]; do
     local stats
     local sample_recorded=0
-    stats=$(docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}" "${CONTAINERS[@]}" 2>/dev/null || true)
+    stats=$(timeout "${DOCKER_TIMEOUT}" docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}" "${CONTAINERS[@]}" 2>/dev/null) || stats=""
     if [ -n "$stats" ]; then
       local current_mib
       current_mib=$(node -e "
@@ -175,6 +181,7 @@ sample_ram_during_load() {
   done
 }
 
+LOAD_START_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 sample_ram_during_load &
 SAMPLER_PID=$!
 
@@ -206,8 +213,13 @@ wait "${WORKER_PIDS[@]}"
 WORKER_PIDS=()
 
 touch "${TMP_DIR}/load_done"
-wait "$SAMPLER_PID" || true
+SAMPLER_EXIT=0
+wait "$SAMPLER_PID" || SAMPLER_EXIT=$?
 SAMPLER_PID=""
+if [ "$SAMPLER_EXIT" -ne 0 ]; then
+  echo "❌ Sampler de RAM encerrou de forma anormal (exit=${SAMPLER_EXIT})." >&2
+  exit 1
+fi
 
 node -e "
 const fs = require('node:fs');
@@ -248,11 +260,24 @@ fi
 DELTA_HIST=$(node -e "process.stdout.write(String(Number(process.argv[1]) - Number(process.argv[2])))" "$AFTER_HIST_COUNT" "$BEFORE_HIST_COUNT")
 echo "✅ Histograma OTLP confirmado no Prometheus (+${DELTA_HIST} novas amostras; total=${AFTER_HIST_COUNT})."
 
-echo "[4/4] Auditando pico de memória RAM sob carga e OOMKill dos contêineres..."
+echo "[4/4] Auditando pico de memória RAM sob carga, OOM e saúde pós-carga dos contêineres..."
+LOAD_END_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+OOM_EVENTS=$(timeout "${DOCKER_TIMEOUT}" docker events --since "$LOAD_START_TS" --until "$LOAD_END_TS" --filter type=container --filter event=oom --format '{{.Actor.Attributes.name}}') || {
+  echo "❌ Falha ao coletar eventos OOM do Docker na janela de carga (${LOAD_START_TS}..${LOAD_END_TS})." >&2
+  exit 1
+}
 for c in "${CONTAINERS[@]}"; do
-  OOM=$(docker inspect --format='{{.State.OOMKilled}}' "$c" 2>/dev/null || echo "missing")
-  if [ "$OOM" != "false" ]; then
-    echo "❌ Contêiner ${c} com OOMKilled=${OOM}" >&2
+  if printf '%s\n' "$OOM_EVENTS" | grep -Fxq "$c"; then
+    echo "❌ Evento OOM detectado pelo Docker durante a carga para o contêiner ${c}" >&2
+    exit 1
+  fi
+  STATE_INFO=$(timeout "${DOCKER_TIMEOUT}" docker inspect --format='{{.State.Running}} {{.State.OOMKilled}}' "$c" 2>/dev/null) || {
+    echo "❌ Falha ao inspecionar contêiner ${c} pós-carga." >&2
+    exit 1
+  }
+  read -r RUNNING OOM <<< "$STATE_INFO"
+  if [ "$RUNNING" != "true" ] || [ "$OOM" != "false" ]; then
+    echo "❌ Contêiner ${c} com Running=${RUNNING:-unknown}, OOMKilled=${OOM:-unknown}" >&2
     exit 1
   fi
 done
@@ -264,7 +289,7 @@ fi
 read -r SAMPLES_OK SAMPLES_FAIL < "${TMP_DIR}/sampler_counts"
 if [ "${SAMPLES_OK:-0}" -eq 0 ] || [ "${SAMPLES_FAIL:-1}" -gt 0 ] || [ ! -s "${TMP_DIR}/peak_ram_mib" ] || [ ! -s "${TMP_DIR}/peak_stats" ]; then
   echo "❌ Medição incompleta de RAM sob carga (amostras_ok=${SAMPLES_OK:-0}, falhas=${SAMPLES_FAIL:-1})." >&2
-  docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}" "${CONTAINERS[@]}" >&2 || true
+  timeout "${DOCKER_TIMEOUT}" docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}" "${CONTAINERS[@]}" >&2 || true
   exit 1
 fi
 
@@ -275,4 +300,5 @@ if node -e "process.exit(Number(process.argv[1]) > Number(process.argv[2]) ? 0 :
   echo "❌ Pico de consumo total de RAM sob carga excedeu ${MAX_RAM_MIB} MiB" >&2
   exit 1
 fi
-echo "✅ Stack LGTM + ZeroMTTR estável dentro do orçamento de RAM sob carga e sem OOMKill."
+check_endpoints_health
+echo "✅ Stack LGTM + ZeroMTTR estável dentro do orçamento de RAM sob carga, sem OOMKill e endpoints saudáveis."

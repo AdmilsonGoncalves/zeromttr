@@ -465,6 +465,56 @@ describe('Adapters Unit Tests', () => {
       });
       expect(trace.criticalSpans?.[1]?.hasError).toBe(true);
     });
+
+    it('should preserve query parameters when normalizing MCP_URL endpoint', async () => {
+      const prevMcpServerUrl = process.env.MCP_SERVER_URL;
+      const prevMcpUrl = process.env.MCP_URL;
+      const mockFetch = vi.fn(async () => ({
+        status: 200,
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            content: [{ type: 'text', text: JSON.stringify({ traces: [] }) }],
+            isError: false
+          }
+        })
+      }));
+      vi.stubGlobal('fetch', mockFetch);
+
+      try {
+        process.env.MCP_SERVER_URL = '';
+        process.env.MCP_URL = 'https://mcp.example/mcp?tenant=blue';
+
+        const adapterWithMcp = new McpClientAdapter(undefined, 'token-123');
+        await adapterWithMcp.searchTracesByTraceQL({ query: '{}' });
+        expect(mockFetch).toHaveBeenLastCalledWith(
+          'https://mcp.example/mcp?tenant=blue',
+          expect.objectContaining({ method: 'POST' })
+        );
+
+        process.env.MCP_URL = 'https://mcp.example/base?tenant=blue';
+        const adapterWithBase = new McpClientAdapter(undefined, 'token-123');
+        await adapterWithBase.searchTracesByTraceQL({ query: '{}' });
+        expect(mockFetch).toHaveBeenLastCalledWith(
+          'https://mcp.example/base/mcp?tenant=blue',
+          expect.objectContaining({ method: 'POST' })
+        );
+      } finally {
+        if (prevMcpServerUrl === undefined) {
+          delete process.env.MCP_SERVER_URL;
+        } else {
+          process.env.MCP_SERVER_URL = prevMcpServerUrl;
+        }
+        if (prevMcpUrl === undefined) {
+          delete process.env.MCP_URL;
+        } else {
+          process.env.MCP_URL = prevMcpUrl;
+        }
+      }
+    });
   });
 
   describe('TypeScriptPatchSyntaxValidator', () => {

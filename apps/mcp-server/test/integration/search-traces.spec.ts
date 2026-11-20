@@ -69,13 +69,13 @@ describe('Tool: search_traces_by_traceql integration', () => {
   it('should complete start-only windows with current timestamp as end bound', async () => {
     const startIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const expectedStart = String(Math.floor(Date.parse(startIso) / 1000));
+    let capturedEnd: number | undefined;
     const scope = nock('http://localhost:3200')
       .get('/api/search')
       .query((q) => {
+        capturedEnd = Number(q.end);
         return (
-          q.q === '{ .status = error }' &&
-          q.start === expectedStart &&
-          Number(q.end) >= Number(expectedStart)
+          q.q === '{ .status = error }' && q.start === expectedStart && Number.isFinite(capturedEnd)
         );
       })
       .reply(200, {
@@ -89,14 +89,19 @@ describe('Tool: search_traces_by_traceql integration', () => {
         ]
       });
 
+    const beforeSec = Math.floor(Date.now() / 1000);
     const res = await callMcpTool(server, 'search_traces_by_traceql', {
       query: '{ .status = error }',
       start: startIso
     });
+    const afterSec = Math.ceil(Date.now() / 1000);
 
     expect(res.status).toBe(200);
     expect(res.result?.isError).toBe(false);
     expect(scope.isDone()).toBe(true);
+    expect(capturedEnd).toBeDefined();
+    expect(capturedEnd).toBeGreaterThanOrEqual(beforeSec);
+    expect(capturedEnd).toBeLessThanOrEqual(afterSec);
   });
 
   it('should pad leading zeros on traceId returned by Tempo search to 32 hex chars', async () => {

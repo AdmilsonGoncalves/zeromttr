@@ -96,7 +96,7 @@ const findTs = (...states) => {
 
 const receivedMs = findTs('RECEIVED') ?? (inc.startedAt ? new Date(inc.startedAt).getTime() : null);
 const remediatingMs = findTs('REMEDIATING');
-const awaitingPrMs = findTs('AWAITING_PR', 'NOTIFIED');
+const awaitingPrMs = findTs('AWAITING_PR');
 const notifiedMs = findTs('NOTIFIED');
 
 const fmt = (endMs) => (receivedMs !== null && endMs !== null ? ((endMs - receivedMs) / 1000).toFixed(2) : null);

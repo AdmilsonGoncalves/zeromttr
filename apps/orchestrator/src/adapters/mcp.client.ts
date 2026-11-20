@@ -135,6 +135,22 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
   };
 }
 
+function normalizeMcpUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    if (cleanPath.endsWith('/mcp')) {
+      parsed.pathname = cleanPath;
+      return parsed.toString();
+    }
+    parsed.pathname = `${cleanPath}/mcp`;
+    return parsed.toString();
+  } catch {
+    const clean = rawUrl.replace(/\/+$/, '');
+    return `${clean}${clean.endsWith('/mcp') ? '' : '/mcp'}`;
+  }
+}
+
 export class McpClientAdapter implements ToolsPort {
   private readonly baseUrl: string;
   private readonly authToken: string;
@@ -142,9 +158,7 @@ export class McpClientAdapter implements ToolsPort {
   public constructor(baseUrl?: string, authToken?: string) {
     const envBaseUrl =
       process.env.MCP_SERVER_URL ||
-      (process.env.MCP_URL
-        ? `${process.env.MCP_URL.replace(/\/+$/, '')}${process.env.MCP_URL.replace(/\/+$/, '').endsWith('/mcp') ? '' : '/mcp'}`
-        : undefined);
+      (process.env.MCP_URL ? normalizeMcpUrl(process.env.MCP_URL) : undefined);
     this.baseUrl = buildUrl(baseUrl || envBaseUrl || 'http://localhost:8000/mcp');
     const isTest = process.env.NODE_ENV === 'test';
     const token = authToken || process.env.MCP_AUTH_TOKEN || (isTest ? 'test-mcp-token' : '');

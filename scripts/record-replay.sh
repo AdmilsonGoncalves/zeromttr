@@ -48,22 +48,40 @@ stop_traffic() {
 }
 
 cleanup() {
+  local exit_code=$?
+  local reset_failed=0
+  trap - EXIT INT TERM
   stop_traffic
   if [ "$CHAOS_ENABLED_BY_RUN" -eq 1 ]; then
     local reset_headers=(-H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json")
     if [ -n "$LIVE_KEY" ]; then
       reset_headers+=(-H "X-Live-Demo-Key: ${LIVE_KEY}")
     fi
-    curl -fsS --max-time 10 -X POST "${ORCH_URL}/api/demo/reset" "${reset_headers[@]}" > /dev/null 2>&1 || true
+    if ! curl -fsS --max-time 10 -X POST "${ORCH_URL}/api/demo/reset" "${reset_headers[@]}" > /dev/null; then
+      echo "❌ Falha ao desativar chaos via ${ORCH_URL}/api/demo/reset — execute o reset manualmente!" >&2
+      reset_failed=1
+    fi
   fi
   rm -rf "$TMP_DIR"
+  if [ "$exit_code" -ne 0 ]; then
+    exit "$exit_code"
+  fi
+  if [ "$reset_failed" -ne 0 ]; then
+    exit 1
+  fi
 }
 trap cleanup EXIT INT TERM
 
 if [ -z "$INCIDENT_ID" ]; then
   TRIGGERED_LIVE=1
   echo "⚡ Capturando baseline de incidentes e disparando simulação Live para gravação de Replay..."
-  EXISTING_LIST_JSON=$(curl -fsS --max-time 10 -H "Authorization: Bearer ${TOKEN}" "${ORCH_URL}/api/incidents" || echo "[]")
+  EXISTING_LIST_JSON=$(curl -fsS --max-time 10 -H "Authorization: Bearer ${TOKEN}" "${ORCH_URL}/api/incidents")
+  node -e "
+    const parsed = JSON.parse(process.argv[1]);
+    if (!Array.isArray(parsed)) {
+      throw new Error('Baseline /api/incidents did not return a JSON array');
+    }
+  " "$EXISTING_LIST_JSON"
   TRIGGER_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   HEADERS=(-H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json")
@@ -71,8 +89,17 @@ if [ -z "$INCIDENT_ID" ]; then
     HEADERS+=(-H "X-Live-Demo-Key: ${LIVE_KEY}")
   fi
 
+  CHAOS_CURL_EXIT=0
+  CHAOS_HTTP_CODE=$(curl -sS -o "${TMP_DIR}/chaos_resp.txt" -w '%{http_code}' --max-time 15 -X POST "${ORCH_URL}/api/demo/chaos" "${HEADERS[@]}" -d '{"mode":"live"}') || CHAOS_CURL_EXIT=$?
+  if [[ "$CHAOS_HTTP_CODE" =~ ^4[0-9][0-9]$ ]]; then
+    echo "❌ Ativação de chaos rejeitada pelo servidor (HTTP ${CHAOS_HTTP_CODE}): $(cat "${TMP_DIR}/chaos_resp.txt" 2>/dev/null || true)" >&2
+    exit 1
+  fi
   CHAOS_ENABLED_BY_RUN=1
-  curl -fsS --max-time 15 -X POST "${ORCH_URL}/api/demo/chaos" "${HEADERS[@]}" -d '{"mode":"live"}' > /dev/null
+  if [ "$CHAOS_CURL_EXIT" -ne 0 ] || [[ ! "$CHAOS_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    echo "❌ Falha ao ativar chaos (curl_exit=${CHAOS_CURL_EXIT}, http=${CHAOS_HTTP_CODE:-000}). Tentando rollback no cleanup..." >&2
+    exit 1
+  fi
 
   echo "Gerando tráfego concorrente limitado em ${TARGET_URL}/payments e aguardando alerta Grafana (<= ${MAX_WAIT_SECONDS}s)..."
   TRAFFIC_PAYLOAD='{
@@ -186,6 +213,14 @@ const target = JSON.parse(process.argv[2] || '{}');
 const outputPath = process.argv[3];
 const triggeredLive = process.argv[4] === '1';
 
+if (inc.mode !== 'live') {
+  throw new Error(
+    'Refusing to persist replay snapshot from non-live incident (mode=' +
+      String(inc.mode || 'unknown') +
+      ')'
+  );
+}
+
 if (
   !inc.rca ||
   !inc.finops ||
@@ -223,6 +258,25 @@ const canUseTargetEdgeLog =
   target &&
   target.service === inc.service &&
   (!inc.rca.deployVersion || target.version === inc.rca.deployVersion);
+
+const KNOWN_SYNTHETIC_EDGE_LOG =
+  'ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig';
+const candidateRawEdgeLog =
+  inc.rca.rawEdgeLogPreCollector ||
+  (canUseTargetEdgeLog ? target.rawEdgeLogPreCollector : undefined);
+let safeRawEdgeLog = undefined;
+if (typeof candidateRawEdgeLog === 'string' && candidateRawEdgeLog.trim().length > 0) {
+  if (
+    candidateRawEdgeLog === KNOWN_SYNTHETIC_EDGE_LOG ||
+    PiiPromptGuard.inspectAndEnforceFailClosed(candidateRawEdgeLog).passed
+  ) {
+    safeRawEdgeLog = candidateRawEdgeLog;
+  } else {
+    throw new Error(
+      'Refusing to persist non-synthetic unredacted PII in rawEdgeLogPreCollector'
+    );
+  }
+}
 
 const eventsTimeline = [
   { event: IncidentEventType.CREATED, delayMs: 500 },
@@ -267,9 +321,7 @@ const snapshot = {
     traceId: inc.rca.traceId,
     criticalSpan: inc.rca.criticalSpan,
     spans: inc.rca.spans,
-    rawEdgeLogPreCollector:
-      inc.rca.rawEdgeLogPreCollector ||
-      (canUseTargetEdgeLog ? target.rawEdgeLogPreCollector : undefined),
+    rawEdgeLogPreCollector: safeRawEdgeLog,
     logSample: inc.rca.logSample,
     deployVersion: inc.rca.deployVersion,
     mitigations: inc.rca.mitigations,
@@ -290,7 +342,25 @@ const snapshot = {
 };
 
 const parsed = ReplaySnapshotSchema.parse(snapshot);
-fs.mkdirSync(require('node:path').dirname(outputPath), { recursive: true });
-fs.writeFileSync(outputPath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+const pathMod = require('node:path');
+const dir = pathMod.dirname(outputPath);
+fs.mkdirSync(dir, { recursive: true });
+const tmpOutput = pathMod.join(
+  dir,
+  '.' + pathMod.basename(outputPath) + '.' + process.pid + '.' + Date.now() + '.tmp'
+);
+try {
+  fs.writeFileSync(tmpOutput, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmpOutput, outputPath);
+} catch (writeErr) {
+  try {
+    if (fs.existsSync(tmpOutput)) {
+      fs.unlinkSync(tmpOutput);
+    }
+  } catch {
+    // Ignore temp file cleanup error
+  }
+  throw writeErr;
+}
 console.log('✅ Snapshot Replay sanitizado gravado e validado em:', outputPath);
 " "$INCIDENT_JSON" "$TARGET_STATUS_JSON" "$OUTPUT_PATH" "$TRIGGERED_LIVE"
