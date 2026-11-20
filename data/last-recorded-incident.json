@@ -1,0 +1,77 @@
+{
+  "recordedAt": "2026-11-18T20:00:00.000Z",
+  "incidentId": "inc-live-demo-golden",
+  "service": "api-pagamentos-core",
+  "severity": "critical",
+  "evidenceCoverage": {
+    "score": 100,
+    "signalsCollected": 4,
+    "signalsTotal": 4,
+    "signals": ["promql_anomaly", "metric_exemplar", "tempo_error_span", "loki_log_diff"]
+  },
+  "blastRadius": {
+    "servicesInvolved": ["api-pagamentos-core", "postgres"]
+  },
+  "finops": {
+    "rawBytesFetched": 48200,
+    "compactedBytesSentToLlm": 2890,
+    "payloadReductionPercent": 94,
+    "estimatedTokensSaved": 11328
+  },
+  "piiGuardAudit": {
+    "leakedPatternsDetected": 0,
+    "detectedTypes": [],
+    "edgeRedactedTokensVerified": 4,
+    "passed": true
+  },
+  "rca": {
+    "summary": "Degradação crítica de latência (p95 > 4.5s) causada por saturação do pool de conexões do PostgreSQL em api-pagamentos-core.",
+    "rootCause": "A release v2.14.8 reduziu o tamanho do pool para max: 2 e omitiu client.release() em bloco finally após timeout, provocando KnexTimeoutError.",
+    "reasoningSource": "llm",
+    "suspectFilePath": "apps/target-app-demo/src/repositories/payment.repository.ts",
+    "diagnosisSeconds": 6,
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "criticalSpan": "pg.pool.acquire",
+    "spans": [
+      {
+        "spanId": "span-root-01",
+        "serviceName": "api-pagamentos-core",
+        "operationName": "POST /payments",
+        "durationMs": 4620,
+        "hasError": true
+      },
+      {
+        "spanId": "span-db-02",
+        "parentSpanId": "span-root-01",
+        "serviceName": "postgres",
+        "operationName": "pg.pool.acquire",
+        "durationMs": 4512,
+        "hasError": true,
+        "errorMessage": "Knex: Timeout acquiring a connection"
+      }
+    ],
+    "rawEdgeLogPreCollector": "ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 000.000.000-00",
+    "logSample": "ERROR [api-pagamentos-core] trace_id=4bf92f3577b34da6a3ce929d0e0e4736 Pool exhausted for CPF [REDACTED_CPF] CNPJ [REDACTED_CNPJ] pixKey [REDACTED_PIX_EMAIL] auth Bearer [REDACTED_TOKEN]",
+    "deployVersion": "v2.14.8",
+    "mitigations": [
+      "Restaurar bloco try/finally com client.release() em payment.repository.ts",
+      "Restaurar dimensionamento seguro do pool de conexões (max: 10)"
+    ]
+  },
+  "remediation": {
+    "branchName": "hotfix/zeromttr-inc-live-demo-golden",
+    "branchUrl": "https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-live-demo-golden",
+    "pullRequestUrl": "https://github.com/AdmilsonGoncalves/zeromttr/pull/1",
+    "commitSha": "8f14e45fceea167a5a36dedd4bea2543d1a2b3c4"
+  },
+  "eventsTimeline": [
+    { "event": "incident.created", "delayMs": 500 },
+    { "event": "incident.transition", "state": "INVESTIGATING", "delayMs": 2000 },
+    { "event": "incident.transition", "state": "ENRICHING", "delayMs": 3000 },
+    { "event": "incident.rca", "delayMs": 4000 },
+    { "event": "incident.transition", "state": "REMEDIATING", "delayMs": 2000 },
+    { "event": "incident.transition", "state": "AWAITING_PR", "delayMs": 3000 },
+    { "event": "incident.remediation", "delayMs": 2000 },
+    { "event": "incident.transition", "state": "NOTIFIED", "delayMs": 3000 }
+  ]
+}

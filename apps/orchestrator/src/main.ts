@@ -6,7 +6,8 @@ import {
   HttpTargetStatusAdapter,
   McpClientAdapter,
   DeterministicFallbackReasoningAdapter,
-  GeminiReasoningAdapter
+  GeminiReasoningAdapter,
+  TypeScriptPatchSyntaxValidator
 } from './adapters/index.js';
 import {
   createInitialIncident,
@@ -20,6 +21,7 @@ import {
 } from './application/index.js';
 import {
   HttpDemoControlAdapter,
+  ReplayRunner,
   SimulateDemoDecision,
   createDemoRouterFactory
 } from './demo/index.js';
@@ -63,13 +65,15 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     logger
   );
   const enrichWithDeployDiff = new EnrichWithDeployDiff(repository, toolsPort, broadcaster);
+  const patchSyntaxValidator = new TypeScriptPatchSyntaxValidator();
   const dispatchRemediation = new DispatchRemediation(
     repository,
     toolsPort,
     llmAdapter,
     fallbackAdapter,
     broadcaster,
-    logger
+    logger,
+    { syntaxValidator: patchSyntaxValidator }
   );
   const notifyOnCall = new NotifyOnCall(
     repository,
@@ -104,6 +108,7 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     ? parseNumber(process.env.DEMO_COOLDOWN_MS, 120_000)
     : undefined;
 
+  const replayRunner = new ReplayRunner(repository, broadcaster, {}, logger);
   const demoRouter =
     process.env.ENABLE_DEMO_MODE === 'false'
       ? undefined
@@ -111,6 +116,7 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
           repository,
           demoControlPort: new HttpDemoControlAdapter(),
           simulateDemoDecision,
+          replayRunner,
           liveDemoKey: process.env.LIVE_DEMO_KEY,
           cooldownMs: demoCooldownMs
         });

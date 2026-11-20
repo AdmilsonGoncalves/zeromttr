@@ -83,10 +83,39 @@ function firstNonEmptyString(...candidates: unknown[]): string {
   return '';
 }
 
-function mapTraceSpanItem(item: unknown): TraceSpanItem {
+function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: boolean): boolean {
+  if (typeof span.hasError === 'boolean') {
+    return span.hasError;
+  }
+  if (typeof span.has_error === 'boolean') {
+    return span.has_error;
+  }
+  if (
+    span.statusCode === 2 ||
+    span.statusCode === 'ERROR' ||
+    span.statusCode === 'STATUS_CODE_ERROR'
+  ) {
+    return true;
+  }
+  if (isObject(span.attributes)) {
+    const attrs = span.attributes;
+    if (attrs.error === true || attrs.error === 'true') {
+      return true;
+    }
+    const httpStatus = Number(attrs['http.status_code'] ?? attrs['http.response.status_code']);
+    if (Number.isFinite(httpStatus) && httpStatus >= 500) {
+      return true;
+    }
+  }
+  return defaultHasError ?? false;
+}
+
+function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanItem {
   const span = isObject(item) ? item : {};
   const parentSpanRaw = span.parentSpanId ?? span.parent_span_id;
-  const errorMessageRaw = span.errorMessage ?? span.error_message;
+  const errorMessageRaw =
+    span.errorMessage ?? span.error_message ?? span.statusMessage ?? span.status_message;
+
   return {
     spanId: String(span.spanId ?? span.span_id ?? ''),
     parentSpanId: isNonEmptyString(parentSpanRaw)
@@ -95,9 +124,9 @@ function mapTraceSpanItem(item: unknown): TraceSpanItem {
         ? String(parentSpanRaw)
         : undefined,
     serviceName: String(span.serviceName ?? span.service_name ?? ''),
-    operationName: String(span.operationName ?? span.operation_name ?? ''),
+    operationName: String(span.operationName ?? span.operation_name ?? span.name ?? ''),
     durationMs: parseNumber(span.durationMs ?? span.duration_ms, 0),
-    hasError: Boolean(span.hasError ?? span.has_error ?? true),
+    hasError: inferSpanHasError(span, defaultHasError),
     errorMessage: isNonEmptyString(errorMessageRaw)
       ? errorMessageRaw
       : errorMessageRaw !== undefined && errorMessageRaw !== null
@@ -297,18 +326,29 @@ export class McpClientAdapter implements ToolsPort {
 
     let criticalSpans: TraceSpanItem[] = [];
     if (isArray(raw.criticalSpans)) {
-      criticalSpans = raw.criticalSpans.map(mapTraceSpanItem);
-    } else if (isArray(raw.top_errors)) {
-      criticalSpans = raw.top_errors.map(mapTraceSpanItem);
+      criticalSpans = raw.criticalSpans.map((item) => mapTraceSpanItem(item));
+    } else if (isArray(raw.top_errors) && raw.top_errors.length > 0) {
+      criticalSpans = raw.top_errors.map((item) => mapTraceSpanItem(item, true));
+    } else if (isArray(raw.top_slowest)) {
+      criticalSpans = raw.top_slowest.map((item) => mapTraceSpanItem(item, false));
     }
 
     const rootSpan = isObject(raw.root_span) ? raw.root_span : undefined;
-    const rootServiceName = firstNonEmptyString(raw.rootServiceName, rootSpan?.service_name);
+    const rootServiceName = firstNonEmptyString(
+      raw.rootServiceName,
+      rootSpan?.serviceName,
+      rootSpan?.service_name
+    );
+    const totalDurationMs = isNumber(raw.totalDurationMs)
+      ? raw.totalDurationMs
+      : isNumber(rootSpan?.durationMs)
+        ? rootSpan.durationMs
+        : undefined;
 
     return {
       traceId,
       rootServiceName: isNonEmptyString(rootServiceName) ? rootServiceName : undefined,
-      totalDurationMs: isNumber(raw.totalDurationMs) ? raw.totalDurationMs : undefined,
+      totalDurationMs,
       criticalSpans,
       servicesInvolved
     };

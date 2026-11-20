@@ -18,13 +18,13 @@ describe('core contract', () => {
     const sources: IncidentDecisionSource[] = ['email_hmac', 'demo_simulation'];
     const modes: IncidentMode[] = ['live', 'replay'];
     const reasoningSources: ReasoningSource[] = ['llm', 'fallback'];
-    const healthStatuses: TargetHealthStatus[] = ['healthy', 'degraded'];
+    const healthStatuses: TargetHealthStatus[] = ['healthy', 'degraded', 'unreachable'];
 
     expect(actions).toEqual(['approve', 'reject']);
     expect(sources).toEqual(['email_hmac', 'demo_simulation']);
     expect(modes).toEqual(['live', 'replay']);
     expect(reasoningSources).toEqual(['llm', 'fallback']);
-    expect(healthStatuses).toEqual(['healthy', 'degraded']);
+    expect(healthStatuses).toEqual(['healthy', 'degraded', 'unreachable']);
   });
 
   it('should define valid Incident and IncidentDetail structures', () => {
@@ -46,12 +46,14 @@ describe('core contract', () => {
       serviceName: 'api-pagamentos-core',
       operationName: 'pg.pool.acquire',
       durationMs: 4710,
-      hasError: true
+      hasError: true,
+      errorMessage: 'KnexTimeoutError'
     };
     expect(span.hasError).toBe(true);
 
     const audit: PiiGuardAudit = {
       leakedPatternsDetected: 0,
+      detectedTypes: [],
       edgeRedactedTokensVerified: 4,
       passed: true
     };
@@ -60,7 +62,7 @@ describe('core contract', () => {
     const incident: Incident = {
       id: 'inc-001',
       service: 'api-pagamentos-core',
-      severity: 'CRITICAL',
+      severity: 'critical',
       state: 'INVESTIGATING',
       mode: 'live',
       startedAt: '2026-11-10T16:20:00Z'
@@ -78,6 +80,7 @@ describe('core contract', () => {
       ],
       rca: {
         summary: 'Pool exhaustion',
+        rootCause: 'Missing client.release() in finally block',
         reasoningSource: 'llm',
         evidenceCoveragePercent: 100,
         signalsCollected: 4,

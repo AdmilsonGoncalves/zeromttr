@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "mock": "pnpm --filter @zeromttr/utils run build && pnpm dlx tsx mock-server/index.ts",
+    "mock": "pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build && pnpm dlx tsx mock-server/index.ts",
     "dev": "pnpm dlx vite",
     "start": "pnpm run mock & pnpm run dev"
   },
@@ -27,6 +27,7 @@
     "@angular/platform-browser": "^22.2.5",
     "@angular/router": "^22.2.5",
     "@primeuix/themes": "^1.0.0",
+    "@zeromttr/contracts": "workspace:^",
     "@zeromttr/utils": "workspace:^",
     "primeicons": "^7.0.0",
     "primeng": "^22.1.4",

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { RcaAndPatchSynthesisSchema } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber, safeJsonParse } from '@zeromttr/utils';
 import { ReasoningProvider } from '../domain/index.js';
 import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
@@ -8,7 +9,7 @@ export const GEMINI_SYSTEM_INSTRUCTION = `You are the ZeroMTTR Autonomous SRE Re
 Your mission:
 1. Analyze the collected telemetry evidence (Prometheus, Loki, Tempo, Git Diff).
 2. Identify the exact root cause of the anomaly, correlating metric degradation with the regression introduced in the code diff.
-3. Produce a concise explanation in English for on-call engineers.
+3. Produce a concise explanation in Brazilian Portuguese (pt-BR) for on-call engineers.
 4. Generate the COMPLETE fixed source code file (patchedContent), restoring operational stability.
 
 Strict security and coding rules:
@@ -16,6 +17,13 @@ Strict security and coding rules:
 - Preserve the suspectFilePath identified in the deploy diff and fix the root cause of the regression (such as resource leaks, missing cleanup in finally blocks, or degraded pool/timeout settings), restoring the healthy baseline behavior.
 - Never invent dependencies or alter public method signatures.
 - You must respond strictly in structured JSON matching the requested schema.`;
+
+export interface GeminiAdapterOptions {
+  systemInstruction?: string;
+  fallbackModelName?: string;
+  maxRetries?: number;
+  retryDelayMs?: number;
+}
 
 export const RCA_SYNTHESIS_SCHEMA = {
   type: Type.OBJECT,
@@ -60,21 +68,27 @@ export class GeminiReasoningAdapter implements ReasoningPort {
   private readonly client: GoogleGenAI;
   private readonly apiKey: string;
   private readonly modelName: string;
+  private readonly fallbackModelName: string;
+  private readonly systemInstruction: string;
+  private readonly maxRetries: number;
+  private readonly retryDelayMs: number;
 
-  public constructor(apiKey?: string, modelName?: string) {
+  public constructor(apiKey?: string, modelName?: string, options: GeminiAdapterOptions = {}) {
     this.apiKey = apiKey || process.env.GEMINI_API_KEY || '';
     this.client = new GoogleGenAI({ apiKey: this.apiKey || 'placeholder-for-instantiation' });
     this.modelName = modelName || process.env.LLM_MODEL || 'gemini-3.5-flash';
+    this.fallbackModelName =
+      options.fallbackModelName ?? process.env.LLM_FALLBACK_MODEL ?? 'gemini-3.5-flash-lite';
+    this.systemInstruction = options.systemInstruction ?? GEMINI_SYSTEM_INSTRUCTION;
+    this.maxRetries = options.maxRetries ?? 1;
+    this.retryDelayMs = options.retryDelayMs ?? 1_000;
   }
 
-  public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
-    if (!isNonEmptyString(this.apiKey) || this.apiKey === 'change-me-gemini-api-key') {
-      throw new Error('Gemini API key is not configured');
-    }
-
-    const prompt = `Analyze the incident evidence and synthesize the RCA and surgical patch:\n${JSON.stringify(evidence, null, 2)}`;
-
-    const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 25_000);
+  private async invokeModelWithTimeout(
+    model: string,
+    prompt: string,
+    timeoutMs: number
+  ): Promise<RcaAndPatchSynthesis> {
     let timer: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
@@ -86,10 +100,10 @@ export class GeminiReasoningAdapter implements ReasoningPort {
     try {
       response = await Promise.race([
         this.client.models.generateContent({
-          model: this.modelName,
+          model,
           contents: prompt,
           config: {
-            systemInstruction: GEMINI_SYSTEM_INSTRUCTION,
+            systemInstruction: this.systemInstruction,
             temperature: 0.1,
             maxOutputTokens: 4096,
             responseMimeType: 'application/json',
@@ -104,23 +118,56 @@ export class GeminiReasoningAdapter implements ReasoningPort {
       }
     }
 
-    const text = response.text;
+    const text = response?.text;
     if (!isNonEmptyString(text)) {
       throw new Error('Empty response from Gemini LLM');
     }
 
-    const parsed = safeJsonParse<RcaAndPatchSynthesis>(text);
-    if (
-      !parsed ||
-      !isNonEmptyString(parsed.summary) ||
-      !isNonEmptyString(parsed.patchedContent) ||
-      !isNonEmptyString(parsed.suspectFilePath)
-    ) {
+    const rawParsed = safeJsonParse<unknown>(text);
+    const validated = RcaAndPatchSynthesisSchema.safeParse(rawParsed);
+    if (!validated.success) {
       throw new Error(
         'Failed to parse structured JSON response from Gemini or missing required schema fields'
       );
     }
-    parsed.reasoningSource = ReasoningProvider.LLM;
-    return parsed;
+
+    return {
+      ...validated.data,
+      reasoningSource: ReasoningProvider.LLM
+    };
+  }
+
+  public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
+    if (!isNonEmptyString(this.apiKey) || this.apiKey === 'change-me-gemini-api-key') {
+      throw new Error('Gemini API key is not configured');
+    }
+
+    const prompt = `Analyze the incident evidence and synthesize the RCA and surgical patch:\n${JSON.stringify(evidence, null, 2)}`;
+    const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 15_000);
+
+    const modelsToTry = [this.modelName];
+    if (isNonEmptyString(this.fallbackModelName) && this.fallbackModelName !== this.modelName) {
+      modelsToTry.push(this.fallbackModelName);
+    }
+
+    let lastError: unknown;
+    for (let modelIdx = 0; modelIdx < modelsToTry.length; modelIdx++) {
+      const model = modelsToTry[modelIdx];
+      const attempts = modelIdx === 0 ? 1 + Math.max(0, this.maxRetries) : 1;
+
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        try {
+          return await this.invokeModelWithTimeout(model, prompt, timeoutMs);
+        } catch (err) {
+          lastError = err;
+          if (attempt + 1 < attempts && this.retryDelayMs > 0) {
+            const backoffMs = this.retryDelayMs * 2 ** attempt;
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+          }
+        }
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Gemini synthesis failed');
   }
 }

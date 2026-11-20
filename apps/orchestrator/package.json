@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@google/genai": "^0.2.0",
+    "@zeromttr/contracts": "workspace:^",
     "@zeromttr/utils": "workspace:*",
     "express": "^4.21.2",
+    "typescript": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -22,7 +24,6 @@
     "@types/supertest": "^6.0.2",
     "nock": "^15.0.6",
     "supertest": "^7.0.0",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

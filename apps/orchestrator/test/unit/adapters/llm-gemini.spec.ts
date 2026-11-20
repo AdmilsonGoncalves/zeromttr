@@ -44,7 +44,7 @@ describe('GeminiReasoningAdapter', () => {
   };
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.useRealTimers();
     delete process.env.GEMINI_TIMEOUT_MS;
   });
@@ -82,9 +82,13 @@ describe('GeminiReasoningAdapter', () => {
     expect(result.patchedContent).toBe('export const max = 10;');
   });
 
-  it('should reject empty response text and malformed JSON from Gemini', async () => {
+  it('should reject empty response text and malformed or incomplete JSON from Gemini', async () => {
     mockGenerateContent.mockResolvedValueOnce({ text: '   ' });
-    const adapter = new GeminiReasoningAdapter('real-looking-test-key');
+    const adapter = new GeminiReasoningAdapter('real-looking-test-key', 'gemini-3.5-flash', {
+      maxRetries: 0,
+      retryDelayMs: 0,
+      fallbackModelName: ''
+    });
 
     await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
       'Empty response from Gemini LLM'
@@ -96,18 +100,79 @@ describe('GeminiReasoningAdapter', () => {
     await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
       'Failed to parse structured JSON response from Gemini'
     );
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        summary: 'Has summary',
+        suspectFilePath: 'src/db.ts',
+        patchedContent: 'export const ok = true;'
+        // Missing rootCause, evidenceRefs, explanation
+      })
+    });
+    await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
+      'Failed to parse structured JSON response from Gemini'
+    );
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        summary: 'Pool exhausted due to max=1',
+        rootCause: 'Connection pool cap reduced from 10 to 1',
+        evidenceRefs: ['trace-abc'],
+        suspectFilePath: 'src/db.ts',
+        patchedContent: 'export const max = 10;',
+        explanation: 'Restores max connections',
+        reasoningSource: 'fallback',
+        extraHallucinatedField: 'unexpected'
+      })
+    });
+    await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
+      'Failed to parse structured JSON response from Gemini'
+    );
+  });
+
+  it('should retry once with backoff and fall back to gemini-3.5-flash-lite before failing', async () => {
+    mockGenerateContent
+      .mockRejectedValueOnce(new Error('429 rate limited'))
+      .mockRejectedValueOnce(new Error('503 primary unavailable'))
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          summary: 'Recovered via secondary model',
+          rootCause: 'Pool leak',
+          evidenceRefs: ['trace-abc'],
+          suspectFilePath: 'src/db.ts',
+          patchedContent: 'export const max = 10;',
+          explanation: 'Restores pool size'
+        })
+      });
+
+    const adapter = new GeminiReasoningAdapter('real-looking-test-key', 'gemini-3.5-flash', {
+      retryDelayMs: 1,
+      fallbackModelName: 'gemini-3.5-flash-lite'
+    });
+    const result = await adapter.synthesizeRcaAndPatch(sampleEvidence);
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+    expect(mockGenerateContent.mock.calls[0]?.[0]?.model).toBe('gemini-3.5-flash');
+    expect(mockGenerateContent.mock.calls[1]?.[0]?.model).toBe('gemini-3.5-flash');
+    expect(mockGenerateContent.mock.calls[2]?.[0]?.model).toBe('gemini-3.5-flash-lite');
+    expect(result.reasoningSource).toBe('llm');
+    expect(result.summary).toBe('Recovered via secondary model');
   });
 
   it('should fail fast when Gemini call exceeds GEMINI_TIMEOUT_MS', async () => {
     process.env.GEMINI_TIMEOUT_MS = '20';
-    mockGenerateContent.mockImplementationOnce(
+    mockGenerateContent.mockImplementation(
       () =>
         new Promise(() => {
           // Intentionally never resolves to simulate hung upstream call
         })
     );
 
-    const adapter = new GeminiReasoningAdapter('real-looking-test-key');
+    const adapter = new GeminiReasoningAdapter('real-looking-test-key', 'gemini-3.5-flash', {
+      retryDelayMs: 0,
+      maxRetries: 0,
+      fallbackModelName: ''
+    });
     await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
       'Gemini generateContent timed out after 20ms'
     );

@@ -4,6 +4,7 @@ RUN corepack enable && corepack prepare pnpm@10.5.2 --activate
 
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json nx.json ./
 COPY libs ./libs
+COPY data ./data
 COPY apps/orchestrator ./apps/orchestrator
 
 RUN pnpm install --frozen-lockfile --filter @zeromttr/orchestrator...

@@ -19,7 +19,7 @@ export const HEALTHY_TARGET_STATUS: TargetStatusResponse = {
 export const MOCK_INCIDENT: IncidentDetail = {
   id: 'inc-20261110-001',
   service: 'api-pagamentos-core',
-  severity: 'CRITICAL',
+  severity: 'critical',
   state: 'NOTIFIED',
   mode: 'live',
   startedAt: '2026-11-10T16:20:00Z',
@@ -117,6 +117,7 @@ export const MOCK_INCIDENT: IncidentDetail = {
       '2026-11-10T16:20:00.123Z [ERROR] [api-pagamentos-core] [trace_id=4bf92f3577b34da6a3ce929d0e0e4736] Payment failed for payer CPF [REDACTED_CPF] merchant CNPJ [REDACTED_CNPJ] phone [REDACTED_PHONE] Bearer [REDACTED_JWT]: pool connection acquire timeout after 4710ms',
     piiGuardAudit: {
       leakedPatternsDetected: 0,
+      detectedTypes: [],
       edgeRedactedTokensVerified: 4,
       passed: true
     },

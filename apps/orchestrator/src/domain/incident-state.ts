@@ -1,23 +1,8 @@
+import { IncidentState, type IncidentTransition } from '@zeromttr/contracts';
 import { nowIso } from '@zeromttr/utils';
 
-export enum IncidentState {
-  RECEIVED = 'RECEIVED',
-  INVESTIGATING = 'INVESTIGATING',
-  ENRICHING = 'ENRICHING',
-  REMEDIATING = 'REMEDIATING',
-  AWAITING_PR = 'AWAITING_PR',
-  NOTIFIED = 'NOTIFIED',
-  RESOLVED = 'RESOLVED',
-  REJECTED = 'REJECTED',
-  FAILED = 'FAILED'
-}
-
-export interface IncidentTransition {
-  from: IncidentState | null;
-  to: IncidentState;
-  at: string;
-  reason?: string;
-}
+export { IncidentState };
+export type { IncidentTransition };
 
 export class InvalidTransitionError extends Error {
   public constructor(from: IncidentState, to: IncidentState, reason?: string) {

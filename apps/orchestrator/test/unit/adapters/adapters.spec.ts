@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import nock from 'nock';
 import {
   McpClientAdapter,
   FileIncidentRepository,
   HttpTargetStatusAdapter,
-  DeterministicFallbackReasoningAdapter
+  DeterministicFallbackReasoningAdapter,
+  TypeScriptPatchSyntaxValidator
 } from '../../../src/adapters/index.js';
 import { HttpDemoControlAdapter } from '../../../src/demo/index.js';
 import { Incident, IncidentState } from '../../../src/domain/index.js';
@@ -15,6 +17,21 @@ import type { CollectedEvidence } from '../../../src/ports/index.js';
 describe('Adapters Unit Tests', () => {
   const tempDir = path.join(os.tmpdir(), `zeromttr-adapters-test-${process.pid}`);
   const tempFile = path.join(tempDir, 'incidents.json');
+
+  const savedEnv: Partial<Record<string, string | undefined>> = {};
+
+  function setIsolatedEnv(overrides: Record<string, string | undefined>): void {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!(key in savedEnv)) {
+        savedEnv[key] = process.env[key];
+      }
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
 
   beforeEach(() => {
     if (!fs.existsSync(tempDir)) {
@@ -26,6 +43,17 @@ describe('Adapters Unit Tests', () => {
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+    nock.cleanAll();
+    nock.enableNetConnect();
+    for (const [key, original] of Object.entries(savedEnv)) {
+      if (original === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = original;
+      }
+      delete savedEnv[key];
+    }
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -70,6 +98,59 @@ describe('Adapters Unit Tests', () => {
       expect(genericSynthesis.patchedContent).toContain('src/worker/pool.ts');
       expect(genericSynthesis.patchedContent).toContain('commit-789');
       expect(genericSynthesis.patchedContent).not.toContain('api-pagamentos-core');
+    });
+
+    it('should fetch healthy baseline source from GitHub Contents API with preserved slashes and TARGET_GITHUB_REPO fallback', async () => {
+      nock.disableNetConnect();
+      const healthySource = 'export const pool = { max: 10 };\n';
+      const encoded = Buffer.from(healthySource, 'utf-8').toString('base64');
+
+      const scope = nock('https://api.github.com')
+        .get(
+          '/repos/AdmilsonGoncalves/zeromttr/contents/apps/target-app-demo/src/repositories/payment.repository.ts'
+        )
+        .query({ ref: 'v2.14.7' })
+        .matchHeader('Authorization', 'Bearer ghp_test_token')
+        .reply(200, {
+          encoding: 'base64',
+          content: encoded
+        });
+
+      setIsolatedEnv({
+        GITHUB_OWNER: undefined,
+        GITHUB_REPO: undefined,
+        GITHUB_API_BASE_URL: undefined,
+        TARGET_GITHUB_REPO: 'https://github.com/AdmilsonGoncalves/zeromttr',
+        GITHUB_TOKEN: 'ghp_test_token'
+      });
+
+      const adapter = new DeterministicFallbackReasoningAdapter();
+
+      const result = await adapter.synthesizeRcaAndPatch({
+        incidentId: 'inc-gh-fallback',
+        service: 'payments-service',
+        alertName: 'PoolExhausted',
+        promqlSummary: { metric: 'm' },
+        traceAnalysis: {
+          traceId: 'trace-1',
+          criticalOperation: 'pg.pool.acquire',
+          durationMs: 4200,
+          servicesInvolved: ['payments-service']
+        },
+        logSample: 'Pool exhausted',
+        gitDiff: {
+          baseRef: 'v2.14.7',
+          headRef: 'v2.14.8',
+          suspectCommit: '8f14e45',
+          authorLogin: 'dev',
+          suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+          patch: '- max: 10\n+ max: 2'
+        }
+      });
+
+      expect(scope.isDone()).toBe(true);
+      expect(result.reasoningSource).toBe('fallback');
+      expect(result.patchedContent).toBe(healthySource);
     });
   });
 
@@ -312,6 +393,117 @@ describe('Adapters Unit Tests', () => {
       expect(gitRes.currentBlobSha).toBe('blob-123');
       expect(gitRes.truncatedPatch).toBe('+ max: 10');
       expect(gitRes.finops.rawBytesFetched).toBe(4000);
+    });
+
+    it('should properly map RawSpan fields (name, statusCode, statusMessage) in analyzeOtelTrace', async () => {
+      const mockFetchTrace = vi.fn(async () => ({
+        status: 200,
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  trace_id: '4bf92f3577b34da6a3ce929d0e0e4736',
+                  services_involved: ['api-pagamentos-core', 'postgres'],
+                  root_span: {
+                    spanId: 'span-root',
+                    serviceName: 'api-pagamentos-core',
+                    name: 'POST /payments',
+                    durationMs: 4620,
+                    statusCode: 'ERROR'
+                  },
+                  top_errors: [
+                    {
+                      spanId: 'span-db-err',
+                      parentSpanId: 'span-root',
+                      serviceName: 'postgres',
+                      name: 'pg.pool.acquire',
+                      durationMs: 4510,
+                      statusCode: 2,
+                      statusMessage: 'KnexTimeoutError: pool exhausted'
+                    },
+                    {
+                      spanId: 'span-http-err',
+                      parentSpanId: 'span-root',
+                      serviceName: 'api-pagamentos-core',
+                      name: 'gateway.dispatch',
+                      durationMs: 120,
+                      statusCode: 'STATUS_CODE_ERROR',
+                      attributes: { error: true }
+                    }
+                  ],
+                  top_slowest: []
+                })
+              }
+            ],
+            isError: false
+          }
+        })
+      }));
+      vi.stubGlobal('fetch', mockFetchTrace);
+
+      const adapter = new McpClientAdapter('http://localhost:8000/mcp', 'token-123');
+      const trace = await adapter.analyzeOtelTrace({
+        trace_id: '4bf92f3577b34da6a3ce929d0e0e4736'
+      });
+
+      expect(trace.rootServiceName).toBe('api-pagamentos-core');
+      expect(trace.totalDurationMs).toBe(4620);
+      expect(trace.criticalSpans).toHaveLength(2);
+      expect(trace.criticalSpans?.[0]).toEqual({
+        spanId: 'span-db-err',
+        parentSpanId: 'span-root',
+        serviceName: 'postgres',
+        operationName: 'pg.pool.acquire',
+        durationMs: 4510,
+        hasError: true,
+        errorMessage: 'KnexTimeoutError: pool exhausted'
+      });
+      expect(trace.criticalSpans?.[1]?.hasError).toBe(true);
+    });
+  });
+
+  describe('TypeScriptPatchSyntaxValidator', () => {
+    it('should validate TS, JSX, ambient TS declarations, and reject JS early/grammar errors and duplicate exports', () => {
+      const validator = new TypeScriptPatchSyntaxValidator();
+
+      expect(validator.isValidSyntax('worker.js', 'const x = 1;\nexport { x };')).toBe(true);
+      expect(validator.isValidSyntax('worker.js', 'export const x = 1;\nexport { x };')).toBe(
+        false
+      );
+      expect(validator.isValidSyntax('worker.js', 'export const x;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// @ts-ignore\nexport const x;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// @ts-expect-error\nexport const x;')).toBe(
+        false
+      );
+      expect(validator.isValidSyntax('worker.js', '// @ts-nocheck\nexport const x;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// @ts-ignore\nexport const x = 1;')).toBe(true);
+      expect(validator.isValidSyntax('worker.js', '// @ts-nocheck\nexport const x = 1;')).toBe(
+        true
+      );
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-expect-error */\nexport const x;')
+      ).toBe(false);
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-expect-error */\nexport const x = 1;')
+      ).toBe(true);
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-ignore */\nexport const x;')
+      ).toBe(false);
+      expect(
+        validator.isValidSyntax('worker.js', '/* foo\n * @ts-ignore */\nexport const x = 1;')
+      ).toBe(true);
+      expect(validator.isValidSyntax('worker.js', 'const count: number = 1;')).toBe(false);
+      expect(validator.isValidSyntax('worker.js', '// comment only')).toBe(false);
+      expect(validator.isValidSyntax('payment.repository.ts', '/* comment only */')).toBe(false);
+      expect(validator.isValidSyntax('ambient.ts', 'declare const x: number;')).toBe(true);
+      expect(validator.isValidSyntax('view.jsx', 'export const View = () => <div />;')).toBe(true);
+      expect(validator.isValidSyntax('view.jsx', 'export const View = () => <div>;')).toBe(false);
     });
   });
 
