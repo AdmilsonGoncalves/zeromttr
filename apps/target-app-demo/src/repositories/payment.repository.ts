@@ -25,8 +25,8 @@ export class PaymentRepository {
   private waitingWaiters = 0;
   private pendingCleanups = new Set<() => void>();
 
-  // Pool Configuration (Baseline v2.14.7: max 10)
-  private healthyMaxConnections = 10;
+  // Pool Configuration (v2.14.8 regression: max 2)
+  private healthyMaxConnections = 2;
   private degradedMaxConnections = 2;
   private acquireTimeoutMs = parseNumber(process.env.DB_ACQUIRE_TIMEOUT_MS, 150);
 
@@ -170,16 +170,12 @@ export class PaymentRepository {
         telemetry.endSpan(span, { code: SpanStatusCode.OK });
         return payment;
       } else {
-        // --- HEALTHY BASELINE (Release v2.14.7) ---
-        // Knex pool max: 10, strictly releasing connections in try { ... } finally { client.release() }
+        // --- REGRESSION (Release v2.14.8: perf(db): inline payment lock query on high concurrency) ---
+        // Reduced pool to max: 2 and omitted client.release(), leaking connections on concurrent load
         const client = await this.acquireConnection(traceId);
-        try {
-          const payment = await this.executePaymentInsert(client, input);
-          telemetry.endSpan(span, { code: SpanStatusCode.OK });
-          return payment;
-        } finally {
-          client.release();
-        }
+        const payment = await this.executePaymentInsert(client, input);
+        telemetry.endSpan(span, { code: SpanStatusCode.OK });
+        return payment;
       }
     } catch (err) {
       telemetry.endSpan(span, {
