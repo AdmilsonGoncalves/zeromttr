@@ -22,6 +22,9 @@ const envSchema = z.object({
   NODE_ENV: z.string().default('development')
 });
 
+/**
+ * Validates environment variables for the MCP server and normalizes repository and Grafana token settings.
+ */
 export function loadEnv(rawEnv: Record<string, string | undefined> = process.env) {
   const parsed = envSchema.safeParse(rawEnv);
   if (!parsed.success) {

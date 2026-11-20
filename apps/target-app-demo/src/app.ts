@@ -68,6 +68,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   res.end(JSON.stringify({ error: 'Not Found' }));
 }
 
+/**
+ * Initializes telemetry and returns the Node HTTP request listener for `target-app-demo`.
+ */
 export function createApp(): http.RequestListener {
   initTelemetry();
 

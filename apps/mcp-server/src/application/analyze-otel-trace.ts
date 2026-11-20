@@ -18,6 +18,9 @@ export interface AnalyzeOtelTraceOutput {
 export class AnalyzeOtelTrace {
   constructor(private readonly tracesPort: TracesPort) {}
 
+  /**
+   * Validates a 32-char trace ID, fetches spans, and returns root, error, and slowest span summaries.
+   */
   async execute(input: AnalyzeOtelTraceInput): Promise<AnalyzeOtelTraceOutput> {
     const traceId = input.trace_id.trim();
     if (!/^[0-9a-fA-F]{32}$/.test(traceId)) {

@@ -153,6 +153,9 @@ export class DeterministicFallbackReasoningAdapter implements ReasoningPort {
     ].join('\n');
   }
 
+  /**
+   * Produces a deterministic RCA and fallback patch without calling external LLMs.
+   */
   public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
     const suspectFilePath = isNonEmptyString(evidence.gitDiff?.suspectFilePath)
       ? evidence.gitDiff.suspectFilePath

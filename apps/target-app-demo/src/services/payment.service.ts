@@ -18,6 +18,9 @@ export interface ServiceHealth {
 export class PaymentService {
   public constructor(private repository: PaymentRepository = paymentRepository) {}
 
+  /**
+   * Delegates payment creation to the repository with optional trace context.
+   */
   public async createPayment(
     input: CreatePaymentInput,
     context?: { traceId?: string }
@@ -25,10 +28,16 @@ export class PaymentService {
     return this.repository.createPayment(input, context);
   }
 
+  /**
+   * Retrieves a payment record by ID from the repository.
+   */
   public async getPayment(id: string, traceId?: string): Promise<Payment | null> {
     return this.repository.getPaymentById(id, traceId);
   }
 
+  /**
+   * Aggregates chaos state and pool saturation metrics into a service health snapshot.
+   */
   public async getHealth(): Promise<ServiceHealth> {
     const isChaos = chaosManager.isPoolSaturationEnabled();
     const stats = this.repository.getPoolStats();

@@ -30,6 +30,9 @@ export class PaymentRepository {
   private degradedMaxConnections = 2;
   private acquireTimeoutMs = parseNumber(process.env.DB_ACQUIRE_TIMEOUT_MS, 150);
 
+  /**
+   * Returns active, waiting, and maximum connection pool counts for the current mode.
+   */
   public getPoolStats(): { active: number; waiting: number; max: number } {
     const isChaos = chaosManager.isPoolSaturationEnabled();
     const max = isChaos ? this.degradedMaxConnections : this.healthyMaxConnections;
@@ -40,6 +43,9 @@ export class PaymentRepository {
     };
   }
 
+  /**
+   * Cancels queued waiters, clears active pool connections, and resets pool telemetry gauges.
+   */
   public resetPool(): void {
     const cleanups = Array.from(this.pendingCleanups);
     this.pendingCleanups.clear();
@@ -56,6 +62,9 @@ export class PaymentRepository {
     telemetry.recordPoolWaiting(0);
   }
 
+  /**
+   * Acquires a simulated DB pool connection, queuing or timing out with `KnexTimeoutError` if saturated.
+   */
   public async acquireConnection(traceId?: string): Promise<DbClient> {
     const isChaos = chaosManager.isPoolSaturationEnabled();
     const maxConnections = isChaos ? this.degradedMaxConnections : this.healthyMaxConnections;
@@ -134,6 +143,9 @@ export class PaymentRepository {
     }
   }
 
+  /**
+   * Persists a PIX payment while simulating baseline `finally` cleanup or degraded pool leakage.
+   */
   public async createPayment(
     input: CreatePaymentInput,
     context?: { traceId?: string }
@@ -205,6 +217,9 @@ export class PaymentRepository {
     }
   }
 
+  /**
+   * Fetches a stored payment by ID using a pooled connection released in `finally`.
+   */
   public async getPaymentById(id: string, traceId?: string): Promise<Payment | null> {
     const client = await this.acquireConnection(traceId);
     try {

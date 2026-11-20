@@ -44,6 +44,9 @@ export interface ApplyDecisionOptions {
   annotationTags: string[];
 }
 
+/**
+ * Transitions a notified incident to resolved/rejected, annotates Grafana, saves, and broadcasts events.
+ */
 export async function applyIncidentDecision(
   repository: IncidentRepository,
   tools: ToolsPort,

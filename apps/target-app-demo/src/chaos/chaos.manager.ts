@@ -11,6 +11,7 @@ export interface ChaosStatus {
   rawEdgeLogPreCollector: string;
 }
 
+// Sample raw edge log containing synthetic PII prior to OTel Collector OTTL masking
 export const RAW_EDGE_LOG_SAMPLE =
   'ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig';
 
@@ -24,10 +25,16 @@ export class ChaosManager {
     }
   }
 
+  /**
+   * Returns whether database connection pool saturation chaos mode is enabled.
+   */
   public isPoolSaturationEnabled(): boolean {
     return this.poolSaturation;
   }
 
+  /**
+   * Enables or disables pool saturation chaos and clamps the artificial delay in milliseconds.
+   */
   public setPoolSaturation(enabled: boolean, delayMs = 4600): void {
     this.poolSaturation = enabled;
     if (isNumber(delayMs) && delayMs >= 0) {
@@ -37,10 +44,16 @@ export class ChaosManager {
     }
   }
 
+  /**
+   * Returns the configured artificial query delay in milliseconds under chaos mode.
+   */
   public getArtificialDelayMs(): number {
     return this.artificialDelayMs;
   }
 
+  /**
+   * Returns the current target service health status, release tag, and chaos metadata.
+   */
   public getStatus(): ChaosStatus {
     const isDegraded = this.poolSaturation;
     return {
@@ -54,6 +67,9 @@ export class ChaosManager {
     };
   }
 
+  /**
+   * Restores healthy baseline defaults by disabling pool saturation and resetting delay.
+   */
   public reset(): void {
     this.poolSaturation = false;
     this.artificialDelayMs = 4600;

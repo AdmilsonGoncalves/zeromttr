@@ -18,6 +18,9 @@ export interface SearchTracesByTraceQLOutput {
 export class SearchTracesByTraceQL {
   constructor(private readonly tracesPort: TracesPort) {}
 
+  /**
+   * Validates trace search bounds and searches Tempo traces matching the TraceQL query.
+   */
   async execute(input: SearchTracesByTraceQLInput): Promise<SearchTracesByTraceQLOutput> {
     const safeLimit = clamp(input.limit ?? 10, 1, 20);
     if (isEmpty(input.start) && isFilled(input.end)) {

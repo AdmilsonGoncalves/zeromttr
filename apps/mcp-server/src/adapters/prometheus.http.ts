@@ -11,6 +11,9 @@ export interface PrometheusAdapterConfig {
 export class PrometheusHttpAdapter implements MetricsPort {
   constructor(private readonly config: PrometheusAdapterConfig) {}
 
+  /**
+   * Executes a PromQL range query against Prometheus and returns parsed metric series with raw byte size.
+   */
   async queryRange(input: PromqlQueryInput): Promise<MetricsQueryResult> {
     const windowSec = Math.max(1, diffInSeconds(input.start, input.end));
     const defaultStep = `${Math.max(15, Math.ceil(windowSec / 250))}s`;

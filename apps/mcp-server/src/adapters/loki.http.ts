@@ -9,6 +9,9 @@ export interface LokiAdapterConfig {
 export class LokiHttpAdapter implements LogsPort {
   constructor(private readonly config: LokiAdapterConfig) {}
 
+  /**
+   * Executes a LogQL range query against Loki and returns extracted log lines with raw byte size.
+   */
   async queryLogs(input: LokiQueryInput): Promise<LogsQueryResult> {
     const url = buildUrl(this.config.baseUrl, '/loki/api/v1/query_range', {
       query: input.logql,

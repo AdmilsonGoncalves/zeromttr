@@ -13,6 +13,9 @@ export interface ExecutePromqlRangeOutput {
 export class ExecutePromqlRange {
   constructor(private readonly metricsPort: MetricsPort) {}
 
+  /**
+   * Validates the time window, queries Prometheus range metrics, and summarizes series with FinOps stats.
+   */
   async execute(input: PromqlQueryInput): Promise<ExecutePromqlRangeOutput> {
     const { startIso, endIso } = validateTimeRange(input.start, input.end);
 

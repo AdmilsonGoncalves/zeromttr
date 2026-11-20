@@ -75,6 +75,9 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
     return headers;
   }
 
+  /**
+   * Posts an incident timeline annotation with remediation tags to the Grafana HTTP API.
+   */
   async createAnnotation(req: AnnotationRequest): Promise<AnnotationReceipt> {
     const url = buildUrl(this.baseUrl, '/api/annotations');
     const tags = unique([...(req.tags || []), 'aiops-remediation']);

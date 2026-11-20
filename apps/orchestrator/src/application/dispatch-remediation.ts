@@ -86,6 +86,9 @@ export class DispatchRemediation {
     private readonly options: DispatchRemediationOptions = {}
   ) {}
 
+  /**
+   * Enforces PII guardrails, synthesizes RCA/patch, opens the remediation PR, and persists state.
+   */
   public async execute(
     incidentId: string,
     evidence: CollectedEvidence,

@@ -62,6 +62,9 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   readonly rawPreCollectorLog = RAW_PRE_COLLECTOR_LOG;
   readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
 
+  /**
+   * Updates the selected dashboard tab signal when a valid tab value is provided.
+   */
   onTabChange(tab: string | number | undefined): void {
     if (isFilled(tab)) {
       this.activeTab.set(String(tab));
@@ -120,12 +123,18 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     this.incidentService.disconnectSse();
   }
 
+  /**
+   * Applies the selected execution mode to the incident service.
+   */
   onModeChange(mode: IncidentMode): void {
     if (isNonEmptyString(mode)) {
       this.incidentService.setActiveMode(mode);
     }
   }
 
+  /**
+   * Captures the live demo key from the input element and stores it in the service.
+   */
   onLiveKeyInput(event: Event): void {
     const target = event.target as HTMLInputElement;
     if (target && isString(target.value)) {
@@ -133,20 +142,32 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Switches the active dashboard language.
+   */
   onLangChange(lang: Language): void {
     if (isNonEmptyString(lang)) {
       this.i18n.setLang(lang);
     }
   }
 
+  /**
+   * Triggers a simulated failure or replay sequence.
+   */
   onTriggerChaos(): void {
     void this.incidentService.triggerChaos();
   }
 
+  /**
+   * Resets target service chaos and refreshes dashboard state.
+   */
   onResetService(): void {
     void this.incidentService.resetChaos();
   }
 
+  /**
+   * Triggers a simulated approval decision in demo mode.
+   */
   onSimulateDecision(): void {
     void this.incidentService.simulateDecision('approve');
   }

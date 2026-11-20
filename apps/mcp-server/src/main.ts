@@ -27,6 +27,9 @@ export interface BootstrapOverrides {
   };
 }
 
+/**
+ * Wires MCP server adapters, application use cases, tool registry, and HTTP transport.
+ */
 export function buildMcpServer(overrides?: BootstrapOverrides): {
   server: http.Server;
   toolRegistry: ToolRegistry;
@@ -91,6 +94,9 @@ export function buildMcpServer(overrides?: BootstrapOverrides): {
   return { server, toolRegistry };
 }
 
+/**
+ * Builds the MCP HTTP server and starts listening on the configured port.
+ */
 export function bootstrap(
   port: number = mcpConfig.MCP_PORT,
   overrides?: BootstrapOverrides

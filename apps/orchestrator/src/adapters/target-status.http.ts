@@ -28,6 +28,9 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
       'http://localhost:3000';
   }
 
+  /**
+   * Queries the target app's chaos status endpoint, falling back to `UNREACHABLE` on failure.
+   */
   public async getStatus(): Promise<TargetStatus> {
     try {
       const url = buildUrl(this.baseUrl, '/chaos/status');

@@ -16,6 +16,9 @@ export const DecisionPayloadSchema = z.object({
   exp: z.union([z.number().finite(), z.string().regex(/^\d+$/).transform(Number)])
 });
 
+/**
+ * Mounts the signed human-in-the-loop decision endpoint (`POST /incidents/:id/decision`).
+ */
 export function createDecisionRouter(recordDecision: RecordDecision): Router {
   const router = Router();
 

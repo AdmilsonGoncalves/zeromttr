@@ -7,10 +7,16 @@ import { appConfig } from './app/app.config.js';
 
 export { appConfig };
 
+/**
+ * Returns a readiness marker indicating the dashboard module is loaded.
+ */
 export function initDashboard(): { status: string } {
   return { status: 'initialized' };
 }
 
+/**
+ * Bootstraps the standalone Angular War Room application.
+ */
 export function startApp(): Promise<unknown> {
   return bootstrapApplication(AppComponent, appConfig);
 }

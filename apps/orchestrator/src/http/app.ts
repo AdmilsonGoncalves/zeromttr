@@ -37,6 +37,9 @@ export interface AppDependencies {
   demoRouter?: Router | PluggableRouterFactory;
 }
 
+/**
+ * Builds the Express application with health endpoints, webhook, decision, API, and demo routers.
+ */
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
 

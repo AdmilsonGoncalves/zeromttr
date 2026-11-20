@@ -14,6 +14,9 @@ export interface QueryLokiLogsOutput {
 export class QueryLokiLogs {
   constructor(private readonly logsPort: LogsPort) {}
 
+  /**
+   * Validates the time range, queries Loki logs with bounded line limits, and calculates FinOps reduction.
+   */
   async execute(input: LokiQueryInput): Promise<QueryLokiLogsOutput> {
     const { startIso, endIso } = validateTimeRange(input.start, input.end);
 

@@ -43,6 +43,9 @@ interface BatchSpanHolder {
 export class TempoHttpAdapter implements TracesPort {
   constructor(private readonly config: TempoAdapterConfig) {}
 
+  /**
+   * Fetches and normalizes all OpenTelemetry spans for a trace ID from Tempo.
+   */
   async getTrace(traceId: string): Promise<{ rawBytes: number; spans: RawSpan[] }> {
     const url = buildUrl(this.config.baseUrl, `/api/traces/${traceId}`);
     const response = await fetch(url, {
@@ -140,6 +143,9 @@ export class TempoHttpAdapter implements TracesPort {
     return Math.floor(ms / 1000);
   }
 
+  /**
+   * Searches traces in Tempo using TraceQL and an optional bounded time window.
+   */
   async searchTraces(
     query: string,
     limit = 10,

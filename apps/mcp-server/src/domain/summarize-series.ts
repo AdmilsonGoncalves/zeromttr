@@ -32,6 +32,9 @@ function calculatePercentile(sortedValues: number[], p: number): number {
   return sortedValues[safeIndex];
 }
 
+/**
+ * Compacts raw Prometheus time series into statistical summaries (min, max, avg, latest, p95) and bounded exemplars.
+ */
 export function summarizeSeries(
   series: RawPromSeries[],
   maxSeries = 5,
@@ -80,6 +83,9 @@ export function summarizeSeries(
 }
 
 export class SeriesSummarizer {
+  /**
+   * Summarizes bounded Prometheus series into compact statistical snapshots.
+   */
   static summarize(series: RawPromSeries[], maxSeries = 5, maxExemplars = 10): SeriesSummary[] {
     return summarizeSeries(series, maxSeries, maxExemplars);
   }

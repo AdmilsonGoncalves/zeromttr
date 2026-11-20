@@ -37,6 +37,9 @@ const SUPPRESSION_DIRECTIVE_PATTERN = /@ts-(?:ignore|expect-error|nocheck)/gi;
  * Validates TypeScript/JavaScript/JSX patch syntax using the TypeScript Compiler API.
  */
 export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort {
+  /**
+   * Checks whether proposed TS/JS/JSX patch content parses without syntax or early JS errors.
+   */
   public isValidSyntax(filePath: string, content: string): boolean {
     if (!isNonEmptyString(filePath) || !isNonEmptyString(content)) {
       return false;

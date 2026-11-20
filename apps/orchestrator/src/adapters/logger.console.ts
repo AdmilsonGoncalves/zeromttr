@@ -77,18 +77,30 @@ export class ConsoleJsonLogger implements LoggerPort {
     this.minLevel = resolveMinLevel(minLevel ?? process.env.LOG_LEVEL);
   }
 
+  /**
+   * Emits a debug-level structured JSON log entry with automatic secret redaction.
+   */
   public debug(context: LogContext): void {
     this.write(LogLevel.DEBUG, context);
   }
 
+  /**
+   * Emits an info-level structured JSON log entry with automatic secret redaction.
+   */
   public info(context: LogContext): void {
     this.write(LogLevel.INFO, context);
   }
 
+  /**
+   * Emits a warn-level structured JSON log entry with automatic secret redaction.
+   */
   public warn(context: LogContext): void {
     this.write(LogLevel.WARN, context);
   }
 
+  /**
+   * Emits an error-level structured JSON log entry with automatic secret redaction.
+   */
   public error(context: LogContext): void {
     this.write(LogLevel.ERROR, context);
   }

@@ -24,6 +24,9 @@ import { SystemClock } from './ports/clock.port.js';
 import { createApp } from './http/app.js';
 import { SseEventBroadcaster } from './http/events.sse.js';
 
+/**
+ * Instantiates orchestrator adapters, use cases, Express app, and starts the HTTP server.
+ */
 export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
   const logger = new ConsoleJsonLogger();
   const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH, logger);

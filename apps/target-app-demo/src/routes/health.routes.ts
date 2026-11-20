@@ -1,6 +1,9 @@
 import type http from 'node:http';
 import { healthController } from '../controllers/health.controller.js';
 
+/**
+ * Dispatches `GET /health` requests to `HealthController`.
+ */
 export async function handleHealthRoutes(
   req: http.IncomingMessage,
   res: http.ServerResponse,

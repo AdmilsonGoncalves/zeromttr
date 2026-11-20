@@ -14,6 +14,9 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
     this.heartbeatTimer.unref();
   }
 
+  /**
+   * Registers an HTTP response as an active SSE client and streams periodic heartbeats.
+   */
   public handleConnection(req: Request, res: Response): void {
     res.writeHead(HTTP_STATUS.OK, {
       'Content-Type': 'text/event-stream',
@@ -40,6 +43,9 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
     res.once('error', cleanup);
   }
 
+  /**
+   * Broadcasts an incident SSE event to all connected dashboard clients.
+   */
   public broadcast(event: string, data: unknown): void {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of this.clients) {
@@ -62,6 +68,9 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
     }
   }
 
+  /**
+   * Stops the SSE heartbeat timer and closes all active client connections.
+   */
   public close(): void {
     clearInterval(this.heartbeatTimer);
     for (const client of this.clients) {
@@ -74,6 +83,9 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
     this.clients.clear();
   }
 
+  /**
+   * Returns the number of currently connected SSE clients.
+   */
   public getActiveClientsCount(): number {
     return this.clients.size;
   }

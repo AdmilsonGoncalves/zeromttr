@@ -12,6 +12,9 @@ export class HttpDemoControlAdapter implements DemoControlPort {
       'http://localhost:3000';
   }
 
+  /**
+   * Sends an HTTP POST request to enable or disable database pool saturation chaos on the target app.
+   */
   public async triggerChaos(enable: boolean, delayMs = 4600): Promise<void> {
     const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
       enable: String(enable),
@@ -23,6 +26,9 @@ export class HttpDemoControlAdapter implements DemoControlPort {
     }
   }
 
+  /**
+   * Disables database pool saturation chaos on the target app.
+   */
   public async reset(): Promise<void> {
     const url = buildUrl(this.baseUrl, '/chaos/pool-saturation', {
       enable: 'false'

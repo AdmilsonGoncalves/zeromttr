@@ -59,6 +59,9 @@ export class ReplayRunner {
     return path.resolve(process.cwd(), '../../data/last-recorded-incident.json');
   }
 
+  /**
+   * Reads and validates the recorded replay snapshot JSON file from disk.
+   */
   public loadSnapshot(): ReplaySnapshot {
     if (!fs.existsSync(this.snapshotPath)) {
       throw new Error(`Replay snapshot not found at '${this.snapshotPath}'`);
@@ -72,6 +75,9 @@ export class ReplayRunner {
     return validated.data;
   }
 
+  /**
+   * Cancels any active replay timeline playback and clears pending delay timers.
+   */
   public stop(): void {
     this.activeRunId++;
     if (this.activeDelayTimer) {
@@ -85,6 +91,9 @@ export class ReplayRunner {
     }
   }
 
+  /**
+   * Starts a deterministic replay incident from the recorded snapshot and streams SSE events.
+   */
   public async trigger(): Promise<string> {
     const snapshot = this.loadSnapshot();
     this.stop();

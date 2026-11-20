@@ -1,5 +1,8 @@
 import { diffInHours, parseIsoDate, round } from '@zeromttr/utils';
 
+/**
+ * Parses ISO8601 start/end timestamps and enforces ordering within a 24-hour maximum window.
+ */
 export function validateTimeRange(
   startStr: string,
   endStr: string

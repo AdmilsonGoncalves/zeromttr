@@ -8,6 +8,7 @@ import type {
   RcaAndPatchSynthesis
 } from '../ports/reasoning.port.js';
 
+// System prompt instructing Gemini to synthesize full-file fixes and pt-BR RCA summaries
 export const GEMINI_SYSTEM_INSTRUCTION = `You are the ZeroMTTR Autonomous SRE Reasoner, a specialist in Root Cause Analysis (RCA) and remediation engineering for production microservices.
 
 Your mission:
@@ -29,6 +30,7 @@ export interface GeminiAdapterOptions {
   retryDelayMs?: number;
 }
 
+// Structured Gemini response schema enforcing deterministic RCA and patch JSON fields
 export const RCA_SYNTHESIS_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -141,6 +143,9 @@ export class GeminiReasoningAdapter implements ReasoningPort {
     };
   }
 
+  /**
+   * Calls Gemini with structured output schema and retry/fallback model handling to synthesize RCA and a patch.
+   */
   public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
     if (!isNonEmptyString(this.apiKey) || this.apiKey === 'change-me-gemini-api-key') {
       throw new Error('Gemini API key is not configured');

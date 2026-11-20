@@ -17,6 +17,9 @@ export class EnrichWithDeployDiff {
     private readonly servicePath: string = process.env.TARGET_SERVICE_PATH || 'apps/target-app-demo'
   ) {}
 
+  /**
+   * Transitions the incident to `ENRICHING`, fetches Git deploy diff, and records FinOps savings.
+   */
   public async execute(
     incidentId: string,
     baseRef = process.env.TARGET_BASE_REF || OrchestratorDefault.DEFAULT_BASE_REF,

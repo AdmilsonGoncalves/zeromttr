@@ -8,6 +8,9 @@ import type {
 export class CreateRemediationPr {
   constructor(private readonly remediationPort: RemediationPort) {}
 
+  /**
+   * Validates remediation PR inputs and delegates branch/PR creation to the remediation port.
+   */
   async execute(input: RemediationPrRequest): Promise<RemediationPrReceipt> {
     if (
       !isNonEmptyString(input.incident_id) ||

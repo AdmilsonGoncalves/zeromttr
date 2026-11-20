@@ -24,6 +24,9 @@ export class RecordDecision {
     private readonly logger?: LoggerPort
   ) {}
 
+  /**
+   * Verifies the signed email decision HMAC token and records the human approval or rejection.
+   */
   public async execute(
     incidentId: string,
     action: IncidentDecisionAction,

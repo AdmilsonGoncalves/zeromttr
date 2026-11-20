@@ -5,6 +5,9 @@ import { paymentService, PaymentService } from '../services/payment.service.js';
 export class HealthController {
   public constructor(private service: PaymentService = paymentService) {}
 
+  /**
+   * Returns the current service health and connection pool status (`200` or `503` on failure).
+   */
   public async getHealth(_req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     try {
       const health = await this.service.getHealth();

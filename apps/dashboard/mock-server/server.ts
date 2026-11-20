@@ -39,18 +39,30 @@ export class MockServer {
 
   constructor(private readonly options: MockServerOptions = {}) {}
 
+  /**
+   * Returns the current in-memory incident detail state.
+   */
   getIncident(): IncidentDetail {
     return this.currentIncident;
   }
 
+  /**
+   * Returns the current simulated target service status.
+   */
   getTargetStatus(): TargetStatusResponse {
     return this.targetStatus;
   }
 
+  /**
+   * Overrides the simulated target service status.
+   */
   setTargetStatus(status: TargetStatusResponse): void {
     this.targetStatus = status;
   }
 
+  /**
+   * Starts the HTTP and SSE mock server and returns the bound port.
+   */
   async start(): Promise<number> {
     const port = this.options.port ?? 0;
 
@@ -83,6 +95,9 @@ export class MockServer {
     });
   }
 
+  /**
+   * Stops the heartbeat timer, closes active SSE streams, and shuts down the HTTP server.
+   */
   async stop(): Promise<void> {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
@@ -117,6 +132,9 @@ export class MockServer {
     }, interval);
   }
 
+  /**
+   * Sends a named SSE event payload to all connected dashboard clients.
+   */
   broadcastSse(eventName: string, data: unknown): void {
     const message = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of this.sseClients) {
@@ -441,6 +459,9 @@ export class MockServer {
   }
 }
 
+/**
+ * Creates a new dashboard mock server instance.
+ */
 export function createMockServer(options?: MockServerOptions): MockServer {
   return new MockServer(options);
 }

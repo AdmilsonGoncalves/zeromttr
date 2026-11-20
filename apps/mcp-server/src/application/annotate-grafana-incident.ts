@@ -8,6 +8,9 @@ import type {
 export class AnnotateGrafanaIncident {
   constructor(private readonly annotationPort: AnnotationPort) {}
 
+  /**
+   * Validates annotation text, attaches the remediation tag, and creates the Grafana annotation.
+   */
   async execute(input: AnnotationRequest): Promise<AnnotationReceipt> {
     if (!isNonEmptyString(input.text)) {
       throw new Error('Annotation text must not be empty.');

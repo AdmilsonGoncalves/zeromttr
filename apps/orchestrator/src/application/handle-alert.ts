@@ -55,6 +55,9 @@ export class HandleAlert {
     private readonly broadcaster: EventBroadcasterPort
   ) {}
 
+  /**
+   * Parses Grafana webhook alerts, ignores resolved notices, deduplicates active fingerprints, and creates an incident.
+   */
   public async execute(rawPayload: unknown): Promise<HandleAlertResult> {
     const payload = GrafanaWebhookPayloadSchema.parse(rawPayload);
     const primaryAlert = payload.alerts[0];

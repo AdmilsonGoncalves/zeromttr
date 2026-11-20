@@ -59,6 +59,9 @@ export class GithubRemediationHttpAdapter implements RemediationPort {
     return headers;
   }
 
+  /**
+   * Idempotently creates a hotfix branch, commits the patched file, and opens or reuses a remediation Pull Request.
+   */
   async createPullRequest(req: RemediationPrRequest): Promise<RemediationPrReceipt> {
     if (!/^[A-Za-z0-9._-]+$/.test(req.incident_id)) {
       throw new Error(

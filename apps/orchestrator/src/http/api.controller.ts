@@ -5,6 +5,9 @@ import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { TargetStatusPort } from '../ports/target-status.port.js';
 import type { SseEventBroadcaster } from './events.sse.js';
 
+/**
+ * Mounts protected dashboard API routes (`/events`, `/incidents`, `/incidents/:id`, `/target/status`).
+ */
 export function createApiRouter(
   repository: IncidentRepository,
   targetStatusPort: TargetStatusPort,

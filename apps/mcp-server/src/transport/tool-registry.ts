@@ -250,14 +250,23 @@ export class ToolRegistry {
     });
   }
 
+  /**
+   * Registers an MCP tool definition and Zod validation schema in the registry.
+   */
   register(def: McpToolDefinition) {
     this.tools.set(def.name, def);
   }
 
+  /**
+   * Retrieves a registered tool definition by name.
+   */
   getTool(name: string): McpToolDefinition | undefined {
     return this.tools.get(name);
   }
 
+  /**
+   * Returns MCP-formatted metadata and JSON schemas for all registered tools.
+   */
   listTools(): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
     return Array.from(this.tools.values()).map((t) => ({
       name: t.name,
@@ -266,6 +275,9 @@ export class ToolRegistry {
     }));
   }
 
+  /**
+   * Validates arguments and invokes the named MCP tool handler, returning structured MCP content.
+   */
   async callTool(name: string, rawArgs: unknown): Promise<McpToolResult> {
     const tool = this.tools.get(name);
     if (!tool) {

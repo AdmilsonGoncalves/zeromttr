@@ -43,6 +43,9 @@ export class InvestigateIncident {
     private readonly logger?: LoggerPort
   ) {}
 
+  /**
+   * Collects PromQL metrics, Loki logs, Tempo traces, and target status to evaluate evidence coverage.
+   */
   public async execute(incidentId: string): Promise<InvestigateResult> {
     const incident = await this.repository.findById(incidentId);
     if (!incident) {

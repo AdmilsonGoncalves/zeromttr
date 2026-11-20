@@ -35,6 +35,9 @@ export class NotifyOnCall {
     private readonly recipientEmail?: string
   ) {}
 
+  /**
+   * Generates signed HMAC decision links, emails the on-call engineer via Resend, and transitions to `NOTIFIED`.
+   */
   public async execute(incidentId: string): Promise<NotifyOnCallResult> {
     const incident = await this.repository.findById(incidentId);
     if (!incident) {

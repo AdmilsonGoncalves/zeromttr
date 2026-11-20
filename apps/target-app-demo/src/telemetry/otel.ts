@@ -105,24 +105,39 @@ export class TelemetryService {
     this.otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || null;
   }
 
+  /**
+   * Returns the configured OpenTelemetry service name.
+   */
   public getServiceName(): string {
     return TargetServiceIdentity.SERVICE_NAME;
   }
 
+  /**
+   * Returns the active release version tag (`v2.14.8` in chaos mode or `v2.14.7` baseline).
+   */
   public getServiceVersion(): string {
     return chaosManager.isPoolSaturationEnabled()
       ? TargetReleaseVersion.DEGRADED
       : TargetReleaseVersion.HEALTHY;
   }
 
+  /**
+   * Generates a random 16-byte W3C trace ID hex string.
+   */
   public generateTraceId(): string {
     return crypto.randomBytes(16).toString('hex');
   }
 
+  /**
+   * Generates a random 8-byte OpenTelemetry span ID hex string.
+   */
   public generateSpanId(): string {
     return crypto.randomBytes(8).toString('hex');
   }
 
+  /**
+   * Starts a new OpenTelemetry span with service metadata and optional parent/attributes.
+   */
   public startSpan(
     name: string,
     options?: {
@@ -149,6 +164,9 @@ export class TelemetryService {
     return span;
   }
 
+  /**
+   * Completes a span, stores it in the bounded buffer, and exports it via OTLP when configured.
+   */
   public endSpan(
     span: Span,
     status: { code: SpanStatusCode; message?: string } = { code: SpanStatusCode.OK }
@@ -162,6 +180,9 @@ export class TelemetryService {
     void this.exportSpanToOtlp(span);
   }
 
+  /**
+   * Records HTTP request duration metrics and exemplar histograms in milliseconds and seconds.
+   */
   public recordHttpServerDuration(durationSeconds: number, traceId: string): void {
     const exemplar: MetricExemplar = {
       traceId,
@@ -210,6 +231,9 @@ export class TelemetryService {
     );
   }
 
+  /**
+   * Records the number of callers queued for a database pool connection.
+   */
   public recordPoolWaiting(waitingCount: number): void {
     const serviceAttributes = {
       service: this.getServiceName(),
@@ -230,6 +254,9 @@ export class TelemetryService {
     );
   }
 
+  /**
+   * Records active database connection counts across `db.pool.used` and pool active metrics.
+   */
   public recordPoolUsed(usedCount: number): void {
     const serviceAttributes = {
       service: this.getServiceName(),
@@ -259,6 +286,9 @@ export class TelemetryService {
     );
   }
 
+  /**
+   * Buffers a structured telemetry log record and exports it via OTLP when configured.
+   */
   public emitLog(
     severity: OtelLogSeverity,
     body: string,
@@ -285,18 +315,30 @@ export class TelemetryService {
     void this.exportLogToOtlp(logRecord);
   }
 
+  /**
+   * Returns a copy of buffered OpenTelemetry spans.
+   */
   public getSpans(): Span[] {
     return [...this.spans];
   }
 
+  /**
+   * Returns a copy of buffered metric records.
+   */
   public getMetrics(): MetricRecord[] {
     return [...this.metrics];
   }
 
+  /**
+   * Returns a copy of buffered telemetry log records.
+   */
   public getLogs(): LogRecord[] {
     return [...this.logs];
   }
 
+  /**
+   * Clears buffered telemetry records and cancels pending histogram flush timers.
+   */
   public clear(): void {
     for (const state of this.histograms.values()) {
       if (state.flushTimer) {
@@ -602,6 +644,9 @@ export class TelemetryService {
 
 export const telemetry = new TelemetryService();
 
+/**
+ * Returns the singleton `TelemetryService` instance for target app instrumentation.
+ */
 export function initTelemetry(): TelemetryService {
   return telemetry;
 }

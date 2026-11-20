@@ -38,6 +38,9 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
     return headers;
   }
 
+  /**
+   * Fetches commit metadata and file diffs between two Git refs, sanitizing PII and computing FinOps metrics.
+   */
   async inspectDeployDiff(req: DeployDiffRequest): Promise<DeployDiffBundle> {
     const compareUrl = buildUrl(
       this.baseUrl,

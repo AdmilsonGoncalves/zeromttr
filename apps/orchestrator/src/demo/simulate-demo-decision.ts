@@ -14,6 +14,9 @@ export class SimulateDemoDecision {
     private readonly logger?: LoggerPort
   ) {}
 
+  /**
+   * Records a simulated on-call approve or reject decision for interactive dashboard demos.
+   */
   public async execute(incidentId: string, action: IncidentDecisionAction): Promise<Incident> {
     return applyIncidentDecision(this.repository, this.tools, this.broadcaster, this.logger, {
       incidentId,

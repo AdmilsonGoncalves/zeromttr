@@ -24,6 +24,9 @@ export class OrchestratorWorkflow {
     private readonly broadcaster: EventBroadcasterPort
   ) {}
 
+  /**
+   * Runs the end-to-end investigation, diff enrichment, remediation PR, and on-call notification pipeline.
+   */
   public async runFullPipeline(incidentId: string): Promise<void> {
     try {
       const incident = await this.repository.findById(incidentId);

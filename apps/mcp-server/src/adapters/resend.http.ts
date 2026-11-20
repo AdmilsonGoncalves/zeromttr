@@ -21,6 +21,9 @@ export interface ResendAdapterConfig {
   defaultRecipient?: string;
 }
 
+/**
+ * Renders an HTML post-mortem email body with escaped fields and signed decision links.
+ */
 export function renderPostMortemHtml(req: PostMortemNotification): string {
   const safeTitle = escapeHtml(req.title);
   const safeRca = escapeHtml(req.rca_summary);
@@ -101,6 +104,9 @@ export class ResendHttpAdapter implements NotifierPort {
     this.baseUrl = trimTrailingSlash(config.apiBaseUrl || 'https://api.resend.com');
   }
 
+  /**
+   * Sends an idempotent post-mortem notification email with HMAC decision buttons via Resend.
+   */
   async sendPostMortem(req: PostMortemNotification): Promise<NotificationReceipt> {
     if (isEmpty(this.config.apiKey)) {
       throw new Error('Resend API key is missing or empty');

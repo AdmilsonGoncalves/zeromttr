@@ -9,6 +9,9 @@ import { HTTP_STATUS } from '@zeromttr/utils/http';
 export class PaymentsController {
   public constructor(private service: PaymentService = paymentService) {}
 
+  /**
+   * Validates the payment request body, delegates creation, and records trace spans and HTTP latency metrics.
+   */
   public async createPayment(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -84,6 +87,9 @@ export class PaymentsController {
     }
   }
 
+  /**
+   * Looks up a payment by ID while recording OpenTelemetry spans and request duration metrics.
+   */
   public async getPayment(
     req: http.IncomingMessage,
     res: http.ServerResponse,

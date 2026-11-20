@@ -25,6 +25,9 @@ export interface McpSession {
   lastAccessedAt: number;
 }
 
+/**
+ * Creates the HTTP server hosting health endpoints and Streamable HTTP/SSE MCP sessions.
+ */
 export function createMcpHttpServer(options: McpServerOptions): http.Server {
   const { authToken, toolRegistry } = options;
   const sessions = new Map<string, McpSession>();

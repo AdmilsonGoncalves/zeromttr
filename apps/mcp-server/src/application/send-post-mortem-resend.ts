@@ -8,6 +8,9 @@ import type {
 export class SendPostMortemResend {
   constructor(private readonly notifierPort: NotifierPort) {}
 
+  /**
+   * Validates required notification URLs and dispatches the post-mortem email via the notifier port.
+   */
   async execute(input: PostMortemNotification): Promise<NotificationReceipt> {
     if (
       !isNonEmptyString(input.incident_id) ||

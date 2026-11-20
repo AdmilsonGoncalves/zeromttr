@@ -242,10 +242,16 @@ export class I18nService {
     return EN_TRANSLATIONS;
   });
 
+  /**
+   * Switches the active UI language signal.
+   */
   setLang(lang: Language): void {
     this.currentLang.set(lang);
   }
 
+  /**
+   * Resolves a localized string for the given translation key.
+   */
   t(key: keyof TranslationDictionary): string {
     return this.dict()[key];
   }

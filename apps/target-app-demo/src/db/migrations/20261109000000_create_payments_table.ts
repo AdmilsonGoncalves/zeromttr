@@ -15,6 +15,9 @@ export interface KnexInstance {
   schema: KnexSchema;
 }
 
+/**
+ * Creates the `payments` table schema via Knex.
+ */
 export async function up(knex: KnexInstance): Promise<void> {
   await knex.schema.createTable('payments', (table) => {
     table.uuid('id').primary();
@@ -30,6 +33,9 @@ export async function up(knex: KnexInstance): Promise<void> {
   });
 }
 
+/**
+ * Drops the `payments` table during migration rollback.
+ */
 export async function down(knex: KnexInstance): Promise<void> {
   await knex.schema.dropTableIfExists('payments');
 }

@@ -78,6 +78,9 @@ function runExpressMiddleware(
   });
 }
 
+/**
+ * Mounts interactive demo endpoints (`/demo/chaos`, `/demo/reset`, `/demo/simulate-decision`) with cooldown and auth guards.
+ */
 export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
   const router = Router();
   const cooldownMs = dependencies.cooldownMs ?? 120_000;
@@ -234,6 +237,9 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
   return router;
 }
 
+/**
+ * Wraps `createDemoRouter` into a pluggable factory wired after dashboard middleware initialization.
+ */
 export function createDemoRouterFactory(
   dependencies: Omit<DemoRouterDependencies, 'dashboardAuthMiddleware'>
 ): DemoRouterFactory {

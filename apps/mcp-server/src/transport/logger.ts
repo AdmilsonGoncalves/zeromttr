@@ -1,5 +1,6 @@
 import { pino } from 'pino';
 
+// Structured Pino logger configured with automatic authorization/secret redaction
 export const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   redact: {
