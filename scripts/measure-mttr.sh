@@ -32,7 +32,8 @@ if [ -z "$INCIDENT_ID" ]; then
       process.exit(1);
     }
     const sorted = [...items].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-    process.stdout.write(String(sorted[0].id));
+    const preferred = sorted.find((i) => i.mode === 'live') ?? sorted[0];
+    process.stdout.write(String(preferred.id));
   " "$LIST_JSON" 2>/dev/null || true)
 
   if [ -z "$INCIDENT_ID" ]; then
@@ -105,6 +106,7 @@ const postMortem = fmt(notifiedMs);
 
 console.log('Modo:               ', inc.mode || 'unknown');
 console.log('Estado atual:       ', inc.state);
+console.log('Notificação:        ', inc.notification?.status || 'n/a');
 console.log('Reasoning Source:   ', inc.rca?.reasoningSource || 'n/a');
 console.log('Evidence Coverage:  ', inc.rca ? \`\${inc.rca.signalsCollected}/\${inc.rca.signalsTotal} (\${inc.rca.evidenceCoveragePercent}%)\` : 'n/a');
 console.log('PII Guard Passed:   ', inc.rca?.piiGuardAudit ? String(inc.rca.piiGuardAudit.passed) : 'n/a');
@@ -120,9 +122,32 @@ if (inc.state === 'FAILED') {
   console.error('❌ Incidente terminou em FAILED.');
   process.exit(1);
 }
+const notifiedTransition = transitions.find((tr) => tr.to === 'NOTIFIED');
+const notifStatus = String(inc.notification?.status || '').toLowerCase();
+const isDegradedNotification =
+  notifStatus === 'degraded' ||
+  Boolean(notifiedTransition?.reason && /degraded|fallback/i.test(String(notifiedTransition.reason)));
+if (isDegradedNotification) {
+  console.error('❌ Notificação pós-incidente em modo DEGRADED/fallback; entrega real não confirmada.');
+  process.exit(1);
+}
 if (ttd === null || Number(ttd) > 15 || ttpr === null || Number(ttpr) > 30 || postMortem === null || Number(postMortem) > 45) {
   console.error('❌ Uma ou mais metas de TTD/TTPR/Post-Mortem não foram atingidas.');
   process.exit(1);
 }
-console.log('✅ Todas as metas de TTD, TTPR e Post-Mortem foram cumpridas.');
+if (inc.mode === 'replay') {
+  console.log(
+    'ℹ️  Modo replay: metas cronometradas da simulação cumpridas (não certifica criação real de PR nem envio real de e-mail).'
+  );
+} else {
+  if (!inc.remediation?.pullRequestUrl || !/^https?:\/\//.test(inc.remediation.pullRequestUrl)) {
+    console.error('❌ Execução live sem URL válida de Pull Request de remediação.');
+    process.exit(1);
+  }
+  if (notifStatus !== 'dispatched') {
+    console.error('❌ Execução live não confirmou entrega real de e-mail (notification.status != dispatched).');
+    process.exit(1);
+  }
+  console.log('✅ Execução live: metas de TTD, TTPR, PR real e envio real de e-mail cumpridas.');
+}
 " "$INCIDENT_JSON"

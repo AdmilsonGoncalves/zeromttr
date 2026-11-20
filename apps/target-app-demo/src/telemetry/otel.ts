@@ -55,7 +55,12 @@ export interface LogRecord {
   attributes: Record<string, string | number | boolean>;
 }
 
+interface OtlpResource {
+  attributes: Array<{ key: OtelAttributeKey; value: { stringValue: string } }>;
+}
+
 interface HistogramState {
+  key: string;
   name: TelemetryMetricName;
   unit: OtelMetricUnit;
   startTimeUnixNano: string;
@@ -64,7 +69,11 @@ interface HistogramState {
   bounds: number[];
   bucketCounts: number[];
   attributes: Record<string, string | number | boolean>;
+  resource: OtlpResource;
+  scope: { name: string };
   lastExportMs: number;
+  inFlight: boolean;
+  pendingFlush: boolean;
   pendingExemplar?: {
     traceId: string;
     value: number;
@@ -299,7 +308,7 @@ export class TelemetryService {
     this.histograms.clear();
   }
 
-  private buildOtlpResource() {
+  private buildOtlpResource(): OtlpResource {
     return {
       attributes: [
         { key: OtelAttributeKey.SERVICE_NAME, value: { stringValue: this.getServiceName() } },
@@ -308,7 +317,7 @@ export class TelemetryService {
     };
   }
 
-  private buildOtlpScope() {
+  private buildOtlpScope(): { name: string } {
     return { name: this.getServiceName() };
   }
 
@@ -465,6 +474,7 @@ export class TelemetryService {
     let state = this.histograms.get(key);
     if (!state) {
       state = {
+        key,
         name,
         unit,
         startTimeUnixNano: nowUnixNano(),
@@ -473,7 +483,11 @@ export class TelemetryService {
         bounds,
         bucketCounts: new Array<number>(bounds.length + 1).fill(0),
         attributes,
-        lastExportMs: 0
+        resource: this.buildOtlpResource(),
+        scope: this.buildOtlpScope(),
+        lastExportMs: 0,
+        inFlight: false,
+        pendingFlush: false
       };
       this.histograms.set(key, state);
     }
@@ -496,13 +510,22 @@ export class TelemetryService {
       return;
     }
 
-    if (!state.flushTimer) {
-      const delayMs = Math.max(1, state.lastExportMs + 1 - Date.now());
-      state.flushTimer = setTimeout(() => {
-        void this.flushHistogramSnapshot(state);
-      }, delayMs);
-      state.flushTimer.unref?.();
+    if (state.inFlight) {
+      state.pendingFlush = true;
+      return;
     }
+
+    if (!state.flushTimer) {
+      this.scheduleHistogramFlush(state);
+    }
+  }
+
+  private scheduleHistogramFlush(state: HistogramState): void {
+    const delayMs = Math.max(1, state.lastExportMs + 1 - Date.now());
+    state.flushTimer = setTimeout(() => {
+      void this.flushHistogramSnapshot(state);
+    }, delayMs);
+    state.flushTimer.unref?.();
   }
 
   private async flushHistogramSnapshot(state: HistogramState): Promise<void> {
@@ -510,6 +533,9 @@ export class TelemetryService {
     if (!this.otlpEndpoint) {
       return;
     }
+
+    state.inFlight = true;
+    state.pendingFlush = false;
 
     const exportMs = Math.max(Date.now(), state.lastExportMs + 1);
     state.lastExportMs = exportMs;
@@ -520,10 +546,10 @@ export class TelemetryService {
     const payload = {
       resourceMetrics: [
         {
-          resource: this.buildOtlpResource(),
+          resource: state.resource,
           scopeMetrics: [
             {
-              scope: this.buildOtlpScope(),
+              scope: state.scope,
               metrics: [
                 {
                   name: state.name,
@@ -562,7 +588,14 @@ export class TelemetryService {
       ]
     };
 
-    await this.postOtlpPayload(OtlpSignalPath.METRICS, payload);
+    try {
+      await this.postOtlpPayload(OtlpSignalPath.METRICS, payload);
+    } finally {
+      state.inFlight = false;
+      if (state.pendingFlush && this.histograms.get(state.key) === state && !state.flushTimer) {
+        this.scheduleHistogramFlush(state);
+      }
+    }
   }
 }
 

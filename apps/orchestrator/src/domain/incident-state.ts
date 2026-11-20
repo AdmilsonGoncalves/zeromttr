@@ -1,5 +1,5 @@
 import { IncidentState, type IncidentTransition } from '@zeromttr/contracts';
-import { nowIso } from '@zeromttr/utils';
+import { isString, nowIso } from '@zeromttr/utils';
 
 export { IncidentState };
 export type { IncidentTransition };
@@ -27,7 +27,7 @@ const ALLOWED_TRANSITIONS: Record<IncidentState, readonly IncidentState[]> = {
 const INCIDENT_STATE_VALUES: ReadonlySet<string> = new Set(Object.values(IncidentState));
 
 export function isIncidentState(value: unknown): value is IncidentState {
-  return typeof value === 'string' && INCIDENT_STATE_VALUES.has(value);
+  return isString(value) && INCIDENT_STATE_VALUES.has(value);
 }
 
 export function canTransition(from: IncidentState | string, to: IncidentState): boolean {

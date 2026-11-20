@@ -67,7 +67,7 @@ describe('Tool: search_traces_by_traceql integration', () => {
   });
 
   it('should complete start-only windows with current timestamp as end bound', async () => {
-    const startIso = '2026-11-01T10:00:00Z';
+    const startIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const expectedStart = String(Math.floor(Date.parse(startIso) / 1000));
     const scope = nock('http://localhost:3200')
       .get('/api/search')

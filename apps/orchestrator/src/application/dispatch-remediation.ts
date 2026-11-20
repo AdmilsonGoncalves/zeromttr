@@ -267,22 +267,7 @@ export class DispatchRemediation {
       ...rcaReport
     });
 
-    // Transition to AWAITING_PR
-    if (incident.state === IncidentState.REMEDIATING) {
-      const transitionAwaiting = incident.transition(
-        IncidentState.AWAITING_PR,
-        TransitionReason.AWAITING_PR
-      );
-      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-        incidentId: incident.id,
-        from: transitionAwaiting.from,
-        to: transitionAwaiting.to,
-        at: transitionAwaiting.at,
-        reason: transitionAwaiting.reason
-      });
-    }
-
-    // Create Remediation PR
+    // Create Remediation PR while incident remains in REMEDIATING so TTPR includes PR latency
     const prTitleSummary = truncate(sanitizeWhitespace(synthesis.summary), 72, '');
     const prResult = await this.tools.createRemediationPr({
       incident_id: incident.id,
@@ -298,6 +283,22 @@ export class DispatchRemediation {
       ...prResult,
       suspectCommitSha: evidence.gitDiff?.suspectCommit
     };
+
+    // Transition to AWAITING_PR only after createRemediationPr succeeds
+    if (incident.state === IncidentState.REMEDIATING) {
+      const transitionAwaiting = incident.transition(
+        IncidentState.AWAITING_PR,
+        TransitionReason.AWAITING_PR
+      );
+      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
+        incidentId: incident.id,
+        from: transitionAwaiting.from,
+        to: transitionAwaiting.to,
+        at: transitionAwaiting.at,
+        reason: transitionAwaiting.reason
+      });
+    }
+
     await this.repository.save(incident);
 
     this.broadcaster.broadcast(IncidentEventType.REMEDIATION, {

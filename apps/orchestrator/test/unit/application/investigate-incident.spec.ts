@@ -131,36 +131,42 @@ describe('InvestigateIncident Use Case', () => {
     expect(result.servicesInvolved).toEqual(['api-pagamentos-core', 'postgres']);
   });
 
-  it('should_fallback_to_searchTracesByTraceQL_when_promql_has_no_exemplarTraceId', async () => {
-    const fallbackTraceId = '025f21ef64d6bd75a7089b2a45e602a8';
-    const { incident, tools, useCase } = createHarness({
-      exemplarTraceId: undefined,
-      searchTracesByTraceQL: vi.fn(async () => ({
-        traces: [
-          {
-            traceId: fallbackTraceId,
-            rootServiceName: 'api-pagamentos-core',
-            errorCount: 1,
-            durationMs: 4600
-          }
-        ]
-      }))
-    });
+  it('should fallback to searchTracesByTraceQL when PromQL has no exemplarTraceId', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-20T00:10:00.000Z'));
+    try {
+      const fallbackTraceId = '025f21ef64d6bd75a7089b2a45e602a8';
+      const { incident, tools, useCase } = createHarness({
+        exemplarTraceId: undefined,
+        searchTracesByTraceQL: vi.fn(async () => ({
+          traces: [
+            {
+              traceId: fallbackTraceId,
+              rootServiceName: 'api-pagamentos-core',
+              errorCount: 1,
+              durationMs: 4600
+            }
+          ]
+        }))
+      });
 
-    const result = await useCase.execute(incident.id);
+      const result = await useCase.execute(incident.id);
 
-    expect(tools.searchTracesByTraceQL).toHaveBeenCalledWith({
-      query: '{resource.service.name="api-pagamentos-core" && status=error}',
-      limit: 5,
-      start: expect.any(String),
-      end: expect.any(String)
-    });
-    expect(tools.analyzeOtelTrace).toHaveBeenCalledWith({ trace_id: fallbackTraceId });
-    expect(result.traceId).toBe(fallbackTraceId);
-    expect(result.criticalSpan).toBe('pg.pool.acquire');
+      expect(tools.searchTracesByTraceQL).toHaveBeenCalledWith({
+        query: '{resource.service.name="api-pagamentos-core" && status=error}',
+        limit: 5,
+        start: '2026-11-20T00:05:00.000Z',
+        end: '2026-11-20T00:10:00.000Z'
+      });
+      expect(tools.analyzeOtelTrace).toHaveBeenCalledWith({ trace_id: fallbackTraceId });
+      expect(result.traceId).toBe(fallbackTraceId);
+      expect(result.criticalSpan).toBe('pg.pool.acquire');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('should_continue_gracefully_when_traceql_fallback_throws', async () => {
+  it('should continue gracefully when TraceQL fallback throws', async () => {
     const { incident, tools, useCase } = createHarness({
       exemplarTraceId: undefined,
       searchTracesByTraceQL: vi.fn(async () => {

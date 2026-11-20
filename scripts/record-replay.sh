@@ -26,6 +26,7 @@ INCIDENT_ID="${1:-}"
 MAX_WAIT_SECONDS="${RECORD_TIMEOUT_SECONDS:-90}"
 TRAFFIC_CONCURRENCY="${RECORD_TRAFFIC_CONCURRENCY:-4}"
 TRIGGERED_LIVE=0
+CHAOS_ENABLED_BY_RUN=0
 
 if [ -z "$TOKEN" ]; then
   echo "❌ DASHBOARD_API_TOKEN não configurado." >&2
@@ -48,6 +49,13 @@ stop_traffic() {
 
 cleanup() {
   stop_traffic
+  if [ "$CHAOS_ENABLED_BY_RUN" -eq 1 ]; then
+    local reset_headers=(-H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json")
+    if [ -n "$LIVE_KEY" ]; then
+      reset_headers+=(-H "X-Live-Demo-Key: ${LIVE_KEY}")
+    fi
+    curl -fsS --max-time 10 -X POST "${ORCH_URL}/api/demo/reset" "${reset_headers[@]}" > /dev/null 2>&1 || true
+  fi
   rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT INT TERM
@@ -64,6 +72,7 @@ if [ -z "$INCIDENT_ID" ]; then
   fi
 
   curl -fsS --max-time 15 -X POST "${ORCH_URL}/api/demo/chaos" "${HEADERS[@]}" -d '{"mode":"live"}' > /dev/null
+  CHAOS_ENABLED_BY_RUN=1
 
   echo "Gerando tráfego concorrente limitado em ${TARGET_URL}/payments e aguardando alerta Grafana (<= ${MAX_WAIT_SECONDS}s)..."
   TRAFFIC_PAYLOAD='{
@@ -143,7 +152,7 @@ while true; do
   if [ -n "$FETCH_RESULT" ]; then
     INCIDENT_JSON="$FETCH_RESULT"
     STATE=$(node -e "const d = JSON.parse(process.argv[1]); process.stdout.write(String(d.state || ''));" "$INCIDENT_JSON")
-    if [ "$STATE" = "NOTIFIED" ] || [ "$STATE" = "RESOLVED" ]; then
+    if [ "$STATE" = "NOTIFIED" ] || [ "$STATE" = "RESOLVED" ] || [ "$STATE" = "REJECTED" ]; then
       break
     fi
     if [ "$STATE" = "FAILED" ]; then
@@ -164,14 +173,8 @@ if [ "$TRIGGERED_LIVE" -eq 1 ]; then
   TARGET_STATUS_JSON=$(curl -fsS --max-time 10 -H "Authorization: Bearer ${TOKEN}" "${ORCH_URL}/api/target/status" || echo '{}')
 fi
 
-if [ ! -f "libs/contracts/dist/index.js" ]; then
-  echo "⚙️  Compilando @zeromttr/contracts para validação ReplaySnapshotSchema..."
-  CI=true pnpm nx build @zeromttr/contracts > /dev/null
-fi
-if [ ! -f "apps/orchestrator/dist/domain/pii-prompt-guard.js" ]; then
-  echo "⚙️  Compilando @zeromttr/orchestrator para auditoria fail-closed de PII..."
-  CI=true pnpm nx build @zeromttr/orchestrator > /dev/null
-fi
+echo "⚙️  Garantindo compilação atualizada de @zeromttr/contracts e @zeromttr/orchestrator..."
+CI=true pnpm nx run-many -t build -p @zeromttr/contracts @zeromttr/orchestrator > /dev/null
 
 node -e "
 const fs = require('node:fs');
@@ -193,7 +196,8 @@ if (!inc.rca.piiGuardAudit || inc.rca.piiGuardAudit.passed !== true) {
 const persistedTexts = [
   inc.rca.summary,
   inc.rca.rootCause || inc.rca.summary,
-  inc.rca.logSample || ''
+  inc.rca.logSample || '',
+  ...(Array.isArray(inc.rca.mitigations) ? inc.rca.mitigations : [])
 ].join('\n');
 const postAudit = PiiPromptGuard.inspectAndEnforceFailClosed(persistedTexts);
 if (!postAudit.passed) {
@@ -261,7 +265,11 @@ const snapshot = {
     grafanaAnnotationId: inc.rca.grafanaAnnotationId
   },
   remediation: {
-    branchName: inc.remediation.branchName,
+    branchName:
+      inc.remediation.branchName ||
+      (inc.remediation.branchUrl && inc.remediation.branchUrl.includes('/tree/')
+        ? inc.remediation.branchUrl.split('/tree/')[1]
+        : undefined),
     branchUrl: inc.remediation.branchUrl,
     pullRequestUrl: inc.remediation.pullRequestUrl,
     commitSha: inc.remediation.commitSha,

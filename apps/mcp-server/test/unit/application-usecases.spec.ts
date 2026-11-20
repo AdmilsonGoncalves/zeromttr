@@ -166,6 +166,31 @@ describe('Application Use Cases Unit Tests', () => {
       expect(mockTracesPort.searchTraces).toHaveBeenCalledWith('{ status = error }', 20);
       expect(out.count).toBe(2);
     });
+
+    it('should reject end-only or inverted time windows', async () => {
+      const mockTracesPort: TracesPort = {
+        getTrace: vi.fn(),
+        searchTraces: vi.fn()
+      };
+      const useCase = new SearchTracesByTraceQL(mockTracesPort);
+
+      await expect(
+        useCase.execute({
+          query: '{ status = error }',
+          end: '2026-11-20T01:00:00Z'
+        })
+      ).rejects.toThrow(/'start' is required/);
+
+      await expect(
+        useCase.execute({
+          query: '{ status = error }',
+          start: '2026-11-20T02:00:00Z',
+          end: '2026-11-20T01:00:00Z'
+        })
+      ).rejects.toThrow(/must be before end/);
+
+      expect(mockTracesPort.searchTraces).not.toHaveBeenCalled();
+    });
   });
 
   describe('InspectGitDeployDiff', () => {

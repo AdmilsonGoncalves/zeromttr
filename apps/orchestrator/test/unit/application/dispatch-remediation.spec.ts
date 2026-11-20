@@ -592,4 +592,107 @@ describe('DispatchRemediation Use Case', () => {
     );
     expect(tools.createRemediationPr).toHaveBeenCalledTimes(prCallsBefore);
   });
+
+  it('should transition to AWAITING_PR only after createRemediationPr succeeds and not on PR failure', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+
+    let resolvePr!: (value: {
+      branchName: string;
+      branchUrl: string;
+      pullRequestUrl: string;
+      commitSha: string;
+    }) => void;
+    const prPromise = new Promise<{
+      branchName: string;
+      branchUrl: string;
+      pullRequestUrl: string;
+      commitSha: string;
+    }>((resolve) => {
+      resolvePr = resolve;
+    });
+
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(() => prPromise),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 105, success: true }))
+    };
+
+    const validPatch = ['export async function createPayment() {', '  return true;', '}'].join(
+      '\n'
+    );
+
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Release pooled connection',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'valid'
+      }))
+    };
+
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn()
+    };
+
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    const execPromise = useCase.execute(incident.id, validEvidence, 'blob123');
+    await vi.waitFor(() => {
+      expect(tools.createRemediationPr).toHaveBeenCalledOnce();
+    });
+
+    // While PR creation is in flight, incident must remain in REMEDIATING (TTPR accuracy)
+    expect(incident.state).toBe(IncidentState.REMEDIATING);
+    expect(broadcaster.broadcast).not.toHaveBeenCalledWith(
+      'incident.transition',
+      expect.objectContaining({ to: IncidentState.AWAITING_PR })
+    );
+
+    resolvePr({
+      branchName: 'hotfix/zeromttr-inc-test-001',
+      branchUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-test-001',
+      pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/46',
+      commitSha: 'commit-ordered'
+    });
+
+    await execPromise;
+    expect(incident.state).toBe(IncidentState.AWAITING_PR);
+
+    // Unhappy path: PR failure must NOT emit AWAITING_PR
+    const failedIncident = createMockIncident();
+    const failedBroadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    vi.mocked(repo.findById).mockResolvedValueOnce(failedIncident);
+    vi.mocked(tools.createRemediationPr).mockRejectedValueOnce(new Error('GitHub 502'));
+
+    const failUseCase = new DispatchRemediation(
+      repo,
+      tools,
+      llmAdapter,
+      fallbackAdapter,
+      failedBroadcaster
+    );
+
+    await expect(failUseCase.execute(failedIncident.id, validEvidence, 'blob123')).rejects.toThrow(
+      'GitHub 502'
+    );
+    expect(failedIncident.state).toBe(IncidentState.REMEDIATING);
+    expect(failedBroadcaster.broadcast).not.toHaveBeenCalledWith(
+      'incident.transition',
+      expect.objectContaining({ to: IncidentState.AWAITING_PR })
+    );
+  });
 });

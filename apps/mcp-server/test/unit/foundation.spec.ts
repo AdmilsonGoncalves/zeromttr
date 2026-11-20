@@ -4,6 +4,7 @@ import { getMcpDomainStatus } from '../../src/domain/index.js';
 import { checkMcpApplicationHealth } from '../../src/application/index.js';
 import { GrafanaAnnotationsHttpAdapter } from '../../src/adapters/grafana-annotations.http.js';
 import { ResendHttpAdapter } from '../../src/adapters/resend.http.js';
+import { TempoHttpAdapter } from '../../src/adapters/tempo.http.js';
 
 describe('mcp-server foundation', () => {
   beforeAll(() => {
@@ -30,7 +31,7 @@ describe('mcp-server foundation', () => {
     expect(health.status).toBe('ready');
   });
 
-  it('should_use_basic_auth_when_grafana_api_token_is_missing', async () => {
+  it('should use Basic Auth when Grafana API token is missing', async () => {
     const expectedBasic = Buffer.from('admin:secret', 'utf-8').toString('base64');
     const scope = nock('http://localhost:3000')
       .post('/api/annotations')
@@ -52,7 +53,7 @@ describe('mcp-server foundation', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  it('should_reject_basic_auth_over_non_local_http_grafana_url', async () => {
+  it('should reject Basic Auth over non-local HTTP Grafana URL', async () => {
     const adapter = new GrafanaAnnotationsHttpAdapter({
       baseUrl: 'http://grafana.remote.example.com:3000',
       apiToken: '',
@@ -67,7 +68,7 @@ describe('mcp-server foundation', () => {
     ).rejects.toThrow(/Refusing to send Grafana Basic credentials/);
   });
 
-  it('should_fallback_to_default_recipient_in_resend_adapter', async () => {
+  it('should fall back to defaultRecipient in Resend adapter', async () => {
     let capturedBody: { to?: string[] } | undefined;
     const scope = nock('https://api.resend.com')
       .post('/emails', (body) => {
@@ -97,6 +98,27 @@ describe('mcp-server foundation', () => {
 
     expect(receipt.delivered).toBe(true);
     expect(capturedBody?.to).toEqual(['oncall-default@example.com']);
+    expect(scope.isDone()).toBe(true);
+  });
+
+  it('should bound end-only Tempo search windows to five minutes before end', async () => {
+    const endIso = '2026-11-20T01:05:00Z';
+    const expectedEnd = Math.floor(Date.parse(endIso) / 1000);
+    const expectedStart = expectedEnd - 300;
+    const scope = nock('http://localhost:3200')
+      .get('/api/search')
+      .query({
+        q: '{ .status = error }',
+        limit: '5',
+        start: String(expectedStart),
+        end: String(expectedEnd)
+      })
+      .reply(200, { traces: [] });
+
+    const adapter = new TempoHttpAdapter({ baseUrl: 'http://localhost:3200' });
+    const result = await adapter.searchTraces('{ .status = error }', 5, { end: endIso });
+
+    expect(result.traces).toEqual([]);
     expect(scope.isDone()).toBe(true);
   });
 });

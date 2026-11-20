@@ -103,7 +103,7 @@ function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: bool
       return true;
     }
     const httpStatus = Number(attrs['http.status_code'] ?? attrs['http.response.status_code']);
-    if (Number.isFinite(httpStatus) && httpStatus >= 500) {
+    if (isNumber(httpStatus) && httpStatus >= 500) {
       return true;
     }
   }

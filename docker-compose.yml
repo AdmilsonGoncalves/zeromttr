@@ -199,7 +199,7 @@ services:
       - DEMO_COOLDOWN_MS=${DEMO_COOLDOWN_MS:-${SIMULATION_COOLDOWN_MS:-120000}}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - TARGET_GITHUB_REPO=${TARGET_GITHUB_REPO:-https://github.com/AdmilsonGoncalves/zeromttr}
-      - TARGET_REPO_URL=${TARGET_GITHUB_REPO:-https://github.com/AdmilsonGoncalves/zeromttr}
+      - TARGET_REPO_URL=${TARGET_REPO_URL:-https://github.com/AdmilsonGoncalves/zeromttr}
       - TARGET_BASE_REF=v2.14.7
       - TARGET_HEAD_REF=v2.14.8
       - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH:-apps/target-app-demo}

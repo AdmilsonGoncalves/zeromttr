@@ -82,7 +82,7 @@ describe('target-app-demo foundation unit tests', () => {
       expect(used?.value).toBe(7);
     });
 
-    it('should_coalesce_same_millisecond_histogram_observations_and_preserve_order', async () => {
+    it('should coalesce same-millisecond histogram observations and preserve order', async () => {
       const prevEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://otel-collector.local:4318';
       const capturedBodies: unknown[] = [];
@@ -157,6 +157,109 @@ describe('target-app-demo foundation unit tests', () => {
         expect(second?.sum).toBeCloseTo(4.73, 5);
         expect(second?.exemplars[0].traceId).toBe(trace3);
         expect(BigInt(second?.timeUnixNano ?? '0') > BigInt(first?.timeUnixNano ?? '0')).toBe(true);
+      } finally {
+        vi.unstubAllGlobals();
+        if (prevEndpoint === undefined) {
+          delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+        } else {
+          process.env.OTEL_EXPORTER_OTLP_ENDPOINT = prevEndpoint;
+        }
+      }
+    });
+
+    it('should serialize in-flight histogram exports and reuse captured resource', async () => {
+      const prevEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://otel-collector.local:4318';
+      const requests: Array<{ body: unknown; resolve: () => void }> = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((_url: unknown, init?: { body?: string }) => {
+          return new Promise<{ ok: boolean; status: number }>((res) => {
+            requests.push({
+              body: init?.body ? JSON.parse(init.body) : null,
+              resolve: () => res({ ok: true, status: 200 })
+            });
+          });
+        })
+      );
+
+      try {
+        chaosManager.setPoolSaturation(true);
+        const otlpTelemetry = new TelemetryService();
+        const trace1 = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+        const trace2 = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+        otlpTelemetry.recordHttpServerDuration(0.1, trace1);
+        await new Promise((resolve) => setTimeout(resolve, 15));
+
+        const secondsFirst = requests.filter((r) => {
+          const body = r.body as {
+            resourceMetrics?: Array<{
+              scopeMetrics?: Array<{ metrics?: Array<{ name: string }> }>;
+            }>;
+          };
+          return (
+            body?.resourceMetrics?.[0]?.scopeMetrics?.[0]?.metrics?.[0]?.name ===
+            'http_request_duration_seconds'
+          );
+        });
+        expect(secondsFirst).toHaveLength(1);
+
+        // Second observation for the same series arrives while first POST is still in flight
+        otlpTelemetry.recordHttpServerDuration(0.4, trace2);
+        // Flip chaos before flushing the pending snapshot to prove captured resource is reused
+        chaosManager.setPoolSaturation(false);
+        await new Promise((resolve) => setTimeout(resolve, 15));
+
+        // Still only 1 in-flight request while first has not resolved
+        const secondsStillInFlight = requests.filter((r) => {
+          const body = r.body as {
+            resourceMetrics?: Array<{
+              scopeMetrics?: Array<{ metrics?: Array<{ name: string }> }>;
+            }>;
+          };
+          return (
+            body?.resourceMetrics?.[0]?.scopeMetrics?.[0]?.metrics?.[0]?.name ===
+            'http_request_duration_seconds'
+          );
+        });
+        expect(secondsStillInFlight).toHaveLength(1);
+
+        for (const req of requests) {
+          req.resolve();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+
+        const secondsAll = requests.filter((r) => {
+          const body = r.body as {
+            resourceMetrics?: Array<{
+              scopeMetrics?: Array<{ metrics?: Array<{ name: string }> }>;
+            }>;
+          };
+          return (
+            body?.resourceMetrics?.[0]?.scopeMetrics?.[0]?.metrics?.[0]?.name ===
+            'http_request_duration_seconds'
+          );
+        });
+        expect(secondsAll.length).toBeGreaterThanOrEqual(2);
+
+        const secondBody = secondsAll[1].body as {
+          resourceMetrics: Array<{
+            resource: { attributes: Array<{ key: string; value: { stringValue: string } }> };
+            scopeMetrics: Array<{
+              metrics: Array<{
+                histogram: { dataPoints: Array<{ count: string }> };
+              }>;
+            }>;
+          }>;
+        };
+        const versionAttr = secondBody.resourceMetrics[0].resource.attributes.find(
+          (a) => a.key === 'service.version'
+        );
+        expect(versionAttr?.value.stringValue).toBe('v2.14.8');
+        expect(
+          secondBody.resourceMetrics[0].scopeMetrics[0].metrics[0].histogram.dataPoints[0].count
+        ).toBe('2');
       } finally {
         vi.unstubAllGlobals();
         if (prevEndpoint === undefined) {

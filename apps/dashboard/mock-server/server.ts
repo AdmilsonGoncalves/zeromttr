@@ -4,6 +4,7 @@ import {
   isEmpty,
   isNonEmptyString,
   isNumber,
+  isObject,
   safeJsonParse,
   toErrorMessage
 } from '@zeromttr/utils';
@@ -75,7 +76,7 @@ export class MockServer {
 
       this.server.listen(port, () => {
         const addr = this.server?.address();
-        const boundPort = typeof addr === 'object' && addr !== null ? addr.port : port;
+        const boundPort = isObject(addr) && isNumber(addr.port) ? addr.port : port;
         this.startHeartbeat();
         resolve(boundPort);
       });

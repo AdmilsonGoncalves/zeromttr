@@ -1,5 +1,6 @@
-import { clamp } from '@zeromttr/utils';
+import { clamp, isEmpty, isFilled, nowIso } from '@zeromttr/utils';
 import type { TracesPort, TraceSearchResult } from '../ports/index.js';
+import { validateTimeRange } from './validate-time-range.js';
 
 export interface SearchTracesByTraceQLInput {
   query: string;
@@ -19,13 +20,23 @@ export class SearchTracesByTraceQL {
 
   async execute(input: SearchTracesByTraceQLInput): Promise<SearchTracesByTraceQLOutput> {
     const safeLimit = clamp(input.limit ?? 10, 1, 20);
-    const hasWindow = input.start !== undefined || input.end !== undefined;
-    const { traces } = hasWindow
-      ? await this.tracesPort.searchTraces(input.query, safeLimit, {
-          start: input.start,
-          end: input.end
-        })
-      : await this.tracesPort.searchTraces(input.query, safeLimit);
+    if (isEmpty(input.start) && isFilled(input.end)) {
+      throw new Error("Invalid time window: 'start' is required when 'end' is provided.");
+    }
+
+    let traces: TraceSearchResult[];
+    if (isFilled(input.start)) {
+      const { startIso, endIso } = validateTimeRange(
+        input.start,
+        isFilled(input.end) ? input.end : nowIso()
+      );
+      ({ traces } = await this.tracesPort.searchTraces(input.query, safeLimit, {
+        start: startIso,
+        end: endIso
+      }));
+    } else {
+      ({ traces } = await this.tracesPort.searchTraces(input.query, safeLimit));
+    }
 
     return {
       query: input.query,

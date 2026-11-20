@@ -1,4 +1,12 @@
-import { isArray, isNumber, isObject, isString, round, toErrorMessage } from '@zeromttr/utils';
+import {
+  isArray,
+  isFilled,
+  isNumber,
+  isObject,
+  isString,
+  round,
+  toErrorMessage
+} from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import type { TracesPort, TraceSearchResult, TraceSearchWindow } from '../ports/index.js';
 import { extractOtelAttributeValue, type RawSpan } from '../domain/index.js';
@@ -126,7 +134,7 @@ export class TempoHttpAdapter implements TracesPort {
       return undefined;
     }
     const ms = Date.parse(iso);
-    if (!Number.isFinite(ms)) {
+    if (!isNumber(ms)) {
       return undefined;
     }
     return Math.floor(ms / 1000);
@@ -137,10 +145,12 @@ export class TempoHttpAdapter implements TracesPort {
     limit = 10,
     window?: TraceSearchWindow
   ): Promise<{ rawBytes: number; traces: TraceSearchResult[] }> {
-    const startSec = this.toEpochSeconds(window?.start);
+    let startSec = this.toEpochSeconds(window?.start);
     let endSec = this.toEpochSeconds(window?.end);
-    if (startSec !== undefined && endSec === undefined) {
+    if (isNumber(startSec) && !isNumber(endSec)) {
       endSec = Math.floor(Date.now() / 1000);
+    } else if (!isNumber(startSec) && isNumber(endSec)) {
+      startSec = Math.max(0, endSec - 300);
     }
     const url = buildUrl(this.config.baseUrl, '/api/search', {
       q: query,
@@ -195,7 +205,9 @@ export class TempoHttpAdapter implements TracesPort {
           traceId,
           rootServiceName: t.rootServiceName,
           rootTraceName: t.rootTraceName,
-          startTimeUnixNano: t.startTimeUnixNano != null ? String(t.startTimeUnixNano) : undefined,
+          startTimeUnixNano: isFilled(t.startTimeUnixNano)
+            ? String(t.startTimeUnixNano)
+            : undefined,
           durationMs: isNumber(t.durationMs) ? round(t.durationMs) : undefined
         });
       }

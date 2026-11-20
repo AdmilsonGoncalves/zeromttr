@@ -26,6 +26,25 @@ TARGET_URL="${CALLER_TARGET_URL:-http://127.0.0.1:3001}"
 ORCH_URL="${CALLER_ORCH_URL:-http://127.0.0.1:8080}"
 DASHBOARD_URL="${CALLER_DASHBOARD_URL:-http://127.0.0.1:4200}"
 MCP_URL="${CALLER_MCP_URL:-http://127.0.0.1:8000}"
+MCP_HEALTH_BASE="${MCP_URL%/}"
+MCP_HEALTH_BASE="${MCP_HEALTH_BASE%/mcp}"
+
+validate_positive_int() {
+  local name="$1"
+  local value="$2"
+  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ ${name} deve ser um inteiro positivo >= 1 (recebido: '${value}')." >&2
+    exit 1
+  fi
+}
+
+validate_positive_int "LOAD_CONCURRENCY" "$CONCURRENCY"
+validate_positive_int "LOAD_DURATION" "$DURATION"
+validate_positive_int "MAX_TOTAL_RAM_MIB" "$MAX_RAM_MIB"
+if [[ ! "$MIN_SUCCESS_RATE" =~ ^(100|[1-9]?[0-9])$ ]]; then
+  echo "❌ LOAD_MIN_SUCCESS_RATE deve ser um inteiro entre 0 e 100 (recebido: '${MIN_SUCCESS_RATE}')." >&2
+  exit 1
+fi
 
 CONTAINERS=(
   zeromttr-prometheus
@@ -82,7 +101,7 @@ echo "=========================================================="
 echo "[1/4] Verificando saúde dos endpoints principais..."
 curl -fsS --max-time 10 "${TARGET_URL}/health" > /dev/null
 curl -fsS --max-time 10 "${ORCH_URL}/health" > /dev/null
-curl -fsS --max-time 10 "${MCP_URL}/health" > /dev/null
+curl -fsS --max-time 10 "${MCP_HEALTH_BASE}/health" > /dev/null
 curl -fsS --max-time 10 "${DASHBOARD_URL}/" | grep -q "ZeroMTTR"
 echo "✅ target-app-demo, orchestrator, mcp-server e dashboard respondendo HTTP 200."
 
@@ -103,8 +122,11 @@ PAYLOAD='{
 sample_ram_during_load() {
   local peak_mib="0"
   local expected_count="${#CONTAINERS[@]}"
+  local samples_ok=0
+  local samples_fail=0
   while [ ! -f "${TMP_DIR}/load_done" ]; do
     local stats
+    local sample_recorded=0
     stats=$(docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}" "${CONTAINERS[@]}" 2>/dev/null || true)
     if [ -n "$stats" ]; then
       local current_mib
@@ -135,12 +157,20 @@ sample_ram_during_load() {
         }
         process.stdout.write(total.toFixed(1));
       " "$stats" "$expected_count" 2>/dev/null || true)
-      if [ -n "$current_mib" ] && node -e "process.exit(Number(process.argv[1]) > Number(process.argv[2]) ? 0 : 1)" "$current_mib" "$peak_mib"; then
-        peak_mib="$current_mib"
-        printf '%s\n' "$peak_mib" > "${TMP_DIR}/peak_ram_mib"
-        printf '%s\n' "$stats" > "${TMP_DIR}/peak_stats"
+      if [ -n "$current_mib" ]; then
+        sample_recorded=1
+        samples_ok=$((samples_ok + 1))
+        if node -e "process.exit(Number(process.argv[1]) > Number(process.argv[2]) ? 0 : 1)" "$current_mib" "$peak_mib"; then
+          peak_mib="$current_mib"
+          printf '%s\n' "$peak_mib" > "${TMP_DIR}/peak_ram_mib"
+          printf '%s\n' "$stats" > "${TMP_DIR}/peak_stats"
+        fi
       fi
     fi
+    if [ "$sample_recorded" -eq 0 ]; then
+      samples_fail=$((samples_fail + 1))
+    fi
+    printf '%s %s\n' "$samples_ok" "$samples_fail" > "${TMP_DIR}/sampler_counts"
     sleep 1
   done
 }
@@ -227,8 +257,13 @@ for c in "${CONTAINERS[@]}"; do
   fi
 done
 
-if [ ! -s "${TMP_DIR}/peak_ram_mib" ] || [ ! -s "${TMP_DIR}/peak_stats" ]; then
-  echo "❌ Nenhuma medição válida completa de RAM foi coletada durante a carga." >&2
+if [ ! -s "${TMP_DIR}/sampler_counts" ]; then
+  echo "❌ Sampler de RAM não produziu contagem de amostras." >&2
+  exit 1
+fi
+read -r SAMPLES_OK SAMPLES_FAIL < "${TMP_DIR}/sampler_counts"
+if [ "${SAMPLES_OK:-0}" -eq 0 ] || [ "${SAMPLES_FAIL:-1}" -gt 0 ] || [ ! -s "${TMP_DIR}/peak_ram_mib" ] || [ ! -s "${TMP_DIR}/peak_stats" ]; then
+  echo "❌ Medição incompleta de RAM sob carga (amostras_ok=${SAMPLES_OK:-0}, falhas=${SAMPLES_FAIL:-1})." >&2
   docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}" "${CONTAINERS[@]}" >&2 || true
   exit 1
 fi

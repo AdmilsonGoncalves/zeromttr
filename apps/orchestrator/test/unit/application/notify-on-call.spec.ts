@@ -81,4 +81,61 @@ describe('NotifyOnCall Use Case', () => {
 
     expect(result.emailId).toBe('email-resend-999');
   });
+
+  const createRecipientHarness = (recipientEmail?: string) => {
+    const incident = new Incident({
+      id: 'inc-test-recipient',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
+      state: IncidentState.AWAITING_PR,
+      remediation: {
+        branchUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-test',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/43',
+        commitSha: 'commit999'
+      }
+    });
+    const repo = createMockIncidentRepository([incident]);
+    const sendPostMortemResend = vi.fn(async () => ({
+      emailId: 'email-resend-recipient',
+      sentAt: '2026-11-10T12:00:00.000Z'
+    }));
+    const tools = createMockToolsPort({ sendPostMortemResend });
+    const useCase = new NotifyOnCall(
+      repo,
+      tools,
+      createMockClock(),
+      createMockBroadcaster(),
+      'test-secret-key-123',
+      'https://zeromttr.agjworks.com',
+      undefined,
+      recipientEmail
+    );
+    return { incident, sendPostMortemResend, useCase };
+  };
+
+  it('should forward recipient_email when configured', async () => {
+    const { incident, sendPostMortemResend, useCase } =
+      createRecipientHarness('sre-oncall@example.com');
+
+    await useCase.execute(incident.id);
+
+    expect(sendPostMortemResend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipient_email: 'sre-oncall@example.com'
+      })
+    );
+  });
+
+  it('should omit recipient_email when blank', async () => {
+    const { incident, sendPostMortemResend, useCase } = createRecipientHarness('   ');
+
+    await useCase.execute(incident.id);
+
+    expect(sendPostMortemResend).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        recipient_email: expect.anything()
+      })
+    );
+  });
 });
