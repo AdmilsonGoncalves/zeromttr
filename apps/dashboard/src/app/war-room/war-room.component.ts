@@ -32,6 +32,9 @@ interface LangOption {
   value: Language;
 }
 
+/**
+ * Single-pane War Room mission control component displaying live telemetry, PII audit, diffs, and FinOps.
+ */
 @Component({
   selector: 'app-war-room',
   imports: [

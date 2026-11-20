@@ -50,6 +50,9 @@ export function sanitizeAuthorLogin(
   return 'unknown';
 }
 
+/**
+ * Domain policy helper enforcing maximum line count and character length on fetched logs.
+ */
 export class LogTruncator {
   /**
    * Truncates log lines to bounded count and line length limits.

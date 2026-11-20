@@ -18,6 +18,9 @@ const TargetStatusSchema = z.object({
   rawEdgeLogPreCollector: z.string()
 });
 
+/**
+ * HTTP adapter polling the target workload's status endpoint with an unreachable fallback.
+ */
 export class HttpTargetStatusAdapter implements TargetStatusPort {
   private readonly baseUrl: string;
 

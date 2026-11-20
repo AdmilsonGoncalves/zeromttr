@@ -70,6 +70,9 @@ function redactValue(value: unknown, seen = new WeakSet<object>()): unknown {
   return value;
 }
 
+/**
+ * Structured JSON console logger enforcing log-level filtering and automatic secret redaction.
+ */
 export class ConsoleJsonLogger implements LoggerPort {
   private readonly minLevel: LogLevel;
 

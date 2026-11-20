@@ -82,6 +82,9 @@ export function isValidCnpj(digits: string): boolean {
   return true;
 }
 
+/**
+ * Fail-closed pre-LLM security guard blocking prompts containing unmasked Brazilian PII or auth tokens.
+ */
 export class PiiPromptGuard {
   /**
    * Scans prompt text for leaked PII patterns (fail-closed) and counts verified edge redaction tokens.

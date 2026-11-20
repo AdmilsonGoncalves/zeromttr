@@ -2,6 +2,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { isNonEmptyString, isNumber } from '@zeromttr/utils';
 import type { IncidentDecisionAction } from './incident.js';
 
+/**
+ * Cryptographic utility signing and verifying expiring HMAC-SHA256 tokens for email decisions.
+ */
 export class DecisionHmac {
   /**
    * Builds the canonical string signed in decision HMAC tokens (`incidentId:action:exp`).

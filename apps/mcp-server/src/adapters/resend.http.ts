@@ -97,6 +97,9 @@ export function renderPostMortemHtml(req: PostMortemNotification): string {
 </html>`;
 }
 
+/**
+ * Resend API adapter delivering idempotent HTML post-mortem notifications with signed decision links.
+ */
 export class ResendHttpAdapter implements NotifierPort {
   private readonly baseUrl: string;
 

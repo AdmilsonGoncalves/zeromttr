@@ -5,6 +5,9 @@ export interface Clock {
   iso(): string;
 }
 
+/**
+ * Default Clock implementation backed by the system wall clock.
+ */
 export class SystemClock implements Clock {
   /**
    * Returns the current Unix epoch timestamp in milliseconds.

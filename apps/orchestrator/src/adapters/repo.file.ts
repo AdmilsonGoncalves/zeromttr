@@ -72,6 +72,9 @@ const PersistedIncidentSchema = z
   })
   .passthrough();
 
+/**
+ * In-memory incident repository with optional atomic JSON file persistence for replay and restart recovery.
+ */
 export class FileIncidentRepository implements IncidentRepository {
   private readonly store = new Map<string, Incident>();
   private readonly filePath?: string;

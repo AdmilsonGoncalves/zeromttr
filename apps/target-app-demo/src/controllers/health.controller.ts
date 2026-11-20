@@ -2,6 +2,9 @@ import type http from 'node:http';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { paymentService, PaymentService } from '../services/payment.service.js';
 
+/**
+ * HTTP controller serving the target workload's health and database pool saturation status.
+ */
 export class HealthController {
   public constructor(private service: PaymentService = paymentService) {}
 

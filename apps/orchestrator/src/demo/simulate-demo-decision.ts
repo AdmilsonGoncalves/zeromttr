@@ -6,6 +6,9 @@ import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { LoggerPort } from '../ports/logger.port.js';
 import type { ToolsPort } from '../ports/tools.port.js';
 
+/**
+ * Demo use case recording interactive dashboard decisions without requiring email HMAC links.
+ */
 export class SimulateDemoDecision {
   public constructor(
     private readonly repository: IncidentRepository,

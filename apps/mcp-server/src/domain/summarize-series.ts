@@ -82,6 +82,9 @@ export function summarizeSeries(
   });
 }
 
+/**
+ * Domain summarizer compacting Prometheus time series into bounded statistical snapshots.
+ */
 export class SeriesSummarizer {
   /**
    * Summarizes bounded Prometheus series into compact statistical snapshots.

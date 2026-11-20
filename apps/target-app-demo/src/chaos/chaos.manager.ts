@@ -15,6 +15,9 @@ export interface ChaosStatus {
 export const RAW_EDGE_LOG_SAMPLE =
   'ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig';
 
+/**
+ * In-memory controller toggling controlled DB pool saturation chaos and reporting release metadata.
+ */
 export class ChaosManager {
   private poolSaturation = false;
   private artificialDelayMs = 4600;

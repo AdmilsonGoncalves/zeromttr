@@ -70,6 +70,9 @@ export const RCA_SYNTHESIS_SCHEMA = {
   ]
 };
 
+/**
+ * Gemini reasoning adapter synthesizing structured RCA reports and full-file patches with retry/fallback.
+ */
 export class GeminiReasoningAdapter implements ReasoningPort {
   private readonly client: GoogleGenAI;
   private readonly apiKey: string;

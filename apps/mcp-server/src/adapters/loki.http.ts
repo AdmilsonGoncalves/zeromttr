@@ -6,6 +6,9 @@ export interface LokiAdapterConfig {
   baseUrl: string;
 }
 
+/**
+ * Grafana Loki HTTP adapter executing LogQL range queries and measuring raw fetched byte volume.
+ */
 export class LokiHttpAdapter implements LogsPort {
   constructor(private readonly config: LokiAdapterConfig) {}
 

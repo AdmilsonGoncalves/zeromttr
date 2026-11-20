@@ -75,6 +75,9 @@ function validatePatchDefensively(
   return true;
 }
 
+/**
+ * Use case enforcing fail-closed PII checks, LLM/fallback synthesis, patch validation, and PR creation.
+ */
 export class DispatchRemediation {
   public constructor(
     private readonly repository: IncidentRepository,

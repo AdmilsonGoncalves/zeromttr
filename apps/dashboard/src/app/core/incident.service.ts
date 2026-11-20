@@ -40,6 +40,9 @@ export interface TimelineStepItem {
   badgeSeverity?: 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast';
 }
 
+/**
+ * Signal-based state manager handling SSE incident streaming, polling, demo triggers, and signed decisions.
+ */
 @Injectable({
   providedIn: 'root'
 })

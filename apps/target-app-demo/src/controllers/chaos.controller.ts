@@ -3,6 +3,9 @@ import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
 
+/**
+ * HTTP controller exposing chaos pool-saturation toggles and target status inspection endpoints.
+ */
 export class ChaosController {
   /**
    * Toggles pool saturation chaos mode, resets the pool on recovery, and responds with updated status.

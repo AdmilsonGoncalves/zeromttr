@@ -14,6 +14,9 @@ export {
   IncidentAlreadyResolvedError
 } from './decision-helpers.js';
 
+/**
+ * Use case verifying signed email HMAC tokens and finalizing incident approval or rejection.
+ */
 export class RecordDecision {
   public constructor(
     private readonly repository: IncidentRepository,

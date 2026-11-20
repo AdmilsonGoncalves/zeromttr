@@ -40,6 +40,9 @@ export interface GithubRemediationConfig {
   apiBaseUrl?: string;
 }
 
+/**
+ * GitHub REST adapter that idempotently creates hotfix branches, commits patches, and opens remediation PRs.
+ */
 export class GithubRemediationHttpAdapter implements RemediationPort {
   private readonly baseUrl: string;
 

@@ -40,6 +40,9 @@ interface BatchSpanHolder {
   instrumentationLibrarySpans?: ScopeSpanHolder[];
 }
 
+/**
+ * Grafana Tempo HTTP adapter fetching OpenTelemetry trace spans and running TraceQL searches.
+ */
 export class TempoHttpAdapter implements TracesPort {
   constructor(private readonly config: TempoAdapterConfig) {}
 

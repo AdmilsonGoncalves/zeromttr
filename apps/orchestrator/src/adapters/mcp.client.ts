@@ -151,6 +151,9 @@ function normalizeMcpUrl(rawUrl: string): string {
   }
 }
 
+/**
+ * Streamable HTTP JSON-RPC client invoking the 8 MCP server tools behind ToolsPort.
+ */
 export class McpClientAdapter implements ToolsPort {
   private readonly baseUrl: string;
   private readonly authToken: string;

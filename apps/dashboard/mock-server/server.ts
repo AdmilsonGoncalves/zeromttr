@@ -30,6 +30,9 @@ class ClientError extends Error {
   }
 }
 
+/**
+ * Standalone HTTP and SSE mock server simulating orchestrator endpoints for local dashboard development.
+ */
 export class MockServer {
   private server: http.Server | null = null;
   private sseClients = new Set<ServerResponse>();

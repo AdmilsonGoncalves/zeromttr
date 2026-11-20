@@ -5,6 +5,9 @@ import type {
   NotificationReceipt
 } from '../ports/notifier.port.js';
 
+/**
+ * MCP use case validating decision URLs and dispatching post-mortem notifications via Resend.
+ */
 export class SendPostMortemResend {
   constructor(private readonly notifierPort: NotifierPort) {}
 

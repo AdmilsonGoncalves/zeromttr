@@ -6,6 +6,9 @@ import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
 import { durationInSeconds, isNonEmptyString, toErrorMessage } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 
+/**
+ * HTTP controller handling PIX payment creation/lookup with OpenTelemetry spans and latency metrics.
+ */
 export class PaymentsController {
   public constructor(private service: PaymentService = paymentService) {}
 

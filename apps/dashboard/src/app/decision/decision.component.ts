@@ -15,6 +15,9 @@ import type { DecisionPayload, IncidentDecisionAction } from '../core/contract.j
 import { I18nService } from '../core/i18n.service.js';
 import { IncidentService } from '../core/incident.service.js';
 
+/**
+ * Standalone human-in-the-loop view parsing HMAC decision tokens from the URL fragment.
+ */
 @Component({
   selector: 'app-decision',
   imports: [CommonModule, RouterModule, Button, Tag],

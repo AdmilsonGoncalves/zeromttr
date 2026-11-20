@@ -52,6 +52,9 @@ export interface UseCasesRegistry {
   annotateGrafanaIncident: AnnotateGrafanaIncident;
 }
 
+/**
+ * Registry binding the 8 deterministic AIOps MCP tools to Zod schemas and use-case handlers.
+ */
 export class ToolRegistry {
   private readonly tools = new Map<string, McpToolDefinition>();
 

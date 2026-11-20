@@ -14,6 +14,9 @@ export interface LoggerPort {
   error(context: LogContext): void;
 }
 
+/**
+ * Silent LoggerPort implementation used when structured logging is disabled or injected in tests.
+ */
 export class NoopLogger implements LoggerPort {
   /**
    * Discards debug log messages.

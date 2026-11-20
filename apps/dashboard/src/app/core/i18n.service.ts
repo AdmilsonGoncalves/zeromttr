@@ -229,6 +229,9 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   hmacExpiredError: 'HMAC decision link has expired'
 };
 
+/**
+ * Signal-based internationalization service switching dashboard copy between Portuguese and English.
+ */
 @Injectable({
   providedIn: 'root'
 })

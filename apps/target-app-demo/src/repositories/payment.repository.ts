@@ -19,6 +19,9 @@ export interface DbClient {
   query: <T = unknown>(sql: string, params?: unknown[]) => Promise<{ rows: T[] }>;
 }
 
+/**
+ * Simulated PostgreSQL connection-pool repository reproducing healthy cleanup vs. degraded connection leaks.
+ */
 export class PaymentRepository {
   private payments = new Map<string, Payment>();
   private activeConnections = new Set<string>();

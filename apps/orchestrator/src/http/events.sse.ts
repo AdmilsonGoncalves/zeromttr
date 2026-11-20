@@ -3,6 +3,9 @@ import { nowIso } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
+/**
+ * Server-Sent Events hub broadcasting real-time incident lifecycle updates and heartbeats to dashboards.
+ */
 export class SseEventBroadcaster implements EventBroadcasterPort {
   private readonly clients = new Set<Response>();
   private readonly heartbeatTimer: NodeJS.Timeout;

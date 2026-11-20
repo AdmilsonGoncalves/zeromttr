@@ -5,6 +5,9 @@ import type {
   RemediationPrReceipt
 } from '../ports/remediation.port.js';
 
+/**
+ * MCP use case validating remediation inputs and delegating hotfix Pull Request creation.
+ */
 export class CreateRemediationPr {
   constructor(private readonly remediationPort: RemediationPort) {}
 

@@ -8,6 +8,9 @@ export interface PrometheusAdapterConfig {
   timeoutMs?: number;
 }
 
+/**
+ * Prometheus HTTP adapter executing bounded PromQL range queries with adaptive step sizing.
+ */
 export class PrometheusHttpAdapter implements MetricsPort {
   constructor(private readonly config: PrometheusAdapterConfig) {}
 

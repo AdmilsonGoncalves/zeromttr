@@ -121,6 +121,9 @@ export function analyzeSpans(spans: RawSpan[]): TraceSummary {
   };
 }
 
+/**
+ * Domain analyzer extracting service blast radius, error spans, and critical paths from raw spans.
+ */
 export class SpanAnalyzer {
   /**
    * Analyzes raw trace spans into a structured trace summary.

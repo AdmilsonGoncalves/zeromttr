@@ -5,6 +5,9 @@ import type {
   AnnotationReceipt
 } from '../ports/annotation.port.js';
 
+/**
+ * MCP use case creating tagged Grafana incident annotations through the annotation port.
+ */
 export class AnnotateGrafanaIncident {
   constructor(private readonly annotationPort: AnnotationPort) {}
 

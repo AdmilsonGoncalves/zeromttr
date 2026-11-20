@@ -20,6 +20,9 @@ export interface GrafanaAnnotationsConfig {
   };
 }
 
+/**
+ * Grafana HTTP adapter publishing incident timeline annotations using Bearer token or local Basic auth.
+ */
 export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
   private readonly baseUrl: string;
 

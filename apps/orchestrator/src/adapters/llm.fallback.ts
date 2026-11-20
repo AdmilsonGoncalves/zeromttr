@@ -25,6 +25,9 @@ export interface FallbackReasoningOptions {
   defaultExplanation?: string;
 }
 
+/**
+ * Deterministic reasoning fallback generating RCA and baseline-restoration patches without external LLMs.
+ */
 export class DeterministicFallbackReasoningAdapter implements ReasoningPort {
   public constructor(private readonly options: FallbackReasoningOptions = {}) {}
 

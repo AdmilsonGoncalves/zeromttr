@@ -5,6 +5,9 @@ import type {
   DeployDiffBundle
 } from '../ports/repo-inspector.port.js';
 
+/**
+ * MCP use case inspecting commit diffs between baseline and candidate release refs.
+ */
 export class InspectGitDeployDiff {
   constructor(private readonly repoInspectorPort: RepoInspectorPort) {}
 

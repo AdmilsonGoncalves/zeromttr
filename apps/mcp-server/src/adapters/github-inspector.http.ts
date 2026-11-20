@@ -20,6 +20,9 @@ export interface GithubInspectorConfig {
   apiBaseUrl?: string;
 }
 
+/**
+ * GitHub REST adapter for comparing deploy refs with PII sanitization and bounded diff pruning.
+ */
 export class GithubInspectorHttpAdapter implements RepoInspectorPort {
   private readonly baseUrl: string;
 

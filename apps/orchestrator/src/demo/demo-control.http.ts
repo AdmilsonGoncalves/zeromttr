@@ -1,6 +1,9 @@
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import type { DemoControlPort } from './demo-control.port.js';
 
+/**
+ * HTTP demo control adapter toggling or resetting chaos simulation on the target workload.
+ */
 export class HttpDemoControlAdapter implements DemoControlPort {
   private readonly baseUrl: string;
 

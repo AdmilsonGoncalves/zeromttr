@@ -10,6 +10,9 @@ import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { ToolsPort, GitDeployDiffOutput } from '../ports/tools.port.js';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
+/**
+ * Use case enriching an investigating incident with Git deploy diffs, docs references, and FinOps stats.
+ */
 export class EnrichWithDeployDiff {
   public constructor(
     private readonly repository: IncidentRepository,

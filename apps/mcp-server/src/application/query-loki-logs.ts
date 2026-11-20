@@ -11,6 +11,9 @@ export interface QueryLokiLogsOutput {
   finops: FinOpsMetrics;
 }
 
+/**
+ * MCP use case querying Loki logs under bounded line limits with FinOps payload reduction metrics.
+ */
 export class QueryLokiLogs {
   constructor(private readonly logsPort: LogsPort) {}
 

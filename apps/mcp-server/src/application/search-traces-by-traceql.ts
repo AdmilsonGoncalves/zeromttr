@@ -15,6 +15,9 @@ export interface SearchTracesByTraceQLOutput {
   traces: TraceSearchResult[];
 }
 
+/**
+ * MCP use case running TraceQL trace searches with bounded limits and validated time windows.
+ */
 export class SearchTracesByTraceQL {
   constructor(private readonly tracesPort: TracesPort) {}
 

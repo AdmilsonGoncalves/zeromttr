@@ -14,6 +14,9 @@ import type { EnrichWithDeployDiff } from './enrich-with-deploy-diff.js';
 import type { DispatchRemediation } from './dispatch-remediation.js';
 import type { NotifyOnCall } from './notify-on-call.js';
 
+/**
+ * Workflow coordinator running the full incident FSM pipeline and transitioning failures to FAILED.
+ */
 export class OrchestratorWorkflow {
   public constructor(
     private readonly repository: IncidentRepository,

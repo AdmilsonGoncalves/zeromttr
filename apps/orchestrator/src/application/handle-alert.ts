@@ -47,6 +47,9 @@ export interface HandleAlertResult {
   ignored?: boolean;
 }
 
+/**
+ * Use case ingesting Grafana alert webhooks with fingerprint deduplication and concurrency coalescing.
+ */
 export class HandleAlert {
   private readonly inFlightFingerprints = new Map<string, Promise<HandleAlertResult>>();
 

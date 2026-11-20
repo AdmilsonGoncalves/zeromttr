@@ -34,6 +34,9 @@ export interface InvestigateResult {
   hasTempoErrorSpan: boolean;
 }
 
+/**
+ * Use case correlating PromQL, Tempo traces, Loki logs, and target status into evidence coverage.
+ */
 export class InvestigateIncident {
   public constructor(
     private readonly repository: IncidentRepository,

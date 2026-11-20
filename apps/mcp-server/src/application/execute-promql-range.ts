@@ -10,6 +10,9 @@ export interface ExecutePromqlRangeOutput {
   finops: FinOpsMetrics;
 }
 
+/**
+ * MCP use case running bounded PromQL range queries with series summarization and FinOps accounting.
+ */
 export class ExecutePromqlRange {
   constructor(private readonly metricsPort: MetricsPort) {}
 

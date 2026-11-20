@@ -24,6 +24,9 @@ export interface NotifyOnCallResult {
   rejectUrl: string;
 }
 
+/**
+ * Use case signing email-only HMAC decision links and notifying on-call engineers via Resend.
+ */
 export class NotifyOnCall {
   public constructor(
     private readonly repository: IncidentRepository,

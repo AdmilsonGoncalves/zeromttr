@@ -82,6 +82,9 @@ interface HistogramState {
   flushTimer?: ReturnType<typeof setTimeout>;
 }
 
+/**
+ * OpenTelemetry emitter managing bounded spans, histograms with exemplars, logs, and OTLP HTTP export.
+ */
 export class TelemetryService {
   private static readonly MAX_BUFFERED_RECORDS = 5000;
   private static readonly SECONDS_BOUNDS = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];

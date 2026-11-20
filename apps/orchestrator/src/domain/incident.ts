@@ -58,6 +58,9 @@ export interface IncidentProps {
   decisionSource?: IncidentDecisionSource;
 }
 
+/**
+ * Core incident aggregate enforcing valid FSM state transitions and encapsulating RCA and remediation state.
+ */
 export class Incident {
   public readonly id: string;
   public readonly service: string;

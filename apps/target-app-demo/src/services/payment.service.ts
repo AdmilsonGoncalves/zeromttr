@@ -15,6 +15,9 @@ export interface ServiceHealth {
   };
 }
 
+/**
+ * Service layer coordinating PIX payment persistence and aggregated database pool health reporting.
+ */
 export class PaymentService {
   public constructor(private repository: PaymentRepository = paymentRepository) {}
 

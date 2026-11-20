@@ -34,6 +34,9 @@ export function calculateFinOps(rawBytes: number, compactedBytes: number): FinOp
   };
 }
 
+/**
+ * Domain helper facade computing schema-validated FinOps byte and token reduction metrics.
+ */
 export class FinOpsCalculator {
   /**
    * Calculates validated FinOps payload reduction metrics.

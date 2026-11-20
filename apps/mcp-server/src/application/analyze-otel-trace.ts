@@ -15,6 +15,9 @@ export interface AnalyzeOtelTraceOutput {
   critical_span?: RawSpan;
 }
 
+/**
+ * MCP use case analyzing a trace's spans to identify blast radius, root span, errors, and slowest paths.
+ */
 export class AnalyzeOtelTrace {
   constructor(private readonly tracesPort: TracesPort) {}
 
