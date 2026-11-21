@@ -11,7 +11,7 @@ Logs emitidos por aplicações críticas frequentemente contêm dados pessoais p
 
 Aplicar mascaramento de PII **na borda de ingestão**, diretamente no **OpenTelemetry Collector** (`infra/otel-collector-config.yaml` e `infra/otel-collector-config.prod.yaml`), usando o processor **`transform`** com expressões OTTL `replace_pattern` sobre `body` e atributos de log antes da exportação para o Loki.
 
-Essa barreira primária é complementada na camada de raciocínio pela segunda barreira determinística e _fail-closed_ (**`PiiPromptGuard`**, ADR-004), que bloqueia o envio ao LLM caso algum dos padrões determinísticos suportados (CPF/CNPJ Módulo-11, telefones com DDD segundo regras ANATEL, e-mail RFC 5322, chave PIX EVP em contexto PIX e tokens JWT/Bearer) escape da borda. Formatos fora desse escopo (como telefones sem DDD ou nomes próprios em texto livre) não são detectados por essas regras e podem permanecer sem máscara no Loki e atravessar o guard.
+Essa barreira primária é complementada na camada de raciocínio pela segunda barreira determinística e _fail-closed_ (**`PiiPromptGuard`**, ADR-004), que bloqueia o envio ao LLM caso algum dos padrões determinísticos suportados (CPF/CNPJ Módulo-11, telefones com DDD segundo regras ANATEL, e-mail no formato padrão `[A-Za-z0-9._%+-]+@domínio`, chave PIX EVP em contexto PIX e tokens JWT/Bearer) escape da borda. Formatos fora desse escopo — como corpos de log estruturados em mapa (*map-valued log bodies*, já que `replace_pattern(body, ...)` no `transform/pii_logs` atua apenas sobre `body` string e atributos string), *quoted local parts* de e-mail, telefones sem DDD ou nomes próprios em texto livre — não são mascarados antes da exportação ao Loki e podem atravessar o guard.
 
 ## Consequências
 

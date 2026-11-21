@@ -13,8 +13,8 @@ Implementar, na camada de domínio do `apps/mcp-server`, sumarização e **trunc
 
 - Séries temporais PromQL são sumarizadas em estatísticas essenciais (`summarize-series.ts`).
 - Traces OTel são filtrados para o caminho crítico e spans em erro (`span-analysis.ts`).
-- Logs Loki e diffs Git respeitam tetos explícitos de linhas e bytes (`truncate.ts`).
-- Cada ferramenta calcula e anexa telemetria FinOps (`finops.ts`): `rawBytesFetched`, `compactedBytesSentToLlm`, percentual de redução e estimativa conservadora de tokens economizados (`Math.round(bytesSaved / 4)`).
+- Logs Loki e diffs Git respeitam tetos explícitos de linhas e **caracteres** (`maxLines` e `maxChars` em `truncate.ts`; são limites de contagem de caracteres, e não tetos diretos de bytes UTF-8).
+- As ferramentas de maior volume textual (`execute_promql_range`, `query_loki_logs` e `inspect_git_deploy_diff`, excluindo `analyze_otel_trace` e `search_traces_by_traceql`) calculam e anexam telemetria FinOps (`finops.ts`): `rawBytesFetched`, `compactedBytesSentToLlm`, percentual de redução e estimativa conservadora de tokens economizados (`Math.round(bytesSaved / 4)`).
 
 ## Consequências
 

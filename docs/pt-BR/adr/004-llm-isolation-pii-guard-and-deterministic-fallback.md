@@ -10,7 +10,7 @@ Modelos de linguagem externos introduzem três riscos operacionais em incidentes
 ## Decisão
 
 1. Isolar o provedor de IA atrás da interface **`ReasoningPort`** (`apps/orchestrator/src/ports/reasoning.port.ts`), implementada em produção por `GeminiReasoningAdapter` (`apps/orchestrator/src/adapters/llm.gemini.ts`).
-2. Executar obrigatoriamente o **`PiiPromptGuard`** em modo **fail-closed** antes de qualquer despacho ao LLM. Caso qualquer padrão residual de CPF/CNPJ (validado por Módulo-11), telefone (regras ANATEL), e-mail RFC 5322, chave PIX EVP (UUID v4 em contexto PIX) ou token JWT/Bearer seja encontrado, o envio ao LLM é abortado imediatamente.
+2. Executar obrigatoriamente o **`PiiPromptGuard`** em modo **fail-closed** antes de qualquer despacho ao LLM. Caso qualquer padrão residual de CPF/CNPJ (validado por Módulo-11), telefone (regras ANATEL), e-mail no formato padrão sem aspas (`[A-Za-z0-9._%+-]+@domínio`, não cobrindo *quoted local parts* da RFC 5322 como endereços com espaços), chave PIX EVP (UUID v4 em contexto PIX) ou token JWT/Bearer seja encontrado, o envio ao LLM é abortado imediatamente.
 3. Fornecer o **`FallbackReasoningAdapter`** (`apps/orchestrator/src/adapters/llm.fallback.ts`) para manter o diagnóstico determinístico operacional caso o LLM falhe, dê timeout ou não possua credencial configurada, registrando transparentemente `reasoningSource: 'llm' | 'fallback'` no incidente, SSE e PR.
 
 ## Consequências

@@ -12,7 +12,7 @@
 
 In mission-critical distributed systems — such as instant payment settlement (PIX), logistics fulfillment, e-commerce checkout, or billing — the mean time from alert to reviewable fix is dominated by manual context switching across siloed metrics, traces, logs, and Git diffs.
 
-**ZeroMTTR** is an autonomous AIOps and incident remediation platform built for the **Logistics & Automation** track (automating operational workflows and integrating mission-critical systems). Its core follows **Clean / Hexagonal Architecture** and is **100% domain-agnostic**: any service emitting OpenTelemetry (OTLP) telemetry and backed by a Git repository can be diagnosed and remediated without changing a single line in `apps/orchestrator` or `apps/mcp-server`.
+**ZeroMTTR** is an autonomous AIOps and incident remediation platform built for the **Logistics & Automation** track (automating operational workflows and integrating mission-critical systems). Its core follows **Clean / Hexagonal Architecture** and is **100% domain-agnostic**: any service emitting OpenTelemetry (OTLP) telemetry and backed by a **GitHub** repository (with other Git hosts like GitLab supported by adding an adapter for `RepoInspectorPort` / `RemediationPort`) can be diagnosed and remediated without changing a single line in `apps/orchestrator` or `apps/mcp-server`.
 
 ### Comparative Positioning (as of November 2026)
 
@@ -52,7 +52,7 @@ To keep evaluation honest and auditable, ZeroMTTR explicitly documents the bound
    - ZeroMTTR does **not** auto-merge into `master` or automatically redeploy running production containers.
 3. **FinOps Estimation & PII Masking Scope:**
    - **FinOps metric:** measures payload reduction achieved by MCP summarization and policy truncation (`rawBytesFetched` vs. `compactedBytesSentToLlm`), using a conservative proportional estimate of `Math.round(bytesSaved / 4)` tokens rather than a vendor-specific tokenizer count.
-   - **PII protection:** covers all **5 official Central Bank of Brazil (BACEN) PIX key types** — **CPF** and **CNPJ** (validated with Receita Federal Modulo-11 check digits), **mobile/landline phone numbers** (ANATEL rules), **RFC 5322 emails**, and **random PIX keys (EVP / RFC 4122 UUID v4 in PIX context)** — plus **JWT / `Bearer` tokens**. Technical UUIDs (such as `request_id` / `trace_id`) and unstructured proper names in free text are intentionally outside the deterministic regex/validator scope.
+   - **PII protection:** covers all **5 official Central Bank of Brazil (BACEN) PIX key types** — **CPF** and **CNPJ** (validated with Receita Federal Modulo-11 check digits), **mobile/landline phone numbers** (ANATEL rules), **standard unquoted email addresses** (`[A-Za-z0-9._%+-]+@domain`, excluding quoted local-part forms such as addresses with spaces), and **random PIX keys (EVP / RFC 4122 UUID v4 in PIX context)** — plus **JWT / `Bearer` tokens**. Technical UUIDs (such as `request_id` / `trace_id`), quoted email local parts, and unstructured proper names in free text are intentionally outside the deterministic regex/validator scope.
 
 ---
 

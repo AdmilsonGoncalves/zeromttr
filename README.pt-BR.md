@@ -12,7 +12,7 @@
 
 Em sistemas distribuídos de missão crítica — como liquidação de pagamentos instantâneos (PIX), separação e expedição logística, checkout ou faturamento — o tempo entre o disparo de um alerta e um hotfix revisável ainda é dominado por trabalho manual fragmentado entre métricas, traces, logs e diffs no Git.
 
-O **ZeroMTTR** é uma plataforma autônoma de AIOps e remediação de incidentes inscrita na trilha **Logística & Automação** (automação de fluxos de trabalho operacionais e integração entre sistemas críticos). Seu núcleo adota **Clean Architecture / Arquitetura Hexagonal** e é **100% agnóstico ao domínio**: qualquer serviço que emita telemetria OpenTelemetry (OTLP) e possua um repositório Git pode ser diagnosticado e remediado sem alterar uma única linha em `apps/orchestrator` ou `apps/mcp-server`.
+O **ZeroMTTR** é uma plataforma autônoma de AIOps e remediação de incidentes inscrita na trilha **Logística & Automação** (automação de fluxos de trabalho operacionais e integração entre sistemas críticos). Seu núcleo adota **Clean Architecture / Arquitetura Hexagonal** e é **100% agnóstico ao domínio**: qualquer serviço que emita telemetria OpenTelemetry (OTLP) e possua um repositório hospedado no **GitHub** (outros provedores Git como GitLab podem ser suportados implementando um adapter para `RepoInspectorPort` / `RemediationPort`) pode ser diagnosticado e remediado sem alterar uma única linha em `apps/orchestrator` ou `apps/mcp-server`.
 
 ### Tabela Comparativa Qualificada (referência: novembro/2026)
 
@@ -52,7 +52,7 @@ Para uma avaliação honesta e auditável, o ZeroMTTR explicita os limites atuai
    - O ZeroMTTR **não** realiza merge automático na `master` nem redeploy automático no contêiner em execução.
 3. **Escopo da Métrica FinOps e do Mascaramento de PII:**
    - **Métrica FinOps:** mede a **redução de payload obtida por sumarização e truncamento de política** no servidor MCP (`rawBytesFetched` vs. `compactedBytesSentToLlm`), usando estimativa proporcional conservadora de `Math.round(bytesSaved / 4)` tokens (não uma contagem proprietária de tokenizador).
-   - **Mascaramento de PII:** cobre os **5 tipos oficiais de Chave PIX do Banco Central (BACEN)** — **CPF** e **CNPJ** (validados por dígito verificador Módulo-11 da Receita Federal), **telefone celular/fixo** (regras da ANATEL), **e-mail RFC 5322** e **chave aleatória EVP (UUID v4 RFC 4122 em contexto PIX)** — além de **tokens JWT / `Bearer`**. UUIDs técnicos (como `request_id` e `trace_id`) e nomes próprios em texto livre ficam intencionalmente fora do escopo determinístico.
+   - **Mascaramento de PII:** cobre os **5 tipos oficiais de Chave PIX do Banco Central (BACEN)** — **CPF** e **CNPJ** (validados por dígito verificador Módulo-11 da Receita Federal), **telefone celular/fixo** (regras da ANATEL), **e-mail no formato padrão sem aspas** (`[A-Za-z0-9._%+-]+@domínio`, não cobrindo _quoted local parts_ como endereços com espaços) e **chave aleatória EVP (UUID v4 RFC 4122 em contexto PIX)** — além de **tokens JWT / `Bearer`**. UUIDs técnicos (como `request_id` e `trace_id`), _quoted local parts_ de e-mail e nomes próprios em texto livre ficam intencionalmente fora do escopo determinístico.
 
 ---
 

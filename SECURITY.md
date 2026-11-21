@@ -14,7 +14,7 @@
   - `sig`, `approveSig`, and `rejectSig` are never exposed in REST responses, SSE streams, or application logs.
 - **Dual-Barrier PII & Secret Protection (LGPD):**
   1. **Edge Redaction:** The OpenTelemetry Collector (`infra/otel-collector-config.yaml` and `infra/otel-collector-config.prod.yaml`) applies OTTL `transform` (`replace_pattern`) rules to redact PII and `Bearer`/JWT credentials before logs are persisted in Loki.
-  2. **Fail-Closed Prompt Guard:** Before any payload is sent to an external LLM, `PiiPromptGuard` validates the prompt deterministically against all 5 official BACEN PIX key formats (CPF & CNPJ with Modulo-11 check digits, ANATEL mobile/landline phone rules, RFC 5322 emails, PIX EVP UUID v4 in PIX context) and JWT/Bearer tokens. Any residual match aborts LLM dispatch immediately.
+  2. **Fail-Closed Prompt Guard:** Before any payload is sent to an external LLM, `PiiPromptGuard` validates the prompt deterministically against all 5 official BACEN PIX key formats (CPF & CNPJ with Modulo-11 check digits, ANATEL mobile/landline phone rules, standard unquoted email addresses matching `[A-Za-z0-9._%+-]+@domain` — excluding quoted local-part forms — and PIX EVP UUID v4 in PIX context) and JWT/Bearer tokens. Any residual match aborts LLM dispatch immediately.
 - **Secret Hygiene:**
   - Production secrets must live outside the Git repository (e.g., an external `.env` file with `chmod 600`).
   - Automated CI runs secret scanning (Gitleaks) and `pnpm audit` on Pull Requests.
