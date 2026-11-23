@@ -140,12 +140,15 @@ export class DispatchRemediation {
       throw new Error('Cannot create remediation PR without an authoritative suspectFilePath');
     }
 
+    let transitionedBeforeSynthesis = false;
+
     // Ensure valid lifecycle transitions to REMEDIATING before synthesis so UI and TTD reflect start of remediation
     if (incident.state === IncidentState.INVESTIGATING) {
       const transitionEnriching = incident.transition(
         IncidentState.ENRICHING,
         TransitionReason.ENRICHING_BEFORE_REMEDIATION
       );
+      transitionedBeforeSynthesis = true;
       this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transitionEnriching.from,
@@ -160,6 +163,7 @@ export class DispatchRemediation {
         IncidentState.REMEDIATING,
         TransitionReason.REMEDIATING_SYNTHESIS
       );
+      transitionedBeforeSynthesis = true;
       this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
         incidentId: incident.id,
         from: transitionRemediating.from,
@@ -167,6 +171,10 @@ export class DispatchRemediation {
         at: transitionRemediating.at,
         reason: transitionRemediating.reason
       });
+    }
+
+    if (transitionedBeforeSynthesis) {
+      await this.repository.save(incident);
     }
 
     // Inspect complete evidence object before LLM synthesis

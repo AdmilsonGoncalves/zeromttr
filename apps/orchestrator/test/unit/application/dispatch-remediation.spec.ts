@@ -822,7 +822,7 @@ describe('DispatchRemediation Use Case', () => {
       'terminal state'
     );
     expect(tools.createRemediationPr).not.toHaveBeenCalled();
-    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.save).toHaveBeenCalledTimes(1);
     expect(broadcaster.broadcast).not.toHaveBeenCalledWith(
       'incident.remediation',
       expect.anything()

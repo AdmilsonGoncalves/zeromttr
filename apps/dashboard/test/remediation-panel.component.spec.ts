@@ -14,11 +14,11 @@ describe('RemediationPanelComponent', () => {
     component = new RemediationPanelComponent(i18n);
   });
 
-  it('should render default preview when no incident notification is set', () => {
+  it('should_render_default_preview_when_no_incident_notification_is_set', () => {
     expect(component.safeResendPreview()).toContain('🚨 ZeroMTTR Incident Post-Mortem');
   });
 
-  it('should render degraded HTML preview across languages', () => {
+  it('should_render_degraded_html_preview_across_languages', () => {
     const degradedIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
     degradedIncident.notification = {
       emailId: 'email-fallback-1',
@@ -33,7 +33,7 @@ describe('RemediationPanelComponent', () => {
     expect(component.safeResendPreview()).toContain(i18n.t('resendDegradedTitle'));
   });
 
-  it('should render dispatched fallback preview with escaped emailId when htmlPreview is plain text', () => {
+  it('should_render_dispatched_fallback_preview_with_escaped_email_id_when_html_preview_is_plain_text', () => {
     const dispatchedIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
     dispatchedIncident.notification = {
       emailId: '<script>alert(1)</script>',
@@ -47,7 +47,22 @@ describe('RemediationPanelComponent', () => {
     expect(preview).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
   });
 
-  it('should emit simulateDecision when triggered', () => {
+  it('should_strip_unsafe_scripts_and_event_handlers_from_raw_html_preview', () => {
+    const unsafeIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    unsafeIncident.notification = {
+      emailId: 'email-unsafe-1',
+      status: NotificationStatus.DISPATCHED,
+      htmlPreview: '<div onclick="alert(1)"><script>evil()</script><p>Safe body</p></div>'
+    };
+    component.incident = unsafeIncident;
+
+    const preview = String(component.safeResendPreview());
+    expect(preview).toContain('Safe body');
+    expect(preview).not.toContain('<script');
+    expect(preview).not.toContain('onclick=');
+  });
+
+  it('should_emit_simulate_decision_when_triggered', () => {
     const spy = vi.fn();
     component.simulateDecision.subscribe(spy);
     component.simulateDecision.emit();

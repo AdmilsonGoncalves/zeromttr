@@ -13,7 +13,7 @@ describe('TargetTelemetryComponent', () => {
     component = new TargetTelemetryComponent(i18n);
   });
 
-  it('should return healthy defaults when metrics signal is null', () => {
+  it('should_return_healthy_defaults_when_metrics_signal_is_null', () => {
     component.metrics = null;
     expect(component.throughputPercent()).toBe(0);
     expect(component.latencyPercent()).toBe(0);
@@ -24,7 +24,7 @@ describe('TargetTelemetryComponent', () => {
     expect(component.poolMeters()).toEqual([]);
   });
 
-  it('should compute critical levels, colors and pool meters when workload is saturated', () => {
+  it('should_compute_critical_levels_colors_and_pool_meters_when_workload_is_saturated', () => {
     component.metrics = {
       healthyTrafficActive: true,
       requestsPerSecond: 12,
@@ -43,7 +43,7 @@ describe('TargetTelemetryComponent', () => {
     expect(component.poolMeters()).toHaveLength(2);
   });
 
-  it('should compute warning levels and amber color when thresholds are in warn range', () => {
+  it('should_compute_warning_levels_and_amber_color_when_thresholds_are_in_warn_range', () => {
     component.metrics = {
       healthyTrafficActive: true,
       requestsPerSecond: 0.2,
