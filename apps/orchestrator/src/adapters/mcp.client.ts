@@ -423,6 +423,7 @@ export class McpClientAdapter implements ToolsPort {
     const commitMessage = firstNonEmptyString(raw.commitMessage, raw.commit_message);
 
     const currentBlobSha = firstNonEmptyString(raw.currentBlobSha, suspectFile?.blob_sha);
+    const suspectFileContent = firstNonEmptyString(raw.suspectFileContent, suspectFile?.content);
 
     let truncatedPatch = isNonEmptyString(raw.truncatedPatch) ? raw.truncatedPatch : '';
     if (!truncatedPatch && filesChanged.length > 0) {
@@ -439,7 +440,8 @@ export class McpClientAdapter implements ToolsPort {
       suspectFilePath,
       currentBlobSha,
       truncatedPatch,
-      finops
+      finops,
+      suspectFileContent
     };
   }
 

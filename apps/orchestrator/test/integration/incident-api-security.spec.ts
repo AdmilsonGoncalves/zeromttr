@@ -321,6 +321,9 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
     expect(missingKeyResetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
 
+    // Use an empty findAll during the auth-matrix assertions so simulate-decision fixtures remain NOTIFIED,
+    // then verify directly that /api/demo/reset marks open incidents as FAILED.
+    vi.mocked(localRepo.findAll).mockResolvedValueOnce([]);
     const validKeyResetRes = await request(protectedApp)
       .post('/api/demo/reset')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
@@ -355,6 +358,68 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       .send({ incidentId: liveIncident.id, action: DecisionAction.REJECT });
     expect(simLiveAllowedRes.status).toBe(HTTP_STATUS.OK);
     expect(simLiveAllowedRes.body.state).toBe(IncidentState.REJECTED);
+
+    // Reset closes remaining non-terminal incidents so subsequent Grafana alerts do not deduplicate
+    expect(replayIncident.state).toBe(IncidentState.RESOLVED);
+    const lingeringIncident = new Incident({
+      id: 'inc-lingering-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:lingering',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.LIVE
+    });
+    vi.mocked(localRepo.findAll).mockResolvedValue([lingeringIncident]);
+    const unauthorizedLiveResetRes = await request(protectedApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(unauthorizedLiveResetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(lingeringIncident.state).toBe(IncidentState.NOTIFIED);
+
+    const closingResetRes = await request(protectedApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'secret-demo-key-123');
+    expect(closingResetRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(lingeringIncident.state).toBe(IncidentState.FAILED);
+    expect(localRepo.save).toHaveBeenCalledWith(lingeringIncident);
+  });
+
+  it('should fail closed on live demo actions when LIVE_DEMO_KEY is empty in production', async () => {
+    const prevEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const localRepo: IncidentRepository = {
+        findById: vi.fn(async () => null),
+        findOpenByFingerprint: vi.fn(async () => null),
+        findAll: vi.fn(async () => []),
+        save: vi.fn(async () => {})
+      };
+      const prodApp = createApp({
+        repository: localRepo,
+        targetStatusPort: { getStatus: vi.fn() },
+        handleAlert: createStubHandleAlert(),
+        orchestratorWorkflow: createStubWorkflow(),
+        recordDecision: { execute: vi.fn() } as unknown as RecordDecision,
+        broadcaster: new SseEventBroadcaster(60_000),
+        grafanaWebhookToken: 'grafana-test-token',
+        dashboardApiToken: DASHBOARD_TOKEN,
+        demoRouter: createDemoRouterFactory({
+          repository: localRepo,
+          demoControlPort: { triggerChaos: vi.fn(), reset: vi.fn() },
+          simulateDemoDecision: { execute: vi.fn() } as unknown as SimulateDemoDecision,
+          liveDemoKey: ''
+        })
+      });
+
+      const res = await request(prodApp)
+        .post('/api/demo/chaos')
+        .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+        .send({ mode: IncidentExecutionMode.LIVE });
+      expect(res.status).toBe(HTTP_STATUS.FORBIDDEN);
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
   });
 
   it('should stream SSE heartbeat and events on GET /api/events with query token', async () => {

@@ -16,7 +16,7 @@ const envSchema = z.object({
   TARGET_BASE_BRANCH: z.string().default('release/target-v2.14.8'),
   TARGET_SERVICE_PATH: z.string().default('apps/target-app-demo'),
   RESEND_API_KEY: z.string().default(''),
-  RESEND_FROM: z.string().default('ZeroMTTR - AGJ Works <sre@send.zeromttr.agjworks.com>'),
+  RESEND_FROM: z.string().default('ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>'),
   ON_CALL_ENGINEER_EMAIL: z.string().default('oncall-sre@example.com'),
   PUBLIC_DASHBOARD_URL: z.string().default('http://localhost:4200'),
   NODE_ENV: z.string().default('development')

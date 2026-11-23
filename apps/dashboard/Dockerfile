@@ -6,6 +6,9 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json nx.json 
 COPY libs ./libs
 COPY apps/dashboard ./apps/dashboard
 
+ARG VITE_PRIMEUI_LICENSE_KEY=""
+ENV VITE_PRIMEUI_LICENSE_KEY=${VITE_PRIMEUI_LICENSE_KEY}
+
 RUN pnpm install --frozen-lockfile --filter @zeromttr/dashboard...
 RUN pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build
 RUN pnpm --filter @zeromttr/dashboard exec vite build

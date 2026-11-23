@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FinOpsMetricsSchema } from './finops.schema.js';
+import { ReasoningSourceSchema } from '../llm/reasoning.schema.js';
 
 const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
 
@@ -103,6 +104,7 @@ export const InspectGitDeployDiffOutputSchema = z.object({
   suspectFilePath: z.string(),
   currentBlobSha: z.string(),
   truncatedPatch: z.string().max(1500),
+  suspectFileContent: z.string().optional(),
   finops: FinOpsMetricsSchema
 });
 
@@ -114,7 +116,7 @@ export const CreateRemediationPrInputSchema = z.object({
   blob_sha: z.string().optional(),
   title: z.string().min(1),
   rca_markdown: z.string(),
-  reasoning_source: z.enum(['llm', 'fallback'])
+  reasoning_source: ReasoningSourceSchema
 });
 
 export const CreateRemediationPrOutputSchema = z.object({
@@ -131,7 +133,7 @@ export const SendPostMortemResendInputSchema = z.object({
   title: z.string().min(1),
   rca_summary: z.string().min(1),
   evidence_coverage: z.string().min(1),
-  reasoning_source: z.enum(['llm', 'fallback']),
+  reasoning_source: ReasoningSourceSchema,
   blast_radius: z.array(z.string()),
   regression_commit: z.string().min(1),
   pull_request_url: z.string(),

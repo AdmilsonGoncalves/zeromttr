@@ -1,3 +1,4 @@
+<p-toast position="top-right" />
 <div
   class="h-full max-h-full bg-slate-950 text-slate-100 font-sans p-2.5 flex flex-col gap-2.5 overflow-hidden"
 >
@@ -60,8 +61,11 @@
           [options]="modeOptions"
           [ngModel]="incidentService.activeMode()"
           (ngModelChange)="onModeChange($event)"
+          [disabled]="incidentService.isWorkflowRunning()"
           optionLabel="label"
           optionValue="value"
+          [pTooltip]="i18n.t('tooltipModeSelector')"
+          tooltipPosition="bottom"
           styleClass="text-[10px]"
         />
 
@@ -69,12 +73,24 @@
         @if (incidentService.activeMode() === 'live') {
           <form (submit)="$event.preventDefault()" class="inline-flex m-0 p-0">
             <input
+              type="text"
+              autocomplete="username"
+              value="zeromttr-live-demo"
+              readonly
+              tabindex="-1"
+              aria-hidden="true"
+              class="sr-only"
+            />
+            <input
               type="password"
               autocomplete="current-password"
               [placeholder]="i18n.t('liveKeyPlaceholder')"
               [value]="incidentService.liveDemoKey()"
+              [disabled]="incidentService.isWorkflowRunning()"
               (input)="onLiveKeyInput($event)"
-              class="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-32"
+              [pTooltip]="i18n.t('tooltipLiveKeyInput')"
+              tooltipPosition="bottom"
+              class="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-32 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </form>
         }
@@ -84,16 +100,20 @@
           [label]="i18n.t('simulateIncident')"
           severity="danger"
           size="small"
-          [disabled]="incidentService.isSimulating()"
+          [disabled]="incidentService.isWorkflowRunning()"
           (onClick)="onTriggerChaos()"
+          [pTooltip]="i18n.t('tooltipSimulateIncident')"
+          tooltipPosition="bottom"
           styleClass="text-xs py-1"
         />
         <p-button
           [label]="i18n.t('restoreService')"
           severity="secondary"
           size="small"
-          [disabled]="incidentService.isSimulating()"
+          [disabled]="incidentService.isResetting() || incidentService.isSimulating()"
           (onClick)="onResetService()"
+          [pTooltip]="i18n.t('tooltipRestoreService')"
+          tooltipPosition="bottom"
           styleClass="text-xs py-1"
         />
 
@@ -104,6 +124,8 @@
           (ngModelChange)="onLangChange($event)"
           optionLabel="label"
           optionValue="value"
+          [pTooltip]="i18n.t('tooltipLanguageSelector')"
+          tooltipPosition="bottom"
           styleClass="text-[10px]"
         />
       </div>
@@ -118,6 +140,57 @@
         <span>{{ i18n.t('replayNotice') }}</span>
       </div>
     }
+
+    <!-- Interactive FSM Flow Bar -->
+    <div
+      class="bg-slate-950/90 border border-slate-800 rounded px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-2"
+    >
+      <div class="flex items-center gap-1 flex-wrap">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">
+          {{ i18n.t('fsmFlowLabel') }}:
+        </span>
+        @for (stage of incidentService.fsmStages(); track stage.state; let isLast = $last) {
+          <span
+            [pTooltip]="i18n.t(stage.tooltipKey)"
+            tooltipPosition="bottom"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border cursor-help transition-colors"
+            [ngClass]="{
+              'bg-emerald-950/70 border-emerald-600/70 text-emerald-300 font-semibold':
+                stage.status === 'completed',
+              'bg-cyan-950 border-cyan-400 text-cyan-200 font-bold ring-1 ring-cyan-400/50':
+                stage.status === 'active',
+              'bg-rose-950/80 border-rose-500 text-rose-200 font-bold': stage.status === 'failed',
+              'bg-slate-900 border-slate-800 text-slate-500': stage.status === 'pending'
+            }"
+          >
+            @if (stage.status === 'completed') {
+              <i class="pi pi-check text-[9px]"></i>
+            } @else if (stage.status === 'active') {
+              <i class="pi pi-spin pi-spinner text-[9px]"></i>
+            } @else if (stage.status === 'failed') {
+              <i class="pi pi-times text-[9px]"></i>
+            } @else {
+              <i class="pi pi-circle text-[8px]"></i>
+            }
+            <span>{{ i18n.t(stage.labelKey) }}</span>
+          </span>
+          @if (!isLast) {
+            <i
+              class="pi pi-arrow-right text-[9px]"
+              [ngClass]="stage.status === 'completed' ? 'text-emerald-500' : 'text-slate-700'"
+            ></i>
+          }
+        }
+      </div>
+      <span class="text-[11px] text-slate-300 flex items-center gap-1">
+        <i class="pi pi-compass text-cyan-400 text-[11px]"></i>
+        <span>{{
+          i18n
+            .t(incidentService.fsmHintKey())
+            .replace('{N}', incidentService.liveWaitSeconds().toString())
+        }}</span>
+      </span>
+    </div>
 
     <!-- Quick KPI Strip -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-slate-800/80">
@@ -166,49 +239,11 @@
     </div>
   </header>
 
-  <!-- Main Layout: Q2 (Esquerda), Q3 (Centro), Q4 (Direita) -->
+  <!-- Main Layout: Centro (Evidências OTel, PII, Git Diff) + Direita (GitHub PR & Governança Resend) -->
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
-    <!-- Q2: Esquerda (Pipeline ao Vivo 8 etapas) -->
+    <!-- Centro (Evidências OTel, Mascaramento PII, Git Diff) -->
     <section
-      class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col min-h-0 shadow-md"
-    >
-      <div class="shrink-0 flex items-center justify-between mb-2">
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">
-          {{ i18n.t('pipelineTitle') }}
-        </h2>
-        <span class="text-xs text-cyan-400 font-mono font-semibold">
-          {{ incidentService.currentIncident()?.state ?? 'IDLE' }}
-        </span>
-      </div>
-
-      <div class="flex-1 min-h-0 overflow-y-auto pr-1">
-        <p-timeline [value]="incidentService.timelineSteps()" styleClass="w-full custom-timeline">
-          <ng-template #content let-step>
-            <div class="mb-2 pl-1">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-xs font-bold text-slate-200">
-                  {{ step.id }}. {{ i18n.t(step.titleKey) }}
-                </span>
-                @if (step.badge) {
-                  <p-tag
-                    [value]="step.badge"
-                    [severity]="step.badgeSeverity"
-                    styleClass="text-[9px] py-0 px-1"
-                  />
-                }
-              </div>
-              <p class="text-[11px] text-slate-400 leading-snug mt-0.5">
-                {{ i18n.t(step.descKey) }}
-              </p>
-            </div>
-          </ng-template>
-        </p-timeline>
-      </div>
-    </section>
-
-    <!-- Q3: Centro (Evidências OTel, Mascaramento PII, Git Diff) -->
-    <section
-      class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col min-h-0 shadow-md"
+      class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col min-h-0 shadow-md"
     >
       <p-tabs
         [value]="activeTab()"
@@ -363,10 +398,7 @@
                   </span>
                   <pre
                     class="font-mono text-[11px] text-rose-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-rose-950 max-h-64 overflow-y-auto"
-                    >{{
-                      incidentService.currentIncident()?.rca?.rawEdgeLogPreCollector ??
-                        rawPreCollectorLog
-                    }}</pre>
+                    >{{ displayedPreCollectorLog() }}</pre>
                 </div>
 
                 <!-- Post-OTTL Masked Log -->
@@ -378,19 +410,7 @@
                   </span>
                   <pre
                     class="font-mono text-[11px] text-emerald-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-emerald-950 max-h-64 overflow-y-auto"
-                    >{{
-                      incidentService.isPiiPassed() === false
-                        ? i18n
-                            .t('piiLogWithheldMessage')
-                            .replace(
-                              '{TYPES}',
-                              (
-                                incidentService.currentIncident()?.rca?.piiGuardAudit
-                                  ?.detectedTypes ?? []
-                              ).join(', ')
-                            )
-                        : (incidentService.currentIncident()?.rca?.logSample ?? maskedPostOttlLog)
-                    }}</pre>
+                    >{{ displayedPostOttlLog() }}</pre>
                 </div>
               </div>
             </div>
@@ -455,9 +475,9 @@
       </p-tabs>
     </section>
 
-    <!-- Q4: Direita (GitHub PR & Governança Resend) -->
+    <!-- Direita (GitHub PR & Governança Resend) -->
     <section
-      class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col gap-2 min-h-0 shadow-md"
+      class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col gap-2 min-h-0 shadow-md"
     >
       <!-- GitHub Pull Request Card -->
       <div class="shrink-0 bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1.5">
@@ -471,7 +491,10 @@
 
         <p class="text-[11px] text-slate-400 leading-snug">
           Branch:
-          <code class="text-cyan-300 font-mono text-[10px]">hotfix/zeromttr-pool-timeout</code>
+          <code class="text-cyan-300 font-mono text-[10px]">{{
+            incidentService.currentIncident()?.remediation?.branchName ??
+              'hotfix/zeromttr-pool-timeout'
+          }}</code>
         </p>
 
         <a
@@ -481,6 +504,8 @@
           "
           target="_blank"
           rel="noopener noreferrer"
+          [pTooltip]="i18n.t('tooltipViewPr')"
+          tooltipPosition="left"
           class="inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-1 px-2.5 rounded transition-colors"
         >
           <i class="pi pi-external-link text-xs"></i>
@@ -503,22 +528,43 @@
         ></div>
       </div>
 
-      <!-- Human-in-the-Loop Awaiting Decision Badge -->
-      <div
-        class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center gap-1.5"
-      >
-        <i class="pi pi-lock text-amber-400 shrink-0"></i>
-        <span class="leading-tight text-[11px]">{{ i18n.t('awaitingDecisionBadge') }}</span>
-      </div>
+      <!-- Human-in-the-Loop Decision Controls (shown only once post-mortem is NOTIFIED or decided) -->
+      @if (incidentService.displayedFsmState() === 'NOTIFIED') {
+        <div
+          class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center gap-1.5"
+        >
+          <i class="pi pi-lock text-amber-400 shrink-0"></i>
+          <span class="leading-tight text-[11px]">{{ i18n.t('awaitingDecisionBadge') }}</span>
+        </div>
 
-      <!-- Simulation Button for Demo -->
-      <p-button
-        [label]="i18n.t('simulateDecisionBtn')"
-        severity="warn"
-        size="small"
-        styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
-        (onClick)="onSimulateDecision()"
-      />
+        <p-button
+          [label]="i18n.t('simulateDecisionBtn')"
+          severity="warn"
+          size="small"
+          [pTooltip]="i18n.t('tooltipSimulateDecision')"
+          tooltipPosition="left"
+          styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
+          (onClick)="onSimulateDecision()"
+        />
+      } @else if (incidentService.displayedFsmState() === 'RESOLVED') {
+        <div
+          class="shrink-0 bg-emerald-950/60 border border-emerald-500/70 rounded p-2 text-xs text-emerald-200 flex items-center gap-1.5"
+        >
+          <i class="pi pi-check-circle text-emerald-400 shrink-0"></i>
+          <span class="leading-tight text-[11px] font-semibold">{{
+            i18n.t('decisionSuccessMsg')
+          }}</span>
+        </div>
+      } @else if (incidentService.displayedFsmState() === 'REJECTED') {
+        <div
+          class="shrink-0 bg-rose-950/60 border border-rose-500/70 rounded p-2 text-xs text-rose-200 flex items-center gap-1.5"
+        >
+          <i class="pi pi-times-circle text-rose-400 shrink-0"></i>
+          <span class="leading-tight text-[11px] font-semibold">{{
+            i18n.t('fsmHintRejected')
+          }}</span>
+        </div>
+      }
     </section>
   </div>
 </div>

@@ -47,6 +47,16 @@ export interface HandleAlertResult {
   ignored?: boolean;
 }
 
+function normalizeAlertSeverity(rawSeverity?: string): AlertSeverity {
+  if (isNonEmptyString(rawSeverity)) {
+    const normalized = rawSeverity.trim().toLowerCase();
+    if (normalized === AlertSeverity.WARNING || normalized === 'warn') {
+      return AlertSeverity.WARNING;
+    }
+  }
+  return AlertSeverity.CRITICAL;
+}
+
 /**
  * Use case ingesting Grafana alert webhooks with fingerprint deduplication and concurrency coalescing.
  */
@@ -127,9 +137,7 @@ export class HandleAlert {
     }
 
     const incidentId = `inc-${randomUUID().slice(0, 8)}`;
-    const severity = isNonEmptyString(primaryAlert.labels.severity)
-      ? primaryAlert.labels.severity
-      : AlertSeverity.CRITICAL;
+    const severity = normalizeAlertSeverity(primaryAlert.labels.severity);
     const mode: IncidentMode = IncidentExecutionMode.LIVE;
 
     const incident = new Incident({

@@ -163,7 +163,7 @@ services:
       - TARGET_BASE_BRANCH=${TARGET_BASE_BRANCH:-release/target-v2.14.8}
       - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH:-apps/target-app-demo}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
-      - RESEND_FROM=${RESEND_FROM:-ZeroMTTR - AGJ Works <sre@send.zeromttr.agjworks.com>}
+      - RESEND_FROM=${RESEND_FROM:-ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>}
       - ON_CALL_ENGINEER_EMAIL=${ON_CALL_ENGINEER_EMAIL:-oncall-sre@example.com}
       - PUBLIC_DASHBOARD_URL=${PUBLIC_DASHBOARD_URL:-http://localhost:4200}
     depends_on:
@@ -222,7 +222,7 @@ services:
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-zeromttr}:${POSTGRES_PASSWORD:-change-me-postgres-password}@postgres:5432/${POSTGRES_DB:-payments}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - CHAOS_ENABLED=${CHAOS_ENABLED:-true}
+      - CHAOS_ENABLED=${CHAOS_ENABLED:-false}
       - DEMO_MODE=${DEMO_MODE:-true}
     depends_on:
       postgres:
@@ -236,6 +236,8 @@ services:
     build:
       context: .
       dockerfile: apps/dashboard/Dockerfile
+      args:
+        - VITE_PRIMEUI_LICENSE_KEY=${VITE_PRIMEUI_LICENSE_KEY:-}
     container_name: zeromttr-dashboard
     restart: unless-stopped
     ports:

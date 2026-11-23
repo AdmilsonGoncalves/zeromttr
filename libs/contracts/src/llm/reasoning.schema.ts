@@ -38,7 +38,8 @@ export const CollectedEvidenceSchema = z.object({
     suspectCommit: z.string(),
     authorLogin: z.string(),
     suspectFilePath: z.string(),
-    patch: z.string()
+    patch: z.string(),
+    suspectFileContent: z.string().optional()
   }),
   signals: z
     .object({

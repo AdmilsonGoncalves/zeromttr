@@ -85,7 +85,8 @@ export class OrchestratorWorkflow {
           suspectCommit: diffOutput.suspectCommitSha,
           authorLogin: diffOutput.authorLogin,
           suspectFilePath: diffOutput.suspectFilePath,
-          patch: diffOutput.truncatedPatch
+          patch: diffOutput.truncatedPatch,
+          suspectFileContent: diffOutput.suspectFileContent
         },
         signals: {
           hasPromqlAnomaly: investigation.hasPromqlAnomaly,

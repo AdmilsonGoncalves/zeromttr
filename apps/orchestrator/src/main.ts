@@ -71,7 +71,9 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     fallbackAdapter,
     broadcaster,
     logger,
-    { syntaxValidator: patchSyntaxValidator }
+    {
+      syntaxValidator: patchSyntaxValidator
+    }
   );
   const onCallEmail = process.env.ON_CALL_ENGINEER_EMAIL || process.env.ONCALL_TO_EMAIL;
   const notifyOnCall = new NotifyOnCall(

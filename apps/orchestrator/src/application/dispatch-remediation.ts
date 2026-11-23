@@ -20,12 +20,12 @@ import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
 import { calculateEvidenceCoverage } from '../domain/evidence-coverage.js';
 import type { RcaReport, ReasoningSource, SpanNode } from '../domain/rca-report.js';
 import type { IncidentRepository } from '../ports/incident-repository.port.js';
-import type { ToolsPort, CreateRemediationPrOutput } from '../ports/tools.port.js';
+import type { CreateRemediationPrOutput, ToolsPort } from '../ports/tools.port.js';
 import type {
-  ReasoningPort,
-  PatchSyntaxValidatorPort,
   CollectedEvidence,
-  RcaAndPatchSynthesis
+  PatchSyntaxValidatorPort,
+  RcaAndPatchSynthesis,
+  ReasoningPort
 } from '../ports/reasoning.port.js';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 import type { LoggerPort } from '../ports/logger.port.js';
@@ -41,10 +41,41 @@ export interface DispatchRemediationOptions {
   requiredContentPatterns?: RegExp[];
 }
 
+const TRUNCATED_PATCH_PLACEHOLDER_PATTERN =
+  /(?:\/\/|\/\*)\s*\.\.\.|keep all original|rest of (?:the )?(?:file|class|code)/i;
+
+function isTruncatedLlmSnippet(content: string): boolean {
+  return TRUNCATED_PATCH_PLACEHOLDER_PATTERN.test(content);
+}
+
+function extractRequiredExportPatterns(suspectFileContent?: string): RegExp[] {
+  if (!isNonEmptyString(suspectFileContent)) {
+    return [];
+  }
+  const patterns: RegExp[] = [];
+  const seen = new Set<string>();
+  const exportRegex =
+    /\bexport\s+(?:async\s+)?(?:class|const|let|function|interface|type|enum)\s+([A-Za-z_$][A-Za-z0-9_$]*)/g;
+  for (const match of suspectFileContent.matchAll(exportRegex)) {
+    const symbolName = match[1];
+    if (symbolName && !seen.has(symbolName)) {
+      seen.add(symbolName);
+      const escapedSymbol = symbolName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      patterns.push(
+        new RegExp(
+          `\\bexport\\s+(?:async\\s+)?(?:class|const|let|function|interface|type|enum)\\s+${escapedSymbol}(?![A-Za-z0-9_$])`
+        )
+      );
+    }
+  }
+  return patterns;
+}
+
 function validatePatchDefensively(
   synthesis: RcaAndPatchSynthesis,
   expectedSuspectPath?: string,
-  options: DispatchRemediationOptions = {}
+  options: DispatchRemediationOptions = {},
+  suspectFileContent?: string
 ): boolean {
   if (!isNonEmptyString(expectedSuspectPath) || !isNonEmptyString(synthesis.suspectFilePath)) {
     return false;
@@ -62,14 +93,16 @@ function validatePatchDefensively(
   ) {
     return false;
   }
-  if (options.requiredContentPatterns) {
-    for (const pattern of options.requiredContentPatterns) {
-      if (pattern.global || pattern.sticky) {
-        pattern.lastIndex = 0;
-      }
-      if (!pattern.test(content)) {
-        return false;
-      }
+  const requiredPatterns = [
+    ...(options.requiredContentPatterns ?? []),
+    ...extractRequiredExportPatterns(suspectFileContent)
+  ];
+  for (const pattern of requiredPatterns) {
+    if (pattern.global || pattern.sticky) {
+      pattern.lastIndex = 0;
+    }
+    if (!pattern.test(content)) {
+      return false;
     }
   }
   return true;
@@ -107,41 +140,7 @@ export class DispatchRemediation {
       throw new Error('Cannot create remediation PR without an authoritative suspectFilePath');
     }
 
-    // Inspect complete evidence object before LLM synthesis
-    const promptToAudit = JSON.stringify(evidence);
-    const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
-
-    let synthesis: RcaAndPatchSynthesis;
-    let reasoningSource: ReasoningSource;
-
-    if (piiAudit.passed) {
-      try {
-        const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
-        if (validatePatchDefensively(rawSynthesis, authoritativeSuspectPath, this.options)) {
-          synthesis = rawSynthesis;
-          reasoningSource = ReasoningProvider.LLM;
-        } else {
-          synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-          reasoningSource = ReasoningProvider.FALLBACK;
-        }
-      } catch {
-        synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-        reasoningSource = ReasoningProvider.FALLBACK;
-      }
-    } else {
-      // Fail-closed! Route directly to fallback
-      synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-      reasoningSource = ReasoningProvider.FALLBACK;
-    }
-
-    if (
-      reasoningSource === ReasoningProvider.FALLBACK &&
-      !validatePatchDefensively(synthesis, authoritativeSuspectPath, this.options)
-    ) {
-      throw new Error('Fallback remediation patch failed defensive validation');
-    }
-
-    // Ensure valid lifecycle transitions before REMEDIATING
+    // Ensure valid lifecycle transitions to REMEDIATING before synthesis so UI and TTD reflect start of remediation
     if (incident.state === IncidentState.INVESTIGATING) {
       const transitionEnriching = incident.transition(
         IncidentState.ENRICHING,
@@ -168,6 +167,55 @@ export class DispatchRemediation {
         at: transitionRemediating.at,
         reason: transitionRemediating.reason
       });
+    }
+
+    // Inspect complete evidence object before LLM synthesis
+    const promptToAudit = JSON.stringify(evidence);
+    const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
+
+    let synthesis: RcaAndPatchSynthesis;
+    let reasoningSource: ReasoningSource;
+
+    const suspectFileContent = evidence.gitDiff?.suspectFileContent;
+    if (piiAudit.passed) {
+      try {
+        const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
+        if (
+          isNonEmptyString(rawSynthesis.patchedContent) &&
+          !isTruncatedLlmSnippet(rawSynthesis.patchedContent) &&
+          validatePatchDefensively(
+            rawSynthesis,
+            authoritativeSuspectPath,
+            this.options,
+            suspectFileContent
+          )
+        ) {
+          synthesis = rawSynthesis;
+          reasoningSource = ReasoningProvider.LLM;
+        } else {
+          synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+          reasoningSource = ReasoningProvider.FALLBACK;
+        }
+      } catch {
+        synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+        reasoningSource = ReasoningProvider.FALLBACK;
+      }
+    } else {
+      // Fail-closed! Route directly to fallback
+      synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+      reasoningSource = ReasoningProvider.FALLBACK;
+    }
+
+    if (
+      reasoningSource === ReasoningProvider.FALLBACK &&
+      !validatePatchDefensively(
+        synthesis,
+        authoritativeSuspectPath,
+        this.options,
+        suspectFileContent
+      )
+    ) {
+      throw new Error('Fallback remediation patch failed defensive validation');
     }
 
     // Annotate Grafana
@@ -269,6 +317,19 @@ export class DispatchRemediation {
       incidentId: incident.id,
       ...rcaReport
     });
+
+    // Re-check persisted state right before opening an external PR (e.g. if operator reset raced)
+    const persistedIncident = await this.repository.findById(incidentId);
+    if (
+      !persistedIncident ||
+      persistedIncident.state === IncidentState.FAILED ||
+      persistedIncident.state === IncidentState.RESOLVED ||
+      persistedIncident.state === IncidentState.REJECTED
+    ) {
+      throw new Error(
+        `Aborted remediation PR creation: incident '${incidentId}' is in terminal state '${persistedIncident?.state ?? 'missing'}'`
+      );
+    }
 
     // Create Remediation PR while incident remains in REMEDIATING so TTPR includes PR latency
     const prTitleSummary = truncate(sanitizeWhitespace(synthesis.summary), 72, '');

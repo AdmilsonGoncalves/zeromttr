@@ -59,3 +59,14 @@
 .custom-timeline .p-timeline-event-content {
   padding-left: 0.5rem !important;
 }
+
+/* Compact PrimeNG tooltip styling */
+.p-tooltip {
+  max-width: 230px !important;
+}
+
+.p-tooltip .p-tooltip-text {
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+  padding: 0.35rem 0.55rem !important;
+}

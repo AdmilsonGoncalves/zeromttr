@@ -63,6 +63,9 @@ export interface TranslationDictionary {
   decisionRejectBtn: string;
   decisionSuccessMsg: string;
   decisionErrorMsg: string;
+  decisionAlreadyResolvedError: string;
+  decisionAlreadyClosedBanner: string;
+  decisionConfirmationHelp: string;
   decisionTokenSecurityNote: string;
   backToWarRoom: string;
   awaitingAuditBadge: string;
@@ -72,6 +75,57 @@ export interface TranslationDictionary {
   hmacMissingSigError: string;
   hmacInvalidExpError: string;
   hmacExpiredError: string;
+  toastLiveKeyRequiredSummary: string;
+  toastLiveKeyRequiredDetail: string;
+  toastCooldownSummary: string;
+  toastCooldownDetail: string;
+  toastCooldownDetailWithSeconds: string;
+  toastActionErrorSummary: string;
+  toastActionErrorDetail: string;
+  toastChaosStartedSummary: string;
+  toastChaosStartedDetail: string;
+  toastServiceRestoredSummary: string;
+  toastServiceRestoredDetail: string;
+  toastDecisionApprovedSummary: string;
+  toastDecisionApprovedDetail: string;
+  tooltipModeSelector: string;
+  tooltipLiveKeyInput: string;
+  tooltipSimulateIncident: string;
+  tooltipRestoreService: string;
+  tooltipLanguageSelector: string;
+  tooltipViewPr: string;
+  tooltipSimulateDecision: string;
+  fsmFlowLabel: string;
+  fsmAwaitingAlertLabel: string;
+  fsmAwaitingAlertTip: string;
+  fsmReceivedLabel: string;
+  fsmReceivedTip: string;
+  fsmInvestigatingLabel: string;
+  fsmInvestigatingTip: string;
+  fsmEnrichingLabel: string;
+  fsmEnrichingTip: string;
+  fsmRemediatingLabel: string;
+  fsmRemediatingTip: string;
+  fsmAwaitingPrLabel: string;
+  fsmAwaitingPrTip: string;
+  fsmNotifiedLabel: string;
+  fsmNotifiedTip: string;
+  fsmResolvedLabel: string;
+  fsmResolvedTip: string;
+  fsmRejectedLabel: string;
+  fsmRejectedTip: string;
+  fsmFailedLabel: string;
+  fsmHintIdle: string;
+  fsmHintAwaitingAlert: string;
+  fsmHintActive: string;
+  fsmHintNotified: string;
+  fsmHintResolved: string;
+  fsmHintRejected: string;
+  fsmHintFailed: string;
+  resendDispatchedBadge: string;
+  resendDispatchedBody: string;
+  resendDegradedTitle: string;
+  resendDegradedBody: string;
 }
 
 const PT_TRANSLATIONS: TranslationDictionary = {
@@ -133,13 +187,19 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   githubPrTitle: 'Pull Request Aberto no GitHub',
   githubPrViewBtn: 'Ver PR no GitHub ↗',
   resendPreviewTitle: 'Post-Mortem Resend (Preview Sanitizado)',
-  awaitingDecisionBadge: '🔒 Aguardando decisão via link HMAC enviado por e-mail ao plantonista',
+  awaitingDecisionBadge: 'Aguardando decisão via link HMAC enviado por e-mail ao plantonista',
   simulateDecisionBtn: '[Modo Simulação] Simular Aprovação do Plantonista',
   decisionPageTitle: 'Confirmação de Decisão de Remediação',
-  decisionApproveBtn: 'Aprovar Merge do Hotfix',
+  decisionApproveBtn: 'Aprovar Hotfix (Resolver Incidente)',
   decisionRejectBtn: 'Rejeitar Hotfix',
   decisionSuccessMsg: 'Decisão registrada com sucesso via HMAC assinado!',
   decisionErrorMsg: 'Falha ao validar assinatura HMAC ou link expirado.',
+  decisionAlreadyResolvedError:
+    'Este incidente já foi encerrado anteriormente (status RESOLVED ou REJECTED).',
+  decisionAlreadyClosedBanner:
+    'Este incidente já foi processado e encontra-se encerrado. Novas ações não são permitidas.',
+  decisionConfirmationHelp:
+    'Por segurança e conformidade com RFC 7231, a confirmação na página é necessária para evitar que rastreadores de e-mail acionem o hotfix automaticamente.',
   decisionTokenSecurityNote:
     'Nota de Segurança: O token de decisão trafega exclusivamente pelo hash da URL (#fragment) e nunca é exposto em logs HTTP ou servidores intermediários.',
   backToWarRoom: 'Voltar ao War Room Dashboard',
@@ -149,7 +209,72 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   hmacInvalidActionError: 'Parâmetro action inválido no hash (esperado approve ou reject)',
   hmacMissingSigError: 'Assinatura sig HMAC ausente no hash',
   hmacInvalidExpError: 'Timestamp exp inválido no hash',
-  hmacExpiredError: 'Link de decisão HMAC expirou'
+  hmacExpiredError: 'Link de decisão HMAC expirou',
+  toastLiveKeyRequiredSummary: 'Chave Live inválida ou não informada',
+  toastLiveKeyRequiredDetail:
+    'Informe a chave X-Live-Demo-Key válida para executar ações no Modo Live.',
+  toastCooldownSummary: 'Cooldown ativo',
+  toastCooldownDetail: 'Aguarde o intervalo de cooldown antes de disparar outro incidente.',
+  toastCooldownDetailWithSeconds:
+    'Simulação em cooldown. Aguarde {N} segundos antes de disparar novamente.',
+  toastActionErrorSummary: 'Falha na ação de demonstração',
+  toastActionErrorDetail: 'Não foi possível concluir a operação no orquestrador.',
+  toastChaosStartedSummary: 'Incidente disparado',
+  toastChaosStartedDetail: 'Simulação iniciada — acompanhe a telemetria ao vivo no War Room.',
+  toastServiceRestoredSummary: 'Serviço restaurado',
+  toastServiceRestoredDetail: 'O estado de caos foi limpo e o serviço alvo voltou ao normal.',
+  toastDecisionApprovedSummary: 'Hotfix aprovado',
+  toastDecisionApprovedDetail:
+    'Incidente resolvido e serviço alvo restaurado! Os dados permanecem na tela para inspeção.',
+  tooltipModeSelector:
+    'Alterna entre Modo Live (Gemini, GitHub e Resend reais) e Modo Replay (execução gravada).',
+  tooltipLiveKeyInput:
+    'Informe a chave LIVE_DEMO_KEY configurada no servidor para liberar o Modo Live.',
+  tooltipSimulateIncident:
+    'Inicia o incidente: degrada o serviço alvo (v2.14.8) no Modo Live ou executa a gravação no Modo Replay.',
+  tooltipRestoreService:
+    'Remove a saturação de pool e restaura o serviço alvo para o estado saudável.',
+  tooltipLanguageSelector: 'Alterna o idioma da interface entre Português e Inglês.',
+  tooltipViewPr: 'Abre o Pull Request de hotfix gerado automaticamente no GitHub.',
+  tooltipSimulateDecision:
+    'Simula a aprovação do plantonista no ambiente de demonstração (em produção exige link HMAC do e-mail).',
+  fsmFlowLabel: 'Fluxo FSM',
+  fsmAwaitingAlertLabel: '0. Coleta LGTM',
+  fsmAwaitingAlertTip:
+    'Serviço degradado emitindo telemetria — aguardando Prometheus/Grafana disparar o alerta.',
+  fsmReceivedLabel: '1. Recebido',
+  fsmReceivedTip: 'Alerta recebido pelo webhook do Grafana e incidente inicializado.',
+  fsmInvestigatingLabel: '2. Investigando',
+  fsmInvestigatingTip:
+    'Coleta autônoma de PromQL, traces no Tempo e logs mascarados no Loki via MCP.',
+  fsmEnrichingLabel: '3. Enriquecendo',
+  fsmEnrichingTip: 'Inspeção do git diff v2.14.7...v2.14.8 e validação de cobertura de sinais.',
+  fsmRemediatingLabel: '4. Remediando',
+  fsmRemediatingTip: 'Auditoria fail-closed do PiiPromptGuard e síntese do RCA/patch via LLM.',
+  fsmAwaitingPrLabel: '5. Abrindo PR',
+  fsmAwaitingPrTip:
+    'Criação da branch hotfix/* e abertura do Pull Request contra a branch de release.',
+  fsmNotifiedLabel: '6. Notificado',
+  fsmNotifiedTip: 'Post-mortem enviado via Resend com link HMAC exclusivo no #fragment.',
+  fsmResolvedLabel: '7. Resolvido',
+  fsmResolvedTip: 'Decisão humana registrada e incidente encerrado com sucesso.',
+  fsmRejectedLabel: '7. Rejeitado',
+  fsmRejectedTip: 'Decisão de rejeição registrada pelo operador.',
+  fsmFailedLabel: 'Falhou',
+  fsmHintIdle: 'Pronto — escolha o modo acima e clique em "Simular Incidente" para iniciar.',
+  fsmHintAwaitingAlert:
+    'Serviço degradado — gerando tráfego PIX e aguardando Prometheus/Grafana disparar o alerta ({N}s)...',
+  fsmHintActive: 'Pipeline autônomo em execução — acompanhando transições da FSM em tempo real.',
+  fsmHintNotified: 'Aguardando decisão humana via link HMAC no e-mail (ou simulação no painel).',
+  fsmHintResolved: 'Incidente resolvido e aprovado. Use "Restaurar Serviço" para limpar o alvo.',
+  fsmHintRejected: 'Hotfix rejeitado pelo plantonista. O PR permanece sem merge.',
+  fsmHintFailed: 'Pipeline interrompido por falha — verifique os logs do orquestrador.',
+  resendDispatchedBadge: 'E-mail Post-Mortem enviado ao plantonista via Resend',
+  resendDispatchedBody:
+    'Link de decisão assinado via HMAC entregue exclusivamente no #fragment do e-mail.',
+  resendDegradedTitle: '⚠️ Envio Resend em Modo Degradado',
+  resendDegradedBody:
+    'A API do Resend recusou o domínio remetente configurado (HTTP 403/erro de entrega). O incidente permanece ativo para decisão simulada no painel.'
 };
 
 const EN_TRANSLATIONS: TranslationDictionary = {
@@ -210,13 +335,19 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   githubPrTitle: 'Pull Request Opened on GitHub',
   githubPrViewBtn: 'View PR on GitHub ↗',
   resendPreviewTitle: 'Resend Post-Mortem (Sanitized Preview)',
-  awaitingDecisionBadge: '🔒 Awaiting on-call decision via HMAC link dispatched by email',
+  awaitingDecisionBadge: 'Awaiting on-call decision via HMAC link dispatched by email',
   simulateDecisionBtn: '[Simulation Mode] Simulate On-Call Approval',
   decisionPageTitle: 'Remediation Decision Confirmation',
-  decisionApproveBtn: 'Approve Hotfix Merge',
+  decisionApproveBtn: 'Approve Hotfix (Resolve Incident)',
   decisionRejectBtn: 'Reject Hotfix',
   decisionSuccessMsg: 'Decision successfully registered via signed HMAC!',
   decisionErrorMsg: 'Failed to validate HMAC signature or link has expired.',
+  decisionAlreadyResolvedError:
+    'This incident has already been closed (status RESOLVED or REJECTED).',
+  decisionAlreadyClosedBanner:
+    'This incident has already been processed and is closed. Further actions are disabled.',
+  decisionConfirmationHelp:
+    'For security and RFC 7231 compliance, explicit confirmation on this page is required to prevent email scanner bots from triggering hotfixes automatically.',
   decisionTokenSecurityNote:
     'Security Note: The decision token travels strictly inside the URL hash (#fragment) and is never exposed to HTTP logs or proxy servers.',
   backToWarRoom: 'Back to War Room Dashboard',
@@ -226,7 +357,70 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   hmacInvalidActionError: 'Invalid action parameter in hash (expected approve or reject)',
   hmacMissingSigError: 'Missing HMAC sig signature in hash',
   hmacInvalidExpError: 'Invalid exp timestamp in hash',
-  hmacExpiredError: 'HMAC decision link has expired'
+  hmacExpiredError: 'HMAC decision link has expired',
+  toastLiveKeyRequiredSummary: 'Live key invalid or not provided',
+  toastLiveKeyRequiredDetail:
+    'Provide a valid X-Live-Demo-Key to trigger actions in Live API Mode.',
+  toastCooldownSummary: 'Cooldown active',
+  toastCooldownDetail: 'Please wait for the cooldown window before triggering another incident.',
+  toastCooldownDetailWithSeconds:
+    'Chaos simulation is in cooldown. Please wait {N} seconds before triggering again.',
+  toastActionErrorSummary: 'Demo action failed',
+  toastActionErrorDetail: 'Could not complete the operation on the orchestrator.',
+  toastChaosStartedSummary: 'Incident triggered',
+  toastChaosStartedDetail: 'Simulation started — follow live telemetry in the War Room.',
+  toastServiceRestoredSummary: 'Service restored',
+  toastServiceRestoredDetail: 'Chaos state cleared and target service returned to healthy.',
+  toastDecisionApprovedSummary: 'Hotfix approved',
+  toastDecisionApprovedDetail:
+    'Incident resolved and target service restored! Incident data remains on screen for inspection.',
+  tooltipModeSelector:
+    'Switch between Live Mode (real Gemini, GitHub, and Resend) and Replay Mode (recorded run).',
+  tooltipLiveKeyInput: 'Enter the server LIVE_DEMO_KEY to authorize actions in Live API Mode.',
+  tooltipSimulateIncident:
+    'Starts the incident: degrades the target service (v2.14.8) in Live Mode or plays the recorded run in Replay Mode.',
+  tooltipRestoreService: 'Clears pool saturation chaos and restores the target service to healthy.',
+  tooltipLanguageSelector: 'Switch UI language between Portuguese and English.',
+  tooltipViewPr: 'Open the autonomously generated hotfix Pull Request on GitHub.',
+  tooltipSimulateDecision:
+    'Simulates on-call approval in demo mode (production requires the email HMAC link).',
+  fsmFlowLabel: 'FSM Flow',
+  fsmAwaitingAlertLabel: '0. LGTM Collect',
+  fsmAwaitingAlertTip:
+    'Degraded service emitting telemetry — waiting for Prometheus/Grafana to fire the alert.',
+  fsmReceivedLabel: '1. Received',
+  fsmReceivedTip: 'Grafana webhook alert received and incident initialized.',
+  fsmInvestigatingLabel: '2. Investigating',
+  fsmInvestigatingTip:
+    'Autonomous collection of PromQL metrics, Tempo traces, and redacted Loki logs via MCP.',
+  fsmEnrichingLabel: '3. Enriching',
+  fsmEnrichingTip: 'Git diff v2.14.7...v2.14.8 inspection and evidence coverage scoring.',
+  fsmRemediatingLabel: '4. Remediating',
+  fsmRemediatingTip: 'Fail-closed PiiPromptGuard audit and RCA/patch synthesis via LLM.',
+  fsmAwaitingPrLabel: '5. Opening PR',
+  fsmAwaitingPrTip:
+    'Creating hotfix/* branch and opening the Pull Request against the release branch.',
+  fsmNotifiedLabel: '6. Notified',
+  fsmNotifiedTip: 'Post-mortem dispatched via Resend with #fragment-only HMAC decision link.',
+  fsmResolvedLabel: '7. Resolved',
+  fsmResolvedTip: 'Human decision recorded and incident closed successfully.',
+  fsmRejectedLabel: '7. Rejected',
+  fsmRejectedTip: 'Hotfix rejected by on-call engineer.',
+  fsmFailedLabel: 'Failed',
+  fsmHintIdle: 'Ready — choose a mode above and click "Simulate Incident" to start.',
+  fsmHintAwaitingAlert:
+    'Service degraded — generating PIX traffic and waiting for Prometheus/Grafana alert ({N}s)...',
+  fsmHintActive: 'Autonomous pipeline running — streaming live FSM state transitions.',
+  fsmHintNotified: 'Awaiting human decision via email HMAC link (or demo simulation button).',
+  fsmHintResolved: 'Incident resolved and approved. Use "Restore Service" to reset the target.',
+  fsmHintRejected: 'Hotfix rejected by on-call engineer. Pull Request remains unmerged.',
+  fsmHintFailed: 'Pipeline stopped due to failure — check orchestrator logs.',
+  resendDispatchedBadge: 'Post-Mortem email dispatched to on-call engineer via Resend',
+  resendDispatchedBody:
+    'HMAC-signed decision link delivered exclusively inside the email URL #fragment.',
+  resendDegradedTitle: '⚠️ Resend Delivery in Degraded Mode',
+  resendDegradedBody:
+    'The Resend API rejected the configured sender domain (HTTP 403/delivery error). The incident remains active for simulated decision in the dashboard.'
 };
 
 /**

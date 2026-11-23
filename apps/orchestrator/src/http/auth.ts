@@ -95,6 +95,12 @@ export function createDashboardAuthMiddleware(dashboardToken: string) {
 export function createLiveDemoKeyMiddleware(configuredKey?: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (isEmpty(configuredKey)) {
+      if (process.env.NODE_ENV === 'production') {
+        res.status(HTTP_STATUS.FORBIDDEN).json({
+          error: 'Forbidden: LIVE_DEMO_KEY must be configured for live execution in production'
+        });
+        return;
+      }
       next();
       return;
     }

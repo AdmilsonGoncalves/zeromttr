@@ -24,18 +24,32 @@ O **ZeroMTTR** é uma plataforma autônoma de AIOps e remediação de incidentes
 | **Governança de Remediação**        | Scripts ou sugestões via ChatOps                       | PR / sugestões proprietárias                 | **Pull Request de hotfix** contra branch de release + **CI Gate (`hotfix-verify.yml`)** + **aprovação humana via HMAC enviada exclusivamente por e-mail** |
 | **Resiliência sem LLM**             | Dependente do LLM configurado                          | Dependente do SaaS                           | `ReasoningPort` explícito com **fallback determinístico** (`reasoningSource: 'llm' \| 'fallback'`)                                                        |
 
+### Como o Sistema Demo Funciona
+
+Ao clicar em **"Simular Incidente"** no War Room (`POST /api/demo/chaos`), o `demo.controller.ts` do Orchestrator opera em um de dois modos sobre o serviço alvo **`api-pagamentos-core`** (`apps/target-app-demo`):
+
+1. **Modo `Replay` (padrão público):**
+   - Reproduz em tempo real via SSE a linha do tempo de uma execução real gravada (`data/last-recorded-incident.json`), usando o `ReplayRunner`.
+   - Não consome cotas de APIs externas (Gemini, GitHub, Resend).
+2. **Modo `Live` (execução real ponta a ponta, liberado com `LIVE_DEMO_KEY` ou em Docker local):**
+   1. **Ativação do caos no `api-pagamentos-core`:** O Orchestrator aciona o `chaos.controller.ts`, ligando `chaosManager.setPoolSaturation(true)` (`chaos.manager.ts`). O status muda de `healthy` (`v2.14.7`) para `degraded` (`v2.14.8`), enquanto `payment.repository.ts` reduz o pool para `2` conexões (`degradedMaxConnections`), aplica atraso artificial (`4600 ms`) e omite `client.release()`, causando esgotamento de conexões.
+   2. **Rajada de tráfego sintético:** Com `DEMO_MODE=true`, `startSyntheticTrafficBurst()` dispara ondas de 6 requisições `POST /payments` (em `0s, 3s, 6s, 9s, 12s, 15s`) contendo dados sintéticos de PIX (CPF, CNPJ, e-mail e token `Bearer`).
+   3. **Observabilidade LGTM & Alerta:** O esgotamento gera `KnexTimeoutError`, spans `pg.pool.acquire` com erro no **Tempo**, picos de latência no **Prometheus** e logs mascarados na borda pelo processor `transform` (OTTL) do OTel Collector antes de irem ao **Loki**. O **Grafana** detecta a anomalia e dispara o webhook de alerta para o Orchestrator.
+   4. **Remediação Autônoma:** O Orchestrator coleta métricas, traces, logs e o `git diff v2.14.7...v2.14.8` via **MCP Server**, audita o prompt no `PiiPromptGuard` (fail-closed), gera RCA + patch completo (via **Gemini** ou fallback determinístico), abre um PR real no GitHub contra `release/target-v2.14.8` e envia o e-mail Post-Mortem via **Resend** com o link HMAC no `#fragment`.
+   5. **Restauração ("Restaurar Serviço" / `POST /api/demo/reset`):** Desliga o caos no `ChaosManager`, cancela as rajadas agendadas e chama `paymentRepository.resetPool()`, devolvendo o `api-pagamentos-core` para `healthy` (`v2.14.7`).
+
 ---
 
 ## 2. Arquitetura e Fluxo Autônomo
 
-```text
-Alerta Grafana (Webhook, GRAFANA_WEBHOOK_TOKEN)
-  ──> Orchestrator (FSM: RECEIVED -> INVESTIGATING -> ENRICHING -> REMEDIATING -> AWAITING_PR -> NOTIFIED -> RESOLVED/REJECTED)
-  <──> MCP Server (8 Tools sobre Streamable HTTP: PromQL, Tempo, Loki, GitHub Diff/PR, Resend, Grafana Annotations)
-  <──> Gemini LLM (via ReasoningPort auditado pelo PiiPromptGuard fail-closed + fallback determinístico)
-  ──> Pull Request de Hotfix no GitHub (contra release/target-v2.14.8 + CI Gate hotfix-verify.yml)
-  ──> E-mail Post-Mortem via Resend (link de decisão HMAC exclusivamente no #fragment)
-  ──> Stream SSE em tempo real para o War Room Dashboard (Angular)
+```mermaid
+flowchart TD
+    G["Alerta Grafana (Webhook, GRAFANA_WEBHOOK_TOKEN)"] --> O["Orchestrator (FSM: RECEIVED → INVESTIGATING → ENRICHING → REMEDIATING → AWAITING_PR → NOTIFIED → RESOLVED/REJECTED)"]
+    O <--> M["MCP Server (8 Tools via Streamable HTTP: PromQL, Tempo, Loki, GitHub Diff/PR, Resend, Grafana Annotations)"]
+    O <--> L["Gemini LLM (ReasoningPort auditado pelo PiiPromptGuard fail-closed + fallback determinístico)"]
+    O --> PR["Pull Request de Hotfix no GitHub (contra release/target-v2.14.8 + CI Gate hotfix-verify.yml)"]
+    O --> E["E-mail Post-Mortem via Resend (link de decisão HMAC exclusivamente no #fragment)"]
+    O --> D["Stream SSE em tempo real para o War Room Dashboard (Angular)"]
 ```
 
 ---

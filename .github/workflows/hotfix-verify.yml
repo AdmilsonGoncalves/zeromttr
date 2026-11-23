@@ -22,12 +22,13 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @zeromttr/target-app-demo^... run build
       - run: pnpm --filter @zeromttr/target-app-demo run typecheck
       - run: pnpm --filter @zeromttr/target-app-demo run test
 
       - name: Comment Verification Badge on PR
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v7.0.1
         with:
           script: |
             const passed = '${{ job.status }}' === 'success';

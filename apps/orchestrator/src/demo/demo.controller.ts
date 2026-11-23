@@ -14,6 +14,7 @@ import {
 } from '../application/decision-helpers.js';
 import { DecisionAction, IncidentExecutionMode } from '../domain/incident-enums.js';
 import type { IncidentMode } from '../domain/incident.js';
+import { IncidentState } from '../domain/incident-state.js';
 import { createLiveDemoKeyMiddleware } from '../http/auth.js';
 import { HttpResponseStatus } from '../http/http-constants.js';
 import type { IncidentRepository } from '../ports/incident-repository.port.js';
@@ -153,10 +154,29 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
     })();
   });
 
-  // Reset demo (requires X-Live-Demo-Key if active session was live)
+  // Reset demo (requires X-Live-Demo-Key if active session or any open incident is live)
   router.post('/demo/reset', ...authMiddlewares, (req: Request, res: Response): void => {
     void (async () => {
-      if (lastChaosTimestamp > 0 && lastChaosMode === IncidentExecutionMode.LIVE) {
+      let openIncidents: Awaited<ReturnType<IncidentRepository['findAll']>> = [];
+      if (dependencies.repository) {
+        try {
+          const allIncidents = await dependencies.repository.findAll();
+          openIncidents = allIncidents.filter(
+            (inc) =>
+              inc.state !== IncidentState.RESOLVED &&
+              inc.state !== IncidentState.REJECTED &&
+              inc.state !== IncidentState.FAILED
+          );
+        } catch {
+          // Non-fatal repository lookup error during reset auth check
+        }
+      }
+
+      const hasLiveSessionOrIncident =
+        (lastChaosTimestamp > 0 && lastChaosMode === IncidentExecutionMode.LIVE) ||
+        openIncidents.some((inc) => inc.mode === IncidentExecutionMode.LIVE);
+
+      if (hasLiveSessionOrIncident) {
         const allowed = await runExpressMiddleware(liveDemoAuth, req, res);
         if (!allowed) {
           return;
@@ -164,6 +184,26 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
       }
 
       try {
+        const failedIncidentIds: string[] = [];
+        if (dependencies.repository) {
+          for (const inc of openIncidents) {
+            try {
+              inc.transition(IncidentState.FAILED, 'Demo reset by operator');
+              await dependencies.repository.save(inc);
+            } catch {
+              failedIncidentIds.push(inc.id);
+            }
+          }
+        }
+
+        if (failedIncidentIds.length > 0) {
+          res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            error: `Failed to transition/save open incidents during reset: ${failedIncidentIds.join(', ')}`,
+            failedIncidentIds
+          });
+          return;
+        }
+
         lastChaosTimestamp = 0;
         lastChaosMode = IncidentExecutionMode.REPLAY;
         dependencies.replayRunner?.stop();

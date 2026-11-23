@@ -21,3 +21,41 @@ export const RAW_PRE_COLLECTOR_LOG =
 // Illustrative edge-sanitized log after OTel Collector OTTL masking
 export const MASKED_POST_OTTL_LOG =
   '2026-11-10T16:20:00.123Z [ERROR] [api-pagamentos-core] [trace_id=4bf92f3577b34da6a3ce929d0e0e4736] Payment failed for payer CPF [REDACTED_CPF] merchant CNPJ [REDACTED_CNPJ] phone [REDACTED_PHONE] Bearer [REDACTED_JWT]: pool connection acquire timeout after 4710ms';
+
+export const TimelineStepStatus = {
+  COMPLETED: 'completed',
+  IN_PROGRESS: 'in-progress',
+  PENDING: 'pending'
+} as const;
+export type TimelineStepStatus = (typeof TimelineStepStatus)[keyof typeof TimelineStepStatus];
+
+export const UiSeverity = {
+  SUCCESS: 'success',
+  INFO: 'info',
+  WARN: 'warn',
+  DANGER: 'danger',
+  SECONDARY: 'secondary',
+  CONTRAST: 'contrast'
+} as const;
+export type UiSeverity = (typeof UiSeverity)[keyof typeof UiSeverity];
+
+export const FsmStageStatus = {
+  COMPLETED: 'completed',
+  ACTIVE: 'active',
+  PENDING: 'pending',
+  FAILED: 'failed'
+} as const;
+export type FsmStageStatus = (typeof FsmStageStatus)[keyof typeof FsmStageStatus];
+
+export const FsmVirtualState = {
+  AWAITING_ALERT: 'AWAITING_ALERT'
+} as const;
+export type FsmVirtualState = (typeof FsmVirtualState)[keyof typeof FsmVirtualState];
+
+export const DecisionUiStatus = {
+  IDLE: 'idle',
+  LOADING: 'loading',
+  SUCCESS: 'success',
+  ERROR: 'error'
+} as const;
+export type DecisionUiStatus = (typeof DecisionUiStatus)[keyof typeof DecisionUiStatus];
