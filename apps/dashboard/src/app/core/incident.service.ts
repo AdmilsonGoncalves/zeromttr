@@ -84,6 +84,7 @@ export class IncidentService {
   private visualStateQueue: IncidentState[] = [];
   private readonly dismissedIncidentIds = new Set<string>();
   private activeIncidentFetchToken = 0;
+  private chaosTriggeredAtMs = 0;
 
   readonly currentIncident = signal<IncidentDetail | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
@@ -1000,11 +1001,21 @@ export class IncidentService {
       try {
         const res = await fetch(`${baseUrl}/api/incidents`);
         if (res.ok) {
-          const list = (await res.json()) as Array<{ id: string }>;
+          const list = (await res.json()) as Array<{ id: string; startedAt?: string }>;
+          const minStartedAt = this.chaosTriggeredAtMs > 0 ? this.chaosTriggeredAtMs - 5000 : 0;
           const latest = Array.isArray(list)
-            ? list.find(
-                (inc) => isNonEmptyString(inc?.id) && !this.dismissedIncidentIds.has(inc.id)
-              )
+            ? list.find((inc) => {
+                if (!isNonEmptyString(inc?.id) || this.dismissedIncidentIds.has(inc.id)) {
+                  return false;
+                }
+                if (minStartedAt > 0 && isNonEmptyString(inc.startedAt)) {
+                  const startedMs = new Date(inc.startedAt).getTime();
+                  if (!Number.isNaN(startedMs) && startedMs < minStartedAt) {
+                    return false;
+                  }
+                }
+                return true;
+              })
             : undefined;
           if (latest) {
             this.awaitingIncidentStart.set(false);
@@ -1100,6 +1111,7 @@ export class IncidentService {
       }
 
       this.clearVisualStateQueue();
+      this.chaosTriggeredAtMs = Date.now();
       this.currentIncident.set(null);
       this.awaitingIncidentStart.set(true);
 

@@ -19,7 +19,7 @@ groups:
             datasourceUid: prometheus-datasource
             model:
               editorMode: code
-              expr: '(histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="api-pagamentos-core"}[1m])) by (le)) > 0.5) or (db_pool_waiting{service="api-pagamentos-core"} > 0) or (db_pool_used{service="api-pagamentos-core",version="v2.14.8"} >= 2)'
+              expr: '(histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="api-pagamentos-core"}[1m])) by (le)) > 0.5) or (db_pool_waiting{service="api-pagamentos-core"} > 0) or (db_pool_used{service="api-pagamentos-core",version="v2.14.8"} > 0)'
               instant: true
               range: false
               refId: A

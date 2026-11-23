@@ -140,6 +140,11 @@ export interface TranslationDictionary {
   toastHealthyTrafficStartedDetail: string;
   toastHealthyTrafficStoppedSummary: string;
   toastHealthyTrafficStoppedDetail: string;
+  targetPoolActiveLabel: string;
+  targetPoolWaitingLabel: string;
+  targetSloLatencyHint: string;
+  targetSlaErrorOk: string;
+  targetSlaErrorBreach: string;
 }
 
 const PT_TRANSLATIONS: TranslationDictionary = {
@@ -304,7 +309,12 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   toastHealthyTrafficStartedDetail:
     'Requisições PIX contínuas sendo enviadas para api-pagamentos-core.',
   toastHealthyTrafficStoppedSummary: 'Tráfego saudável interrompido',
-  toastHealthyTrafficStoppedDetail: 'Fluxo contínuo de requisições encerrado.'
+  toastHealthyTrafficStoppedDetail: 'Fluxo contínuo de requisições encerrado.',
+  targetPoolActiveLabel: 'Ativas',
+  targetPoolWaitingLabel: 'Em espera',
+  targetSloLatencyHint: 'SLO: ≤ 500ms',
+  targetSlaErrorOk: 'SLA Saudável',
+  targetSlaErrorBreach: 'Falhas 5xx Ativas'
 };
 
 const EN_TRANSLATIONS: TranslationDictionary = {
@@ -465,7 +475,12 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   toastHealthyTrafficStartedSummary: 'Healthy traffic started',
   toastHealthyTrafficStartedDetail: 'Continuous PIX requests streaming to api-pagamentos-core.',
   toastHealthyTrafficStoppedSummary: 'Healthy traffic stopped',
-  toastHealthyTrafficStoppedDetail: 'Continuous request stream stopped.'
+  toastHealthyTrafficStoppedDetail: 'Continuous request stream stopped.',
+  targetPoolActiveLabel: 'Active',
+  targetPoolWaitingLabel: 'Waiting',
+  targetSloLatencyHint: 'SLO: ≤ 500ms',
+  targetSlaErrorOk: 'Healthy SLA',
+  targetSlaErrorBreach: '5xx Errors Active'
 };
 
 /**
