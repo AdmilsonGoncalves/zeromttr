@@ -154,14 +154,12 @@ describe('DecisionComponent', () => {
       location: { hash: `#action=approve&sig=hmac_valid&exp=${futureExp}` }
     };
 
-    vi.spyOn(incidentService, 'fetchIncident').mockImplementation(async () => {
-      incidentService.currentIncident.set({
-        id: 'inc-20261110-001',
-        service: 'api-pagamentos-core',
-        state: 'RESOLVED',
-        decision: 'approve'
-      } as any);
-    });
+    vi.spyOn(incidentService, 'getIncidentDetail').mockResolvedValue({
+      id: 'inc-20261110-001',
+      service: 'api-pagamentos-core',
+      state: 'RESOLVED',
+      decision: 'approve'
+    } as any);
 
     component.ngOnInit();
     // Allow checkIncidentClosed promise to resolve
@@ -169,5 +167,6 @@ describe('DecisionComponent', () => {
 
     expect(component.incidentClosed()).toBe(true);
     expect(component.incidentClosedState()).toBe('RESOLVED');
+    expect(incidentService.currentIncident()).toBeNull();
   });
 });

@@ -24,18 +24,32 @@ In mission-critical distributed systems — such as instant payment settlement (
 | **Remediation Governance**     | Ad-hoc scripts or ChatOps advice            | Vendor-managed PR / suggestions     | **Automated hotfix PR** against the release branch + **CI gate (`hotfix-verify.yml`)** + **human-in-the-loop HMAC approval sent exclusively via email** |
 | **Resilience Without LLM**     | Depends on configured LLM                   | Cloud SaaS dependent                | Explicit `ReasoningPort` with **deterministic fallback** (`reasoningSource: 'llm' \| 'fallback'`)                                                       |
 
+### How the Interactive Demo Works
+
+When you click **"Simulate Incident"** in the War Room (`POST /api/demo/chaos`), the Orchestrator's `demo.controller.ts` operates in one of two modes targeting the **`api-pagamentos-core`** workload (`apps/target-app-demo`):
+
+1. **Replay Mode (public default):**
+   - Streams a real-time SSE timeline of a recorded real execution (`data/last-recorded-incident.json`) via `ReplayRunner`.
+   - Consumes zero external API quotas (Gemini, GitHub, Resend).
+2. **Live Mode (end-to-end real execution, unlocked with `LIVE_DEMO_KEY` or local Docker):**
+   1. **Chaos Injection on `api-pagamentos-core`:** The Orchestrator triggers `chaos.controller.ts`, enabling `chaosManager.setPoolSaturation(true)` (`chaos.manager.ts`). Service status switches from `healthy` (`v2.14.7`) to `degraded` (`v2.14.8`), while `payment.repository.ts` drops the pool cap to `2` connections (`degradedMaxConnections`), injects a `4600 ms` delay, and omits `client.release()`, causing connection exhaustion.
+   2. **Synthetic Traffic Burst:** With `DEMO_MODE=true`, `startSyntheticTrafficBurst()` fires waves of 6 `POST /payments` requests (at `0s, 3s, 6s, 9s, 12s, 15s`) carrying synthetic PIX PII (CPF, CNPJ, email, and `Bearer` JWT).
+   3. **LGTM Observability & Alerting:** Pool exhaustion raises `KnexTimeoutError`, emits error `pg.pool.acquire` spans in **Tempo**, latency spikes in **Prometheus**, and logs masked at the edge by the OTel Collector's `transform` (OTTL) processor before reaching **Loki**. **Grafana** detects the anomaly and fires the alert webhook to the Orchestrator.
+   4. **Autonomous Remediation:** The Orchestrator gathers metrics, traces, logs, and `git diff v2.14.7...v2.14.8` via the **MCP Server**, audits the prompt through fail-closed `PiiPromptGuard`, synthesizes RCA + full-file patch (via **Gemini** or deterministic fallback), opens a real GitHub PR against `release/target-v2.14.8`, and sends the **Resend** Post-Mortem email with an HMAC link in `#fragment`.
+   5. **Restoration ("Restore Service" / `POST /api/demo/reset`):** Disables chaos in `ChaosManager`, cancels scheduled traffic bursts, and calls `paymentRepository.resetPool()`, returning `api-pagamentos-core` to `healthy` (`v2.14.7`).
+
 ---
 
 ## 2. Architecture & Autonomous Pipeline
 
-```text
-Grafana Alert (Webhook, GRAFANA_WEBHOOK_TOKEN)
-  ──> Orchestrator (FSM: RECEIVED -> INVESTIGATING -> ENRICHING -> REMEDIATING -> AWAITING_PR -> NOTIFIED -> RESOLVED/REJECTED)
-  <──> MCP Server (8 Tools over Streamable HTTP: PromQL, Tempo, Loki, GitHub Diff/PR, Resend, Grafana Annotations)
-  <──> Gemini LLM (via ReasoningPort guarded by fail-closed PiiPromptGuard + deterministic fallback)
-  ──> GitHub Hotfix PR (against release/target-v2.14.8 + hotfix-verify.yml CI Gate)
-  ──> Resend Post-Mortem Email (HMAC decision link in #fragment only)
-  ──> Real-Time SSE Stream to Angular War Room Dashboard
+```mermaid
+flowchart TD
+    G["Grafana Alert (Webhook, GRAFANA_WEBHOOK_TOKEN)"] --> O["Orchestrator (FSM: RECEIVED → INVESTIGATING → ENRICHING → REMEDIATING → AWAITING_PR → NOTIFIED → RESOLVED/REJECTED)"]
+    O <--> M["MCP Server (8 Tools over Streamable HTTP: PromQL, Tempo, Loki, GitHub Diff/PR, Resend, Grafana Annotations)"]
+    O <--> L["Gemini LLM (ReasoningPort guarded by fail-closed PiiPromptGuard + deterministic fallback)"]
+    O --> PR["GitHub Hotfix Pull Request (against release/target-v2.14.8 + hotfix-verify.yml CI Gate)"]
+    O --> E["Resend Post-Mortem Email (HMAC decision link in #fragment only)"]
+    O --> D["Real-Time SSE Stream to Angular War Room Dashboard"]
 ```
 
 ---

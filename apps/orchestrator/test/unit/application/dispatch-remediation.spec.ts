@@ -727,14 +727,16 @@ describe('DispatchRemediation Use Case', () => {
         async saveOrder() { return true; }
       }
       export const orderRepository = new OrderRepository();
+      export const pool = 10;
     `;
     const llmAdapter: ReasoningPort = {
       synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
-        summary: 'Stub missing orderRepository singleton',
+        summary: 'Stub missing orderRepository singleton and renaming pool to pool$',
         rootCause: 'rc',
         evidenceRefs: ['trace1'],
         suspectFilePath: 'apps/orders/src/order.repository.ts',
-        patchedContent: 'export class OrderRepository { async saveOrder() { return true; } }',
+        patchedContent:
+          'export class OrderRepository { async saveOrder() { return true; } }\nexport const pool$ = 10;',
         explanation: 'stub'
       }))
     };

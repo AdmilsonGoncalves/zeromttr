@@ -114,6 +114,7 @@ export const InspectGitDeployDiffOutputSchema = z.object({
   suspectFilePath: z.string(),
   currentBlobSha: z.string(),
   truncatedPatch: z.string().max(1500),
+  suspectFileContent: z.string().optional(),
   finops: FinOpsMetricsSchema,
 });
 
@@ -235,10 +236,10 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 - **Timeout:** 15,000 ms (15 s), with at most 1 automatic retry using 1 s exponential backoff.
 
 ### 2.5 Defensive Pre-PR Patch Validation
-Before invoking the `create_remediation_pr` tool, the Orchestrator runs validation on the synthesized patch:
-1. **File Allowlist:** `suspectFilePath === 'apps/target-app-demo/src/repositories/payment.repository.ts'`.
+Before invoking the `create_remediation_pr` tool, the Orchestrator runs domain-agnostic validation on the synthesized patch:
+1. **Target Path Consistency:** `synthesis.suspectFilePath === evidence.gitDiff.suspectFilePath` (must match the authoritative suspect file path from the deploy diff).
 2. **Syntactic Parsing:** The TypeScript Compiler API (`ts.createSourceFile`) validates that `patchedContent` is syntactically valid.
-3. **Operational Resolution Assertion:** The fixed code **must contain** `client.release()` and `pool` configured (`max: 10`).
+3. **Dynamic Export Completeness:** When `evidence.gitDiff.suspectFileContent` is available, the Orchestrator dynamically extracts all exported declarations (`class`, `const`, `let`, `function`, `interface`, `type`, `enum`) and rejects any truncated or stubbed LLM output that omits them.
 4. **Fallback Routing:** If the JSON is malformed or any validation fails, the Orchestrator aborts using the LLM synthesis and immediately routes to `DeterministicFallbackReasoningAdapter` (`reasoningSource: 'fallback'`).
 
 ---
@@ -257,25 +258,35 @@ To ensure the platform never fails live even in the event of total Gemini unavai
 
 ## 4. Concrete Observability Stack Queries
 
-### 4.1 Prometheus Alerting Rule (`infra/grafana/provisioning/alerting/rules.yaml`)
-Rule triggered when p95 latency exceeds 2,000 ms or the connection pool has waiting connections for more than 30 s:
+### 4.1 Grafana Alerting Provisioning Rule (`infra/grafana/provisioning/alerting/rules.yaml`)
+Grafana unified alerting rule evaluated every `10s` against Prometheus (`p95` latency or DB pool saturation):
 
 ```yaml
+apiVersion: 1
+
 groups:
-  - name: zeromttr-payment-alerts
+  - orgId: 1
+    name: payment-core-alerts
+    folder: ZeroMTTR
+    interval: 10s
     rules:
-      - alert: PaymentServicePoolExhaustion
-        expr: >
-          (histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name="api-pagamentos-core"}[1m])) by (le)) > 2000)
-          or
-          (db_pool_waiting{service_name="api-pagamentos-core"} > 0)
-        for: 30s
-        labels:
-          service: api-pagamentos-core
-          severity: critical
-        annotations:
-          summary: "Pool exhaustion and high p95 latency in api-pagamentos-core"
-          description: "p95 latency above 2s and connections waiting on PostgreSQL."
+      - uid: payment-core-high-latency
+        title: PaymentCoreHighLatencyOrPoolSaturation
+        condition: C
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus-datasource
+            model:
+              editorMode: code
+              expr: '(histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="api-pagamentos-core"}[1m])) by (le)) > 0.5) or (db_pool_waiting{service="api-pagamentos-core"} > 0) or (payment_pool_connections_active{service="api-pagamentos-core"} >= 10)'
+              instant: true
+              range: false
+              refId: A
 ```
 
 ### 4.2 LogQL (Loki)
@@ -305,8 +316,8 @@ To ensure identical reproducibility across machines and AI agents, all versions 
 | **TypeScript** | `5.7.3` (`ES2024`, `NodeNext`) |
 | **@modelcontextprotocol/sdk** | `1.6.0` |
 | **@google/genai** | `0.1.2` |
-| **Angular** | `19.1.5` |
-| **PrimeNG** | `19.0.6` |
+| **Angular** | `22.2.5` |
+| **PrimeNG** | `22.1.4` |
 | **Tailwind CSS** | `4.0.6` |
 | **Express** | `4.21.2` |
 | **Knex** | `3.1.0` |

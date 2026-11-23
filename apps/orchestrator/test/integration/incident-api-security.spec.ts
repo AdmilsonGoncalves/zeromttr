@@ -385,6 +385,43 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     expect(localRepo.save).toHaveBeenCalledWith(lingeringIncident);
   });
 
+  it('should fail closed on live demo actions when LIVE_DEMO_KEY is empty in production', async () => {
+    const prevEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const localRepo: IncidentRepository = {
+        findById: vi.fn(async () => null),
+        findOpenByFingerprint: vi.fn(async () => null),
+        findAll: vi.fn(async () => []),
+        save: vi.fn(async () => {})
+      };
+      const prodApp = createApp({
+        repository: localRepo,
+        targetStatusPort: { getStatus: vi.fn() },
+        handleAlert: createStubHandleAlert(),
+        orchestratorWorkflow: createStubWorkflow(),
+        recordDecision: { execute: vi.fn() } as unknown as RecordDecision,
+        broadcaster: new SseEventBroadcaster(60_000),
+        grafanaWebhookToken: 'grafana-test-token',
+        dashboardApiToken: DASHBOARD_TOKEN,
+        demoRouter: createDemoRouterFactory({
+          repository: localRepo,
+          demoControlPort: { triggerChaos: vi.fn(), reset: vi.fn() },
+          simulateDemoDecision: { execute: vi.fn() } as unknown as SimulateDemoDecision,
+          liveDemoKey: ''
+        })
+      });
+
+      const res = await request(prodApp)
+        .post('/api/demo/chaos')
+        .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+        .send({ mode: IncidentExecutionMode.LIVE });
+      expect(res.status).toBe(HTTP_STATUS.FORBIDDEN);
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
+  });
+
   it('should stream SSE heartbeat and events on GET /api/events with query token', async () => {
     const server = http.createServer(app);
     await new Promise<void>((resolve) => {

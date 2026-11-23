@@ -661,6 +661,7 @@ export class IncidentService {
         this.stopLiveWaitTimer();
         const current = this.currentIncident();
         if (!current || current.id !== payload.incidentId) {
+          this.activeIncidentFetchToken++;
           this.clearVisualStateQueue();
           this.currentIncident.set({
             id: payload.incidentId,
@@ -866,6 +867,21 @@ export class IncidentService {
       }
     } catch (err) {
       this.loadError.set(toErrorMessage(err));
+    }
+  }
+
+  /**
+   * Fetches incident details without mutating War Room selection or applying dismissed guards.
+   */
+  async getIncidentDetail(id: string, baseUrl = ''): Promise<IncidentDetail | null> {
+    try {
+      const res = await fetch(`${baseUrl}/api/incidents/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        return null;
+      }
+      return (await res.json()) as IncidentDetail;
+    } catch {
+      return null;
     }
   }
 

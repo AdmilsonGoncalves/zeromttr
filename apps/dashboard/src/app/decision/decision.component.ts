@@ -75,12 +75,11 @@ export class DecisionComponent implements OnInit {
 
   private async checkIncidentClosed(id: string): Promise<void> {
     try {
-      await this.incidentService.fetchIncident(id);
-      const current = this.incidentService.currentIncident();
-      if (current && current.id === id) {
-        if (current.state === IncidentState.RESOLVED || current.state === IncidentState.REJECTED) {
+      const detail = await this.incidentService.getIncidentDetail(id);
+      if (detail && detail.id === id) {
+        if (detail.state === IncidentState.RESOLVED || detail.state === IncidentState.REJECTED) {
           this.incidentClosed.set(true);
-          this.incidentClosedState.set(current.state);
+          this.incidentClosedState.set(detail.state);
         }
       }
     } catch {

@@ -60,9 +60,10 @@ function extractRequiredExportPatterns(suspectFileContent?: string): RegExp[] {
     const symbolName = match[1];
     if (symbolName && !seen.has(symbolName)) {
       seen.add(symbolName);
+      const escapedSymbol = symbolName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       patterns.push(
         new RegExp(
-          `\\bexport\\s+(?:async\\s+)?(?:class|const|let|function|interface|type|enum)\\s+${symbolName}\\b`
+          `\\bexport\\s+(?:async\\s+)?(?:class|const|let|function|interface|type|enum)\\s+${escapedSymbol}(?![A-Za-z0-9_$])`
         )
       );
     }

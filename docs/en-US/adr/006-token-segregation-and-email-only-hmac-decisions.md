@@ -15,7 +15,7 @@ ZeroMTTR exposes multiple entry points (MCP server, Grafana alert webhook, Dashb
    - `DASHBOARD_API_TOKEN`: injected server-side by the Nginx reverse proxy (`apps/dashboard/nginx.conf.template`) into `/api/*` calls, never embedded in the JavaScript bundle.
 2. **Sign human decisions with HMAC-SHA256** (`DECISION_HMAC_SECRET`) with expiration (`exp`) and binding to `incidentId` and `action` (`approve` | `reject`), using constant-time comparison (`crypto.timingSafeEqual`).
 3. **Transport the signature exclusively in the URL `#fragment`** sent via email through Resend (`/decision/:id#action=approve&sig=...&exp=...`). The `#fragment` is never sent to the server on `GET` requests or written to access logs; `DecisionComponent` reads the fragment in the browser and sends `action`, `sig`, and `exp` in the body of `POST /api/incidents/:id/decision`.
-4. **Never expose** `sig`, `approveSig`, or `rejectSig` in REST responses, SSE events, or structured logs. `POST /api/demo/simulate-decision` is strictly demo-only (not a production human approval path), gated by `DASHBOARD_API_TOKEN`, and for `live` incidents additionally requires `X-Live-Demo-Key` when `LIVE_DEMO_KEY` is set (an empty `LIVE_DEMO_KEY` skips this check).
+4. **Never expose** `sig`, `approveSig`, or `rejectSig` in REST responses, SSE events, or structured logs. `POST /api/demo/simulate-decision` is strictly demo-only (not a production human approval path), gated by `DASHBOARD_API_TOKEN`, and for `live` incidents additionally requires `X-Live-Demo-Key` (`LIVE_DEMO_KEY` fails closed with `403 Forbidden` when empty in `production`, and skips only in local dev/test).
 
 ## Consequences
 

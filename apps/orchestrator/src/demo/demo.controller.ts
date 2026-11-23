@@ -184,19 +184,29 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
       }
 
       try {
+        const failedIncidentIds: string[] = [];
+        if (dependencies.repository) {
+          for (const inc of openIncidents) {
+            try {
+              inc.transition(IncidentState.FAILED, 'Demo reset by operator');
+              await dependencies.repository.save(inc);
+            } catch {
+              failedIncidentIds.push(inc.id);
+            }
+          }
+        }
+
+        if (failedIncidentIds.length > 0) {
+          res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            error: `Failed to transition/save open incidents during reset: ${failedIncidentIds.join(', ')}`,
+            failedIncidentIds
+          });
+          return;
+        }
+
         lastChaosTimestamp = 0;
         lastChaosMode = IncidentExecutionMode.REPLAY;
         dependencies.replayRunner?.stop();
-        if (dependencies.repository) {
-          try {
-            for (const inc of openIncidents) {
-              inc.transition(IncidentState.FAILED, 'Demo reset by operator');
-              await dependencies.repository.save(inc);
-            }
-          } catch {
-            // Non-fatal repository transition error during reset
-          }
-        }
         await dependencies.demoControlPort.reset();
         res.status(HTTP_STATUS.ACCEPTED).json({
           status: HttpResponseStatus.ACCEPTED,

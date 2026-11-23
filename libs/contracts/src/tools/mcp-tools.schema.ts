@@ -104,6 +104,7 @@ export const InspectGitDeployDiffOutputSchema = z.object({
   suspectFilePath: z.string(),
   currentBlobSha: z.string(),
   truncatedPatch: z.string().max(1500),
+  suspectFileContent: z.string().optional(),
   finops: FinOpsMetricsSchema
 });
 

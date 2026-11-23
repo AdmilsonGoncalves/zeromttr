@@ -19,7 +19,7 @@ Because anonymous visitors on the public URL see `Replay` mode by default (for q
 ## 2. Honest Measurement of TTD and TTPR vs. Timed Manual Baseline
 The `scripts/measure-mttr.sh` script reads the transition timestamps from `GET /api/incidents/:id` and computes:
 1. **TTD (*Time to Deterministic Diagnosis*):** `timestamp(REMEDIATING) - timestamp(RECEIVED)` (target: ≤ 15 s).
-2. **TTPR (*Time to Reviewable Pull Request*):** `timestamp(AWAITING_PR/NOTIFIED) - timestamp(RECEIVED)` (target: ≤ 30 s).
+2. **TTPR (*Time to Reviewable Pull Request*):** `timestamp(AWAITING_PR/NOTIFIED) - timestamp(RECEIVED)` — where `AWAITING_PR` is transitioned strictly **after** `createRemediationPr` succeeds and a reviewable PR exists on GitHub (target: ≤ 30 s).
 3. **Time to Post-Mortem Delivered:** `timestamp(NOTIFIED) - timestamp(RECEIVED)` (target: ≤ 45 s).
 
 For a fair comparison in the README, time and record a real manual execution of the same 7 steps performed by an engineer (1. read alert; 2. run PromQL; 3. open exemplar in Tempo; 4. filter Loki by `trace_id`; 5. run `git diff v2.14.7...v2.14.8 -- apps/target-app-demo`; 6. edit `payment.repository.ts` and run tests; 7. create branch and open PR).

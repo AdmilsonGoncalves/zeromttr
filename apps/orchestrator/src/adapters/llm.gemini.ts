@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { RcaAndPatchSynthesisSchema } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber, safeJsonParse } from '@zeromttr/utils';
 import { ReasoningProvider } from '../domain/incident-enums.js';
+import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
 import type {
   ReasoningPort,
   CollectedEvidence,
@@ -175,6 +176,14 @@ Strict instructions for patchedContent:
 - Keep all original imports, types, classes, methods, and exports intact.
 - Apply only the surgical fix for the regression identified in the deploy diff and telemetry, restoring healthy baseline behavior.
 - NEVER truncate, omit methods, or return partial placeholder stubs.`;
+
+    const promptAudit = PiiPromptGuard.inspectAndEnforceFailClosed(prompt);
+    if (!promptAudit.passed) {
+      throw new Error(
+        `Fail-closed PII guard blocked Gemini prompt dispatch (${promptAudit.detectedTypes.join(', ')})`
+      );
+    }
+
     const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 15_000);
 
     const modelsToTry = [this.modelName];
