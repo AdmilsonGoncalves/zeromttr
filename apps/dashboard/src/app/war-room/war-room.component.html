@@ -96,6 +96,22 @@
         }
 
         <!-- Simulator Buttons -->
+        @if (incidentService.activeMode() === 'live') {
+          <p-button
+            [label]="
+              incidentService.targetMetrics()?.healthyTrafficActive
+                ? i18n.t('healthyTrafficStopBtn')
+                : i18n.t('healthyTrafficStartBtn')
+            "
+            [severity]="incidentService.targetMetrics()?.healthyTrafficActive ? 'warn' : 'success'"
+            size="small"
+            [disabled]="incidentService.isTogglingTraffic()"
+            (onClick)="onToggleHealthyTraffic()"
+            [pTooltip]="i18n.t('tooltipHealthyTraffic')"
+            tooltipPosition="bottom"
+            styleClass="text-xs py-1"
+          />
+        }
         <p-button
           [label]="i18n.t('simulateIncident')"
           severity="danger"
@@ -191,6 +207,64 @@
         }}</span>
       </span>
     </div>
+
+    <!-- Live Target App Telemetry Strip -->
+    @if (incidentService.targetMetrics(); as metrics) {
+      <div
+        class="bg-slate-950/90 border border-slate-800 rounded px-2.5 py-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono"
+      >
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+            <i class="pi pi-heart-fill text-[10px] mr-1"></i>
+            {{ i18n.t('targetTelemetryLabel') }}
+          </span>
+          <span class="text-slate-300">
+            {{ i18n.t('targetRpsLabel') }}:
+            <strong class="text-cyan-300">{{ metrics.requestsPerSecond }}</strong>
+          </span>
+          <span class="text-slate-300">
+            {{ i18n.t('targetError5xxLabel') }}:
+            <strong
+              [ngClass]="metrics.errorRate5xxPercent > 0 ? 'text-rose-400' : 'text-emerald-400'"
+            >
+              {{ metrics.errorRate5xxPercent }}%
+            </strong>
+          </span>
+          <span class="text-slate-300">
+            {{ i18n.t('targetP95Label') }}:
+            <strong
+              [ngClass]="metrics.p95LatencyMs >= 1000 ? 'text-amber-300' : 'text-emerald-400'"
+            >
+              {{ metrics.p95LatencyMs }}ms
+            </strong>
+          </span>
+          <span class="text-slate-300">
+            {{ i18n.t('targetPoolLabel') }}:
+            <strong
+              [ngClass]="
+                metrics.poolActive >= metrics.poolMax && metrics.poolMax > 0
+                  ? 'text-rose-400'
+                  : 'text-emerald-400'
+              "
+            >
+              {{ metrics.poolActive }}/{{ metrics.poolMax }}
+            </strong>
+            @if (metrics.poolWaiting > 0) {
+              <span class="text-amber-300 ml-1">(+{{ metrics.poolWaiting }} wait)</span>
+            }
+          </span>
+        </div>
+        <p-tag
+          [value]="
+            metrics.healthyTrafficActive
+              ? i18n.t('healthyTrafficActiveBadge')
+              : i18n.t('healthyTrafficIdleBadge')
+          "
+          [severity]="metrics.healthyTrafficActive ? 'success' : 'secondary'"
+          styleClass="text-[10px] py-0"
+        />
+      </div>
+    }
 
     <!-- Quick KPI Strip -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-slate-800/80">

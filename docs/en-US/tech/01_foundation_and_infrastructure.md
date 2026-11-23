@@ -406,10 +406,11 @@ processors:
           - replace_pattern(body, "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
           # Mask raw JWT without Bearer prefix (starting with eyJ)
           - replace_pattern(body, "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b", "[REDACTED_JWT]")
-          # Mask unformatted 11-digit CPF after token masking so Bearer/JWT tokens are not truncated (supports _ boundary)
-          - replace_pattern(body, "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
-          # Mask email PIX keys in error messages
+          # Mask email PIX keys before 11-digit CPF so numeric local-parts are not split
           - replace_pattern(body, "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "[REDACTED_PIX_EMAIL]")
+          # Mask unformatted 11-digit CPF in two RE2 passes so adjacent underscore-separated CPFs are both masked (e.g., 12345678901_98765432100 -> [REDACTED_CPF][REDACTED_CPF])
+          - replace_pattern(body, "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
+          - replace_pattern(body, "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
           # Mask mobile (9 digits) and landline ([2-5] + 7 digits) phones per ANATEL rules
           - replace_pattern(body, "(?:\\+55\\s?[1-9]{2}\\s?(?:9\\d{8}|[2-5]\\d{7})\\b|(?:\\+?55\\s?)?\\([1-9]{2}\\)\\s?(?:9\\d{4}|[2-5]\\d{3})-?\\d{4}\\b|(?:\\+?55\\s?)?\\b[1-9]{2}\\s?(?:9\\d{4}|[2-5]\\d{3})-\\d{4}\\b)", "[REDACTED_PHONE]")
           # Mask Random PIX Key (EVP / BACEN RFC 4122 UUID v4 in PIX context, case-insensitive across entire pattern)
@@ -419,8 +420,9 @@ processors:
           - replace_all_patterns(attributes, "value", "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
           - replace_all_patterns(attributes, "value", "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
           - replace_all_patterns(attributes, "value", "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b", "[REDACTED_JWT]")
-          - replace_all_patterns(attributes, "value", "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "[REDACTED_PIX_EMAIL]")
+          - replace_all_patterns(attributes, "value", "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
+          - replace_all_patterns(attributes, "value", "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "(?:\\+55\\s?[1-9]{2}\\s?(?:9\\d{8}|[2-5]\\d{7})\\b|(?:\\+?55\\s?)?\\([1-9]{2}\\)\\s?(?:9\\d{4}|[2-5]\\d{3})-?\\d{4}\\b|(?:\\+?55\\s?)?\\b[1-9]{2}\\s?(?:9\\d{4}|[2-5]\\d{3})-\\d{4}\\b)", "[REDACTED_PHONE]")
           - replace_all_patterns(attributes, "value", "(?i:(?:pix(?:_?key)?|chave_?pix|evp)[\"'=:\\s]+[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\b", "pixKey=[REDACTED_PIX_EVP]")
           # Mask Random PIX Key (EVP) when sent directly in a PIX-named attribute

@@ -95,9 +95,12 @@ export function createDashboardAuthMiddleware(dashboardToken: string) {
 export function createLiveDemoKeyMiddleware(configuredKey?: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (isEmpty(configuredKey)) {
-      if (process.env.NODE_ENV === 'production') {
+      const env = process.env.NODE_ENV;
+      const isLocalDevOrTest = !env || env === 'development' || env === 'test';
+      if (!isLocalDevOrTest) {
         res.status(HTTP_STATUS.FORBIDDEN).json({
-          error: 'Forbidden: LIVE_DEMO_KEY must be configured for live execution in production'
+          error:
+            'Forbidden: LIVE_DEMO_KEY must be configured for live execution outside local dev/test'
         });
         return;
       }

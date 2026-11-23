@@ -29,6 +29,16 @@ export class HttpDemoControlAdapter implements DemoControlPort {
     }
   }
 
+  public async toggleHealthyTraffic(enable: boolean): Promise<void> {
+    const url = buildUrl(this.baseUrl, '/chaos/healthy-traffic', {
+      enable: String(enable)
+    });
+    const response = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) });
+    if (!isHttpSuccess(response.status)) {
+      throw new Error(`Target app healthy traffic toggle failed with status ${response.status}`);
+    }
+  }
+
   /**
    * Disables database pool saturation chaos on the target app.
    */

@@ -214,10 +214,12 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.incidentService.connectSse();
     void this.incidentService.fetchTargetStatus();
+    this.incidentService.startTargetStatusPolling();
     void this.incidentService.fetchIncidents();
   }
 
   ngOnDestroy(): void {
+    this.incidentService.stopTargetStatusPolling();
     this.incidentService.disconnectSse();
   }
 
@@ -284,6 +286,29 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       summary: this.i18n.t('toastActionErrorSummary'),
       detail: fallbackDetail,
       life: 6000
+    });
+  }
+
+  /**
+   * Toggles continuous healthy synthetic traffic on the target workload.
+   */
+  async onToggleHealthyTraffic(): Promise<void> {
+    const nextEnable = !(this.incidentService.targetMetrics()?.healthyTrafficActive ?? false);
+    const result = await this.incidentService.toggleHealthyTraffic(nextEnable);
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+
+    this.messageService.add({
+      severity: 'info',
+      summary: this.i18n.t(
+        nextEnable ? 'toastHealthyTrafficStartedSummary' : 'toastHealthyTrafficStoppedSummary'
+      ),
+      detail: this.i18n.t(
+        nextEnable ? 'toastHealthyTrafficStartedDetail' : 'toastHealthyTrafficStoppedDetail'
+      ),
+      life: 4000
     });
   }
 

@@ -343,6 +343,12 @@ export class DispatchRemediation {
       reasoning_source: reasoningSource
     });
 
+    if (!isNonEmptyString(prResult.pullRequestUrl)) {
+      throw new Error(
+        `Remediation PR creation for incident '${incident.id}' returned an empty pullRequestUrl`
+      );
+    }
+
     incident.remediation = {
       ...prResult,
       suspectCommitSha: evidence.gitDiff?.suspectCommit

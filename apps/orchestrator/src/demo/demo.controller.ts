@@ -37,6 +37,13 @@ export const SimulateDecisionPayloadSchema = z.object({
   action: z.enum([DecisionAction.APPROVE, DecisionAction.REJECT])
 });
 
+export const HealthyTrafficPayloadSchema = z
+  .object({
+    enable: z.boolean().optional().default(true)
+  })
+  .optional()
+  .default({ enable: true });
+
 export interface DemoRouterDependencies {
   demoControlPort: DemoControlPort;
   simulateDemoDecision: SimulateDemoDecision;
@@ -273,6 +280,37 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
       })();
     }
   );
+
+  // Toggle continuous healthy synthetic traffic on target workload (protected by X-Live-Demo-Key)
+  router.post('/demo/healthy-traffic', ...authMiddlewares, (req: Request, res: Response): void => {
+    void (async () => {
+      const parsed = HealthyTrafficPayloadSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Invalid healthy traffic payload',
+          details: parsed.error.format()
+        });
+        return;
+      }
+
+      const allowed = await runExpressMiddleware(liveDemoAuth, req, res);
+      if (!allowed) {
+        return;
+      }
+
+      try {
+        await dependencies.demoControlPort.toggleHealthyTraffic(parsed.data.enable);
+        res.status(HTTP_STATUS.OK).json({
+          success: true,
+          healthyTrafficActive: parsed.data.enable
+        });
+      } catch (err) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+          error: toErrorMessage(err, 'Failed to toggle healthy traffic')
+        });
+      }
+    })();
+  });
 
   return router;
 }

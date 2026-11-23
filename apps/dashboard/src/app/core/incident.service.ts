@@ -78,6 +78,8 @@ const VISUAL_STEP_INTERVAL_MS = 450;
 export class IncidentService {
   private eventSource: EventSource | null = null;
   private liveWaitTimer: ReturnType<typeof setInterval> | null = null;
+  private targetStatusPollTimer: ReturnType<typeof setInterval> | null = null;
+  private sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private visualStepTimer: ReturnType<typeof setTimeout> | null = null;
   private visualStateQueue: IncidentState[] = [];
   private readonly dismissedIncidentIds = new Set<string>();
@@ -85,11 +87,13 @@ export class IncidentService {
 
   readonly currentIncident = signal<IncidentDetail | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
+  readonly targetMetrics = computed(() => this.targetStatus()?.metrics ?? null);
   readonly sseConnected = signal<boolean>(false);
   readonly activeMode = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly liveDemoKey = signal<string>('');
   readonly isSimulating = signal<boolean>(false);
   readonly isResetting = signal<boolean>(false);
+  readonly isTogglingTraffic = signal<boolean>(false);
   readonly awaitingIncidentStart = signal<boolean>(false);
   readonly liveWaitSeconds = signal<number>(0);
   readonly stagedSseState = signal<IncidentState | null>(null);
@@ -646,10 +650,16 @@ export class IncidentService {
 
       es.onerror = (): void => {
         this.sseConnected.set(false);
+        if (es.readyState === EventSource.CLOSED && !this.sseReconnectTimer) {
+          this.sseReconnectTimer = setTimeout(() => {
+            this.sseReconnectTimer = null;
+            this.connectSse(baseUrl);
+          }, 3000);
+        }
       };
 
       es.addEventListener('heartbeat', (_evt: MessageEvent) => {
-        // Heartbeat keeps connection alive
+        this.sseConnected.set(true);
       });
 
       es.addEventListener(IncidentEventType.CREATED, (evt: MessageEvent) => {
@@ -843,6 +853,10 @@ export class IncidentService {
   disconnectSse(): void {
     this.stopLiveWaitTimer();
     this.clearVisualStateQueue();
+    if (this.sseReconnectTimer) {
+      clearTimeout(this.sseReconnectTimer);
+      this.sseReconnectTimer = null;
+    }
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
@@ -965,6 +979,95 @@ export class IncidentService {
       // Ignore non-JSON error payloads
     }
     return { error: `HTTP ${res.status}` };
+  }
+
+  /**
+   * Starts periodic polling of `/api/target/status` so live telemetry metrics stay current
+   * and recovers missed incident updates when SSE is offline.
+   */
+  startTargetStatusPolling(baseUrl = '', intervalMs = 2000): void {
+    this.stopTargetStatusPolling();
+    this.targetStatusPollTimer = setInterval(() => {
+      void this.fetchTargetStatus(baseUrl);
+      if (this.awaitingIncidentStart() || !this.sseConnected()) {
+        void this.syncIncidentFallback(baseUrl);
+      }
+    }, intervalMs);
+  }
+
+  private async syncIncidentFallback(baseUrl = ''): Promise<void> {
+    if (this.awaitingIncidentStart()) {
+      try {
+        const res = await fetch(`${baseUrl}/api/incidents`);
+        if (res.ok) {
+          const list = (await res.json()) as Array<{ id: string }>;
+          const latest = Array.isArray(list)
+            ? list.find(
+                (inc) => isNonEmptyString(inc?.id) && !this.dismissedIncidentIds.has(inc.id)
+              )
+            : undefined;
+          if (latest) {
+            this.awaitingIncidentStart.set(false);
+            this.stopLiveWaitTimer();
+            await this.fetchIncident(latest.id, baseUrl);
+          }
+        }
+      } catch {
+        // Ignore transient polling errors
+      }
+      return;
+    }
+
+    const curr = this.currentIncident();
+    if (
+      curr &&
+      curr.state !== IncidentState.RESOLVED &&
+      curr.state !== IncidentState.REJECTED &&
+      curr.state !== IncidentState.FAILED
+    ) {
+      await this.fetchIncident(curr.id, baseUrl);
+    }
+  }
+
+  /**
+   * Stops periodic polling of `/api/target/status`.
+   */
+  stopTargetStatusPolling(): void {
+    if (this.targetStatusPollTimer) {
+      clearInterval(this.targetStatusPollTimer);
+      this.targetStatusPollTimer = null;
+    }
+  }
+
+  /**
+   * Toggles continuous healthy synthetic traffic on the target workload in live mode.
+   */
+  async toggleHealthyTraffic(enable: boolean, baseUrl = ''): Promise<DemoActionResult> {
+    this.isTogglingTraffic.set(true);
+    try {
+      const res = await fetch(`${baseUrl}/api/demo/healthy-traffic`, {
+        method: 'POST',
+        headers: this.buildDemoHeaders(true),
+        body: JSON.stringify({ enable })
+      });
+
+      if (!res.ok) {
+        await this.fetchTargetStatus(baseUrl);
+        const errPayload = await this.readErrorPayload(res);
+        return {
+          ok: false,
+          status: res.status,
+          ...errPayload
+        };
+      }
+
+      await this.fetchTargetStatus(baseUrl);
+      return { ok: true, status: res.status };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err) };
+    } finally {
+      this.isTogglingTraffic.set(false);
+    }
   }
 
   /**

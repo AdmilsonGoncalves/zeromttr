@@ -2,12 +2,19 @@ import type http from 'node:http';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
+import { telemetry } from '../telemetry/otel.js';
+import { requestMetrics } from '../telemetry/request-metrics.js';
+
+const HEALTHY_TRAFFIC_INTERVAL_MS = 1500;
+const HEALTHY_TRAFFIC_BATCH_SIZE = 2;
 
 /**
- * HTTP controller exposing chaos pool-saturation toggles and target status inspection endpoints.
+ * HTTP controller exposing chaos pool-saturation toggles, healthy traffic generation, and target status inspection endpoints.
  */
 export class ChaosController {
   private activeBurstTimers: NodeJS.Timeout[] = [];
+  private healthyTrafficTimer: NodeJS.Timeout | null = null;
+  private healthyTrafficActive = false;
 
   /**
    * Toggles pool saturation chaos mode, resets the pool on recovery, and responds with updated status.
@@ -18,11 +25,18 @@ export class ChaosController {
     enableParam?: string
   ): void {
     const shouldEnable = enableParam === 'true';
-    chaosManager.setPoolSaturation(shouldEnable);
 
     if (!shouldEnable) {
       this.stopSyntheticTrafficBurst();
+      // Reset while degraded version is still active so v2.14.8 gauges drop to 0 in Prometheus
       paymentRepository.resetPool();
+    }
+
+    chaosManager.setPoolSaturation(shouldEnable);
+
+    if (!shouldEnable) {
+      telemetry.recordPoolUsed(0);
+      telemetry.recordPoolWaiting(0);
     } else if (process.env.DEMO_MODE === 'true') {
       this.startSyntheticTrafficBurst();
     }
@@ -32,9 +46,75 @@ export class ChaosController {
       JSON.stringify({
         success: true,
         poolSaturation: shouldEnable,
-        status: chaosManager.getStatus()
+        status: this.buildStatusPayload()
       })
     );
+  }
+
+  /**
+   * Starts or stops continuous healthy synthetic traffic against `POST /payments`.
+   */
+  public toggleHealthyTraffic(
+    _req: http.IncomingMessage,
+    res: http.ServerResponse,
+    enableParam?: string
+  ): void {
+    const shouldEnable = enableParam === 'true';
+    if (shouldEnable) {
+      this.startHealthyTraffic();
+    } else {
+      this.stopHealthyTraffic();
+    }
+
+    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        success: true,
+        healthyTrafficActive: this.healthyTrafficActive,
+        status: this.buildStatusPayload()
+      })
+    );
+  }
+
+  /**
+   * Stops continuous healthy traffic (useful for graceful shutdown and test teardown).
+   */
+  public stopHealthyTraffic(): void {
+    if (this.healthyTrafficTimer) {
+      clearInterval(this.healthyTrafficTimer);
+      this.healthyTrafficTimer = null;
+    }
+    this.healthyTrafficActive = false;
+  }
+
+  private startHealthyTraffic(): void {
+    if (this.healthyTrafficActive && this.healthyTrafficTimer) {
+      return;
+    }
+
+    this.stopHealthyTraffic();
+    this.healthyTrafficActive = true;
+
+    const fireHealthyWave = (): void => {
+      if (!this.healthyTrafficActive) {
+        return;
+      }
+      const port = process.env.PORT || '3001';
+      const targetUrl = `http://127.0.0.1:${port}/payments`;
+      const payload = this.buildSyntheticPaymentPayload('PIX Healthy Stream #OK');
+
+      for (let i = 0; i < HEALTHY_TRAFFIC_BATCH_SIZE; i++) {
+        void fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload
+        }).catch(() => undefined);
+      }
+    };
+
+    fireHealthyWave();
+    this.healthyTrafficTimer = setInterval(fireHealthyWave, HEALTHY_TRAFFIC_INTERVAL_MS);
+    this.healthyTrafficTimer.unref();
   }
 
   private stopSyntheticTrafficBurst(): void {
@@ -44,19 +124,23 @@ export class ChaosController {
     this.activeBurstTimers = [];
   }
 
-  private startSyntheticTrafficBurst(): void {
-    this.stopSyntheticTrafficBurst();
-    const port = process.env.PORT || '3001';
-    const targetUrl = `http://127.0.0.1:${port}/payments`;
-    const syntheticPayload = JSON.stringify({
+  private buildSyntheticPaymentPayload(description: string): string {
+    return JSON.stringify({
       amount: 149.9,
       currency: 'BRL',
       payerCpf: '123.456.789-00',
       merchantCnpj: '12.345.678/0001-99',
       pixKey: 'cliente.silva@exemplo.com.br',
-      description: 'PIX Settlement Burst #TX-9042',
+      description,
       authHeader: 'Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig'
     });
+  }
+
+  private startSyntheticTrafficBurst(): void {
+    this.stopSyntheticTrafficBurst();
+    const port = process.env.PORT || '3001';
+    const targetUrl = `http://127.0.0.1:${port}/payments`;
+    const syntheticPayload = this.buildSyntheticPaymentPayload('PIX Settlement Burst #TX-9042');
 
     const fireWave = (): void => {
       if (!chaosManager.isPoolSaturationEnabled()) {
@@ -79,13 +163,29 @@ export class ChaosController {
     }
   }
 
+  private buildStatusPayload() {
+    const pool = paymentRepository.getPoolStats();
+    const snapshot = requestMetrics.getSnapshot();
+    return {
+      ...chaosManager.getStatus(),
+      metrics: {
+        requestsPerSecond: snapshot.requestsPerSecond,
+        errorRate5xxPercent: snapshot.errorRate5xxPercent,
+        p95LatencyMs: snapshot.p95LatencyMs,
+        poolActive: pool.active,
+        poolWaiting: pool.waiting,
+        poolMax: pool.max,
+        healthyTrafficActive: this.healthyTrafficActive
+      }
+    };
+  }
+
   /**
    * Responds with the current target app chaos status JSON payload.
    */
   public getStatus(_req: http.IncomingMessage, res: http.ServerResponse): void {
-    const status = chaosManager.getStatus();
     res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(status));
+    res.end(JSON.stringify(this.buildStatusPayload()));
   }
 }
 

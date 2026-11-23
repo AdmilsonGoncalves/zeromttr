@@ -80,7 +80,7 @@ describe('PaymentRepository Pool & Regression Suite (v2.14.7 vs v2.14.8)', () =>
     it('should report healthy status with version v2.14.7 when chaos is disabled', async () => {
       const res = await getChaosStatus(server);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({
+      expect(res.body).toMatchObject({
         status: 'healthy',
         service: 'api-pagamentos-core',
         version: 'v2.14.7',
@@ -89,7 +89,11 @@ describe('PaymentRepository Pool & Regression Suite (v2.14.7 vs v2.14.8)', () =>
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
         rawEdgeLogPreCollector: expect.stringContaining(
           'ERROR [api-pagamentos-core] Pool exhausted'
-        )
+        ),
+        metrics: expect.objectContaining({
+          healthyTrafficActive: false,
+          poolMax: 10
+        })
       });
     });
   });

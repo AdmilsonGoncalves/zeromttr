@@ -272,7 +272,7 @@ groups:
     rules:
       - uid: payment-core-high-latency
         title: PaymentCoreHighLatencyOrPoolSaturation
-        condition: C
+        condition: A
         noDataState: OK
         execErrState: Error
         data:

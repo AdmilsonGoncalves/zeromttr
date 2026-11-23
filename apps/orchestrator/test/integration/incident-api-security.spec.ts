@@ -88,6 +88,7 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
 
   const demoControlPort: DemoControlPort = {
     triggerChaos: vi.fn(),
+    toggleHealthyTraffic: vi.fn(),
     reset: vi.fn()
   };
 
@@ -406,7 +407,7 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
         dashboardApiToken: DASHBOARD_TOKEN,
         demoRouter: createDemoRouterFactory({
           repository: localRepo,
-          demoControlPort: { triggerChaos: vi.fn(), reset: vi.fn() },
+          demoControlPort: { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: vi.fn() },
           simulateDemoDecision: { execute: vi.fn() } as unknown as SimulateDemoDecision,
           liveDemoKey: ''
         })
@@ -560,5 +561,72 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
 
     const postEventsRes = await request(app).post(`/api/events?token=${DASHBOARD_TOKEN}`);
     expect(postEventsRes.status).toBe(401);
+  });
+
+  it('should_require_live_demo_key_and_delegate_healthy_traffic_toggle', async () => {
+    const toggleHealthyTraffic = vi.fn(async () => {});
+    const keyedApp = createApp({
+      repository: repo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      grafanaWebhookToken: 'grafana-test-token',
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: repo,
+        demoControlPort: { triggerChaos: vi.fn(), toggleHealthyTraffic, reset: vi.fn() },
+        simulateDemoDecision,
+        liveDemoKey: 'live-secret-key'
+      })
+    });
+
+    const unauthorizedRes = await request(keyedApp)
+      .post('/api/demo/healthy-traffic')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ enable: true });
+    expect(unauthorizedRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(toggleHealthyTraffic).not.toHaveBeenCalled();
+
+    const authorizedRes = await request(keyedApp)
+      .post('/api/demo/healthy-traffic')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'live-secret-key')
+      .send({ enable: true });
+    expect(authorizedRes.status).toBe(HTTP_STATUS.OK);
+    expect(authorizedRes.body).toEqual({ success: true, healthyTrafficActive: true });
+    expect(toggleHealthyTraffic).toHaveBeenCalledWith(true);
+  });
+
+  it('should_fail_closed_when_live_demo_key_is_empty_in_staging', async () => {
+    const prevEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'staging';
+    try {
+      const stagingApp = createApp({
+        repository: repo,
+        targetStatusPort,
+        handleAlert: createStubHandleAlert(repo),
+        orchestratorWorkflow: createStubWorkflow(),
+        recordDecision,
+        broadcaster,
+        grafanaWebhookToken: 'grafana-test-token',
+        dashboardApiToken: DASHBOARD_TOKEN,
+        demoRouter: createDemoRouterFactory({
+          repository: repo,
+          demoControlPort: { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: vi.fn() },
+          simulateDemoDecision,
+          liveDemoKey: ''
+        })
+      });
+
+      const res = await request(stagingApp)
+        .post('/api/demo/chaos')
+        .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+        .send({ mode: IncidentExecutionMode.LIVE });
+      expect(res.status).toBe(HTTP_STATUS.FORBIDDEN);
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
   });
 });
