@@ -51,6 +51,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.incidentService.connectSse();
+    void this.incidentService.fetchDemoConfig();
     void this.incidentService.fetchTargetStatus();
     this.incidentService.startTargetStatusPolling();
     void this.incidentService.fetchIncidents();
@@ -75,6 +76,13 @@ export class WarRoomComponent implements OnInit, OnDestroy {
    */
   onLiveKeyChange(key: string): void {
     this.incidentService.setLiveDemoKey(key);
+  }
+
+  /**
+   * Stores the active Cloudflare Turnstile token in the incident service.
+   */
+  onTurnstileTokenChange(token: string | null): void {
+    this.incidentService.setTurnstileToken(token);
   }
 
   /**

@@ -346,4 +346,61 @@ describe('IncidentService', () => {
 
     fetchSpy.mockRestore();
   });
+
+  it('should_fetch_demo_config_attach_turnstile_header_and_consume_token_after_action', async () => {
+    const service = new IncidentService();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            publicLiveDemo: true,
+            turnstileSiteKey: '0x4AAAAAAATestKey',
+            turnstileRequired: true
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 'accepted', mode: 'live' }), {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'healthy',
+            service: 'api-pagamentos-core',
+            version: 'v2.14.8',
+            previousHealthyVersion: 'v2.14.7'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+    await service.fetchDemoConfig('http://localhost:8080');
+    expect(service.publicLiveDemo()).toBe(true);
+    expect(service.turnstileSiteKey()).toBe('0x4AAAAAAATestKey');
+    expect(service.turnstileRequired()).toBe(true);
+    expect(service.isSimulationLockedByTurnstile()).toBe(true);
+
+    service.setTurnstileToken('cf-token-abc');
+    expect(service.isSimulationLockedByTurnstile()).toBe(false);
+
+    service.setActiveMode('live');
+    const chaosResult = await service.triggerChaos('http://localhost:8080');
+    expect(chaosResult).toEqual({ ok: true, status: 202 });
+
+    const chaosCallInit = fetchSpy.mock.calls[1]?.[1] as RequestInit | undefined;
+    const chaosHeaders = chaosCallInit?.headers as Record<string, string> | undefined;
+    expect(chaosHeaders?.['CF-Turnstile-Response']).toBe('cf-token-abc');
+
+    // Token is single-use and must be cleared + reset counter incremented
+    expect(service.turnstileToken()).toBeNull();
+    expect(service.turnstileResetCounter()).toBe(1);
+    expect(service.isSimulationLockedByTurnstile()).toBe(true);
+
+    fetchSpy.mockRestore();
+  });
 });

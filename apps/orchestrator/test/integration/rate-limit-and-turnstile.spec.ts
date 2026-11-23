@@ -1,0 +1,255 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import nock from 'nock';
+import request from 'supertest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { FileIncidentRepository } from '../../src/adapters/repo.file.js';
+import { createDemoRouterFactory } from '../../src/demo/demo.controller.js';
+import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
+import { IncidentExecutionMode } from '../../src/domain/incident-enums.js';
+import { createApp } from '../../src/http/app.js';
+import { SseEventBroadcaster } from '../../src/http/events.sse.js';
+import {
+  createMockDemoControlPort,
+  createMockTargetStatusPort,
+  createMockToolsPort,
+  createStubHandleAlert,
+  createStubRecordDecision,
+  createStubWorkflow
+} from '../helpers/test-doubles.helper.js';
+
+describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () => {
+  const DASHBOARD_TOKEN = 'test-dashboard-token';
+  let tempDir: string;
+  let repository: FileIncidentRepository;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zeromttr-turnstile-test-'));
+    repository = new FileIncidentRepository(path.join(tempDir, 'incidents.json'));
+    nock.disableNetConnect();
+    nock.enableNetConnect('127.0.0.1');
+  });
+
+  afterEach(() => {
+    nock.cleanAll();
+    nock.enableNetConnect();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function buildTestApp(options: {
+    publicLiveDemo?: boolean;
+    liveDemoKey?: string;
+    turnstileSiteKey?: string;
+    turnstileSecretKey?: string;
+    enableRateLimiting?: boolean;
+  }) {
+    const toolsPort = createMockToolsPort();
+    const broadcaster = new SseEventBroadcaster();
+    const demoControlPort = createMockDemoControlPort();
+    const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster);
+
+    const demoRouter = createDemoRouterFactory({
+      repository,
+      demoControlPort,
+      simulateDemoDecision,
+      liveDemoKey: options.liveDemoKey,
+      publicLiveDemo: options.publicLiveDemo,
+      turnstileSiteKey: options.turnstileSiteKey,
+      turnstileSecretKey: options.turnstileSecretKey,
+      cooldownMs: 0
+    });
+
+    return createApp({
+      repository,
+      targetStatusPort: createMockTargetStatusPort(),
+      handleAlert: createStubHandleAlert(),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: createStubRecordDecision(),
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      grafanaWebhookToken: 'test-grafana-token',
+      demoRouter,
+      enableRateLimiting: options.enableRateLimiting ?? false
+    });
+  }
+
+  it('should expose publicLiveDemo and turnstileSiteKey via GET /api/demo/config', async () => {
+    const app = buildTestApp({
+      publicLiveDemo: true,
+      liveDemoKey: 'secret-key-ignored-when-public',
+      turnstileSiteKey: '0x4AAAAAAATestSiteKey',
+      turnstileSecretKey: '0x4AAAAAAATestSecretKey'
+    });
+
+    const res = await request(app)
+      .get('/api/demo/config')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+
+    expect(res.status).toBe(HTTP_STATUS.OK);
+    expect(res.body).toEqual({
+      publicLiveDemo: true,
+      turnstileSiteKey: '0x4AAAAAAATestSiteKey',
+      turnstileRequired: true
+    });
+  });
+
+  it('should allow live chaos without X-Live-Demo-Key when PUBLIC_LIVE_DEMO=true and Turnstile passes', async () => {
+    nock('https://challenges.cloudflare.com')
+      .post('/turnstile/v0/siteverify')
+      .reply(200, { success: true });
+
+    const app = buildTestApp({
+      publicLiveDemo: true,
+      liveDemoKey: 'configured-secret-key',
+      turnstileSiteKey: '0x4AAAAAAATestSiteKey',
+      turnstileSecretKey: '0x4AAAAAAATestSecretKey'
+    });
+
+    const res = await request(app)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('CF-Turnstile-Response', 'valid-turnstile-token')
+      .set('CF-Connecting-IP', '203.0.113.42')
+      .send({ mode: IncidentExecutionMode.LIVE });
+
+    expect(res.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(res.body.mode).toBe(IncidentExecutionMode.LIVE);
+  });
+
+  it('should reject both live and replay chaos with 403 when Turnstile is configured and token is missing or invalid', async () => {
+    const app = buildTestApp({
+      publicLiveDemo: true,
+      turnstileSiteKey: '0x4AAAAAAATestSiteKey',
+      turnstileSecretKey: '0x4AAAAAAATestSecretKey'
+    });
+
+    const missingRes = await request(app)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.REPLAY });
+
+    expect(missingRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(missingRes.body.error).toContain('Turnstile verification required');
+
+    nock('https://challenges.cloudflare.com')
+      .post('/turnstile/v0/siteverify')
+      .reply(200, { success: false, 'error-codes': ['invalid-input-response'] });
+
+    const invalidRes = await request(app)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('CF-Turnstile-Response', 'expired-or-fake-token');
+
+    expect(invalidRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(invalidRes.body.error).toContain('Turnstile verification rejected');
+  });
+
+  it('should enforce per-IP rate limiting on simulation endpoints using CF-Connecting-IP (IPv4 and IPv6)', async () => {
+    const app = buildTestApp({
+      publicLiveDemo: true,
+      enableRateLimiting: true
+    });
+
+    for (let i = 0; i < 30; i++) {
+      const ipHeader = i % 2 === 0 ? '198.51.100.10' : '::ffff:198.51.100.10';
+      const okRes = await request(app)
+        .post('/api/demo/reset')
+        .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+        .set('CF-Connecting-IP', ipHeader);
+      expect(okRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    }
+
+    const throttledRes = await request(app)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('CF-Connecting-IP', '198.51.100.10');
+
+    expect(throttledRes.status).toBe(HTTP_STATUS.TOO_MANY_REQUESTS);
+    expect(throttledRes.body.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+
+    // Different IPv6 client should still be allowed
+    const otherIpRes = await request(app)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('CF-Connecting-IP', '2001:db8::1');
+    expect(otherIpRes.status).toBe(HTTP_STATUS.ACCEPTED);
+  });
+
+  it('should protect healthy-traffic and simulate-decision with Turnstile and fail closed on siteverify errors', async () => {
+    const app = buildTestApp({
+      publicLiveDemo: true,
+      turnstileSiteKey: '0x4AAAAAAATestSiteKey',
+      turnstileSecretKey: '0x4AAAAAAATestSecretKey'
+    });
+
+    const trafficMissingRes = await request(app)
+      .post('/api/demo/healthy-traffic')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ enable: true });
+    expect(trafficMissingRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+
+    const decisionMissingRes = await request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: 'inc-unknown', action: 'approve' });
+    expect(decisionMissingRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+
+    // Siteverify HTTP 500 must fail closed with 403
+    nock('https://challenges.cloudflare.com').post('/turnstile/v0/siteverify').reply(500);
+    const serverErrRes = await request(app)
+      .post('/api/demo/healthy-traffic')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('CF-Turnstile-Response', 'valid-token')
+      .send({ enable: true });
+    expect(serverErrRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(serverErrRes.body.error).toContain('Turnstile verification failed');
+
+    // Siteverify network error must fail closed with 403
+    nock('https://challenges.cloudflare.com')
+      .post('/turnstile/v0/siteverify')
+      .replyWithError('ECONNRESET');
+    const netErrRes = await request(app)
+      .post('/api/demo/healthy-traffic')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('CF-Turnstile-Response', 'valid-token')
+      .send({ enable: true });
+    expect(netErrRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(netErrRes.body.error).toContain('Turnstile verification unavailable');
+
+    // Valid siteverify allows healthy-traffic
+    nock('https://challenges.cloudflare.com')
+      .post('/turnstile/v0/siteverify')
+      .reply(200, { success: true });
+    const okRes = await request(app)
+      .post('/api/demo/healthy-traffic')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('CF-Turnstile-Response', 'valid-token')
+      .send({ enable: true });
+    expect(okRes.status).toBe(HTTP_STATUS.OK);
+    expect(okRes.body.healthyTrafficActive).toBe(true);
+  });
+
+  it('should extract first client IP from X-Forwarded-For when CF-Connecting-IP is absent', async () => {
+    const app = buildTestApp({
+      publicLiveDemo: true,
+      enableRateLimiting: true
+    });
+
+    for (let i = 0; i < 30; i++) {
+      const okRes = await request(app)
+        .post('/api/demo/reset')
+        .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+        .set('X-Forwarded-For', '203.0.113.77, 10.0.0.1');
+      expect(okRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    }
+
+    const throttledRes = await request(app)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Forwarded-For', '203.0.113.77, 10.0.0.2');
+    expect(throttledRes.status).toBe(HTTP_STATUS.TOO_MANY_REQUESTS);
+  });
+});

@@ -6,6 +6,7 @@ import {
   isSafeRelativePath,
   isString,
   sanitizeWhitespace,
+  stripUnsafeHtml,
   truncate
 } from '../../src/string.utils.js';
 
@@ -84,6 +85,22 @@ describe('string.utils', () => {
     it('should return empty string for falsy/empty values', () => {
       expect(escapeHtml('')).toBe('');
       expect(escapeHtml(null as any)).toBe('');
+    });
+  });
+
+  describe('stripUnsafeHtml', () => {
+    it('should strip script tags, inline event handlers, and javascript: URIs', () => {
+      const dirty =
+        '<div onclick="alert(1)"><script>alert("xss")</script><a href="javascript:void(0)">Link</a><p>Safe</p></div>';
+      const cleaned = stripUnsafeHtml(dirty);
+      expect(cleaned).not.toContain('<script');
+      expect(cleaned).not.toContain('onclick=');
+      expect(cleaned).toContain('blocked:void(0)');
+      expect(cleaned).toContain('<p>Safe</p>');
+    });
+
+    it('should return empty string for empty input', () => {
+      expect(stripUnsafeHtml('')).toBe('');
     });
   });
 

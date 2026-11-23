@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { isEmpty, isNonEmptyString, isString } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 
@@ -92,8 +92,16 @@ export function createDashboardAuthMiddleware(dashboardToken: string) {
 /**
  * Creates Express middleware validating `X-Live-Demo-Key` when configured for public hosts.
  */
-export function createLiveDemoKeyMiddleware(configuredKey?: string) {
+export function createLiveDemoKeyMiddleware(
+  configuredKey?: string,
+  options: { publicLiveDemo?: boolean } = {}
+) {
   return (req: Request, res: Response, next: NextFunction): void => {
+    if (options.publicLiveDemo === true) {
+      next();
+      return;
+    }
+
     if (isEmpty(configuredKey)) {
       const env = process.env.NODE_ENV;
       const isLocalDevOrTest = !env || env === 'development' || env === 'test';

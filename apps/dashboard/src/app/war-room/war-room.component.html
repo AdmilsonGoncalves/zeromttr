@@ -10,6 +10,10 @@
     [activeMode]="incidentService.activeMode()"
     [isWorkflowRunning]="incidentService.isWorkflowRunning()"
     [liveDemoKey]="incidentService.liveDemoKey()"
+    [publicLiveDemo]="incidentService.publicLiveDemo()"
+    [turnstileSiteKey]="incidentService.turnstileSiteKey()"
+    [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"
+    [turnstileResetTrigger]="incidentService.turnstileResetCounter()"
     [healthyTrafficActive]="incidentService.targetMetrics()?.healthyTrafficActive ?? false"
     [isTogglingTraffic]="incidentService.isTogglingTraffic()"
     [isResetting]="incidentService.isResetting()"
@@ -22,6 +26,7 @@
     (modeChange)="onModeChange($event)"
     (liveKeyChange)="onLiveKeyChange($event)"
     (langChange)="onLangChange($event)"
+    (turnstileTokenChange)="onTurnstileTokenChange($event)"
     (toggleHealthyTraffic)="onToggleHealthyTraffic()"
     (triggerChaos)="onTriggerChaos()"
     (resetService)="onResetService()"
@@ -51,6 +56,7 @@
       class="lg:col-span-4 flex flex-col min-h-0"
       [incident]="incidentService.currentIncident()"
       [displayedFsmState]="incidentService.displayedFsmState()"
+      [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"
       (simulateDecision)="onSimulateDecision()"
     />
   </div>

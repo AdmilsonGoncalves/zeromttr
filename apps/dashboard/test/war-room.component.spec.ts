@@ -17,6 +17,7 @@ describe('WarRoomComponent', () => {
     // Mock fetch calls for ngOnInit
     vi.spyOn(incidentService, 'connectSse').mockImplementation(() => {});
     vi.spyOn(incidentService, 'disconnectSse').mockImplementation(() => {});
+    vi.spyOn(incidentService, 'fetchDemoConfig').mockImplementation(async () => {});
     vi.spyOn(incidentService, 'fetchTargetStatus').mockImplementation(async () => {});
     vi.spyOn(incidentService, 'fetchIncidents').mockImplementation(async () => {});
 
@@ -24,11 +25,23 @@ describe('WarRoomComponent', () => {
     component = new WarRoomComponent(i18n, incidentService);
   });
 
-  it('should initialize and connect SSE on ngOnInit', () => {
+  it('should initialize, fetch demo config, and connect SSE on ngOnInit', () => {
     component.ngOnInit();
     expect(incidentService.connectSse).toHaveBeenCalled();
+    expect(incidentService.fetchDemoConfig).toHaveBeenCalled();
     expect(incidentService.fetchTargetStatus).toHaveBeenCalled();
     expect(incidentService.fetchIncidents).toHaveBeenCalled();
+  });
+
+  it('should lock simulations when Turnstile is required until a token is provided', () => {
+    incidentService.turnstileRequired.set(true);
+    expect(incidentService.isSimulationLockedByTurnstile()).toBe(true);
+
+    component.onTurnstileTokenChange('cf-valid-token');
+    expect(incidentService.isSimulationLockedByTurnstile()).toBe(false);
+
+    component.onTurnstileTokenChange(null);
+    expect(incidentService.isSimulationLockedByTurnstile()).toBe(true);
   });
 
   it('should disconnect SSE on ngOnDestroy', () => {

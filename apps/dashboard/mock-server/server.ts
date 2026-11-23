@@ -284,6 +284,19 @@ export class MockServer {
       return;
     }
 
+    // GET /api/demo/config
+    if (req.method === 'GET' && pathname === '/api/demo/config') {
+      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          publicLiveDemo: true,
+          turnstileSiteKey: null,
+          turnstileRequired: false
+        })
+      );
+      return;
+    }
+
     // POST /api/demo/chaos
     if (req.method === 'POST' && pathname === '/api/demo/chaos') {
       const body = await this.parseBody<{ mode?: 'live' | 'replay' }>(req);

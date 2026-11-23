@@ -60,7 +60,12 @@
       [label]="i18n.t('simulateDecisionBtn')"
       severity="warn"
       size="small"
-      [pTooltip]="i18n.t('tooltipSimulateDecision')"
+      [disabled]="simulationLockedByTurnstileSignal()"
+      [pTooltip]="
+        simulationLockedByTurnstileSignal()
+          ? i18n.t('tooltipTurnstilePending')
+          : i18n.t('tooltipSimulateDecision')
+      "
       tooltipPosition="left"
       styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
       (onClick)="simulateDecision.emit()"

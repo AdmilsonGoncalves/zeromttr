@@ -13,6 +13,7 @@ import {
 import {
   DecisionAction,
   type DecisionPayload,
+  type DemoConfigResponse,
   DecisionSource,
   type IncidentCreatedEvent,
   type IncidentDecisionAction,
@@ -92,6 +93,14 @@ export class IncidentService {
   readonly sseConnected = signal<boolean>(false);
   readonly activeMode = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly liveDemoKey = signal<string>('');
+  readonly publicLiveDemo = signal<boolean>(false);
+  readonly turnstileSiteKey = signal<string | null>(null);
+  readonly turnstileRequired = signal<boolean>(false);
+  readonly turnstileToken = signal<string | null>(null);
+  readonly turnstileResetCounter = signal<number>(0);
+  readonly isSimulationLockedByTurnstile = computed<boolean>(
+    () => this.turnstileRequired() && !isNonEmptyString(this.turnstileToken())
+  );
   readonly isSimulating = signal<boolean>(false);
   readonly isResetting = signal<boolean>(false);
   readonly isTogglingTraffic = signal<boolean>(false);
@@ -947,6 +956,39 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Fetches runtime demo configuration (`publicLiveDemo`, `turnstileSiteKey`, `turnstileRequired`).
+   */
+  async fetchDemoConfig(baseUrl = ''): Promise<void> {
+    try {
+      const res = await fetch(`${baseUrl}/api/demo/config`);
+      if (res.ok) {
+        const config = (await res.json()) as Partial<DemoConfigResponse>;
+        this.publicLiveDemo.set(config.publicLiveDemo === true);
+        this.turnstileSiteKey.set(
+          isNonEmptyString(config.turnstileSiteKey) ? config.turnstileSiteKey : null
+        );
+        this.turnstileRequired.set(config.turnstileRequired === true);
+      }
+    } catch {
+      // Keep safe defaults if config endpoint is unavailable
+    }
+  }
+
+  /**
+   * Updates the active Cloudflare Turnstile verification token.
+   */
+  setTurnstileToken(token: string | null): void {
+    this.turnstileToken.set(isNonEmptyString(token) ? token.trim() : null);
+  }
+
+  private consumeTurnstileToken(): void {
+    if (this.turnstileRequired()) {
+      this.turnstileToken.set(null);
+      this.turnstileResetCounter.update((c) => c + 1);
+    }
+  }
+
   private buildDemoHeaders(includeJsonContentType = false): Record<string, string> {
     const headers: Record<string, string> = {};
     if (includeJsonContentType) {
@@ -955,6 +997,10 @@ export class IncidentService {
     const key = this.liveDemoKey();
     if (isNonEmptyString(key)) {
       headers['X-Live-Demo-Key'] = key.trim();
+    }
+    const turnstile = this.turnstileToken();
+    if (isNonEmptyString(turnstile)) {
+      headers['CF-Turnstile-Response'] = turnstile.trim();
     }
     return headers;
   }
@@ -1077,6 +1123,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
+      this.consumeTurnstileToken();
       this.isTogglingTraffic.set(false);
     }
   }
@@ -1126,6 +1173,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
+      this.consumeTurnstileToken();
       this.isSimulating.set(false);
     }
   }
@@ -1170,6 +1218,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
+      this.consumeTurnstileToken();
       this.isResetting.set(false);
     }
   }
@@ -1220,6 +1269,8 @@ export class IncidentService {
       };
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
+    } finally {
+      this.consumeTurnstileToken();
     }
   }
 

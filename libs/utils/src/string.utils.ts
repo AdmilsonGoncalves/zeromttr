@@ -58,6 +58,19 @@ export function escapeHtml(unsafe: string): string {
 }
 
 /**
+ * Strips script tags, inline event handlers, and javascript: URIs from HTML fragments.
+ */
+export function stripUnsafeHtml(html: string): string {
+  if (!html) {
+    return '';
+  }
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript\s*:/gi, 'blocked:');
+}
+
+/**
  * Validates that a file path is repository-relative and safe from directory traversal.
  * Rejects leading slashes, backslashes, empty paths, and '.' or '..' segments.
  */

@@ -121,6 +121,9 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
           simulateDemoDecision,
           replayRunner,
           liveDemoKey: process.env.LIVE_DEMO_KEY,
+          publicLiveDemo: process.env.PUBLIC_LIVE_DEMO === 'true',
+          turnstileSiteKey: process.env.TURNSTILE_SITE_KEY,
+          turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY,
           cooldownMs: demoCooldownMs
         });
 

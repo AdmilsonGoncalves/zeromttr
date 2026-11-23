@@ -77,6 +77,9 @@ export interface TranslationDictionary {
   hmacExpiredError: string;
   toastLiveKeyRequiredSummary: string;
   toastLiveKeyRequiredDetail: string;
+  turnstilePendingNotice: string;
+  turnstileVerifiedBadge: string;
+  tooltipTurnstilePending: string;
   toastCooldownSummary: string;
   toastCooldownDetail: string;
   toastCooldownDetailWithSeconds: string;
@@ -232,6 +235,10 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   toastLiveKeyRequiredSummary: 'Chave Live inválida ou não informada',
   toastLiveKeyRequiredDetail:
     'Informe a chave X-Live-Demo-Key válida para executar ações no Modo Live.',
+  turnstilePendingNotice:
+    'Complete a verificação anti-robô (Cloudflare Turnstile) para habilitar os controles de simulação.',
+  turnstileVerifiedBadge: 'Humano verificado',
+  tooltipTurnstilePending: 'Aguardando conclusão do desafio Cloudflare Turnstile.',
   toastCooldownSummary: 'Cooldown ativo',
   toastCooldownDetail: 'Aguarde o intervalo de cooldown antes de disparar outro incidente.',
   toastCooldownDetailWithSeconds:
@@ -401,6 +408,10 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   toastLiveKeyRequiredSummary: 'Live key invalid or not provided',
   toastLiveKeyRequiredDetail:
     'Provide a valid X-Live-Demo-Key to trigger actions in Live API Mode.',
+  turnstilePendingNotice:
+    'Complete the Cloudflare Turnstile verification challenge to enable simulation controls.',
+  turnstileVerifiedBadge: 'Human verified',
+  tooltipTurnstilePending: 'Awaiting Cloudflare Turnstile challenge completion.',
   toastCooldownSummary: 'Cooldown active',
   toastCooldownDetail: 'Please wait for the cooldown window before triggering another incident.',
   toastCooldownDetailWithSeconds:

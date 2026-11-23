@@ -9,19 +9,12 @@ import {
   signal
 } from '@angular/core';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { escapeHtml, isNonEmptyString } from '@zeromttr/utils';
+import { escapeHtml, isNonEmptyString, stripUnsafeHtml } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { Tag } from 'primeng/tag';
 import { Tooltip } from 'primeng/tooltip';
 import { IncidentState, NotificationStatus, type IncidentDetail } from '../../core/contract.js';
 import { I18nService } from '../../core/i18n.service.js';
-
-function stripUnsafeHtml(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/javascript\s*:/gi, 'blocked:');
-}
 
 /**
  * Right War Room quadrant displaying GitHub PR status, Resend post-mortem preview, and human decision controls.
@@ -38,6 +31,7 @@ export class RemediationPanelComponent {
 
   readonly incidentSignal = signal<IncidentDetail | null>(null);
   readonly displayedFsmStateSignal = signal<IncidentState | undefined>(undefined);
+  readonly simulationLockedByTurnstileSignal = signal<boolean>(false);
 
   @Input()
   set incident(value: IncidentDetail | null) {
@@ -47,6 +41,11 @@ export class RemediationPanelComponent {
   @Input()
   set displayedFsmState(value: IncidentState | undefined) {
     this.displayedFsmStateSignal.set(value);
+  }
+
+  @Input()
+  set simulationLockedByTurnstile(value: boolean) {
+    this.simulationLockedByTurnstileSignal.set(value);
   }
 
   @Output() readonly simulateDecision = new EventEmitter<void>();

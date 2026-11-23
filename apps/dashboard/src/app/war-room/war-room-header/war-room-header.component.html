@@ -63,7 +63,7 @@
         styleClass="text-[10px]"
       />
 
-      @if (activeModeSignal() === 'live') {
+      @if (activeModeSignal() === 'live' && !publicLiveDemoSignal()) {
         <form (submit)="$event.preventDefault()" class="inline-flex m-0 p-0">
           <input
             type="text"
@@ -97,9 +97,13 @@
           "
           [severity]="healthyTrafficActiveSignal() ? 'warn' : 'success'"
           size="small"
-          [disabled]="isTogglingTrafficSignal()"
+          [disabled]="isTogglingTrafficSignal() || simulationLockedByTurnstileSignal()"
           (onClick)="toggleHealthyTraffic.emit()"
-          [pTooltip]="i18n.t('tooltipHealthyTraffic')"
+          [pTooltip]="
+            simulationLockedByTurnstileSignal()
+              ? i18n.t('tooltipTurnstilePending')
+              : i18n.t('tooltipHealthyTraffic')
+          "
           tooltipPosition="bottom"
           styleClass="text-xs py-1"
         />
@@ -108,9 +112,13 @@
         [label]="i18n.t('simulateIncident')"
         severity="danger"
         size="small"
-        [disabled]="isWorkflowRunningSignal()"
+        [disabled]="isWorkflowRunningSignal() || simulationLockedByTurnstileSignal()"
         (onClick)="triggerChaos.emit()"
-        [pTooltip]="i18n.t('tooltipSimulateIncident')"
+        [pTooltip]="
+          simulationLockedByTurnstileSignal()
+            ? i18n.t('tooltipTurnstilePending')
+            : i18n.t('tooltipSimulateIncident')
+        "
         tooltipPosition="bottom"
         styleClass="text-xs py-1"
       />
@@ -118,9 +126,15 @@
         [label]="i18n.t('restoreService')"
         severity="secondary"
         size="small"
-        [disabled]="isResettingSignal() || isSimulatingSignal()"
+        [disabled]="
+          isResettingSignal() || isSimulatingSignal() || simulationLockedByTurnstileSignal()
+        "
         (onClick)="resetService.emit()"
-        [pTooltip]="i18n.t('tooltipRestoreService')"
+        [pTooltip]="
+          simulationLockedByTurnstileSignal()
+            ? i18n.t('tooltipTurnstilePending')
+            : i18n.t('tooltipRestoreService')
+        "
         tooltipPosition="bottom"
         styleClass="text-xs py-1"
       />
@@ -145,6 +159,24 @@
     >
       <i class="pi pi-info-circle text-amber-400"></i>
       <span>{{ i18n.t('replayNotice') }}</span>
+    </div>
+  }
+
+  <!-- Cloudflare Turnstile Verification Gate when configured -->
+  @if (turnstileSiteKeySignal()) {
+    <div
+      class="bg-slate-950/90 border border-slate-700/80 rounded px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-2"
+    >
+      <div class="flex items-center gap-2 text-xs">
+        @if (simulationLockedByTurnstileSignal()) {
+          <i class="pi pi-lock text-amber-400"></i>
+          <span class="text-amber-200">{{ i18n.t('turnstilePendingNotice') }}</span>
+        } @else {
+          <i class="pi pi-verified text-emerald-400"></i>
+          <span class="text-emerald-300 font-semibold">{{ i18n.t('turnstileVerifiedBadge') }}</span>
+        }
+      </div>
+      <div #turnstileContainer class="shrink-0"></div>
     </div>
   }
 
