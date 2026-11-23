@@ -97,6 +97,7 @@ export interface GitDeployDiffOutput {
   currentBlobSha: string;
   truncatedPatch: string;
   finops: FinOpsData;
+  suspectFileContent?: string;
 }
 
 export interface CreateRemediationPrInput {

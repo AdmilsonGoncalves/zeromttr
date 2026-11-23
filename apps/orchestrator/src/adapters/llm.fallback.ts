@@ -144,6 +144,17 @@ export class DeterministicFallbackReasoningAdapter implements ReasoningPort {
       return githubBaseline;
     }
 
+    if (fs.existsSync(suspectFilePath)) {
+      try {
+        const localContent = fs.readFileSync(suspectFilePath, 'utf-8');
+        if (isNonEmptyString(localContent)) {
+          return localContent;
+        }
+      } catch {
+        // Fall through
+      }
+    }
+
     const commitSha = evidence.gitDiff?.suspectCommit || OrchestratorDefault.UNKNOWN;
     const diffExcerpt = isNonEmptyString(evidence.gitDiff?.patch)
       ? evidence.gitDiff.patch

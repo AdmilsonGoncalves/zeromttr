@@ -166,7 +166,7 @@ export type IncidentNotification = z.infer<typeof IncidentNotificationSchema>;
 export const IncidentSummarySchema = z.object({
   id: z.string(),
   service: z.string(),
-  severity: z.string(),
+  severity: AlertSeveritySchema,
   state: IncidentStateSchema,
   mode: IncidentModeSchema.optional(),
   startedAt: z.string()
@@ -217,7 +217,7 @@ export type ChaosPayload = z.infer<typeof ChaosPayloadSchema>;
 export const IncidentCreatedEventSchema = z.object({
   incidentId: z.string(),
   service: z.string(),
-  severity: z.string(),
+  severity: AlertSeveritySchema,
   mode: IncidentModeSchema,
   at: z.string()
 });

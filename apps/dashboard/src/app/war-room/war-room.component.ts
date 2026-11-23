@@ -10,7 +10,14 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { isFilled, isNonEmptyString, isObject, isString, safeJsonParse } from '@zeromttr/utils';
+import {
+  escapeHtml,
+  isFilled,
+  isNonEmptyString,
+  isObject,
+  isString,
+  safeJsonParse
+} from '@zeromttr/utils';
 import { MessageService } from 'primeng/api';
 import { SelectButton } from 'primeng/selectbutton';
 import { Tag } from 'primeng/tag';
@@ -144,7 +151,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       <div style="font-family: sans-serif; color: #cbd5e1;">
         <h3 style="color: #34d399; margin-top: 0; font-size: 12px;">✅ ${this.i18n.t('resendDispatchedBadge')}</h3>
         <p style="font-size: 11px; margin-bottom: 4px;">${this.i18n.t('resendDispatchedBody')}</p>
-        <p style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${notification.emailId}</p>
+        <p style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${escapeHtml(notification.emailId ?? '')}</p>
       </div>
     `;
       return this.sanitizer.bypassSecurityTrustHtml(dispatchedHtml);
@@ -319,7 +326,11 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
 
-    await this.incidentService.resetChaos('', false);
+    const resetResult = await this.incidentService.resetChaos('', false);
+    if (!resetResult.ok) {
+      this.notifyActionError(resetResult);
+      return;
+    }
 
     this.messageService.add({
       severity: 'success',

@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { computed, Injectable, signal } from '@angular/core';
 import {
   diffInSeconds,
   isFilled,
@@ -69,6 +69,7 @@ export class IncidentService {
   private visualStepTimer: ReturnType<typeof setTimeout> | null = null;
   private visualStateQueue: IncidentState[] = [];
   private readonly dismissedIncidentIds = new Set<string>();
+  private activeIncidentFetchToken = 0;
 
   readonly currentIncident = signal<IncidentDetail | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
@@ -81,6 +82,8 @@ export class IncidentService {
   readonly liveWaitSeconds = signal<number>(0);
   readonly stagedSseState = signal<IncidentState | null>(null);
   readonly decisionStatus = signal<'idle' | 'loading' | 'success' | 'error'>('idle');
+  readonly decisionStatusCode = signal<number | null>(null);
+  readonly decisionError = signal<string | null>(null);
   readonly loadError = signal<string | null>(null);
 
   readonly displayedFsmState = computed<IncidentState | undefined>(() => {
@@ -210,7 +213,7 @@ export class IncidentService {
       {
         state: currentState === 'REJECTED' ? 'REJECTED' : 'RESOLVED',
         labelKey: currentState === 'REJECTED' ? 'fsmRejectedLabel' : 'fsmResolvedLabel',
-        tooltipKey: 'fsmResolvedTip'
+        tooltipKey: currentState === 'REJECTED' ? 'fsmRejectedTip' : 'fsmResolvedTip'
       }
     ];
 
@@ -789,17 +792,25 @@ export class IncidentService {
    * Fetches full details for a specific incident by ID.
    */
   async fetchIncident(id: string, baseUrl = ''): Promise<void> {
+    const token = ++this.activeIncidentFetchToken;
     try {
       const res = await fetch(`${baseUrl}/api/incidents/${encodeURIComponent(id)}`);
+      if (token !== this.activeIncidentFetchToken) {
+        return;
+      }
       if (res.ok) {
         const detail = (await res.json()) as IncidentDetail;
-        this.currentIncident.set(detail);
-        this.loadError.set(null);
+        if (token === this.activeIncidentFetchToken) {
+          this.currentIncident.set(detail);
+          this.loadError.set(null);
+        }
       } else {
         this.loadError.set(`Failed to fetch incident ${id}: HTTP ${res.status}`);
       }
     } catch (err) {
-      this.loadError.set(toErrorMessage(err));
+      if (token === this.activeIncidentFetchToken) {
+        this.loadError.set(toErrorMessage(err));
+      }
     }
   }
 
@@ -864,11 +875,13 @@ export class IncidentService {
 
     try {
       const mode = this.activeMode();
+      const previousIncident = this.currentIncident();
       const res = await fetch(`${baseUrl}/api/demo/chaos`, {
         method: 'POST',
         headers: this.buildDemoHeaders(true),
         body: JSON.stringify({ mode })
       });
+
       if (!res.ok) {
         await this.fetchTargetStatus(baseUrl);
         const errPayload = await this.readErrorPayload(res);
@@ -879,18 +892,20 @@ export class IncidentService {
         };
       }
 
-      const current = this.currentIncident();
-      if (current) {
-        this.dismissedIncidentIds.add(current.id);
+      if (previousIncident) {
+        this.dismissedIncidentIds.add(previousIncident.id);
       }
+
       this.clearVisualStateQueue();
       this.currentIncident.set(null);
       this.awaitingIncidentStart.set(true);
+
       if (mode === 'live') {
         this.startLiveWaitTimer();
       } else {
         this.stopLiveWaitTimer();
       }
+
       await this.fetchTargetStatus(baseUrl);
       return { ok: true, status: res.status };
     } catch (err) {
@@ -911,6 +926,15 @@ export class IncidentService {
         headers: this.buildDemoHeaders()
       });
       await this.fetchTargetStatus(baseUrl);
+      if (!res.ok) {
+        const errPayload = await this.readErrorPayload(res);
+        return {
+          ok: false,
+          status: res.status,
+          ...errPayload
+        };
+      }
+
       if (clearIncident) {
         const current = this.currentIncident();
         if (current) {
@@ -925,14 +949,6 @@ export class IncidentService {
         if (current) {
           await this.fetchIncident(current.id, baseUrl);
         }
-      }
-      if (!res.ok) {
-        const errPayload = await this.readErrorPayload(res);
-        return {
-          ok: false,
-          status: res.status,
-          ...errPayload
-        };
       }
       return { ok: true, status: res.status };
     } catch (err) {
@@ -1009,14 +1025,20 @@ export class IncidentService {
         }
       );
 
+      this.decisionStatusCode.set(res.status);
       if (res.ok) {
         this.decisionStatus.set('success');
+        this.decisionError.set(null);
         return true;
       }
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
       this.decisionStatus.set('error');
+      this.decisionError.set(data?.error ?? null);
       return false;
-    } catch {
+    } catch (err) {
       this.decisionStatus.set('error');
+      this.decisionStatusCode.set(null);
+      this.decisionError.set(toErrorMessage(err));
       return false;
     }
   }

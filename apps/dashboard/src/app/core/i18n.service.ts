@@ -63,6 +63,9 @@ export interface TranslationDictionary {
   decisionRejectBtn: string;
   decisionSuccessMsg: string;
   decisionErrorMsg: string;
+  decisionAlreadyResolvedError: string;
+  decisionAlreadyClosedBanner: string;
+  decisionConfirmationHelp: string;
   decisionTokenSecurityNote: string;
   backToWarRoom: string;
   awaitingAuditBadge: string;
@@ -110,6 +113,7 @@ export interface TranslationDictionary {
   fsmResolvedLabel: string;
   fsmResolvedTip: string;
   fsmRejectedLabel: string;
+  fsmRejectedTip: string;
   fsmFailedLabel: string;
   fsmHintIdle: string;
   fsmHintAwaitingAlert: string;
@@ -190,6 +194,12 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   decisionRejectBtn: 'Rejeitar Hotfix',
   decisionSuccessMsg: 'Decisão registrada com sucesso via HMAC assinado!',
   decisionErrorMsg: 'Falha ao validar assinatura HMAC ou link expirado.',
+  decisionAlreadyResolvedError:
+    'Este incidente já foi encerrado anteriormente (status RESOLVED ou REJECTED).',
+  decisionAlreadyClosedBanner:
+    'Este incidente já foi processado e encontra-se encerrado. Novas ações não são permitidas.',
+  decisionConfirmationHelp:
+    'Por segurança e conformidade com RFC 7231, a confirmação na página é necessária para evitar que rastreadores de e-mail acionem o hotfix automaticamente.',
   decisionTokenSecurityNote:
     'Nota de Segurança: O token de decisão trafega exclusivamente pelo hash da URL (#fragment) e nunca é exposto em logs HTTP ou servidores intermediários.',
   backToWarRoom: 'Voltar ao War Room Dashboard',
@@ -249,6 +259,7 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   fsmResolvedLabel: '7. Resolvido',
   fsmResolvedTip: 'Decisão humana registrada e incidente encerrado com sucesso.',
   fsmRejectedLabel: '7. Rejeitado',
+  fsmRejectedTip: 'Decisão de rejeição registrada pelo operador.',
   fsmFailedLabel: 'Falhou',
   fsmHintIdle: 'Pronto — escolha o modo acima e clique em "Simular Incidente" para iniciar.',
   fsmHintAwaitingAlert:
@@ -331,6 +342,12 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   decisionRejectBtn: 'Reject Hotfix',
   decisionSuccessMsg: 'Decision successfully registered via signed HMAC!',
   decisionErrorMsg: 'Failed to validate HMAC signature or link has expired.',
+  decisionAlreadyResolvedError:
+    'This incident has already been closed (status RESOLVED or REJECTED).',
+  decisionAlreadyClosedBanner:
+    'This incident has already been processed and is closed. Further actions are disabled.',
+  decisionConfirmationHelp:
+    'For security and RFC 7231 compliance, explicit confirmation on this page is required to prevent email scanner bots from triggering hotfixes automatically.',
   decisionTokenSecurityNote:
     'Security Note: The decision token travels strictly inside the URL hash (#fragment) and is never exposed to HTTP logs or proxy servers.',
   backToWarRoom: 'Back to War Room Dashboard',
@@ -388,6 +405,7 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   fsmResolvedLabel: '7. Resolved',
   fsmResolvedTip: 'Human decision recorded and incident closed successfully.',
   fsmRejectedLabel: '7. Rejected',
+  fsmRejectedTip: 'Hotfix rejected by on-call engineer.',
   fsmFailedLabel: 'Failed',
   fsmHintIdle: 'Ready — choose a mode above and click "Simulate Incident" to start.',
   fsmHintAwaitingAlert:

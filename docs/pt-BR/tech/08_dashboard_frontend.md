@@ -10,7 +10,7 @@
 | Framework | **Angular (última versão estável)** — Standalone Components, Signals, control flow `@if/@for`, `--ssr=false` |
 | UI Components | **PrimeNG** (`primeng`, `@primeuix/themes` preset **Aura Dark**, `primeicons`) |
 | Estilo | **Tailwind CSS v4** + `tailwindcss-primeui` (`slate-950` de fundo, `border-slate-800`) |
-| Componentes utilizados | `p-toolbar`, `p-selectbutton`, `p-tag`, `p-button`, `p-timeline`, `p-tabs`, `p-progressbar`, `p-card`, `p-dialog` (usando elementos nativos estilizados com Tailwind para a árvore de spans e console de logs a fim de reduzir complexidade) |
+| Componentes utilizados | `p-selectbutton`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (barra de FSM horizontal e elementos nativos estilizados com Tailwind para a árvore de spans e console de logs a fim de reduzir complexidade) |
 | Internacionalização (i18n) | **Signal estático (`I18nService`)** em arquivo único (~40 linhas, zero dependências externas) com seletor `<p-selectbutton>` (`🇧🇷 PT` \| `🇺🇸 EN`) no Header |
 | Servidor Mock | `apps/dashboard/mock-server/` (Node puro) emitindo SSE e REST conforme o contrato da §4 |
 

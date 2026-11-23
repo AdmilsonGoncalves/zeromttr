@@ -169,16 +169,20 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
         lastChaosMode = IncidentExecutionMode.REPLAY;
         dependencies.replayRunner?.stop();
         if (dependencies.repository) {
-          const incidents = await dependencies.repository.findAll();
-          for (const inc of incidents) {
-            if (
-              inc.state !== IncidentState.RESOLVED &&
-              inc.state !== IncidentState.REJECTED &&
-              inc.state !== IncidentState.FAILED
-            ) {
-              inc.transition(IncidentState.FAILED, 'Demo reset by operator');
-              await dependencies.repository.save(inc);
+          try {
+            const incidents = await dependencies.repository.findAll();
+            for (const inc of incidents) {
+              if (
+                inc.state !== IncidentState.RESOLVED &&
+                inc.state !== IncidentState.REJECTED &&
+                inc.state !== IncidentState.FAILED
+              ) {
+                inc.transition(IncidentState.FAILED, 'Demo reset by operator');
+                await dependencies.repository.save(inc);
+              }
             }
+          } catch {
+            // Non-fatal repository transition error during reset
           }
         }
         await dependencies.demoControlPort.reset();

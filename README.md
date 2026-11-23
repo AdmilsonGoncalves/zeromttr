@@ -137,7 +137,7 @@ Against the 7-step manual baseline (1. alert triage → 2. PromQL query → 3. T
 | **Local Live LGTM** (`inc-d7a8aa3e`, fallback mode without external API keys) | `1.03s` (target `<= 15s`)       | `1.06s` (target `<= 30s`)        | `n/a` (stopped at `401` on GitHub PR without `GITHUB_TOKEN`) | `66.14%` (`5,014` est. tokens) | `passed: true` |
 
 - **LGTM Load Stability (`./scripts/load-test-lgtm.sh`):** `1,462` Prometheus histogram observations across 9 buckets, `zeromttr-otel-collector` stable at `91.77 MiB` (`GOMEMLIMIT=200MiB`), total memory across all 10 containers at `986.8 MiB` (`<= 2,200 MiB`, zero OOMKills).
-- **Live Demo Video (3 min, en-US):** _Pending final Live Mode recording (see [07_demo_and_delivery.md](./docs/pt-BR/tech/07_demo_and_delivery.md) §1 for the exact 3-minute storyboard)._
+- **Live Demo Video (3 min, en-US):** _Pending final Live Mode recording (see [07_demo_and_delivery.md](./docs/en-US/tech/07_demo_and_delivery.md) §1 for the exact 3-minute storyboard)._
 
 ---
 
@@ -177,11 +177,13 @@ Local endpoints:
 
 ## 8. Documentation
 
-- [Architecture Master Document (pt-BR)](./docs/pt-BR/00_architecture_master.md)
-- [System Diagrams & Flows (pt-BR)](./docs/pt-BR/01_system_diagrams.md)
-- [Architecture Decision Records — ADRs 001–009 (pt-BR)](./docs/pt-BR/adr/README.md)
-- [Phase 5 Baseline & Load Measurements (pt-BR)](./docs/pt-BR/phase-5-baseline.md)
-- [Technical Specifications (`docs/pt-BR/tech/`)](./docs/pt-BR/tech/)
+- [English Documentation Index (`docs/en-US/README.md`)](./docs/en-US/README.md)
+- [Architecture Master Document (en-US)](./docs/en-US/00_architecture_master.md)
+- [System Diagrams & Flows (en-US)](./docs/en-US/01_system_diagrams.md)
+- [Architecture Decision Records — ADRs 001–009 (en-US)](./docs/en-US/adr/README.md)
+- [Phase 5 Baseline & Load Measurements (en-US)](./docs/en-US/phase-5-baseline.md)
+- [Technical Specifications (`docs/en-US/tech/`)](./docs/en-US/tech/)
+- [Portuguese Documentation (`docs/pt-BR/`)](./docs/pt-BR/00_architecture_master.md)
 - [Contributing Guide](./CONTRIBUTING.md)
 - [Security Policy](./SECURITY.md)
 - [Coding Agent Guidelines](./AGENTS.md)

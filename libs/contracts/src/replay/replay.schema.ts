@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  AlertSeveritySchema,
   IncidentDocSchema,
   IncidentEventType,
   IncidentNotificationSchema,
@@ -50,7 +51,7 @@ export const ReplaySnapshotSchema = z.object({
   recordedAt: z.string(),
   incidentId: z.string().min(1),
   service: z.string().min(1),
-  severity: z.string().min(1),
+  severity: AlertSeveritySchema,
   evidenceCoverage: z.object({
     score: z.number().min(0).max(100),
     signalsCollected: z.number().int().nonnegative(),

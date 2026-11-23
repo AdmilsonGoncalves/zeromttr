@@ -7,6 +7,8 @@ import { paymentRepository } from '../repositories/payment.repository.js';
  * HTTP controller exposing chaos pool-saturation toggles and target status inspection endpoints.
  */
 export class ChaosController {
+  private activeBurstTimers: NodeJS.Timeout[] = [];
+
   /**
    * Toggles pool saturation chaos mode, resets the pool on recovery, and responds with updated status.
    */
@@ -19,6 +21,7 @@ export class ChaosController {
     chaosManager.setPoolSaturation(shouldEnable);
 
     if (!shouldEnable) {
+      this.stopSyntheticTrafficBurst();
       paymentRepository.resetPool();
     } else if (process.env.DEMO_MODE === 'true') {
       this.startSyntheticTrafficBurst();
@@ -34,7 +37,15 @@ export class ChaosController {
     );
   }
 
+  private stopSyntheticTrafficBurst(): void {
+    for (const timer of this.activeBurstTimers) {
+      clearTimeout(timer);
+    }
+    this.activeBurstTimers = [];
+  }
+
   private startSyntheticTrafficBurst(): void {
+    this.stopSyntheticTrafficBurst();
     const port = process.env.PORT || '3001';
     const targetUrl = `http://127.0.0.1:${port}/payments`;
     const syntheticPayload = JSON.stringify({
@@ -62,7 +73,9 @@ export class ChaosController {
 
     fireWave();
     for (const delayMs of [3000, 6000, 9000, 12000, 15000]) {
-      setTimeout(fireWave, delayMs).unref();
+      const timer = setTimeout(fireWave, delayMs);
+      timer.unref();
+      this.activeBurstTimers.push(timer);
     }
   }
 

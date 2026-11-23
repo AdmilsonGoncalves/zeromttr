@@ -125,4 +125,49 @@ describe('DecisionComponent', () => {
     await component.executeDecision();
     expect(component.status()).toBe('error');
   });
+
+  it('should display decisionAlreadyResolvedError and mark incidentClosed when backend returns 409 Conflict', async () => {
+    const futureExp = Math.floor(Date.now() / 1000) + 3600;
+    (globalThis as unknown as { window: { location: { hash: string } } }).window = {
+      location: { hash: `#action=reject&sig=hmac_valid&exp=${futureExp}` }
+    };
+
+    vi.spyOn(incidentService, 'submitDecision').mockImplementation(async () => {
+      incidentService.decisionStatusCode.set(409);
+      incidentService.decisionError.set(
+        'Cannot record decision on incident because its state is already RESOLVED'
+      );
+      return false;
+    });
+
+    component.ngOnInit();
+    await component.executeDecision();
+
+    expect(component.status()).toBe('error');
+    expect(component.incidentClosed()).toBe(true);
+    expect(component.errorMessage()).toContain('já foi encerrado anteriormente');
+  });
+
+  it('should detect already resolved incident during checkIncidentClosed and set incidentClosed', async () => {
+    const futureExp = Math.floor(Date.now() / 1000) + 3600;
+    (globalThis as unknown as { window: { location: { hash: string } } }).window = {
+      location: { hash: `#action=approve&sig=hmac_valid&exp=${futureExp}` }
+    };
+
+    vi.spyOn(incidentService, 'fetchIncident').mockImplementation(async () => {
+      incidentService.currentIncident.set({
+        id: 'inc-20261110-001',
+        service: 'api-pagamentos-core',
+        state: 'RESOLVED',
+        decision: 'approve'
+      } as any);
+    });
+
+    component.ngOnInit();
+    // Allow checkIncidentClosed promise to resolve
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(component.incidentClosed()).toBe(true);
+    expect(component.incidentClosedState()).toBe('RESOLVED');
+  });
 });

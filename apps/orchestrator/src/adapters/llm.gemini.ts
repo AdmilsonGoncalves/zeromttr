@@ -154,7 +154,27 @@ export class GeminiReasoningAdapter implements ReasoningPort {
       throw new Error('Gemini API key is not configured');
     }
 
-    const prompt = `Analyze the incident evidence and synthesize the RCA and surgical patch:\n${JSON.stringify(evidence, null, 2)}`;
+    const suspectFileHeader = isNonEmptyString(evidence.gitDiff?.suspectFileContent)
+      ? `Existing source code of '${evidence.gitDiff.suspectFilePath}':\n\`\`\`typescript\n${evidence.gitDiff.suspectFileContent}\n\`\`\`\n\n`
+      : '';
+
+    const sanitizedEvidenceForPrompt = {
+      ...evidence,
+      gitDiff: {
+        ...evidence.gitDiff,
+        suspectFileContent: undefined
+      }
+    };
+
+    const prompt = `Analyze the incident telemetry and deploy diff, then synthesize the RCA and surgical patch:
+${suspectFileHeader}Incident Telemetry & Evidence:
+${JSON.stringify(sanitizedEvidenceForPrompt, null, 2)}
+
+Strict instructions for patchedContent:
+- Return the COMPLETE source code file.
+- Keep all original imports, types, classes, methods, and exports intact.
+- Apply only the surgical fix for the regression identified in the deploy diff/telemetry (restore pool capacity to 10 and ensure client.release() is called in a finally block).
+- NEVER truncate, omit methods, or return partial placeholder stubs.`;
     const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 15_000);
 
     const modelsToTry = [this.modelName];

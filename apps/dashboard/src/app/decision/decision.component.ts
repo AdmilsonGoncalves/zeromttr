@@ -37,6 +37,8 @@ export class DecisionComponent implements OnInit {
   readonly isExpired = signal<boolean>(false);
   readonly isValid = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
+  readonly incidentClosed = signal<boolean>(false);
+  readonly incidentClosedState = signal<string>('');
   readonly status = signal<'idle' | 'success' | 'error'>('idle');
   readonly errorMessage = signal<string>('');
 
@@ -60,6 +62,25 @@ export class DecisionComponent implements OnInit {
     this.incidentId.set(id);
 
     this.parseFragment();
+
+    if (isNonEmptyString(id)) {
+      void this.checkIncidentClosed(id);
+    }
+  }
+
+  private async checkIncidentClosed(id: string): Promise<void> {
+    try {
+      await this.incidentService.fetchIncident(id);
+      const current = this.incidentService.currentIncident();
+      if (current && current.id === id) {
+        if (current.state === 'RESOLVED' || current.state === 'REJECTED') {
+          this.incidentClosed.set(true);
+          this.incidentClosedState.set(current.state);
+        }
+      }
+    } catch {
+      // Ignore network fetch error during closed check
+    }
   }
 
   /**
@@ -119,7 +140,7 @@ export class DecisionComponent implements OnInit {
    * Submits the validated HMAC decision payload to the orchestrator API.
    */
   async executeDecision(): Promise<void> {
-    if (!this.isValid() || this.isExpired()) {
+    if (!this.isValid() || this.isExpired() || this.incidentClosed()) {
       return;
     }
 
@@ -139,6 +160,15 @@ export class DecisionComponent implements OnInit {
       if (success) {
         this.status.set('success');
       } else {
+        const statusCode = this.incidentService.decisionStatusCode();
+        if (statusCode === 409) {
+          this.incidentClosed.set(true);
+          this.errorMessage.set(this.i18n.t('decisionAlreadyResolvedError'));
+        } else {
+          this.errorMessage.set(
+            this.incidentService.decisionError() || this.i18n.t('decisionErrorMsg')
+          );
+        }
         this.status.set('error');
       }
     } catch (err: unknown) {

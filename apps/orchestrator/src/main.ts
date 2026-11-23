@@ -71,7 +71,16 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     fallbackAdapter,
     broadcaster,
     logger,
-    { syntaxValidator: patchSyntaxValidator }
+    {
+      syntaxValidator: patchSyntaxValidator,
+      requiredContentPatterns: [
+        /class\s+PaymentRepository/,
+        /KnexTimeoutError/,
+        /createPayment\s*\(/,
+        /getPoolStats\s*\(/,
+        /export\s+const\s+paymentRepository/
+      ]
+    }
   );
   const onCallEmail = process.env.ON_CALL_ENGINEER_EMAIL || process.env.ONCALL_TO_EMAIL;
   const notifyOnCall = new NotifyOnCall(

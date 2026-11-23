@@ -20,12 +20,12 @@ import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
 import { calculateEvidenceCoverage } from '../domain/evidence-coverage.js';
 import type { RcaReport, ReasoningSource, SpanNode } from '../domain/rca-report.js';
 import type { IncidentRepository } from '../ports/incident-repository.port.js';
-import type { ToolsPort, CreateRemediationPrOutput } from '../ports/tools.port.js';
+import type { CreateRemediationPrOutput, ToolsPort } from '../ports/tools.port.js';
 import type {
-  ReasoningPort,
-  PatchSyntaxValidatorPort,
   CollectedEvidence,
-  RcaAndPatchSynthesis
+  PatchSyntaxValidatorPort,
+  RcaAndPatchSynthesis,
+  ReasoningPort
 } from '../ports/reasoning.port.js';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 import type { LoggerPort } from '../ports/logger.port.js';
@@ -44,18 +44,8 @@ export interface DispatchRemediationOptions {
 const TRUNCATED_PATCH_PLACEHOLDER_PATTERN =
   /(?:\/\/|\/\*)\s*\.\.\.|keep all original|rest of (?:the )?(?:file|class|code)/i;
 
-function isTruncatedLlmSnippet(content: string, diffPatch?: string): boolean {
-  if (TRUNCATED_PATCH_PLACEHOLDER_PATTERN.test(content)) {
-    return true;
-  }
-  if (isNonEmptyString(diffPatch) && diffPatch.includes('[TRUNCATED_DIFF]')) {
-    return true;
-  }
-  // If LLM output a partial class without module imports or stripped surrounding exports
-  if (content.includes('class PaymentRepository') && !content.includes('KnexTimeoutError')) {
-    return true;
-  }
-  return false;
+function isTruncatedLlmSnippet(content: string): boolean {
+  return TRUNCATED_PATCH_PLACEHOLDER_PATTERN.test(content);
 }
 
 function validatePatchDefensively(
@@ -163,19 +153,12 @@ export class DispatchRemediation {
     if (piiAudit.passed) {
       try {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
-        let candidateSynthesis = rawSynthesis;
         if (
           isNonEmptyString(rawSynthesis.patchedContent) &&
-          isTruncatedLlmSnippet(rawSynthesis.patchedContent, evidence.gitDiff?.patch)
+          !isTruncatedLlmSnippet(rawSynthesis.patchedContent) &&
+          validatePatchDefensively(rawSynthesis, authoritativeSuspectPath, this.options)
         ) {
-          const fallbackPatch = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-          candidateSynthesis = {
-            ...rawSynthesis,
-            patchedContent: fallbackPatch.patchedContent
-          };
-        }
-        if (validatePatchDefensively(candidateSynthesis, authoritativeSuspectPath, this.options)) {
-          synthesis = candidateSynthesis;
+          synthesis = rawSynthesis;
           reasoningSource = ReasoningProvider.LLM;
         } else {
           synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);

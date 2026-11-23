@@ -110,7 +110,7 @@
           [label]="i18n.t('restoreService')"
           severity="secondary"
           size="small"
-          [disabled]="incidentService.isResetting()"
+          [disabled]="incidentService.isResetting() || incidentService.isSimulating()"
           (onClick)="onResetService()"
           [pTooltip]="i18n.t('tooltipRestoreService')"
           tooltipPosition="bottom"
