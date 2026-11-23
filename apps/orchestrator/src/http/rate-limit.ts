@@ -14,27 +14,50 @@ interface RateLimitBucket {
   resetAtMs: number;
 }
 
+const PRIVATE_IPV4_RANGES = [/^127\./, /^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[0-1])\./];
+
+function isTrustedProxyIp(ip: string): boolean {
+  const normalized = normalizeIp(ip).toLowerCase();
+  if (normalized === '::1' || normalized === 'localhost') {
+    return true;
+  }
+  if (PRIVATE_IPV4_RANGES.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+  return (
+    normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80:')
+  );
+}
+
 /**
- * Extracts the client IP address from Cloudflare, proxy, or socket headers.
+ * Extracts the client IP address from trusted proxy headers or the direct socket peer.
  */
 export function extractClientIp(req: Request): string {
-  const cfIp = parseForwardedIp(req.headers['cf-connecting-ip']);
-  if (cfIp) {
-    return cfIp;
+  const rawPeerIp = isNonEmptyString(req.socket?.remoteAddress)
+    ? req.socket.remoteAddress
+    : isNonEmptyString(req.ip)
+      ? req.ip
+      : '';
+  const peerIp = isNonEmptyString(rawPeerIp) ? normalizeIp(rawPeerIp) : 'unknown';
+
+  if (peerIp !== 'unknown' && isTrustedProxyIp(peerIp)) {
+    const cfIp = parseForwardedIp(req.headers['cf-connecting-ip']);
+    if (cfIp) {
+      return cfIp;
+    }
+
+    const forwardedIp = parseForwardedIp(req.headers['x-forwarded-for']);
+    if (forwardedIp) {
+      return forwardedIp;
+    }
+
+    const realIp = parseForwardedIp(req.headers['x-real-ip']);
+    if (realIp) {
+      return realIp;
+    }
   }
 
-  const forwardedIp = parseForwardedIp(req.headers['x-forwarded-for']);
-  if (forwardedIp) {
-    return forwardedIp;
-  }
-
-  if (isNonEmptyString(req.ip)) {
-    return normalizeIp(req.ip);
-  }
-  if (isNonEmptyString(req.socket?.remoteAddress)) {
-    return normalizeIp(req.socket.remoteAddress);
-  }
-  return 'unknown';
+  return peerIp;
 }
 
 /**

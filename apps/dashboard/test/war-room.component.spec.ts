@@ -93,7 +93,7 @@ describe('WarRoomComponent', () => {
 
     await component.onSimulateDecision();
     expect(simSpy).toHaveBeenCalledWith('approve');
-    expect(resetSpy).toHaveBeenCalledWith('', false);
+    expect(resetSpy).toHaveBeenCalledTimes(1);
     expect(toastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         severity: 'success',

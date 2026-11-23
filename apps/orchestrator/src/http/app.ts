@@ -96,8 +96,9 @@ export function createApp(dependencies: AppDependencies): Express {
     app.use('/api/demo/simulate-decision', strictActionLimiter);
     app.use('/api/demo/healthy-traffic', strictActionLimiter);
     app.use('/api/incidents/:id/decision', strictActionLimiter);
-    app.use('/api/incidents', readApiLimiter);
-    app.use('/api/target/status', readApiLimiter);
+    app.get('/api/incidents', readApiLimiter);
+    app.get('/api/incidents/:id', readApiLimiter);
+    app.get('/api/target/status', readApiLimiter);
   }
 
   const initialIncident = createInitialIncident();

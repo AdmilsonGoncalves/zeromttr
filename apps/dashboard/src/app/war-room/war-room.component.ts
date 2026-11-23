@@ -199,12 +199,6 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const resetResult = await this.incidentService.resetChaos('', false);
-    if (!resetResult.ok) {
-      this.notifyActionError(resetResult);
-      return;
-    }
-
     this.messageService.add({
       severity: 'success',
       summary: this.i18n.t('toastDecisionApprovedSummary'),

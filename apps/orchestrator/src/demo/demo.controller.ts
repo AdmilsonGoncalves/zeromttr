@@ -197,6 +197,7 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
     (req: Request, res: Response): void => {
       void (async () => {
         let openIncidents: Awaited<ReturnType<IncidentRepository['findAll']>> = [];
+        let repositoryLookupFailed = false;
         if (dependencies.repository) {
           try {
             const allIncidents = await dependencies.repository.findAll();
@@ -207,11 +208,12 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
                 inc.state !== IncidentState.FAILED
             );
           } catch {
-            // Non-fatal repository lookup error during reset auth check
+            repositoryLookupFailed = true;
           }
         }
 
         const hasLiveSessionOrIncident =
+          repositoryLookupFailed ||
           (lastChaosTimestamp > 0 && lastChaosMode === IncidentExecutionMode.LIVE) ||
           openIncidents.some((inc) => inc.mode === IncidentExecutionMode.LIVE);
 
@@ -290,6 +292,12 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
 
         try {
           const incident = await dependencies.simulateDemoDecision.execute(incidentId, action);
+          if (action === DecisionAction.APPROVE) {
+            lastChaosTimestamp = 0;
+            lastChaosMode = IncidentExecutionMode.REPLAY;
+            dependencies.replayRunner?.stop();
+            await dependencies.demoControlPort.reset();
+          }
           res.status(HTTP_STATUS.OK).json({
             success: true,
             simulated: true,

@@ -1258,6 +1258,7 @@ export class IncidentService {
               action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED
           };
         });
+        await this.fetchTargetStatus(baseUrl);
         return { ok: true, status: res.status };
       }
 

@@ -4,13 +4,21 @@ import path from 'node:path';
 import nock from 'nock';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Request } from 'express';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { FileIncidentRepository } from '../../src/adapters/repo.file.js';
 import { createDemoRouterFactory } from '../../src/demo/demo.controller.js';
 import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
-import { IncidentExecutionMode } from '../../src/domain/incident-enums.js';
+import {
+  AlertSeverity,
+  DecisionAction,
+  IncidentExecutionMode
+} from '../../src/domain/incident-enums.js';
+import { Incident } from '../../src/domain/incident.js';
+import { IncidentState } from '../../src/domain/incident-state.js';
 import { createApp } from '../../src/http/app.js';
 import { SseEventBroadcaster } from '../../src/http/events.sse.js';
+import { extractClientIp } from '../../src/http/rate-limit.js';
 import {
   createMockDemoControlPort,
   createMockTargetStatusPort,
@@ -251,5 +259,89 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
       .set('X-Forwarded-For', '203.0.113.77, 10.0.0.2');
     expect(throttledRes.status).toBe(HTTP_STATUS.TOO_MANY_REQUESTS);
+  });
+
+  it('should ignore spoofed forwarding headers from untrusted public peer IPs and honor X-Real-IP from trusted proxies', () => {
+    const untrustedReq = {
+      headers: {
+        'cf-connecting-ip': '203.0.113.99',
+        'x-forwarded-for': '203.0.113.100',
+        'x-real-ip': '203.0.113.101'
+      },
+      socket: { remoteAddress: '198.51.100.55' }
+    } as unknown as Request;
+    expect(extractClientIp(untrustedReq)).toBe('198.51.100.55');
+
+    const trustedNginxReq = {
+      headers: {
+        'x-real-ip': '203.0.113.88'
+      },
+      socket: { remoteAddress: '172.18.0.5' }
+    } as unknown as Request;
+    expect(extractClientIp(trustedNginxReq)).toBe('203.0.113.88');
+  });
+
+  it('should keep strict 30 req/min RateLimit-Limit header on POST /api/incidents/:id/decision', async () => {
+    const app = buildTestApp({
+      publicLiveDemo: true,
+      enableRateLimiting: true
+    });
+
+    const res = await request(app)
+      .post('/api/incidents/inc-missing/decision')
+      .send({ action: 'invalid-action', sig: '' });
+
+    expect(res.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(res.headers['ratelimit-limit']).toBe('30');
+  });
+
+  it('should restore target chaos automatically on approved simulate-decision and fail closed on reset when repo lookup fails', async () => {
+    const incident = new Incident({
+      id: 'inc-sim-reset-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:sim-reset',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.REPLAY
+    });
+    await repository.save(incident);
+
+    const demoControlPort = createMockDemoControlPort();
+    const toolsPort = createMockToolsPort();
+    const broadcaster = new SseEventBroadcaster();
+    const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster);
+
+    const app = createApp({
+      repository,
+      targetStatusPort: createMockTargetStatusPort(),
+      handleAlert: createStubHandleAlert(),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: createStubRecordDecision(),
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      grafanaWebhookToken: 'test-grafana-token',
+      demoRouter: createDemoRouterFactory({
+        repository,
+        demoControlPort,
+        simulateDemoDecision,
+        liveDemoKey: 'strict-live-key',
+        cooldownMs: 0
+      }),
+      enableRateLimiting: false
+    });
+
+    const simRes = await request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: incident.id, action: DecisionAction.APPROVE });
+
+    expect(simRes.status).toBe(HTTP_STATUS.OK);
+    expect(demoControlPort.reset).toHaveBeenCalledTimes(1);
+
+    vi.spyOn(repository, 'findAll').mockRejectedValueOnce(new Error('DB connection lost'));
+    const resetRes = await request(app)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(resetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
   });
 });
