@@ -154,10 +154,29 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
     })();
   });
 
-  // Reset demo (requires X-Live-Demo-Key if active session was live)
+  // Reset demo (requires X-Live-Demo-Key if active session or any open incident is live)
   router.post('/demo/reset', ...authMiddlewares, (req: Request, res: Response): void => {
     void (async () => {
-      if (lastChaosTimestamp > 0 && lastChaosMode === IncidentExecutionMode.LIVE) {
+      let openIncidents: Awaited<ReturnType<IncidentRepository['findAll']>> = [];
+      if (dependencies.repository) {
+        try {
+          const allIncidents = await dependencies.repository.findAll();
+          openIncidents = allIncidents.filter(
+            (inc) =>
+              inc.state !== IncidentState.RESOLVED &&
+              inc.state !== IncidentState.REJECTED &&
+              inc.state !== IncidentState.FAILED
+          );
+        } catch {
+          // Non-fatal repository lookup error during reset auth check
+        }
+      }
+
+      const hasLiveSessionOrIncident =
+        (lastChaosTimestamp > 0 && lastChaosMode === IncidentExecutionMode.LIVE) ||
+        openIncidents.some((inc) => inc.mode === IncidentExecutionMode.LIVE);
+
+      if (hasLiveSessionOrIncident) {
         const allowed = await runExpressMiddleware(liveDemoAuth, req, res);
         if (!allowed) {
           return;
@@ -170,16 +189,9 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
         dependencies.replayRunner?.stop();
         if (dependencies.repository) {
           try {
-            const incidents = await dependencies.repository.findAll();
-            for (const inc of incidents) {
-              if (
-                inc.state !== IncidentState.RESOLVED &&
-                inc.state !== IncidentState.REJECTED &&
-                inc.state !== IncidentState.FAILED
-              ) {
-                inc.transition(IncidentState.FAILED, 'Demo reset by operator');
-                await dependencies.repository.save(inc);
-              }
+            for (const inc of openIncidents) {
+              inc.transition(IncidentState.FAILED, 'Demo reset by operator');
+              await dependencies.repository.save(inc);
             }
           } catch {
             // Non-fatal repository transition error during reset

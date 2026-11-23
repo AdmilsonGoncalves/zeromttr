@@ -369,10 +369,17 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       state: IncidentState.NOTIFIED,
       mode: IncidentExecutionMode.LIVE
     });
-    vi.mocked(localRepo.findAll).mockResolvedValueOnce([lingeringIncident]);
-    const closingResetRes = await request(protectedApp)
+    vi.mocked(localRepo.findAll).mockResolvedValue([lingeringIncident]);
+    const unauthorizedLiveResetRes = await request(protectedApp)
       .post('/api/demo/reset')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(unauthorizedLiveResetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(lingeringIncident.state).toBe(IncidentState.NOTIFIED);
+
+    const closingResetRes = await request(protectedApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'secret-demo-key-123');
     expect(closingResetRes.status).toBe(HTTP_STATUS.ACCEPTED);
     expect(lingeringIncident.state).toBe(IncidentState.FAILED);
     expect(localRepo.save).toHaveBeenCalledWith(lingeringIncident);

@@ -11,7 +11,12 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { isEmpty, isNonEmptyString, parseNumber, toErrorMessage } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { Tag } from 'primeng/tag';
-import type { DecisionPayload, IncidentDecisionAction } from '../core/contract.js';
+import {
+  DecisionAction,
+  IncidentState,
+  type DecisionPayload,
+  type IncidentDecisionAction
+} from '../core/contract.js';
 import { I18nService } from '../core/i18n.service.js';
 import { IncidentService } from '../core/incident.service.js';
 
@@ -73,7 +78,7 @@ export class DecisionComponent implements OnInit {
       await this.incidentService.fetchIncident(id);
       const current = this.incidentService.currentIncident();
       if (current && current.id === id) {
-        if (current.state === 'RESOLVED' || current.state === 'REJECTED') {
+        if (current.state === IncidentState.RESOLVED || current.state === IncidentState.REJECTED) {
           this.incidentClosed.set(true);
           this.incidentClosedState.set(current.state);
         }
@@ -102,7 +107,10 @@ export class DecisionComponent implements OnInit {
     const expRaw = params.get('exp');
     const expParam = parseNumber(expRaw, 0);
 
-    if (!isNonEmptyString(actionParam) || (actionParam !== 'approve' && actionParam !== 'reject')) {
+    if (
+      !isNonEmptyString(actionParam) ||
+      (actionParam !== DecisionAction.APPROVE && actionParam !== DecisionAction.REJECT)
+    ) {
       this.isValid.set(false);
       this.errorMessage.set(this.i18n.t('hmacInvalidActionError'));
       return;

@@ -676,7 +676,7 @@ describe('DispatchRemediation Use Case', () => {
     // Unhappy path: PR failure must NOT emit AWAITING_PR
     const failedIncident = createMockIncident();
     const failedBroadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
-    vi.mocked(repo.findById).mockResolvedValueOnce(failedIncident);
+    vi.mocked(repo.findById).mockResolvedValue(failedIncident);
     vi.mocked(tools.createRemediationPr).mockRejectedValueOnce(new Error('GitHub 502'));
 
     const failUseCase = new DispatchRemediation(
@@ -694,6 +694,136 @@ describe('DispatchRemediation Use Case', () => {
     expect(failedBroadcaster.broadcast).not.toHaveBeenCalledWith(
       'incident.transition',
       expect.objectContaining({ to: IncidentState.AWAITING_PR })
+    );
+  });
+
+  it('should derive exported declarations from suspectFileContent for non-payment repositories and reject incomplete LLM stubs', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-inc-order-001',
+        branchUrl:
+          'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-order-001',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/99',
+        commitSha: 'commit999'
+      })),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 103, success: true }))
+    };
+
+    const orderBaseline = `
+      export class OrderRepository {
+        async saveOrder() { return true; }
+      }
+      export const orderRepository = new OrderRepository();
+    `;
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Stub missing orderRepository singleton',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/orders/src/order.repository.ts',
+        patchedContent: 'export class OrderRepository { async saveOrder() { return true; } }',
+        explanation: 'stub'
+      }))
+    };
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Fallback complete OrderRepository',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/orders/src/order.repository.ts',
+        patchedContent: orderBaseline,
+        explanation: 'complete'
+      }))
+    };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(
+      repo,
+      tools,
+      llmAdapter,
+      fallbackAdapter,
+      broadcaster,
+      undefined,
+      { syntaxValidator: new TypeScriptPatchSyntaxValidator() }
+    );
+
+    const orderEvidence: CollectedEvidence = {
+      ...validEvidence,
+      gitDiff: {
+        ...validEvidence.gitDiff,
+        suspectFilePath: 'apps/orders/src/order.repository.ts',
+        suspectFileContent: orderBaseline
+      }
+    };
+
+    const result = await useCase.execute(incident.id, orderEvidence, 'blob123');
+    expect(result.reasoningSource).toBe('fallback');
+    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalledTimes(1);
+    expect(tools.createRemediationPr).toHaveBeenCalledWith(
+      expect.objectContaining({ patched_content: orderBaseline })
+    );
+  });
+
+  it('should abort before createRemediationPr when persisted incident becomes terminal during synthesis', async () => {
+    const initialIncident = createMockIncident();
+    const resetIncident = new Incident({
+      id: 'inc-test-001',
+      service: 'api-pagamentos-core',
+      severity: 'critical',
+      fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
+      state: IncidentState.FAILED
+    });
+    const repo: IncidentRepository = {
+      findById: vi.fn().mockResolvedValueOnce(initialIncident).mockResolvedValueOnce(resetIncident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [resetIncident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 104, success: true }))
+    };
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => ({
+        summary: 'Fix',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'fix'
+      }))
+    };
+    const fallbackAdapter: ReasoningPort = { synthesizeRcaAndPatch: vi.fn() };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    await expect(useCase.execute(initialIncident.id, validEvidence, 'blob123')).rejects.toThrow(
+      'terminal state'
+    );
+    expect(tools.createRemediationPr).not.toHaveBeenCalled();
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(broadcaster.broadcast).not.toHaveBeenCalledWith(
+      'incident.remediation',
+      expect.anything()
     );
   });
 });

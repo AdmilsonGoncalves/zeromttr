@@ -173,7 +173,7 @@ ${JSON.stringify(sanitizedEvidenceForPrompt, null, 2)}
 Strict instructions for patchedContent:
 - Return the COMPLETE source code file.
 - Keep all original imports, types, classes, methods, and exports intact.
-- Apply only the surgical fix for the regression identified in the deploy diff/telemetry (restore pool capacity to 10 and ensure client.release() is called in a finally block).
+- Apply only the surgical fix for the regression identified in the deploy diff and telemetry, restoring healthy baseline behavior.
 - NEVER truncate, omit methods, or return partial placeholder stubs.`;
     const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 15_000);
 

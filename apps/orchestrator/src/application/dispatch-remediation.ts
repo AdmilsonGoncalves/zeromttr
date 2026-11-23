@@ -48,10 +48,33 @@ function isTruncatedLlmSnippet(content: string): boolean {
   return TRUNCATED_PATCH_PLACEHOLDER_PATTERN.test(content);
 }
 
+function extractRequiredExportPatterns(suspectFileContent?: string): RegExp[] {
+  if (!isNonEmptyString(suspectFileContent)) {
+    return [];
+  }
+  const patterns: RegExp[] = [];
+  const seen = new Set<string>();
+  const exportRegex =
+    /\bexport\s+(?:async\s+)?(?:class|const|let|function|interface|type|enum)\s+([A-Za-z_$][A-Za-z0-9_$]*)/g;
+  for (const match of suspectFileContent.matchAll(exportRegex)) {
+    const symbolName = match[1];
+    if (symbolName && !seen.has(symbolName)) {
+      seen.add(symbolName);
+      patterns.push(
+        new RegExp(
+          `\\bexport\\s+(?:async\\s+)?(?:class|const|let|function|interface|type|enum)\\s+${symbolName}\\b`
+        )
+      );
+    }
+  }
+  return patterns;
+}
+
 function validatePatchDefensively(
   synthesis: RcaAndPatchSynthesis,
   expectedSuspectPath?: string,
-  options: DispatchRemediationOptions = {}
+  options: DispatchRemediationOptions = {},
+  suspectFileContent?: string
 ): boolean {
   if (!isNonEmptyString(expectedSuspectPath) || !isNonEmptyString(synthesis.suspectFilePath)) {
     return false;
@@ -69,14 +92,16 @@ function validatePatchDefensively(
   ) {
     return false;
   }
-  if (options.requiredContentPatterns) {
-    for (const pattern of options.requiredContentPatterns) {
-      if (pattern.global || pattern.sticky) {
-        pattern.lastIndex = 0;
-      }
-      if (!pattern.test(content)) {
-        return false;
-      }
+  const requiredPatterns = [
+    ...(options.requiredContentPatterns ?? []),
+    ...extractRequiredExportPatterns(suspectFileContent)
+  ];
+  for (const pattern of requiredPatterns) {
+    if (pattern.global || pattern.sticky) {
+      pattern.lastIndex = 0;
+    }
+    if (!pattern.test(content)) {
+      return false;
     }
   }
   return true;
@@ -150,13 +175,19 @@ export class DispatchRemediation {
     let synthesis: RcaAndPatchSynthesis;
     let reasoningSource: ReasoningSource;
 
+    const suspectFileContent = evidence.gitDiff?.suspectFileContent;
     if (piiAudit.passed) {
       try {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
         if (
           isNonEmptyString(rawSynthesis.patchedContent) &&
           !isTruncatedLlmSnippet(rawSynthesis.patchedContent) &&
-          validatePatchDefensively(rawSynthesis, authoritativeSuspectPath, this.options)
+          validatePatchDefensively(
+            rawSynthesis,
+            authoritativeSuspectPath,
+            this.options,
+            suspectFileContent
+          )
         ) {
           synthesis = rawSynthesis;
           reasoningSource = ReasoningProvider.LLM;
@@ -176,7 +207,12 @@ export class DispatchRemediation {
 
     if (
       reasoningSource === ReasoningProvider.FALLBACK &&
-      !validatePatchDefensively(synthesis, authoritativeSuspectPath, this.options)
+      !validatePatchDefensively(
+        synthesis,
+        authoritativeSuspectPath,
+        this.options,
+        suspectFileContent
+      )
     ) {
       throw new Error('Fallback remediation patch failed defensive validation');
     }
@@ -280,6 +316,19 @@ export class DispatchRemediation {
       incidentId: incident.id,
       ...rcaReport
     });
+
+    // Re-check persisted state right before opening an external PR (e.g. if operator reset raced)
+    const persistedIncident = await this.repository.findById(incidentId);
+    if (
+      !persistedIncident ||
+      persistedIncident.state === IncidentState.FAILED ||
+      persistedIncident.state === IncidentState.RESOLVED ||
+      persistedIncident.state === IncidentState.REJECTED
+    ) {
+      throw new Error(
+        `Aborted remediation PR creation: incident '${incidentId}' is in terminal state '${persistedIncident?.state ?? 'missing'}'`
+      );
+    }
 
     // Create Remediation PR while incident remains in REMEDIATING so TTPR includes PR latency
     const prTitleSummary = truncate(sanitizeWhitespace(synthesis.summary), 72, '');

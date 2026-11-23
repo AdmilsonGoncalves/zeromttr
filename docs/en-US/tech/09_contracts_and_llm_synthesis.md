@@ -207,20 +207,23 @@ export interface CollectedEvidence {
     authorLogin: string;
     suspectFilePath: string;
     patch: string;
+    suspectFileContent?: string;
   };
 }
 ```
 
 ### 2.3 Gemini Structured Output Schema (`RcaAndPatchSynthesis`)
 ```ts
-export const RcaAndPatchSynthesisSchema = z.object({
-  summary: z.string().describe('1-paragraph executive summary of the incident'),
-  rootCause: z.string().describe('Detailed technical explanation of the root cause found in the code'),
-  evidenceRefs: z.array(z.string()).describe('List of evidence references (e.g., trace_id, metric, commit)'),
-  suspectFilePath: z.string().describe('Path of the remediated file (e.g., apps/target-app-demo/src/repositories/payment.repository.ts)'),
-  patchedContent: z.string().describe('Full contents of the fixed file ready to commit'),
-  explanation: z.string().describe('Explanation of the change made in the patch and how it resolves the incident'),
-});
+export const RcaAndPatchSynthesisSchema = z
+  .object({
+    summary: z.string().min(1).describe('1-paragraph executive summary of the incident'),
+    rootCause: z.string().min(1).describe('Detailed technical explanation of the root cause found in the code'),
+    evidenceRefs: z.array(z.string()).describe('List of evidence references (e.g., trace_id, metric, commit)'),
+    suspectFilePath: z.string().min(1).describe('Path of the remediated file (e.g., apps/target-app-demo/src/repositories/payment.repository.ts)'),
+    patchedContent: z.string().min(1).describe('Full contents of the fixed file ready to commit'),
+    explanation: z.string().min(1).describe('Explanation of the change made in the patch and how it resolves the incident')
+  })
+  .strict();
 
 export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 ```

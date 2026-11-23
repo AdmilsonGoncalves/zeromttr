@@ -27,7 +27,12 @@ import { ProgressBar } from 'primeng/progressbar';
 import { Toast } from 'primeng/toast';
 import { Tooltip } from 'primeng/tooltip';
 import { I18nService, type Language } from '../core/i18n.service.js';
-import type { IncidentMode } from '../core/contract.js';
+import {
+  DecisionAction,
+  IncidentExecutionMode,
+  NotificationStatus,
+  type IncidentMode
+} from '../core/contract.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
 import { MASKED_POST_OTTL_LOG, MOCK_GIT_DIFF, RAW_PRE_COLLECTOR_LOG } from '../core/constants.js';
 
@@ -131,7 +136,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     const raw = notification?.htmlPreview;
 
     if (
-      notification?.status === 'degraded' ||
+      notification?.status === NotificationStatus.DEGRADED ||
       (isNonEmptyString(raw) && raw.startsWith('Warning: Resend delivery failed'))
     ) {
       const degradedHtml = `
@@ -144,7 +149,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     }
 
     if (
-      notification?.status === 'dispatched' &&
+      notification?.status === NotificationStatus.DISPATCHED &&
       (!isNonEmptyString(raw) || !raw.trim().startsWith('<'))
     ) {
       const dispatchedHtml = `
@@ -167,8 +172,8 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   });
 
   readonly modeOptions: ModeOption[] = [
-    { label: '⚡ Live API Mode', value: 'live' },
-    { label: '🎬 Replay Mode', value: 'replay' }
+    { label: '⚡ Live API Mode', value: IncidentExecutionMode.LIVE },
+    { label: '🎬 Replay Mode', value: IncidentExecutionMode.REPLAY }
   ];
 
   readonly langOptions: LangOption[] = [
@@ -320,7 +325,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
    * Triggers a simulated approval decision in demo mode, restores target health, and keeps incident visible.
    */
   async onSimulateDecision(): Promise<void> {
-    const result = await this.incidentService.simulateDecision('approve');
+    const result = await this.incidentService.simulateDecision(DecisionAction.APPROVE);
     if (!result.ok) {
       this.notifyActionError(result);
       return;

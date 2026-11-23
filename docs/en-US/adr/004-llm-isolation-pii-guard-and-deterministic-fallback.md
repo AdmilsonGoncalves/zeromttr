@@ -10,7 +10,7 @@ External language models introduce three operational risks during critical incid
 ## Decision
 
 1. Isolate the AI provider behind the **`ReasoningPort`** interface (`apps/orchestrator/src/ports/reasoning.port.ts`), implemented in production by `GeminiReasoningAdapter` (`apps/orchestrator/src/adapters/llm.gemini.ts`).
-2. Mandatory execution of **`PiiPromptGuard`** in **fail-closed** mode before any dispatch to the LLM. If any residual pattern for CPF/CNPJ (validated via Modulo-11), phone number (ANATEL rules), unquoted standard email (`[A-Za-z0-9._%+-]+@domain`, not covering RFC 5322 *quoted local parts* such as addresses with spaces), PIX EVP key (UUID v4 in PIX context), or JWT/Bearer token is found, the LLM call is aborted immediately.
+2. Mandatory execution of **`PiiPromptGuard`** in **fail-closed** mode before any dispatch to the LLM. If any residual pattern for CPF/CNPJ (validated via Modulo-11), phone number (ANATEL rules), unquoted standard email (`[A-Za-z0-9._%+-]+@domain`, excluding RFC 5322 *quoted local parts* such as addresses with spaces, `@users.noreply.github.com` addresses, and SSH-style strings such as `git@host:`), PIX EVP key (UUID v4 in PIX context), or JWT/Bearer token is found, the LLM call is aborted immediately.
 3. Provide **`FallbackReasoningAdapter`** (`apps/orchestrator/src/adapters/llm.fallback.ts`) to keep deterministic diagnosis operational if the LLM fails, times out, or has no configured credential, transparently recording `reasoningSource: 'llm' | 'fallback'` in the incident, SSE, and PR.
 
 ## Consequences

@@ -10,34 +10,46 @@ import {
   safeJsonParse,
   toErrorMessage
 } from '@zeromttr/utils';
-import type {
-  DecisionPayload,
-  IncidentCreatedEvent,
-  IncidentDecisionAction,
-  IncidentDecisionEvent,
-  IncidentDetail,
-  IncidentDocsEvent,
-  IncidentFinopsEvent,
-  IncidentMode,
-  IncidentNotifiedEvent,
-  IncidentRcaEvent,
-  IncidentRemediationEvent,
+import {
+  DecisionAction,
+  type DecisionPayload,
+  DecisionSource,
+  type IncidentCreatedEvent,
+  type IncidentDecisionAction,
+  type IncidentDecisionEvent,
+  type IncidentDetail,
+  type IncidentDocsEvent,
+  IncidentEventType,
+  IncidentExecutionMode,
+  type IncidentFinopsEvent,
+  type IncidentMode,
+  type IncidentNotifiedEvent,
+  type IncidentRcaEvent,
+  type IncidentRemediationEvent,
   IncidentState,
-  IncidentTransitionEvent,
-  ReasoningSource,
-  SimulateDecisionPayload,
-  TargetStatusResponse
+  type IncidentTransitionEvent,
+  ReasoningProvider,
+  type ReasoningSource,
+  type SimulateDecisionPayload,
+  type TargetStatusResponse
 } from './contract.js';
+import {
+  DecisionUiStatus,
+  FsmStageStatus,
+  FsmVirtualState,
+  TimelineStepStatus,
+  UiSeverity
+} from './constants.js';
 import type { TranslationDictionary } from './i18n.service.js';
 
 export interface TimelineStepItem {
   id: number;
   titleKey: keyof TranslationDictionary;
   descKey: keyof TranslationDictionary;
-  status: 'completed' | 'in-progress' | 'pending';
+  status: TimelineStepStatus;
   icon: string;
   badge?: string;
-  badgeSeverity?: 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast';
+  badgeSeverity?: UiSeverity;
 }
 
 export interface DemoActionResult {
@@ -48,10 +60,10 @@ export interface DemoActionResult {
 }
 
 export interface FsmStageItem {
-  state: IncidentState | 'AWAITING_ALERT';
+  state: IncidentState | FsmVirtualState;
   labelKey: keyof TranslationDictionary;
   tooltipKey: keyof TranslationDictionary;
-  status: 'completed' | 'active' | 'pending' | 'failed';
+  status: FsmStageStatus;
 }
 
 const LIVE_DEMO_KEY_STORAGE_KEY = 'zeromttr_live_demo_key';
@@ -74,14 +86,14 @@ export class IncidentService {
   readonly currentIncident = signal<IncidentDetail | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
   readonly sseConnected = signal<boolean>(false);
-  readonly activeMode = signal<IncidentMode>('replay');
+  readonly activeMode = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly liveDemoKey = signal<string>('');
   readonly isSimulating = signal<boolean>(false);
   readonly isResetting = signal<boolean>(false);
   readonly awaitingIncidentStart = signal<boolean>(false);
   readonly liveWaitSeconds = signal<number>(0);
   readonly stagedSseState = signal<IncidentState | null>(null);
-  readonly decisionStatus = signal<'idle' | 'loading' | 'success' | 'error'>('idle');
+  readonly decisionStatus = signal<DecisionUiStatus>(DecisionUiStatus.IDLE);
   readonly decisionStatusCode = signal<number | null>(null);
   readonly decisionError = signal<string | null>(null);
   readonly loadError = signal<string | null>(null);
@@ -100,11 +112,11 @@ export class IncidentService {
     }
     const state = this.displayedFsmState();
     return (
-      state === 'RECEIVED' ||
-      state === 'INVESTIGATING' ||
-      state === 'ENRICHING' ||
-      state === 'REMEDIATING' ||
-      state === 'AWAITING_PR'
+      state === IncidentState.RECEIVED ||
+      state === IncidentState.INVESTIGATING ||
+      state === IncidentState.ENRICHING ||
+      state === IncidentState.REMEDIATING ||
+      state === IncidentState.AWAITING_PR
     );
   });
 
@@ -177,7 +189,7 @@ export class IncidentService {
       return '--';
     }
     const prTransition = incident.transitions?.find(
-      (t) => t.to === 'AWAITING_PR' || t.to === 'NOTIFIED'
+      (t) => t.to === IncidentState.AWAITING_PR || t.to === IncidentState.NOTIFIED
     );
     if (isNonEmptyString(incident.startedAt) && prTransition) {
       const diffSec = diffInSeconds(incident.startedAt, prTransition.at).toFixed(1);
@@ -200,28 +212,53 @@ export class IncidentService {
       labelKey: keyof TranslationDictionary;
       tooltipKey: keyof TranslationDictionary;
     }> = [
-      { state: 'RECEIVED', labelKey: 'fsmReceivedLabel', tooltipKey: 'fsmReceivedTip' },
       {
-        state: 'INVESTIGATING',
+        state: IncidentState.RECEIVED,
+        labelKey: 'fsmReceivedLabel',
+        tooltipKey: 'fsmReceivedTip'
+      },
+      {
+        state: IncidentState.INVESTIGATING,
         labelKey: 'fsmInvestigatingLabel',
         tooltipKey: 'fsmInvestigatingTip'
       },
-      { state: 'ENRICHING', labelKey: 'fsmEnrichingLabel', tooltipKey: 'fsmEnrichingTip' },
-      { state: 'REMEDIATING', labelKey: 'fsmRemediatingLabel', tooltipKey: 'fsmRemediatingTip' },
-      { state: 'AWAITING_PR', labelKey: 'fsmAwaitingPrLabel', tooltipKey: 'fsmAwaitingPrTip' },
-      { state: 'NOTIFIED', labelKey: 'fsmNotifiedLabel', tooltipKey: 'fsmNotifiedTip' },
       {
-        state: currentState === 'REJECTED' ? 'REJECTED' : 'RESOLVED',
-        labelKey: currentState === 'REJECTED' ? 'fsmRejectedLabel' : 'fsmResolvedLabel',
-        tooltipKey: currentState === 'REJECTED' ? 'fsmRejectedTip' : 'fsmResolvedTip'
+        state: IncidentState.ENRICHING,
+        labelKey: 'fsmEnrichingLabel',
+        tooltipKey: 'fsmEnrichingTip'
+      },
+      {
+        state: IncidentState.REMEDIATING,
+        labelKey: 'fsmRemediatingLabel',
+        tooltipKey: 'fsmRemediatingTip'
+      },
+      {
+        state: IncidentState.AWAITING_PR,
+        labelKey: 'fsmAwaitingPrLabel',
+        tooltipKey: 'fsmAwaitingPrTip'
+      },
+      {
+        state: IncidentState.NOTIFIED,
+        labelKey: 'fsmNotifiedLabel',
+        tooltipKey: 'fsmNotifiedTip'
+      },
+      {
+        state:
+          currentState === IncidentState.REJECTED ? IncidentState.REJECTED : IncidentState.RESOLVED,
+        labelKey: currentState === IncidentState.REJECTED ? 'fsmRejectedLabel' : 'fsmResolvedLabel',
+        tooltipKey: currentState === IncidentState.REJECTED ? 'fsmRejectedTip' : 'fsmResolvedTip'
       }
     ];
 
     const awaitingAlertStage: FsmStageItem = {
-      state: 'AWAITING_ALERT',
+      state: FsmVirtualState.AWAITING_ALERT,
       labelKey: 'fsmAwaitingAlertLabel',
       tooltipKey: 'fsmAwaitingAlertTip',
-      status: currentState ? 'completed' : isAwaitingAlert ? 'active' : 'pending'
+      status: currentState
+        ? FsmStageStatus.COMPLETED
+        : isAwaitingAlert
+          ? FsmStageStatus.ACTIVE
+          : FsmStageStatus.PENDING
     };
 
     if (!currentState) {
@@ -231,9 +268,33 @@ export class IncidentService {
       ];
     }
 
-    if (currentState === 'FAILED') {
+    if (currentState === IncidentState.FAILED) {
+      const transitions = incident?.transitions ?? [];
+      const failedTransition = [...transitions]
+        .reverse()
+        .find((t) => t.to === IncidentState.FAILED);
+      const failedFromState = failedTransition?.from ?? null;
+      const failedIdx = failedFromState
+        ? orderedIncidentStages.findIndex((stage) => stage.state === failedFromState)
+        : -1;
+
+      if (failedIdx >= 0) {
+        return [
+          awaitingAlertStage,
+          ...orderedIncidentStages.map((stage, idx) => {
+            if (idx < failedIdx) {
+              return { ...stage, status: 'completed' as const };
+            }
+            if (idx === failedIdx) {
+              return { ...stage, labelKey: 'fsmFailedLabel' as const, status: 'failed' as const };
+            }
+            return { ...stage, status: 'pending' as const };
+          })
+        ];
+      }
+
       const visited = new Set<IncidentState>(
-        (incident?.transitions ?? []).map((t) => t.to).filter((s) => s !== 'FAILED')
+        transitions.map((t) => t.to).filter((s) => s !== IncidentState.FAILED)
       );
       let failedMarked = false;
       return [
@@ -252,7 +313,8 @@ export class IncidentService {
     }
 
     const activeIdx = orderedIncidentStages.findIndex((s) => s.state === currentState);
-    const isTerminal = currentState === 'RESOLVED' || currentState === 'REJECTED';
+    const isTerminal =
+      currentState === IncidentState.RESOLVED || currentState === IncidentState.REJECTED;
 
     return [
       awaitingAlertStage,
@@ -264,7 +326,7 @@ export class IncidentService {
           return {
             ...stage,
             status:
-              currentState === 'REJECTED'
+              currentState === IncidentState.REJECTED
                 ? ('failed' as const)
                 : isTerminal
                   ? ('completed' as const)
@@ -281,16 +343,16 @@ export class IncidentService {
     if (!state) {
       return this.awaitingIncidentStart() ? 'fsmHintAwaitingAlert' : 'fsmHintIdle';
     }
-    if (state === 'NOTIFIED') {
+    if (state === IncidentState.NOTIFIED) {
       return 'fsmHintNotified';
     }
-    if (state === 'RESOLVED') {
+    if (state === IncidentState.RESOLVED) {
       return 'fsmHintResolved';
     }
-    if (state === 'REJECTED') {
+    if (state === IncidentState.REJECTED) {
       return 'fsmHintRejected';
     }
-    if (state === 'FAILED') {
+    if (state === IncidentState.FAILED) {
       return 'fsmHintFailed';
     }
     return 'fsmHintActive';
@@ -298,8 +360,7 @@ export class IncidentService {
 
   readonly timelineSteps = computed<TimelineStepItem[]>(() => {
     const incident = this.currentIncident();
-    const state: IncidentState = incident?.state ?? 'RECEIVED';
-    const rca = incident?.rca;
+    const state: IncidentState = incident?.state ?? IncidentState.RECEIVED;
 
     const isDone = (targetStates: IncidentState[]): boolean => {
       return targetStates.includes(state);
@@ -309,20 +370,22 @@ export class IncidentService {
       return state === targetState;
     };
 
+    const rca = incident?.rca;
+
     const steps: TimelineStepItem[] = [
       {
         id: 1,
         titleKey: 'step1Title',
         descKey: 'step1Desc',
         status: isDone([
-          'RECEIVED',
-          'INVESTIGATING',
-          'ENRICHING',
-          'REMEDIATING',
-          'AWAITING_PR',
-          'NOTIFIED',
-          'RESOLVED',
-          'REJECTED'
+          IncidentState.RECEIVED,
+          IncidentState.INVESTIGATING,
+          IncidentState.ENRICHING,
+          IncidentState.REMEDIATING,
+          IncidentState.AWAITING_PR,
+          IncidentState.NOTIFIED,
+          IncidentState.RESOLVED,
+          IncidentState.REJECTED
         ])
           ? 'completed'
           : 'pending',
@@ -335,16 +398,16 @@ export class IncidentService {
         titleKey: 'step2Title',
         descKey: 'step2Desc',
         status: isDone([
-          'INVESTIGATING',
-          'ENRICHING',
-          'REMEDIATING',
-          'AWAITING_PR',
-          'NOTIFIED',
-          'RESOLVED',
-          'REJECTED'
+          IncidentState.INVESTIGATING,
+          IncidentState.ENRICHING,
+          IncidentState.REMEDIATING,
+          IncidentState.AWAITING_PR,
+          IncidentState.NOTIFIED,
+          IncidentState.RESOLVED,
+          IncidentState.REJECTED
         ])
           ? 'completed'
-          : isCurrent('RECEIVED')
+          : isCurrent(IncidentState.RECEIVED)
             ? 'in-progress'
             : 'pending',
         icon: 'pi pi-chart-line',
@@ -356,15 +419,15 @@ export class IncidentService {
         titleKey: 'step3Title',
         descKey: 'step3Desc',
         status: isDone([
-          'ENRICHING',
-          'REMEDIATING',
-          'AWAITING_PR',
-          'NOTIFIED',
-          'RESOLVED',
-          'REJECTED'
+          IncidentState.ENRICHING,
+          IncidentState.REMEDIATING,
+          IncidentState.AWAITING_PR,
+          IncidentState.NOTIFIED,
+          IncidentState.RESOLVED,
+          IncidentState.REJECTED
         ])
           ? 'completed'
-          : isCurrent('INVESTIGATING')
+          : isCurrent(IncidentState.INVESTIGATING)
             ? 'in-progress'
             : 'pending',
         icon: 'pi pi-clock',
@@ -376,15 +439,15 @@ export class IncidentService {
         titleKey: 'step4Title',
         descKey: 'step4Desc',
         status: isDone([
-          'ENRICHING',
-          'REMEDIATING',
-          'AWAITING_PR',
-          'NOTIFIED',
-          'RESOLVED',
-          'REJECTED'
+          IncidentState.ENRICHING,
+          IncidentState.REMEDIATING,
+          IncidentState.AWAITING_PR,
+          IncidentState.NOTIFIED,
+          IncidentState.RESOLVED,
+          IncidentState.REJECTED
         ])
           ? 'completed'
-          : isCurrent('INVESTIGATING')
+          : isCurrent(IncidentState.INVESTIGATING)
             ? 'in-progress'
             : 'pending',
         icon: 'pi pi-shield',
@@ -396,15 +459,15 @@ export class IncidentService {
         titleKey: 'step5Title',
         descKey: 'step5Desc',
         status: isDone([
-          'ENRICHING',
-          'REMEDIATING',
-          'AWAITING_PR',
-          'NOTIFIED',
-          'RESOLVED',
-          'REJECTED'
+          IncidentState.ENRICHING,
+          IncidentState.REMEDIATING,
+          IncidentState.AWAITING_PR,
+          IncidentState.NOTIFIED,
+          IncidentState.RESOLVED,
+          IncidentState.REJECTED
         ])
           ? 'completed'
-          : isCurrent('INVESTIGATING')
+          : isCurrent(IncidentState.INVESTIGATING)
             ? 'in-progress'
             : 'pending',
         icon: 'pi pi-github',
@@ -415,9 +478,15 @@ export class IncidentService {
         id: 6,
         titleKey: 'step6Title',
         descKey: 'step6Desc',
-        status: isDone(['REMEDIATING', 'AWAITING_PR', 'NOTIFIED', 'RESOLVED', 'REJECTED'])
+        status: isDone([
+          IncidentState.REMEDIATING,
+          IncidentState.AWAITING_PR,
+          IncidentState.NOTIFIED,
+          IncidentState.RESOLVED,
+          IncidentState.REJECTED
+        ])
           ? 'completed'
-          : isCurrent('ENRICHING')
+          : isCurrent(IncidentState.ENRICHING)
             ? 'in-progress'
             : 'pending',
         icon: 'pi pi-lock',
@@ -428,22 +497,27 @@ export class IncidentService {
         id: 7,
         titleKey: 'step7Title',
         descKey: 'step7Desc',
-        status: isDone(['AWAITING_PR', 'NOTIFIED', 'RESOLVED', 'REJECTED'])
+        status: isDone([
+          IncidentState.AWAITING_PR,
+          IncidentState.NOTIFIED,
+          IncidentState.RESOLVED,
+          IncidentState.REJECTED
+        ])
           ? 'completed'
-          : isCurrent('REMEDIATING')
+          : isCurrent(IncidentState.REMEDIATING)
             ? 'in-progress'
             : 'pending',
         icon: 'pi pi-code',
-        badge: rca?.reasoningSource === 'llm' ? 'Gemini LLM' : 'Fallback',
+        badge: rca?.reasoningSource === ReasoningProvider.LLM ? 'Gemini LLM' : 'Fallback',
         badgeSeverity: 'info'
       },
       {
         id: 8,
         titleKey: 'step8Title',
         descKey: 'step8Desc',
-        status: isDone(['NOTIFIED', 'RESOLVED', 'REJECTED'])
+        status: isDone([IncidentState.NOTIFIED, IncidentState.RESOLVED, IncidentState.REJECTED])
           ? 'completed'
-          : isCurrent('AWAITING_PR')
+          : isCurrent(IncidentState.AWAITING_PR)
             ? 'in-progress'
             : 'pending',
         icon: 'pi pi-envelope',
@@ -520,7 +594,11 @@ export class IncidentService {
   }
 
   private enqueueVisualState(state: IncidentState): void {
-    if (state === 'RESOLVED' || state === 'REJECTED' || state === 'FAILED') {
+    if (
+      state === IncidentState.RESOLVED ||
+      state === IncidentState.REJECTED ||
+      state === IncidentState.FAILED
+    ) {
       this.clearVisualStateQueue();
       return;
     }
@@ -574,7 +652,7 @@ export class IncidentService {
         // Heartbeat keeps connection alive
       });
 
-      es.addEventListener('incident.created', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.CREATED, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentCreatedEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -588,16 +666,16 @@ export class IncidentService {
             id: payload.incidentId,
             service: payload.service,
             severity: payload.severity,
-            state: 'RECEIVED',
+            state: IncidentState.RECEIVED,
             mode: payload.mode,
             startedAt: payload.at,
-            transitions: [{ from: null, to: 'RECEIVED', at: payload.at }]
+            transitions: [{ from: null, to: IncidentState.RECEIVED, at: payload.at }]
           });
-          this.enqueueVisualState('RECEIVED');
+          this.enqueueVisualState(IncidentState.RECEIVED);
         }
       });
 
-      es.addEventListener('incident.transition', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.TRANSITION, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentTransitionEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -624,7 +702,7 @@ export class IncidentService {
         this.enqueueVisualState(payload.to);
       });
 
-      es.addEventListener('incident.rca', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.RCA, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentRcaEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -646,7 +724,7 @@ export class IncidentService {
         });
       });
 
-      es.addEventListener('incident.finops', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.FINOPS, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentFinopsEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -663,7 +741,7 @@ export class IncidentService {
         });
       });
 
-      es.addEventListener('incident.docs', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.DOCS, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentDocsEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -680,7 +758,7 @@ export class IncidentService {
         });
       });
 
-      es.addEventListener('incident.remediation', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.REMEDIATION, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentRemediationEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -707,7 +785,7 @@ export class IncidentService {
         });
       });
 
-      es.addEventListener('incident.notified', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.NOTIFIED, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentNotifiedEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -732,7 +810,7 @@ export class IncidentService {
         });
       });
 
-      es.addEventListener('incident.decision', (evt: MessageEvent) => {
+      es.addEventListener(IncidentEventType.DECISION, (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentDecisionEvent>(evt.data);
         if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
@@ -746,7 +824,10 @@ export class IncidentService {
             ...curr,
             decision: payload.action,
             decisionSource: payload.source,
-            state: payload.action === 'approve' ? 'RESOLVED' : 'REJECTED'
+            state:
+              payload.action === DecisionAction.APPROVE
+                ? IncidentState.RESOLVED
+                : IncidentState.REJECTED
           };
         });
       });
@@ -792,15 +873,18 @@ export class IncidentService {
    * Fetches full details for a specific incident by ID.
    */
   async fetchIncident(id: string, baseUrl = ''): Promise<void> {
+    if (this.dismissedIncidentIds.has(id)) {
+      return;
+    }
     const token = ++this.activeIncidentFetchToken;
     try {
       const res = await fetch(`${baseUrl}/api/incidents/${encodeURIComponent(id)}`);
-      if (token !== this.activeIncidentFetchToken) {
+      if (token !== this.activeIncidentFetchToken || this.dismissedIncidentIds.has(id)) {
         return;
       }
       if (res.ok) {
         const detail = (await res.json()) as IncidentDetail;
-        if (token === this.activeIncidentFetchToken) {
+        if (token === this.activeIncidentFetchToken && !this.dismissedIncidentIds.has(id)) {
           this.currentIncident.set(detail);
           this.loadError.set(null);
         }
@@ -808,7 +892,7 @@ export class IncidentService {
         this.loadError.set(`Failed to fetch incident ${id}: HTTP ${res.status}`);
       }
     } catch (err) {
-      if (token === this.activeIncidentFetchToken) {
+      if (token === this.activeIncidentFetchToken && !this.dismissedIncidentIds.has(id)) {
         this.loadError.set(toErrorMessage(err));
       }
     }
@@ -900,7 +984,7 @@ export class IncidentService {
       this.currentIncident.set(null);
       this.awaitingIncidentStart.set(true);
 
-      if (mode === 'live') {
+      if (mode === IncidentExecutionMode.LIVE) {
         this.startLiveWaitTimer();
       } else {
         this.stopLiveWaitTimer();
@@ -936,6 +1020,7 @@ export class IncidentService {
       }
 
       if (clearIncident) {
+        this.activeIncidentFetchToken++;
         const current = this.currentIncident();
         if (current) {
           this.dismissedIncidentIds.add(current.id);
@@ -988,8 +1073,9 @@ export class IncidentService {
           return {
             ...curr,
             decision: action,
-            decisionSource: 'demo_simulation',
-            state: action === 'approve' ? 'RESOLVED' : 'REJECTED'
+            decisionSource: DecisionSource.DEMO_SIMULATION,
+            state:
+              action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED
           };
         });
         return { ok: true, status: res.status };
@@ -1014,7 +1100,7 @@ export class IncidentService {
     payload: DecisionPayload,
     baseUrl = ''
   ): Promise<boolean> {
-    this.decisionStatus.set('loading');
+    this.decisionStatus.set(DecisionUiStatus.LOADING);
     try {
       const res = await fetch(
         `${baseUrl}/api/incidents/${encodeURIComponent(incidentId)}/decision`,
@@ -1027,16 +1113,16 @@ export class IncidentService {
 
       this.decisionStatusCode.set(res.status);
       if (res.ok) {
-        this.decisionStatus.set('success');
+        this.decisionStatus.set(DecisionUiStatus.SUCCESS);
         this.decisionError.set(null);
         return true;
       }
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      this.decisionStatus.set('error');
+      this.decisionStatus.set(DecisionUiStatus.ERROR);
       this.decisionError.set(data?.error ?? null);
       return false;
     } catch (err) {
-      this.decisionStatus.set('error');
+      this.decisionStatus.set(DecisionUiStatus.ERROR);
       this.decisionStatusCode.set(null);
       this.decisionError.set(toErrorMessage(err));
       return false;

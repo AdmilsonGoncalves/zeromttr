@@ -397,8 +397,9 @@ processors:
     log_statements:
       - context: log
         statements:
-          # Mascara CPF (ex.: 123.456.789-00 -> [REDACTED_CPF])
+          # Mascara CPF (formatado e apenas 11 dígitos, ex.: 123.456.789-00 -> [REDACTED_CPF])
           - replace_pattern(body, "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
+          - replace_pattern(body, "\\b\\d{11}\\b", "[REDACTED_CPF]")
           # Mascara CNPJ (ex.: 12.345.678/0001-99 -> [REDACTED_CNPJ])
           - replace_pattern(body, "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
           # Mascara tokens Bearer / JWT (case-insensitive para Bearer)
@@ -413,6 +414,7 @@ processors:
           - replace_pattern(body, "(?i:(?:pix(?:_?key)?|chave_?pix|evp)[\"'=:\\s]+[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\b", "pixKey=[REDACTED_PIX_EVP]")
           # Aplica o mesmo mascaramento sobre atributos string do log
           - replace_all_patterns(attributes, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{11}\\b", "[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
           - replace_all_patterns(attributes, "value", "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
           - replace_all_patterns(attributes, "value", "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b", "[REDACTED_JWT]")
