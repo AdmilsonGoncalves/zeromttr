@@ -44,12 +44,8 @@ describe('WarRoomComponent', () => {
     expect(incidentService.activeMode()).toBe('replay');
   });
 
-  it('should update live demo key on input event', () => {
-    const inputEvent = {
-      target: { value: 'demo-secret-key-123' }
-    } as unknown as Event;
-
-    component.onLiveKeyInput(inputEvent);
+  it('should update live demo key when onLiveKeyChange is called', () => {
+    component.onLiveKeyChange('demo-secret-key-123');
     expect(incidentService.liveDemoKey()).toBe('demo-secret-key-123');
   });
 
@@ -62,21 +58,6 @@ describe('WarRoomComponent', () => {
     component.onLangChange('pt');
     expect(i18n.currentLang()).toBe('pt');
     expect(i18n.t('simulateIncident')).toBe('💥 Simular Incidente');
-  });
-
-  it('should expose mock git diff and logs for tabs 2 and 3 and extract clean body from Loki JSON envelope', () => {
-    expect(component.mockGitDiff).toContain('acquireTimeoutMillis: 100');
-    expect(component.mockGitDiff).toContain('acquireTimeoutMillis: 5000');
-    expect(component.rawPreCollectorLog).toContain('123.456.789-00');
-    expect(component.maskedPostOttlLog).toContain('[REDACTED_CPF]');
-
-    const lokiEnvelopeIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
-    lokiEnvelopeIncident.rca.logSample =
-      '{"body":"ERROR [api-pagamentos-core] Pool exhausted for CPF [REDACTED_CPF]","traceid":"abc","attributes":{"service":"api-pagamentos-core"}}\n{"body":"second line"}';
-    incidentService.currentIncident.set(lokiEnvelopeIncident);
-    expect(component.displayedPostOttlLog()).toBe(
-      'ERROR [api-pagamentos-core] Pool exhausted for CPF [REDACTED_CPF]'
-    );
   });
 
   it('should delegate chaos, reset and simulate decision actions to IncidentService', async () => {
@@ -169,22 +150,5 @@ describe('WarRoomComponent', () => {
     expect(incidentService.reasoningSource()).toBe('llm');
     expect(incidentService.isPiiPassed()).toBe(true);
     expect(incidentService.timelineSteps()).toHaveLength(8);
-  });
-
-  it('should sanitize resend preview HTML safely and translate degraded/dispatched status messages', () => {
-    expect(component.safeResendPreview()).toContain('🚨 ZeroMTTR Incident Post-Mortem');
-
-    const degradedIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
-    degradedIncident.notification = {
-      emailId: 'email-fallback-1',
-      status: 'degraded',
-      htmlPreview: 'Warning: Resend delivery failed (403). Notification in degraded mode.'
-    };
-    incidentService.currentIncident.set(degradedIncident);
-    expect(component.safeResendPreview()).toContain(i18n.t('resendDegradedTitle'));
-
-    component.onLangChange('en');
-    expect(component.safeResendPreview()).toContain(i18n.t('resendDegradedTitle'));
-    component.onLangChange('pt');
   });
 });

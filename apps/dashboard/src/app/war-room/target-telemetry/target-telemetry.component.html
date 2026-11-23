@@ -1,0 +1,173 @@
+@if (metrics(); as m) {
+  <div class="bg-slate-950/70 border border-slate-800/90 rounded-lg p-2 flex flex-col gap-2">
+    <div class="flex items-center justify-between gap-2">
+      <span
+        class="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5"
+      >
+        <i class="pi pi-heart-fill text-cyan-400 text-xs"></i>
+        <span>{{ i18n.t('targetTelemetryLabel') }} — api-pagamentos-core</span>
+      </span>
+      <p-tag
+        [value]="
+          m.healthyTrafficActive
+            ? i18n.t('healthyTrafficActiveBadge')
+            : i18n.t('healthyTrafficIdleBadge')
+        "
+        [severity]="m.healthyTrafficActive ? 'success' : 'secondary'"
+        styleClass="text-[10px] py-0.5 px-2"
+      />
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <!-- Card 1: Throughput Req/s -->
+      <div
+        class="bg-slate-900/95 border rounded-md px-3 py-2 flex flex-col justify-between gap-1.5 shadow-sm"
+        [ngClass]="throughputLevel() === 'warn' ? 'border-amber-500/70' : 'border-slate-800'"
+      >
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-slate-400 font-medium">
+            {{ i18n.t('targetRpsLabel') }}
+          </span>
+          <i
+            class="pi pi-bolt text-xs"
+            [ngClass]="throughputLevel() === 'warn' ? 'text-amber-400' : 'text-cyan-400'"
+          ></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span
+            class="text-xl font-mono font-bold"
+            [ngClass]="throughputLevel() === 'warn' ? 'text-amber-300' : 'text-cyan-300'"
+          >
+            {{ m.requestsPerSecond }}
+          </span>
+          <span class="text-[10px] font-mono text-slate-400">req/s</span>
+        </div>
+        <p-progressbar
+          [value]="throughputPercent()"
+          [showValue]="false"
+          [styleClass]="
+            'h-1.5 bg-slate-800 ' +
+            (throughputLevel() === 'warn' ? 'telemetry-bar-warn' : 'telemetry-bar-healthy')
+          "
+        />
+      </div>
+
+      <!-- Card 2: 5xx Error Rate with PrimeNG Knob -->
+      <div
+        class="bg-slate-900/95 border rounded-md px-3 py-2 flex items-center justify-between gap-2 shadow-sm"
+        [ngClass]="{
+          'border-rose-500/70': error5xxLevel() === 'critical',
+          'border-amber-500/70': error5xxLevel() === 'warn',
+          'border-slate-800': error5xxLevel() === 'healthy'
+        }"
+      >
+        <div class="flex flex-col justify-between gap-1">
+          <span class="text-[11px] text-slate-400 font-medium">
+            {{ i18n.t('targetError5xxLabel') }}
+          </span>
+          <span
+            class="text-xl font-mono font-bold"
+            [ngClass]="{
+              'text-rose-400': error5xxLevel() === 'critical',
+              'text-amber-300': error5xxLevel() === 'warn',
+              'text-emerald-400': error5xxLevel() === 'healthy'
+            }"
+          >
+            {{ m.errorRate5xxPercent }}%
+          </span>
+          <span
+            class="text-[10px] font-medium"
+            [ngClass]="{
+              'text-rose-300': error5xxLevel() === 'critical',
+              'text-amber-300': error5xxLevel() === 'warn',
+              'text-emerald-400': error5xxLevel() === 'healthy'
+            }"
+          >
+            {{
+              error5xxLevel() === 'healthy'
+                ? i18n.t('targetSlaErrorOk')
+                : i18n.t('targetSlaErrorBreach')
+            }}
+          </span>
+        </div>
+        <p-knob
+          [ngModel]="m.errorRate5xxPercent"
+          [readonly]="true"
+          [size]="52"
+          [strokeWidth]="10"
+          valueTemplate="{value}%"
+          [valueColor]="error5xxColor()"
+          rangeColor="#1e293b"
+          textColor="#e2e8f0"
+        />
+      </div>
+
+      <!-- Card 3: p95 Latency -->
+      <div
+        class="bg-slate-900/95 border rounded-md px-3 py-2 flex flex-col justify-between gap-1.5 shadow-sm"
+        [ngClass]="{
+          'border-rose-500/70': latencyLevel() === 'critical',
+          'border-amber-500/70': latencyLevel() === 'warn',
+          'border-slate-800': latencyLevel() === 'healthy'
+        }"
+      >
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-slate-400 font-medium">
+            {{ i18n.t('targetP95Label') }}
+          </span>
+          <span class="text-[10px] font-mono text-slate-400">
+            {{ i18n.t('targetSloLatencyHint') }}
+          </span>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span
+            class="text-xl font-mono font-bold"
+            [ngClass]="{
+              'text-rose-400': latencyLevel() === 'critical',
+              'text-amber-300': latencyLevel() === 'warn',
+              'text-emerald-400': latencyLevel() === 'healthy'
+            }"
+          >
+            {{ m.p95LatencyMs }}
+          </span>
+          <span class="text-[10px] font-mono text-slate-400">ms</span>
+        </div>
+        <p-progressbar
+          [value]="latencyPercent()"
+          [showValue]="false"
+          [styleClass]="'h-1.5 bg-slate-800 telemetry-bar-' + latencyLevel()"
+        />
+      </div>
+
+      <!-- Card 4: DB Pool with PrimeNG MeterGroup -->
+      <div
+        class="bg-slate-900/95 border rounded-md px-3 py-2 flex flex-col justify-between gap-1.5 shadow-sm"
+        [ngClass]="{
+          'border-rose-500/70': poolLevel() === 'critical',
+          'border-amber-500/70': poolLevel() === 'warn',
+          'border-slate-800': poolLevel() === 'healthy'
+        }"
+      >
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-slate-400 font-medium">
+            {{ i18n.t('targetPoolLabel') }}
+          </span>
+          <span
+            class="text-sm font-mono font-bold"
+            [ngClass]="{
+              'text-rose-400': poolLevel() === 'critical',
+              'text-amber-300': poolLevel() === 'warn',
+              'text-emerald-400': poolLevel() === 'healthy'
+            }"
+          >
+            {{ m.poolActive }}/{{ m.poolMax }}
+            @if (m.poolWaiting > 0) {
+              <span class="text-amber-300 text-xs">(+{{ m.poolWaiting }})</span>
+            }
+          </span>
+        </div>
+        <p-metergroup [value]="poolMeters()" [max]="poolMax()" />
+      </div>
+    </div>
+  </div>
+}

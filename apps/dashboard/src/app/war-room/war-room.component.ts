@@ -1,82 +1,28 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  OnInit,
-  OnDestroy,
-  computed,
-  inject,
-  signal
-} from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import {
-  escapeHtml,
-  isFilled,
-  isNonEmptyString,
-  isObject,
-  isString,
-  safeJsonParse
-} from '@zeromttr/utils';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { isNonEmptyString } from '@zeromttr/utils';
 import { MessageService } from 'primeng/api';
-import { SelectButton } from 'primeng/selectbutton';
-import { Tag } from 'primeng/tag';
-import { Button } from 'primeng/button';
-import { Tabs, TabList, Tab, TabPanels, TabPanel } from 'primeng/tabs';
-import { ProgressBar } from 'primeng/progressbar';
-import { Knob } from 'primeng/knob';
-import { MeterGroup, type MeterItem } from 'primeng/metergroup';
-import { Timeline } from 'primeng/timeline';
 import { Toast } from 'primeng/toast';
-import { Tooltip } from 'primeng/tooltip';
+import { DecisionAction, type IncidentMode } from '../core/contract.js';
 import { I18nService, type Language } from '../core/i18n.service.js';
-import {
-  DecisionAction,
-  IncidentExecutionMode,
-  NotificationStatus,
-  type IncidentMode
-} from '../core/contract.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
-import {
-  MASKED_POST_OTTL_LOG,
-  MOCK_GIT_DIFF,
-  RAW_PRE_COLLECTOR_LOG,
-  TARGET_TELEMETRY_THRESHOLDS,
-  TelemetryHealthLevel
-} from '../core/constants.js';
-
-interface ModeOption {
-  label: string;
-  value: IncidentMode;
-}
-
-interface LangOption {
-  label: string;
-  value: Language;
-}
+import { EvidencePanelComponent } from './evidence-panel/evidence-panel.component.js';
+import { FsmTimelineComponent } from './fsm-timeline/fsm-timeline.component.js';
+import { RemediationPanelComponent } from './remediation-panel/remediation-panel.component.js';
+import { TargetTelemetryComponent } from './target-telemetry/target-telemetry.component.js';
+import { WarRoomHeaderComponent } from './war-room-header/war-room-header.component.js';
 
 /**
- * Single-pane War Room mission control component displaying live telemetry, PII audit, diffs, and FinOps.
+ * Single-pane War Room mission control orchestrator composing quadrant child components via signals.
  */
 @Component({
   selector: 'app-war-room',
   imports: [
-    CommonModule,
-    FormsModule,
-    SelectButton,
-    Tag,
-    Button,
-    Tabs,
-    TabList,
-    Tab,
-    TabPanels,
-    TabPanel,
-    ProgressBar,
-    Knob,
-    MeterGroup,
-    Timeline,
     Toast,
-    Tooltip
+    WarRoomHeaderComponent,
+    FsmTimelineComponent,
+    TargetTelemetryComponent,
+    EvidencePanelComponent,
+    RemediationPanelComponent
   ],
   providers: [MessageService],
   templateUrl: './war-room.component.html',
@@ -86,227 +32,10 @@ interface LangOption {
 export class WarRoomComponent implements OnInit, OnDestroy {
   readonly i18n: I18nService;
   readonly incidentService: IncidentService;
-  readonly sanitizer: DomSanitizer;
   readonly messageService: MessageService;
 
-  readonly activeTab = signal<string>('0');
-  readonly mockGitDiff = MOCK_GIT_DIFF;
-  readonly rawPreCollectorLog = RAW_PRE_COLLECTOR_LOG;
-  readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
-
-  readonly targetThroughputPercent = computed<number>(() => {
-    const rps = this.incidentService.targetMetrics()?.requestsPerSecond ?? 0;
-    return Math.min(
-      100,
-      Math.round((rps / TARGET_TELEMETRY_THRESHOLDS.THROUGHPUT_SCALE_MAX_RPS) * 100)
-    );
-  });
-
-  readonly targetLatencyPercent = computed<number>(() => {
-    const p95 = this.incidentService.targetMetrics()?.p95LatencyMs ?? 0;
-    return Math.min(
-      100,
-      Math.round((p95 / TARGET_TELEMETRY_THRESHOLDS.LATENCY_P95_SCALE_MAX_MS) * 100)
-    );
-  });
-
-  readonly targetThroughputLevel = computed<TelemetryHealthLevel>(() => {
-    const metrics = this.incidentService.targetMetrics();
-    if (!metrics || !metrics.healthyTrafficActive) {
-      return TelemetryHealthLevel.HEALTHY;
-    }
-    if (metrics.requestsPerSecond < TARGET_TELEMETRY_THRESHOLDS.THROUGHPUT_WARN_MIN_RPS) {
-      return TelemetryHealthLevel.WARN;
-    }
-    return TelemetryHealthLevel.HEALTHY;
-  });
-
-  readonly targetError5xxLevel = computed<TelemetryHealthLevel>(() => {
-    const err = this.incidentService.targetMetrics()?.errorRate5xxPercent ?? 0;
-    if (err >= TARGET_TELEMETRY_THRESHOLDS.ERROR_5XX_CRITICAL_PERCENT) {
-      return TelemetryHealthLevel.CRITICAL;
-    }
-    if (err >= TARGET_TELEMETRY_THRESHOLDS.ERROR_5XX_WARN_PERCENT) {
-      return TelemetryHealthLevel.WARN;
-    }
-    return TelemetryHealthLevel.HEALTHY;
-  });
-
-  readonly targetLatencyLevel = computed<TelemetryHealthLevel>(() => {
-    const p95 = this.incidentService.targetMetrics()?.p95LatencyMs ?? 0;
-    if (p95 >= TARGET_TELEMETRY_THRESHOLDS.LATENCY_P95_CRITICAL_MS) {
-      return TelemetryHealthLevel.CRITICAL;
-    }
-    if (p95 >= TARGET_TELEMETRY_THRESHOLDS.LATENCY_P95_WARN_MS) {
-      return TelemetryHealthLevel.WARN;
-    }
-    return TelemetryHealthLevel.HEALTHY;
-  });
-
-  readonly targetPoolLevel = computed<TelemetryHealthLevel>(() => {
-    const metrics = this.incidentService.targetMetrics();
-    if (!metrics || metrics.poolMax <= 0) {
-      return TelemetryHealthLevel.HEALTHY;
-    }
-    const ratio = metrics.poolActive / metrics.poolMax;
-    if (metrics.poolWaiting > 0 || ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_CRITICAL_RATIO) {
-      return TelemetryHealthLevel.CRITICAL;
-    }
-    if (ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_WARN_RATIO) {
-      return TelemetryHealthLevel.WARN;
-    }
-    return TelemetryHealthLevel.HEALTHY;
-  });
-
-  readonly targetError5xxColor = computed<string>(() => {
-    const level = this.targetError5xxLevel();
-    if (level === TelemetryHealthLevel.CRITICAL) {
-      return '#f43f5e';
-    }
-    if (level === TelemetryHealthLevel.WARN) {
-      return '#f59e0b';
-    }
-    return '#10b981';
-  });
-
-  readonly targetPoolMax = computed<number>(() => {
-    const metrics = this.incidentService.targetMetrics();
-    if (!metrics) {
-      return 10;
-    }
-    return Math.max(1, metrics.poolMax, metrics.poolActive + metrics.poolWaiting);
-  });
-
-  readonly targetPoolMeters = computed<MeterItem[]>(() => {
-    const metrics = this.incidentService.targetMetrics();
-    if (!metrics) {
-      return [];
-    }
-    const poolLevel = this.targetPoolLevel();
-    const activeColor =
-      poolLevel === TelemetryHealthLevel.CRITICAL
-        ? '#f43f5e'
-        : poolLevel === TelemetryHealthLevel.WARN
-          ? '#f59e0b'
-          : '#10b981';
-    const items: MeterItem[] = [
-      {
-        label: `${this.i18n.t('targetPoolActiveLabel')} (${metrics.poolActive})`,
-        value: metrics.poolActive,
-        color: activeColor
-      }
-    ];
-    if (metrics.poolWaiting > 0) {
-      items.push({
-        label: `${this.i18n.t('targetPoolWaitingLabel')} (${metrics.poolWaiting})`,
-        value: metrics.poolWaiting,
-        color: '#f59e0b'
-      });
-    }
-    return items;
-  });
-
-  readonly displayedPreCollectorLog = computed<string>(() => {
-    return (
-      this.incidentService.currentIncident()?.rca?.rawEdgeLogPreCollector ??
-      this.incidentService.targetStatus()?.rawEdgeLogPreCollector ??
-      this.rawPreCollectorLog
-    );
-  });
-
-  readonly displayedPostOttlLog = computed<string>(() => {
-    if (this.incidentService.isPiiPassed() === false) {
-      const types = (
-        this.incidentService.currentIncident()?.rca?.piiGuardAudit?.detectedTypes ?? []
-      ).join(', ');
-      return this.i18n.t('piiLogWithheldMessage').replace('{TYPES}', types);
-    }
-
-    const sample = this.incidentService.currentIncident()?.rca?.logSample;
-    if (!isNonEmptyString(sample)) {
-      return this.maskedPostOttlLog;
-    }
-
-    const lines = sample
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    for (const line of lines) {
-      const parsed = safeJsonParse<Record<string, unknown>>(line);
-      if (isObject(parsed) && isNonEmptyString(parsed.body)) {
-        return parsed.body;
-      }
-      const bodyMatch = line.match(/^\{"body":"((?:[^"\\]|\\.)*)"/);
-      if (bodyMatch?.[1]) {
-        return bodyMatch[1].replace(/\\"/g, '"');
-      }
-    }
-
-    return lines[0] ?? this.maskedPostOttlLog;
-  });
-
-  /**
-   * Updates the selected dashboard tab signal when a valid tab value is provided.
-   */
-  onTabChange(tab: string | number | undefined): void {
-    if (isFilled(tab)) {
-      this.activeTab.set(String(tab));
-    }
-  }
-
-  readonly safeResendPreview = computed<SafeHtml>(() => {
-    const incident = this.incidentService.currentIncident();
-    const notification = incident?.notification;
-    const raw = notification?.htmlPreview;
-
-    if (
-      notification?.status === NotificationStatus.DEGRADED ||
-      (isNonEmptyString(raw) && raw.startsWith('Warning: Resend delivery failed'))
-    ) {
-      const degradedHtml = `
-      <div style="font-family: sans-serif; color: #fde68a;">
-        <h3 style="color: #fbbf24; margin-top: 0; font-size: 12px;">${this.i18n.t('resendDegradedTitle')}</h3>
-        <p style="font-size: 11px; color: #cbd5e1; margin-bottom: 6px;">${this.i18n.t('resendDegradedBody')}</p>
-      </div>
-    `;
-      return this.sanitizer.bypassSecurityTrustHtml(degradedHtml);
-    }
-
-    if (
-      notification?.status === NotificationStatus.DISPATCHED &&
-      (!isNonEmptyString(raw) || !raw.trim().startsWith('<'))
-    ) {
-      const dispatchedHtml = `
-      <div style="font-family: sans-serif; color: #cbd5e1;">
-        <h3 style="color: #34d399; margin-top: 0; font-size: 12px;">✅ ${this.i18n.t('resendDispatchedBadge')}</h3>
-        <p style="font-size: 11px; margin-bottom: 4px;">${this.i18n.t('resendDispatchedBody')}</p>
-        <p style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${escapeHtml(notification.emailId ?? '')}</p>
-      </div>
-    `;
-      return this.sanitizer.bypassSecurityTrustHtml(dispatchedHtml);
-    }
-
-    const defaultPreview = `
-    <div style="font-family: sans-serif; color: #cbd5e1;">
-      <h3 style="color: #ef4444; margin-top: 0;">🚨 ZeroMTTR Incident Post-Mortem</h3>
-      <p style="font-size: 11px;">${this.i18n.t('resendDefaultBody')}</p>
-    </div>
-  `;
-    return this.sanitizer.bypassSecurityTrustHtml(raw ?? defaultPreview);
-  });
-
-  readonly modeOptions: ModeOption[] = [
-    { label: '⚡ Live API Mode', value: IncidentExecutionMode.LIVE },
-    { label: '🎬 Replay Mode', value: IncidentExecutionMode.REPLAY }
-  ];
-
-  readonly langOptions: LangOption[] = [
-    { label: '🇧🇷 PT', value: 'pt' },
-    { label: '🇺🇸 EN', value: 'en' }
-  ];
-
-  constructor(...args: [I18nService?, IncidentService?, DomSanitizer?, MessageService?]) {
-    const [i18n, incidentService, sanitizer, messageService] = args;
+  constructor(...args: [I18nService?, IncidentService?, MessageService?]) {
+    const [i18n, incidentService, messageService] = args;
     this.i18n = i18n ?? inject(I18nService);
     this.incidentService = incidentService ?? inject(IncidentService);
     if (messageService) {
@@ -316,21 +45,6 @@ export class WarRoomComponent implements OnInit, OnDestroy {
         this.messageService = inject(MessageService, { optional: true }) ?? new MessageService();
       } catch {
         this.messageService = new MessageService();
-      }
-    }
-    if (sanitizer) {
-      this.sanitizer = sanitizer;
-    } else {
-      try {
-        this.sanitizer =
-          inject(DomSanitizer, { optional: true }) ??
-          ({
-            bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
-          } as DomSanitizer);
-      } catch {
-        this.sanitizer = {
-          bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
-        } as DomSanitizer;
       }
     }
   }
@@ -357,13 +71,10 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Captures the live demo key from the input element and stores it in the service.
+   * Stores the live demo key in the incident service.
    */
-  onLiveKeyInput(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    if (target && isString(target.value)) {
-      this.incidentService.setLiveDemoKey(target.value);
-    }
+  onLiveKeyChange(key: string): void {
+    this.incidentService.setLiveDemoKey(key);
   }
 
   /**

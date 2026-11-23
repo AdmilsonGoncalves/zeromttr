@@ -1,0 +1,198 @@
+<header
+  class="shrink-0 bg-slate-900 border border-slate-800 rounded-lg p-2.5 shadow-md flex flex-col gap-2"
+>
+  <div class="flex flex-wrap items-center justify-between gap-2.5">
+    <div class="flex items-center gap-2.5">
+      <i class="pi pi-shield text-cyan-400 text-xl"></i>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-bold text-white tracking-wide">
+            {{ i18n.t('appTitle') }}
+          </h1>
+          <p-tag
+            [value]="sseConnected() ? 'SSE Connected' : 'SSE Offline'"
+            [severity]="sseConnected() ? 'success' : 'danger'"
+            styleClass="text-[10px] py-0"
+          />
+          @if (targetStatus(); as ts) {
+            <p-tag
+              [value]="
+                ts.service +
+                ': ' +
+                (ts.status === 'healthy' ? i18n.t('healthy') : i18n.t('degraded')) +
+                ' (' +
+                ts.version +
+                ')'
+              "
+              [severity]="ts.status === 'healthy' ? 'success' : 'warn'"
+              styleClass="text-[10px] py-0"
+            />
+          } @else {
+            <p-tag value="Target: --" severity="secondary" styleClass="text-[10px] py-0" />
+          }
+        </div>
+        <p class="text-[11px] text-slate-400">
+          {{ i18n.t('appSubtitle') }}
+        </p>
+      </div>
+    </div>
+
+    <!-- FinOps Badge -->
+    <div
+      class="bg-slate-950/90 border border-cyan-500/50 rounded px-2.5 py-1 flex items-center gap-2 shadow-inner"
+    >
+      <span class="text-xs font-mono text-cyan-300 font-semibold">
+        {{ i18n.t('finopsPayloadReduction') }}: {{ finopsReduction() }}% (Est. ~{{
+          estimatedTokensSaved()
+        }}
+        {{ i18n.t('finopsTokensSaved') }})
+      </span>
+    </div>
+
+    <!-- Controls: Mode, Demo Key, Chaos Buttons, and Language at extreme right -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <p-selectbutton
+        [options]="modeOptions"
+        [ngModel]="activeMode()"
+        (ngModelChange)="onModeSelect($event)"
+        [disabled]="isWorkflowRunning()"
+        optionLabel="label"
+        optionValue="value"
+        [pTooltip]="i18n.t('tooltipModeSelector')"
+        tooltipPosition="bottom"
+        styleClass="text-[10px]"
+      />
+
+      @if (activeMode() === 'live') {
+        <form (submit)="$event.preventDefault()" class="inline-flex m-0 p-0">
+          <input
+            type="text"
+            autocomplete="username"
+            value="zeromttr-live-demo"
+            readonly
+            tabindex="-1"
+            aria-hidden="true"
+            class="sr-only"
+          />
+          <input
+            type="password"
+            autocomplete="current-password"
+            [placeholder]="i18n.t('liveKeyPlaceholder')"
+            [value]="liveDemoKey()"
+            [disabled]="isWorkflowRunning()"
+            (input)="onLiveKeyInput($event)"
+            [pTooltip]="i18n.t('tooltipLiveKeyInput')"
+            tooltipPosition="bottom"
+            class="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-32 disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+        </form>
+      }
+
+      @if (activeMode() === 'live') {
+        <p-button
+          [label]="
+            healthyTrafficActive()
+              ? i18n.t('healthyTrafficStopBtn')
+              : i18n.t('healthyTrafficStartBtn')
+          "
+          [severity]="healthyTrafficActive() ? 'warn' : 'success'"
+          size="small"
+          [disabled]="isTogglingTraffic()"
+          (onClick)="toggleHealthyTraffic.emit()"
+          [pTooltip]="i18n.t('tooltipHealthyTraffic')"
+          tooltipPosition="bottom"
+          styleClass="text-xs py-1"
+        />
+      }
+      <p-button
+        [label]="i18n.t('simulateIncident')"
+        severity="danger"
+        size="small"
+        [disabled]="isWorkflowRunning()"
+        (onClick)="triggerChaos.emit()"
+        [pTooltip]="i18n.t('tooltipSimulateIncident')"
+        tooltipPosition="bottom"
+        styleClass="text-xs py-1"
+      />
+      <p-button
+        [label]="i18n.t('restoreService')"
+        severity="secondary"
+        size="small"
+        [disabled]="isResetting() || isSimulating()"
+        (onClick)="resetService.emit()"
+        [pTooltip]="i18n.t('tooltipRestoreService')"
+        tooltipPosition="bottom"
+        styleClass="text-xs py-1"
+      />
+
+      <p-selectbutton
+        [options]="langOptions"
+        [ngModel]="i18n.currentLang()"
+        (ngModelChange)="onLangSelect($event)"
+        optionLabel="label"
+        optionValue="value"
+        [pTooltip]="i18n.t('tooltipLanguageSelector')"
+        tooltipPosition="bottom"
+        styleClass="text-[10px]"
+      />
+    </div>
+  </div>
+
+  <!-- Replay Notice if Replay Mode -->
+  @if (activeMode() === 'replay') {
+    <div
+      class="bg-amber-950/50 border border-amber-700/60 rounded px-2.5 py-1 text-xs text-amber-200 flex items-center gap-2"
+    >
+      <i class="pi pi-info-circle text-amber-400"></i>
+      <span>{{ i18n.t('replayNotice') }}</span>
+    </div>
+  }
+
+  <ng-content />
+
+  <!-- Quick KPI Strip -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-slate-800/80">
+    <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+      <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtdLabel') }}</span>
+      <span class="text-base font-mono font-bold text-emerald-400">
+        {{ ttdDisplay() }}
+      </span>
+      <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtdTarget') }}</span>
+    </div>
+    <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+      <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtprLabel') }}</span>
+      <span class="text-base font-mono font-bold text-emerald-400">
+        {{ ttprDisplay() }}
+      </span>
+      <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtprTarget') }}</span>
+    </div>
+    <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+      <span class="text-[11px] text-slate-400">{{ i18n.t('evidenceCoverageLabel') }}</span>
+      <span class="text-base font-mono font-bold text-cyan-400">
+        {{ signalsRatio() }} ({{ evidenceCoveragePercent() }}%)
+      </span>
+      <span class="text-[9px] text-slate-400">PromQL + Exemplar + Tempo + Diff</span>
+    </div>
+    <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
+      <span class="text-[11px] text-slate-400">{{ i18n.t('reasoningSourceLabel') }}</span>
+      <div class="mt-0.5">
+        @if (reasoningSource() === 'llm') {
+          <span
+            class="bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
+          >
+            {{ i18n.t('reasoningSourceLlm') }}
+          </span>
+        } @else if (reasoningSource() === 'fallback') {
+          <span
+            class="bg-amber-950 border border-amber-500 text-amber-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
+          >
+            {{ i18n.t('reasoningSourceFallback') }}
+          </span>
+        } @else {
+          <span class="text-slate-500 font-mono text-[11px]">--</span>
+        }
+      </div>
+      <span class="text-[9px] text-slate-400 mt-0.5">rca.reasoningSource</span>
+    </div>
+  </div>
+</header>

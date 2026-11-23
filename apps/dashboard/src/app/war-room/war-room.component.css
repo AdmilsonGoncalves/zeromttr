@@ -5,29 +5,3 @@
   min-height: 0;
   overflow: hidden;
 }
-
-:host ::ng-deep .fsm-timeline .p-timeline-event-opposite {
-  display: none;
-}
-
-:host ::ng-deep .fsm-timeline .p-timeline-event-content {
-  padding-left: 0;
-  padding-right: 0.75rem;
-}
-
-:host ::ng-deep .fsm-timeline .p-timeline-event-connector {
-  background-color: #334155;
-  height: 2px;
-}
-
-:host ::ng-deep .telemetry-bar-healthy .p-progressbar-value {
-  background: #10b981;
-}
-
-:host ::ng-deep .telemetry-bar-warn .p-progressbar-value {
-  background: #f59e0b;
-}
-
-:host ::ng-deep .telemetry-bar-critical .p-progressbar-value {
-  background: #f43f5e;
-}
