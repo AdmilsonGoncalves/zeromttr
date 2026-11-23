@@ -1,9 +1,9 @@
 packages:
   - apps/*
   - libs/*
-ignoredBuiltDependencies:
-  - esbuild
-  - nx
+allowBuilds:
+  esbuild: false
+  nx: false
 
 catalog:
   '@types/node': ^22.13.14

@@ -2,7 +2,7 @@
   "name": "zeromttr",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@10.5.2",
+  "packageManager": "pnpm@12.23.0",
   "engines": {
     "node": ">=24.0.0"
   },
