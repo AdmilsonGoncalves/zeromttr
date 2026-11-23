@@ -64,26 +64,102 @@ describe('WarRoomComponent', () => {
     expect(i18n.t('simulateIncident')).toBe('💥 Simular Incidente');
   });
 
-  it('should expose mock git diff and logs for tabs 2 and 3', () => {
+  it('should expose mock git diff and logs for tabs 2 and 3 and extract clean body from Loki JSON envelope', () => {
     expect(component.mockGitDiff).toContain('acquireTimeoutMillis: 100');
     expect(component.mockGitDiff).toContain('acquireTimeoutMillis: 5000');
     expect(component.rawPreCollectorLog).toContain('123.456.789-00');
     expect(component.maskedPostOttlLog).toContain('[REDACTED_CPF]');
+
+    const lokiEnvelopeIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    lokiEnvelopeIncident.rca.logSample =
+      '{"body":"ERROR [api-pagamentos-core] Pool exhausted for CPF [REDACTED_CPF]","traceid":"abc","attributes":{"service":"api-pagamentos-core"}}\n{"body":"second line"}';
+    incidentService.currentIncident.set(lokiEnvelopeIncident);
+    expect(component.displayedPostOttlLog()).toBe(
+      'ERROR [api-pagamentos-core] Pool exhausted for CPF [REDACTED_CPF]'
+    );
   });
 
-  it('should delegate chaos, reset and simulate decision actions to IncidentService', () => {
-    const chaosSpy = vi.spyOn(incidentService, 'triggerChaos').mockImplementation(async () => {});
-    const resetSpy = vi.spyOn(incidentService, 'resetChaos').mockImplementation(async () => {});
-    const simSpy = vi.spyOn(incidentService, 'simulateDecision').mockImplementation(async () => {});
+  it('should delegate chaos, reset and simulate decision actions to IncidentService', async () => {
+    const chaosSpy = vi
+      .spyOn(incidentService, 'triggerChaos')
+      .mockResolvedValue({ ok: true, status: 200 });
+    const resetSpy = vi
+      .spyOn(incidentService, 'resetChaos')
+      .mockResolvedValue({ ok: true, status: 200 });
+    const simSpy = vi
+      .spyOn(incidentService, 'simulateDecision')
+      .mockResolvedValue({ ok: true, status: 200 });
+    const toastSpy = vi.spyOn(component.messageService, 'add');
 
-    component.onTriggerChaos();
+    await component.onTriggerChaos();
     expect(chaosSpy).toHaveBeenCalled();
 
-    component.onResetService();
-    expect(resetSpy).toHaveBeenCalled();
+    await component.onResetService();
+    expect(resetSpy).toHaveBeenCalledWith('', true);
 
-    component.onSimulateDecision();
+    await component.onSimulateDecision();
     expect(simSpy).toHaveBeenCalledWith('approve');
+    expect(resetSpy).toHaveBeenCalledWith('', false);
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'success',
+        summary: i18n.t('toastDecisionApprovedSummary')
+      })
+    );
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'success', summary: i18n.t('toastChaosStartedSummary') })
+    );
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'success',
+        summary: i18n.t('toastServiceRestoredSummary')
+      })
+    );
+  });
+
+  it('should display error or warning toast on 403, 429 and network errors from demo actions', async () => {
+    const toastSpy = vi.spyOn(component.messageService, 'add');
+
+    vi.spyOn(incidentService, 'triggerChaos').mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      error: 'Forbidden: Valid X-Live-Demo-Key required'
+    });
+    await component.onTriggerChaos();
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'error',
+        summary: i18n.t('toastLiveKeyRequiredSummary')
+      })
+    );
+
+    vi.spyOn(incidentService, 'triggerChaos').mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      error: 'Cooldown active',
+      retryAfterSeconds: 42
+    });
+    await component.onTriggerChaos();
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastCooldownSummary'),
+        detail: i18n.t('toastCooldownDetailWithSeconds').replace('{N}', '42')
+      })
+    );
+
+    vi.spyOn(incidentService, 'resetChaos').mockResolvedValueOnce({
+      ok: false,
+      error: 'Network failure'
+    });
+    await component.onResetService();
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'error',
+        summary: i18n.t('toastActionErrorSummary'),
+        detail: i18n.t('toastActionErrorDetail')
+      })
+    );
   });
 
   it('should compute evidence coverage and reasoning source correctly when incident is set', () => {
@@ -95,10 +171,20 @@ describe('WarRoomComponent', () => {
     expect(incidentService.timelineSteps()).toHaveLength(8);
   });
 
-  it('should sanitize resend preview HTML safely', () => {
+  it('should sanitize resend preview HTML safely and translate degraded/dispatched status messages', () => {
     expect(component.safeResendPreview()).toContain('🚨 ZeroMTTR Incident Post-Mortem');
 
-    incidentService.currentIncident.set(JSON.parse(JSON.stringify(MOCK_INCIDENT)));
-    expect(component.safeResendPreview()).toBeDefined();
+    const degradedIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    degradedIncident.notification = {
+      emailId: 'email-fallback-1',
+      status: 'degraded',
+      htmlPreview: 'Warning: Resend delivery failed (403). Notification in degraded mode.'
+    };
+    incidentService.currentIncident.set(degradedIncident);
+    expect(component.safeResendPreview()).toContain(i18n.t('resendDegradedTitle'));
+
+    component.onLangChange('en');
+    expect(component.safeResendPreview()).toContain(i18n.t('resendDegradedTitle'));
+    component.onLangChange('pt');
   });
 });

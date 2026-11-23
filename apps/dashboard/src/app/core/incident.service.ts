@@ -40,6 +40,23 @@ export interface TimelineStepItem {
   badgeSeverity?: 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast';
 }
 
+export interface DemoActionResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+  retryAfterSeconds?: number;
+}
+
+export interface FsmStageItem {
+  state: IncidentState | 'AWAITING_ALERT';
+  labelKey: keyof TranslationDictionary;
+  tooltipKey: keyof TranslationDictionary;
+  status: 'completed' | 'active' | 'pending' | 'failed';
+}
+
+const LIVE_DEMO_KEY_STORAGE_KEY = 'zeromttr_live_demo_key';
+const VISUAL_STEP_INTERVAL_MS = 450;
+
 /**
  * Signal-based state manager handling SSE incident streaming, polling, demo triggers, and signed decisions.
  */
@@ -48,6 +65,10 @@ export interface TimelineStepItem {
 })
 export class IncidentService {
   private eventSource: EventSource | null = null;
+  private liveWaitTimer: ReturnType<typeof setInterval> | null = null;
+  private visualStepTimer: ReturnType<typeof setTimeout> | null = null;
+  private visualStateQueue: IncidentState[] = [];
+  private readonly dismissedIncidentIds = new Set<string>();
 
   readonly currentIncident = signal<IncidentDetail | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
@@ -55,8 +76,45 @@ export class IncidentService {
   readonly activeMode = signal<IncidentMode>('replay');
   readonly liveDemoKey = signal<string>('');
   readonly isSimulating = signal<boolean>(false);
+  readonly isResetting = signal<boolean>(false);
+  readonly awaitingIncidentStart = signal<boolean>(false);
+  readonly liveWaitSeconds = signal<number>(0);
+  readonly stagedSseState = signal<IncidentState | null>(null);
   readonly decisionStatus = signal<'idle' | 'loading' | 'success' | 'error'>('idle');
   readonly loadError = signal<string | null>(null);
+
+  readonly displayedFsmState = computed<IncidentState | undefined>(() => {
+    const incident = this.currentIncident();
+    if (!incident) {
+      return undefined;
+    }
+    return this.stagedSseState() ?? incident.state;
+  });
+
+  readonly isWorkflowRunning = computed<boolean>(() => {
+    if (this.isSimulating() || this.awaitingIncidentStart()) {
+      return true;
+    }
+    const state = this.displayedFsmState();
+    return (
+      state === 'RECEIVED' ||
+      state === 'INVESTIGATING' ||
+      state === 'ENRICHING' ||
+      state === 'REMEDIATING' ||
+      state === 'AWAITING_PR'
+    );
+  });
+
+  constructor() {
+    try {
+      const savedKey = globalThis.localStorage?.getItem(LIVE_DEMO_KEY_STORAGE_KEY);
+      if (isNonEmptyString(savedKey)) {
+        this.liveDemoKey.set(savedKey);
+      }
+    } catch {
+      // Ignore storage access errors in headless/SSR environments
+    }
+  }
 
   readonly finopsReduction = computed<number>(() => {
     const finops = this.currentIncident()?.finops;
@@ -127,6 +185,112 @@ export class IncidentService {
 
   readonly leakedPatternsCount = computed<number>(() => {
     return this.currentIncident()?.rca?.piiGuardAudit.leakedPatternsDetected ?? 0;
+  });
+
+  readonly fsmStages = computed<FsmStageItem[]>(() => {
+    const incident = this.currentIncident();
+    const currentState = this.displayedFsmState();
+    const isAwaitingAlert = this.awaitingIncidentStart() && !currentState;
+
+    const orderedIncidentStages: Array<{
+      state: IncidentState;
+      labelKey: keyof TranslationDictionary;
+      tooltipKey: keyof TranslationDictionary;
+    }> = [
+      { state: 'RECEIVED', labelKey: 'fsmReceivedLabel', tooltipKey: 'fsmReceivedTip' },
+      {
+        state: 'INVESTIGATING',
+        labelKey: 'fsmInvestigatingLabel',
+        tooltipKey: 'fsmInvestigatingTip'
+      },
+      { state: 'ENRICHING', labelKey: 'fsmEnrichingLabel', tooltipKey: 'fsmEnrichingTip' },
+      { state: 'REMEDIATING', labelKey: 'fsmRemediatingLabel', tooltipKey: 'fsmRemediatingTip' },
+      { state: 'AWAITING_PR', labelKey: 'fsmAwaitingPrLabel', tooltipKey: 'fsmAwaitingPrTip' },
+      { state: 'NOTIFIED', labelKey: 'fsmNotifiedLabel', tooltipKey: 'fsmNotifiedTip' },
+      {
+        state: currentState === 'REJECTED' ? 'REJECTED' : 'RESOLVED',
+        labelKey: currentState === 'REJECTED' ? 'fsmRejectedLabel' : 'fsmResolvedLabel',
+        tooltipKey: 'fsmResolvedTip'
+      }
+    ];
+
+    const awaitingAlertStage: FsmStageItem = {
+      state: 'AWAITING_ALERT',
+      labelKey: 'fsmAwaitingAlertLabel',
+      tooltipKey: 'fsmAwaitingAlertTip',
+      status: currentState ? 'completed' : isAwaitingAlert ? 'active' : 'pending'
+    };
+
+    if (!currentState) {
+      return [
+        awaitingAlertStage,
+        ...orderedIncidentStages.map((stage) => ({ ...stage, status: 'pending' as const }))
+      ];
+    }
+
+    if (currentState === 'FAILED') {
+      const visited = new Set<IncidentState>(
+        (incident?.transitions ?? []).map((t) => t.to).filter((s) => s !== 'FAILED')
+      );
+      let failedMarked = false;
+      return [
+        awaitingAlertStage,
+        ...orderedIncidentStages.map((stage) => {
+          if (visited.has(stage.state)) {
+            return { ...stage, status: 'completed' as const };
+          }
+          if (!failedMarked) {
+            failedMarked = true;
+            return { ...stage, labelKey: 'fsmFailedLabel' as const, status: 'failed' as const };
+          }
+          return { ...stage, status: 'pending' as const };
+        })
+      ];
+    }
+
+    const activeIdx = orderedIncidentStages.findIndex((s) => s.state === currentState);
+    const isTerminal = currentState === 'RESOLVED' || currentState === 'REJECTED';
+
+    return [
+      awaitingAlertStage,
+      ...orderedIncidentStages.map((stage, idx) => {
+        if (idx < activeIdx) {
+          return { ...stage, status: 'completed' as const };
+        }
+        if (idx === activeIdx) {
+          return {
+            ...stage,
+            status:
+              currentState === 'REJECTED'
+                ? ('failed' as const)
+                : isTerminal
+                  ? ('completed' as const)
+                  : ('active' as const)
+          };
+        }
+        return { ...stage, status: 'pending' as const };
+      })
+    ];
+  });
+
+  readonly fsmHintKey = computed<keyof TranslationDictionary>(() => {
+    const state = this.displayedFsmState();
+    if (!state) {
+      return this.awaitingIncidentStart() ? 'fsmHintAwaitingAlert' : 'fsmHintIdle';
+    }
+    if (state === 'NOTIFIED') {
+      return 'fsmHintNotified';
+    }
+    if (state === 'RESOLVED') {
+      return 'fsmHintResolved';
+    }
+    if (state === 'REJECTED') {
+      return 'fsmHintRejected';
+    }
+    if (state === 'FAILED') {
+      return 'fsmHintFailed';
+    }
+    return 'fsmHintActive';
   });
 
   readonly timelineSteps = computed<TimelineStepItem[]>(() => {
@@ -296,10 +460,90 @@ export class IncidentService {
   }
 
   /**
-   * Stores the live demo authorization key used for protected chaos triggers.
+   * Stores the live demo authorization key in memory and `localStorage` for protected chaos triggers.
    */
   setLiveDemoKey(key: string): void {
     this.liveDemoKey.set(key);
+    try {
+      if (isNonEmptyString(key)) {
+        globalThis.localStorage?.setItem(LIVE_DEMO_KEY_STORAGE_KEY, key);
+      } else {
+        globalThis.localStorage?.removeItem(LIVE_DEMO_KEY_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+  }
+
+  private startLiveWaitTimer(): void {
+    this.stopLiveWaitTimer();
+    this.liveWaitSeconds.set(0);
+    this.liveWaitTimer = setInterval(() => {
+      this.liveWaitSeconds.update((sec) => sec + 1);
+    }, 1000);
+  }
+
+  private stopLiveWaitTimer(): void {
+    if (this.liveWaitTimer) {
+      clearInterval(this.liveWaitTimer);
+      this.liveWaitTimer = null;
+    }
+    this.liveWaitSeconds.set(0);
+  }
+
+  private clearVisualStateQueue(): void {
+    if (this.visualStepTimer) {
+      clearTimeout(this.visualStepTimer);
+      this.visualStepTimer = null;
+    }
+    this.visualStateQueue = [];
+    this.stagedSseState.set(null);
+  }
+
+  private scheduleNextVisualStep(): void {
+    if (this.visualStepTimer) {
+      return;
+    }
+    this.visualStepTimer = setTimeout(() => {
+      this.visualStepTimer = null;
+      const next = this.visualStateQueue.shift();
+      if (next) {
+        this.stagedSseState.set(next);
+        this.scheduleNextVisualStep();
+      } else {
+        this.stagedSseState.set(null);
+      }
+    }, VISUAL_STEP_INTERVAL_MS);
+  }
+
+  private enqueueVisualState(state: IncidentState): void {
+    if (state === 'RESOLVED' || state === 'REJECTED' || state === 'FAILED') {
+      this.clearVisualStateQueue();
+      return;
+    }
+    if (!this.visualStepTimer && this.stagedSseState() === null) {
+      this.stagedSseState.set(state);
+      this.scheduleNextVisualStep();
+      return;
+    }
+    const lastQueued =
+      this.visualStateQueue[this.visualStateQueue.length - 1] ?? this.stagedSseState();
+    if (lastQueued !== state) {
+      this.visualStateQueue.push(state);
+      this.scheduleNextVisualStep();
+    }
+  }
+
+  private hydrateMissedIncidentFromSse(incidentId: string, baseUrl: string): void {
+    if (this.dismissedIncidentIds.has(incidentId)) {
+      return;
+    }
+    this.awaitingIncidentStart.set(false);
+    this.stopLiveWaitTimer();
+    const curr = this.currentIncident();
+    if (!curr || curr.id !== incidentId) {
+      void this.fetchIncident(incidentId, baseUrl);
+    }
   }
 
   /**
@@ -329,11 +573,14 @@ export class IncidentService {
 
       es.addEventListener('incident.created', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentCreatedEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
         }
+        this.awaitingIncidentStart.set(false);
+        this.stopLiveWaitTimer();
         const current = this.currentIncident();
         if (!current || current.id !== payload.incidentId) {
+          this.clearVisualStateQueue();
           this.currentIncident.set({
             id: payload.incidentId,
             service: payload.service,
@@ -343,17 +590,23 @@ export class IncidentService {
             startedAt: payload.at,
             transitions: [{ from: null, to: 'RECEIVED', at: payload.at }]
           });
+          this.enqueueVisualState('RECEIVED');
         }
       });
 
       es.addEventListener('incident.transition', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentTransitionEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
+          return;
+        }
+        const currBefore = this.currentIncident();
+        if (!currBefore || currBefore.id !== payload.incidentId) {
+          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
           return;
         }
         this.currentIncident.update((curr) => {
-          if (!curr) {
-            return null;
+          if (!curr || curr.id !== payload.incidentId) {
+            return curr;
           }
           const updatedTransitions = [
             ...curr.transitions,
@@ -365,17 +618,23 @@ export class IncidentService {
             transitions: updatedTransitions
           };
         });
+        this.enqueueVisualState(payload.to);
       });
 
       es.addEventListener('incident.rca', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentRcaEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
+          return;
+        }
+        const currBefore = this.currentIncident();
+        if (!currBefore || currBefore.id !== payload.incidentId) {
+          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
           return;
         }
         const { incidentId: _incidentId, ...rca } = payload;
         this.currentIncident.update((curr) => {
-          if (!curr) {
-            return null;
+          if (!curr || curr.id !== payload.incidentId) {
+            return curr;
           }
           return {
             ...curr,
@@ -386,13 +645,13 @@ export class IncidentService {
 
       es.addEventListener('incident.finops', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentFinopsEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
         }
         const { incidentId: _incidentId, ...finops } = payload;
         this.currentIncident.update((curr) => {
-          if (!curr) {
-            return null;
+          if (!curr || curr.id !== payload.incidentId) {
+            return curr;
           }
           return {
             ...curr,
@@ -403,28 +662,34 @@ export class IncidentService {
 
       es.addEventListener('incident.docs', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentDocsEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
         }
+        const { incidentId: _incidentId, sources } = payload;
         this.currentIncident.update((curr) => {
-          if (!curr) {
-            return null;
+          if (!curr || curr.id !== payload.incidentId) {
+            return curr;
           }
           return {
             ...curr,
-            docs: payload.sources
+            docs: sources
           };
         });
       });
 
       es.addEventListener('incident.remediation', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentRemediationEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
+          return;
+        }
+        const currBefore = this.currentIncident();
+        if (!currBefore || currBefore.id !== payload.incidentId) {
+          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
           return;
         }
         this.currentIncident.update((curr) => {
-          if (!curr) {
-            return null;
+          if (!curr || curr.id !== payload.incidentId) {
+            return curr;
           }
           return {
             ...curr,
@@ -441,12 +706,17 @@ export class IncidentService {
 
       es.addEventListener('incident.notified', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentNotifiedEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
+          return;
+        }
+        const currBefore = this.currentIncident();
+        if (!currBefore || currBefore.id !== payload.incidentId) {
+          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
           return;
         }
         this.currentIncident.update((curr) => {
-          if (!curr) {
-            return null;
+          if (!curr || curr.id !== payload.incidentId) {
+            return curr;
           }
           return {
             ...curr,
@@ -461,12 +731,13 @@ export class IncidentService {
 
       es.addEventListener('incident.decision', (evt: MessageEvent) => {
         const payload = safeJsonParse<IncidentDecisionEvent>(evt.data);
-        if (!payload) {
+        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
           return;
         }
+        this.clearVisualStateQueue();
         this.currentIncident.update((curr) => {
-          if (!curr) {
-            return null;
+          if (!curr || curr.id !== payload.incidentId) {
+            return curr;
           }
           return {
             ...curr,
@@ -482,9 +753,11 @@ export class IncidentService {
   }
 
   /**
-   * Closes the active SSE connection and marks the stream as disconnected.
+   * Closes the active SSE connection and clears pending client timers.
    */
   disconnectSse(): void {
+    this.stopLiveWaitTimer();
+    this.clearVisualStateQueue();
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
@@ -560,19 +833,68 @@ export class IncidentService {
     return headers;
   }
 
+  private async readErrorPayload(
+    res: Response
+  ): Promise<{ error: string; retryAfterSeconds?: number }> {
+    try {
+      const body = (await res.json()) as { error?: unknown; retryAfterSeconds?: unknown };
+      const retryAfterSeconds = isNumber(body?.retryAfterSeconds)
+        ? body.retryAfterSeconds
+        : undefined;
+      if (isNonEmptyString(body?.error)) {
+        return {
+          error: body.error,
+          ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {})
+        };
+      }
+      if (retryAfterSeconds !== undefined) {
+        return { error: `HTTP ${res.status}`, retryAfterSeconds };
+      }
+    } catch {
+      // Ignore non-JSON error payloads
+    }
+    return { error: `HTTP ${res.status}` };
+  }
+
   /**
    * Triggers a chaos or replay simulation on the orchestrator demo API.
    */
-  async triggerChaos(baseUrl = ''): Promise<void> {
+  async triggerChaos(baseUrl = ''): Promise<DemoActionResult> {
     this.isSimulating.set(true);
 
     try {
-      await fetch(`${baseUrl}/api/demo/chaos`, {
+      const mode = this.activeMode();
+      const res = await fetch(`${baseUrl}/api/demo/chaos`, {
         method: 'POST',
         headers: this.buildDemoHeaders(true),
-        body: JSON.stringify({ mode: this.activeMode() })
+        body: JSON.stringify({ mode })
       });
+      if (!res.ok) {
+        await this.fetchTargetStatus(baseUrl);
+        const errPayload = await this.readErrorPayload(res);
+        return {
+          ok: false,
+          status: res.status,
+          ...errPayload
+        };
+      }
+
+      const current = this.currentIncident();
+      if (current) {
+        this.dismissedIncidentIds.add(current.id);
+      }
+      this.clearVisualStateQueue();
+      this.currentIncident.set(null);
+      this.awaitingIncidentStart.set(true);
+      if (mode === 'live') {
+        this.startLiveWaitTimer();
+      } else {
+        this.stopLiveWaitTimer();
+      }
       await this.fetchTargetStatus(baseUrl);
+      return { ok: true, status: res.status };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err) };
     } finally {
       this.isSimulating.set(false);
     }
@@ -581,30 +903,52 @@ export class IncidentService {
   /**
    * Resets target service chaos state and refreshes incident and target signals.
    */
-  async resetChaos(baseUrl = ''): Promise<void> {
-    this.isSimulating.set(true);
+  async resetChaos(baseUrl = '', clearIncident = false): Promise<DemoActionResult> {
+    this.isResetting.set(true);
     try {
-      await fetch(`${baseUrl}/api/demo/reset`, {
+      const res = await fetch(`${baseUrl}/api/demo/reset`, {
         method: 'POST',
         headers: this.buildDemoHeaders()
       });
       await this.fetchTargetStatus(baseUrl);
-      const current = this.currentIncident();
-      if (current) {
-        await this.fetchIncident(current.id, baseUrl);
+      if (clearIncident) {
+        const current = this.currentIncident();
+        if (current) {
+          this.dismissedIncidentIds.add(current.id);
+        }
+        this.awaitingIncidentStart.set(false);
+        this.stopLiveWaitTimer();
+        this.clearVisualStateQueue();
+        this.currentIncident.set(null);
+      } else {
+        const current = this.currentIncident();
+        if (current) {
+          await this.fetchIncident(current.id, baseUrl);
+        }
       }
+      if (!res.ok) {
+        const errPayload = await this.readErrorPayload(res);
+        return {
+          ok: false,
+          status: res.status,
+          ...errPayload
+        };
+      }
+      return { ok: true, status: res.status };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err) };
     } finally {
-      this.isSimulating.set(false);
+      this.isResetting.set(false);
     }
   }
 
   /**
    * Simulates an on-call decision on the current incident in demo mode.
    */
-  async simulateDecision(action: IncidentDecisionAction, baseUrl = ''): Promise<void> {
+  async simulateDecision(action: IncidentDecisionAction, baseUrl = ''): Promise<DemoActionResult> {
     const incident = this.currentIncident();
     if (!incident) {
-      return;
+      return { ok: false, error: 'No active incident selected' };
     }
 
     const payload: SimulateDecisionPayload = {
@@ -612,24 +956,37 @@ export class IncidentService {
       action
     };
 
-    const res = await fetch(`${baseUrl}/api/demo/simulate-decision`, {
-      method: 'POST',
-      headers: this.buildDemoHeaders(true),
-      body: JSON.stringify(payload)
-    });
-
-    if (res.ok) {
-      this.currentIncident.update((curr) => {
-        if (!curr) {
-          return null;
-        }
-        return {
-          ...curr,
-          decision: action,
-          decisionSource: 'demo_simulation',
-          state: action === 'approve' ? 'RESOLVED' : 'REJECTED'
-        };
+    try {
+      const res = await fetch(`${baseUrl}/api/demo/simulate-decision`, {
+        method: 'POST',
+        headers: this.buildDemoHeaders(true),
+        body: JSON.stringify(payload)
       });
+
+      if (res.ok) {
+        this.clearVisualStateQueue();
+        this.currentIncident.update((curr) => {
+          if (!curr) {
+            return null;
+          }
+          return {
+            ...curr,
+            decision: action,
+            decisionSource: 'demo_simulation',
+            state: action === 'approve' ? 'RESOLVED' : 'REJECTED'
+          };
+        });
+        return { ok: true, status: res.status };
+      }
+
+      const errPayload = await this.readErrorPayload(res);
+      return {
+        ok: false,
+        status: res.status,
+        ...errPayload
+      };
+    } catch (err) {
+      return { ok: false, error: toErrorMessage(err) };
     }
   }
 

@@ -10,16 +10,18 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { isFilled, isNonEmptyString, isString } from '@zeromttr/utils';
+import { isFilled, isNonEmptyString, isObject, isString, safeJsonParse } from '@zeromttr/utils';
+import { MessageService } from 'primeng/api';
 import { SelectButton } from 'primeng/selectbutton';
 import { Tag } from 'primeng/tag';
 import { Button } from 'primeng/button';
-import { Timeline } from 'primeng/timeline';
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from 'primeng/tabs';
 import { ProgressBar } from 'primeng/progressbar';
+import { Toast } from 'primeng/toast';
+import { Tooltip } from 'primeng/tooltip';
 import { I18nService, type Language } from '../core/i18n.service.js';
 import type { IncidentMode } from '../core/contract.js';
-import { IncidentService } from '../core/incident.service.js';
+import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
 import { MASKED_POST_OTTL_LOG, MOCK_GIT_DIFF, RAW_PRE_COLLECTOR_LOG } from '../core/constants.js';
 
 interface ModeOption {
@@ -43,14 +45,16 @@ interface LangOption {
     SelectButton,
     Tag,
     Button,
-    Timeline,
     Tabs,
     TabList,
     Tab,
     TabPanels,
     TabPanel,
-    ProgressBar
+    ProgressBar,
+    Toast,
+    Tooltip
   ],
+  providers: [MessageService],
   templateUrl: './war-room.component.html',
   styleUrl: './war-room.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -59,11 +63,51 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   readonly i18n: I18nService;
   readonly incidentService: IncidentService;
   readonly sanitizer: DomSanitizer;
+  readonly messageService: MessageService;
 
   readonly activeTab = signal<string>('0');
   readonly mockGitDiff = MOCK_GIT_DIFF;
   readonly rawPreCollectorLog = RAW_PRE_COLLECTOR_LOG;
   readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
+
+  readonly displayedPreCollectorLog = computed<string>(() => {
+    return (
+      this.incidentService.currentIncident()?.rca?.rawEdgeLogPreCollector ??
+      this.incidentService.targetStatus()?.rawEdgeLogPreCollector ??
+      this.rawPreCollectorLog
+    );
+  });
+
+  readonly displayedPostOttlLog = computed<string>(() => {
+    if (this.incidentService.isPiiPassed() === false) {
+      const types = (
+        this.incidentService.currentIncident()?.rca?.piiGuardAudit?.detectedTypes ?? []
+      ).join(', ');
+      return this.i18n.t('piiLogWithheldMessage').replace('{TYPES}', types);
+    }
+
+    const sample = this.incidentService.currentIncident()?.rca?.logSample;
+    if (!isNonEmptyString(sample)) {
+      return this.maskedPostOttlLog;
+    }
+
+    const lines = sample
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    for (const line of lines) {
+      const parsed = safeJsonParse<Record<string, unknown>>(line);
+      if (isObject(parsed) && isNonEmptyString(parsed.body)) {
+        return parsed.body;
+      }
+      const bodyMatch = line.match(/^\{"body":"((?:[^"\\]|\\.)*)"/);
+      if (bodyMatch?.[1]) {
+        return bodyMatch[1].replace(/\\"/g, '"');
+      }
+    }
+
+    return lines[0] ?? this.maskedPostOttlLog;
+  });
 
   /**
    * Updates the selected dashboard tab signal when a valid tab value is provided.
@@ -75,14 +119,44 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   readonly safeResendPreview = computed<SafeHtml>(() => {
+    const incident = this.incidentService.currentIncident();
+    const notification = incident?.notification;
+    const raw = notification?.htmlPreview;
+
+    if (
+      notification?.status === 'degraded' ||
+      (isNonEmptyString(raw) && raw.startsWith('Warning: Resend delivery failed'))
+    ) {
+      const degradedHtml = `
+      <div style="font-family: sans-serif; color: #fde68a;">
+        <h3 style="color: #fbbf24; margin-top: 0; font-size: 12px;">${this.i18n.t('resendDegradedTitle')}</h3>
+        <p style="font-size: 11px; color: #cbd5e1; margin-bottom: 6px;">${this.i18n.t('resendDegradedBody')}</p>
+      </div>
+    `;
+      return this.sanitizer.bypassSecurityTrustHtml(degradedHtml);
+    }
+
+    if (
+      notification?.status === 'dispatched' &&
+      (!isNonEmptyString(raw) || !raw.trim().startsWith('<'))
+    ) {
+      const dispatchedHtml = `
+      <div style="font-family: sans-serif; color: #cbd5e1;">
+        <h3 style="color: #34d399; margin-top: 0; font-size: 12px;">✅ ${this.i18n.t('resendDispatchedBadge')}</h3>
+        <p style="font-size: 11px; margin-bottom: 4px;">${this.i18n.t('resendDispatchedBody')}</p>
+        <p style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${notification.emailId}</p>
+      </div>
+    `;
+      return this.sanitizer.bypassSecurityTrustHtml(dispatchedHtml);
+    }
+
     const defaultPreview = `
     <div style="font-family: sans-serif; color: #cbd5e1;">
       <h3 style="color: #ef4444; margin-top: 0;">🚨 ZeroMTTR Incident Post-Mortem</h3>
       <p style="font-size: 11px;">${this.i18n.t('resendDefaultBody')}</p>
     </div>
   `;
-    const raw = this.incidentService.currentIncident()?.notification?.htmlPreview ?? defaultPreview;
-    return this.sanitizer.bypassSecurityTrustHtml(raw);
+    return this.sanitizer.bypassSecurityTrustHtml(raw ?? defaultPreview);
   });
 
   readonly modeOptions: ModeOption[] = [
@@ -95,10 +169,19 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     { label: '🇺🇸 EN', value: 'en' }
   ];
 
-  constructor(...args: [I18nService?, IncidentService?, DomSanitizer?]) {
-    const [i18n, incidentService, sanitizer] = args;
+  constructor(...args: [I18nService?, IncidentService?, DomSanitizer?, MessageService?]) {
+    const [i18n, incidentService, sanitizer, messageService] = args;
     this.i18n = i18n ?? inject(I18nService);
     this.incidentService = incidentService ?? inject(IncidentService);
+    if (messageService) {
+      this.messageService = messageService;
+    } else {
+      try {
+        this.messageService = inject(MessageService, { optional: true }) ?? new MessageService();
+      } catch {
+        this.messageService = new MessageService();
+      }
+    }
     if (sanitizer) {
       this.sanitizer = sanitizer;
     } else {
@@ -154,24 +237,95 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Triggers a simulated failure or replay sequence.
-   */
-  onTriggerChaos(): void {
-    void this.incidentService.triggerChaos();
+  private notifyActionError(result: DemoActionResult): void {
+    if (result.status === 403) {
+      this.messageService.add({
+        severity: 'error',
+        summary: this.i18n.t('toastLiveKeyRequiredSummary'),
+        detail: this.i18n.t('toastLiveKeyRequiredDetail'),
+        life: 6000
+      });
+      return;
+    }
+
+    if (result.status === 429) {
+      const detail =
+        result.retryAfterSeconds !== undefined
+          ? this.i18n
+              .t('toastCooldownDetailWithSeconds')
+              .replace('{N}', String(result.retryAfterSeconds))
+          : this.i18n.t('toastCooldownDetail');
+      this.messageService.add({
+        severity: 'warn',
+        summary: this.i18n.t('toastCooldownSummary'),
+        detail,
+        life: 6000
+      });
+      return;
+    }
+
+    const fallbackDetail = result.status
+      ? `${this.i18n.t('toastActionErrorDetail')} (HTTP ${result.status})`
+      : this.i18n.t('toastActionErrorDetail');
+    this.messageService.add({
+      severity: 'error',
+      summary: this.i18n.t('toastActionErrorSummary'),
+      detail: fallbackDetail,
+      life: 6000
+    });
   }
 
   /**
-   * Resets target service chaos and refreshes dashboard state.
+   * Triggers a simulated failure or replay sequence and surfaces status feedback via toast.
    */
-  onResetService(): void {
-    void this.incidentService.resetChaos();
+  async onTriggerChaos(): Promise<void> {
+    const result = await this.incidentService.triggerChaos();
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+    this.messageService.add({
+      severity: 'success',
+      summary: this.i18n.t('toastChaosStartedSummary'),
+      detail: this.i18n.t('toastChaosStartedDetail'),
+      life: 4000
+    });
   }
 
   /**
-   * Triggers a simulated approval decision in demo mode.
+   * Resets target service chaos, refreshes dashboard state, and notifies via toast.
    */
-  onSimulateDecision(): void {
-    void this.incidentService.simulateDecision('approve');
+  async onResetService(): Promise<void> {
+    const result = await this.incidentService.resetChaos('', true);
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+    this.messageService.add({
+      severity: 'success',
+      summary: this.i18n.t('toastServiceRestoredSummary'),
+      detail: this.i18n.t('toastServiceRestoredDetail'),
+      life: 4000
+    });
+  }
+
+  /**
+   * Triggers a simulated approval decision in demo mode, restores target health, and keeps incident visible.
+   */
+  async onSimulateDecision(): Promise<void> {
+    const result = await this.incidentService.simulateDecision('approve');
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+
+    await this.incidentService.resetChaos('', false);
+
+    this.messageService.add({
+      severity: 'success',
+      summary: this.i18n.t('toastDecisionApprovedSummary'),
+      detail: this.i18n.t('toastDecisionApprovedDetail'),
+      life: 5000
+    });
   }
 }

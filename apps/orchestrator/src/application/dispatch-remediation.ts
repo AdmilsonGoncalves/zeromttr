@@ -41,6 +41,23 @@ export interface DispatchRemediationOptions {
   requiredContentPatterns?: RegExp[];
 }
 
+const TRUNCATED_PATCH_PLACEHOLDER_PATTERN =
+  /(?:\/\/|\/\*)\s*\.\.\.|keep all original|rest of (?:the )?(?:file|class|code)/i;
+
+function isTruncatedLlmSnippet(content: string, diffPatch?: string): boolean {
+  if (TRUNCATED_PATCH_PLACEHOLDER_PATTERN.test(content)) {
+    return true;
+  }
+  if (isNonEmptyString(diffPatch) && diffPatch.includes('[TRUNCATED_DIFF]')) {
+    return true;
+  }
+  // If LLM output a partial class without module imports or stripped surrounding exports
+  if (content.includes('class PaymentRepository') && !content.includes('KnexTimeoutError')) {
+    return true;
+  }
+  return false;
+}
+
 function validatePatchDefensively(
   synthesis: RcaAndPatchSynthesis,
   expectedSuspectPath?: string,
@@ -107,41 +124,7 @@ export class DispatchRemediation {
       throw new Error('Cannot create remediation PR without an authoritative suspectFilePath');
     }
 
-    // Inspect complete evidence object before LLM synthesis
-    const promptToAudit = JSON.stringify(evidence);
-    const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
-
-    let synthesis: RcaAndPatchSynthesis;
-    let reasoningSource: ReasoningSource;
-
-    if (piiAudit.passed) {
-      try {
-        const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
-        if (validatePatchDefensively(rawSynthesis, authoritativeSuspectPath, this.options)) {
-          synthesis = rawSynthesis;
-          reasoningSource = ReasoningProvider.LLM;
-        } else {
-          synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-          reasoningSource = ReasoningProvider.FALLBACK;
-        }
-      } catch {
-        synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-        reasoningSource = ReasoningProvider.FALLBACK;
-      }
-    } else {
-      // Fail-closed! Route directly to fallback
-      synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-      reasoningSource = ReasoningProvider.FALLBACK;
-    }
-
-    if (
-      reasoningSource === ReasoningProvider.FALLBACK &&
-      !validatePatchDefensively(synthesis, authoritativeSuspectPath, this.options)
-    ) {
-      throw new Error('Fallback remediation patch failed defensive validation');
-    }
-
-    // Ensure valid lifecycle transitions before REMEDIATING
+    // Ensure valid lifecycle transitions to REMEDIATING before synthesis so UI and TTD reflect start of remediation
     if (incident.state === IncidentState.INVESTIGATING) {
       const transitionEnriching = incident.transition(
         IncidentState.ENRICHING,
@@ -168,6 +151,51 @@ export class DispatchRemediation {
         at: transitionRemediating.at,
         reason: transitionRemediating.reason
       });
+    }
+
+    // Inspect complete evidence object before LLM synthesis
+    const promptToAudit = JSON.stringify(evidence);
+    const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
+
+    let synthesis: RcaAndPatchSynthesis;
+    let reasoningSource: ReasoningSource;
+
+    if (piiAudit.passed) {
+      try {
+        const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
+        let candidateSynthesis = rawSynthesis;
+        if (
+          isNonEmptyString(rawSynthesis.patchedContent) &&
+          isTruncatedLlmSnippet(rawSynthesis.patchedContent, evidence.gitDiff?.patch)
+        ) {
+          const fallbackPatch = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+          candidateSynthesis = {
+            ...rawSynthesis,
+            patchedContent: fallbackPatch.patchedContent
+          };
+        }
+        if (validatePatchDefensively(candidateSynthesis, authoritativeSuspectPath, this.options)) {
+          synthesis = candidateSynthesis;
+          reasoningSource = ReasoningProvider.LLM;
+        } else {
+          synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+          reasoningSource = ReasoningProvider.FALLBACK;
+        }
+      } catch {
+        synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+        reasoningSource = ReasoningProvider.FALLBACK;
+      }
+    } else {
+      // Fail-closed! Route directly to fallback
+      synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+      reasoningSource = ReasoningProvider.FALLBACK;
+    }
+
+    if (
+      reasoningSource === ReasoningProvider.FALLBACK &&
+      !validatePatchDefensively(synthesis, authoritativeSuspectPath, this.options)
+    ) {
+      throw new Error('Fallback remediation patch failed defensive validation');
     }
 
     // Annotate Grafana

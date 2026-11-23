@@ -50,13 +50,43 @@ describe('IncidentService', () => {
     }
   });
 
-  it('should toggle active mode and demo key', () => {
-    const service = new IncidentService();
-    service.setActiveMode('live');
-    expect(service.activeMode()).toBe('live');
+  it('should toggle active mode and demo key and persist key in localStorage when available', () => {
+    const store = new Map<string, string>();
+    const mockStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      }
+    } as unknown as Storage;
+    const originalStorage = globalThis.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: mockStorage,
+      configurable: true
+    });
 
-    service.setLiveDemoKey('secret-demo-token');
-    expect(service.liveDemoKey()).toBe('secret-demo-token');
+    try {
+      const service = new IncidentService();
+      service.setActiveMode('live');
+      expect(service.activeMode()).toBe('live');
+
+      service.setLiveDemoKey('secret-demo-token');
+      expect(service.liveDemoKey()).toBe('secret-demo-token');
+      expect(store.get('zeromttr_live_demo_key')).toBe('secret-demo-token');
+
+      const hydratedService = new IncidentService();
+      expect(hydratedService.liveDemoKey()).toBe('secret-demo-token');
+
+      service.setLiveDemoKey('');
+      expect(store.has('zeromttr_live_demo_key')).toBe(false);
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: originalStorage,
+        configurable: true
+      });
+    }
   });
 
   it('should fetch target status and incidents from server', async () => {
@@ -121,5 +151,79 @@ describe('IncidentService', () => {
 
     expect(ok).toBe(true);
     expect(service.decisionStatus()).toBe('success');
+  });
+
+  it('should return structured error details when triggerChaos receives 403 Forbidden', async () => {
+    const service = new IncidentService();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: 'Forbidden: Valid X-Live-Demo-Key required for live execution on public host'
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ service: 'api-pagamentos-core', status: 'healthy', version: 'v2.14.7' }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        )
+      );
+
+    const result = await service.triggerChaos(baseUrl);
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      error: 'Forbidden: Valid X-Live-Demo-Key required for live execution on public host'
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('should compute FSM flow stages and contextual hint across lifecycle states', () => {
+    const service = new IncidentService();
+    expect(service.fsmHintKey()).toBe('fsmHintIdle');
+    expect(service.fsmStages()).toHaveLength(8);
+    expect(service.fsmStages().every((stage) => stage.status === 'pending')).toBe(true);
+    expect(service.isWorkflowRunning()).toBe(false);
+
+    service.awaitingIncidentStart.set(true);
+    expect(service.fsmHintKey()).toBe('fsmHintAwaitingAlert');
+    expect(service.fsmStages()[0]?.status).toBe('active');
+    expect(service.isWorkflowRunning()).toBe(true);
+
+    service.awaitingIncidentStart.set(false);
+    const incident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    incident.state = 'ENRICHING';
+    service.currentIncident.set(incident);
+    expect(service.fsmHintKey()).toBe('fsmHintActive');
+    expect(service.isWorkflowRunning()).toBe(true);
+    expect(service.fsmStages().map((stage) => stage.status)).toEqual([
+      'completed',
+      'completed',
+      'completed',
+      'active',
+      'pending',
+      'pending',
+      'pending',
+      'pending'
+    ]);
+
+    incident.state = 'NOTIFIED';
+    service.currentIncident.set({ ...incident });
+    expect(service.fsmHintKey()).toBe('fsmHintNotified');
+    expect(service.isWorkflowRunning()).toBe(false);
+    expect(service.fsmStages()[6]?.status).toBe('active');
+
+    incident.state = 'RESOLVED';
+    service.currentIncident.set({ ...incident });
+    expect(service.fsmHintKey()).toBe('fsmHintResolved');
+    expect(service.isWorkflowRunning()).toBe(false);
+    expect(service.fsmStages().every((stage) => stage.status === 'completed')).toBe(true);
   });
 });

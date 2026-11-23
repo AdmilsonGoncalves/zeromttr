@@ -89,7 +89,6 @@ export class InvestigateIncident {
       promqlOutput.summarizedSeries.some((s) => (s.p95 ?? 0) > 2000);
 
     let exemplarTraceId = promqlOutput.exemplarTraceId;
-    const hasMetricExemplar = Boolean(exemplarTraceId);
 
     // 2. Trace Analysis (with TraceQL fallback if PromQL returned no exemplar)
     let traceAnalysis: TraceAnalysisOutput | undefined;
@@ -114,6 +113,8 @@ export class InvestigateIncident {
         // Non-fatal TraceQL fallback failure
       }
     }
+
+    const hasMetricExemplar = Boolean(exemplarTraceId);
 
     if (exemplarTraceId) {
       try {

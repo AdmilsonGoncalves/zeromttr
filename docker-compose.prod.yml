@@ -252,7 +252,7 @@ services:
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-zeromttr}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-payments}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - CHAOS_ENABLED=${CHAOS_ENABLED:-true}
+      - CHAOS_ENABLED=${CHAOS_ENABLED:-false}
       - DEMO_MODE=${DEMO_MODE:-true}
     depends_on:
       postgres:

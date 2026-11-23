@@ -321,6 +321,9 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
     expect(missingKeyResetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
 
+    // Use an empty findAll during the auth-matrix assertions so simulate-decision fixtures remain NOTIFIED,
+    // then verify directly that /api/demo/reset marks open incidents as FAILED.
+    vi.mocked(localRepo.findAll).mockResolvedValueOnce([]);
     const validKeyResetRes = await request(protectedApp)
       .post('/api/demo/reset')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
@@ -355,6 +358,24 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       .send({ incidentId: liveIncident.id, action: DecisionAction.REJECT });
     expect(simLiveAllowedRes.status).toBe(HTTP_STATUS.OK);
     expect(simLiveAllowedRes.body.state).toBe(IncidentState.REJECTED);
+
+    // Reset closes remaining non-terminal incidents so subsequent Grafana alerts do not deduplicate
+    expect(replayIncident.state).toBe(IncidentState.RESOLVED);
+    const lingeringIncident = new Incident({
+      id: 'inc-lingering-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:lingering',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.LIVE
+    });
+    vi.mocked(localRepo.findAll).mockResolvedValueOnce([lingeringIncident]);
+    const closingResetRes = await request(protectedApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(closingResetRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(lingeringIncident.state).toBe(IncidentState.FAILED);
+    expect(localRepo.save).toHaveBeenCalledWith(lingeringIncident);
   });
 
   it('should stream SSE heartbeat and events on GET /api/events with query token', async () => {
