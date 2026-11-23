@@ -1,4 +1,4 @@
-@if (metrics(); as m) {
+@if (metricsSignal(); as m) {
   <div class="bg-slate-950/70 border border-slate-800/90 rounded-lg p-2 flex flex-col gap-2">
     <div class="flex items-center justify-between gap-2">
       <span
@@ -45,7 +45,7 @@
         <p-progressbar
           [value]="throughputPercent()"
           [showValue]="false"
-          [styleClass]="
+          [class]="
             'h-1.5 bg-slate-800 ' +
             (throughputLevel() === 'warn' ? 'telemetry-bar-warn' : 'telemetry-bar-healthy')
           "
@@ -135,7 +135,7 @@
         <p-progressbar
           [value]="latencyPercent()"
           [showValue]="false"
-          [styleClass]="'h-1.5 bg-slate-800 telemetry-bar-' + latencyLevel()"
+          [class]="'h-1.5 bg-slate-800 telemetry-bar-' + latencyLevel()"
         />
       </div>
 

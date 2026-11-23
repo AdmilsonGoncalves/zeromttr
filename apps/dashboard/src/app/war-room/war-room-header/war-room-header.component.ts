@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  inject,
+  signal
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { isNonEmptyString, isString } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
@@ -35,29 +43,109 @@ interface LangOption {
 export class WarRoomHeaderComponent {
   readonly i18n: I18nService;
 
-  readonly sseConnected = input.required<boolean>();
-  readonly targetStatus = input<TargetStatusResponse | null>(null);
-  readonly finopsReduction = input.required<number>();
-  readonly estimatedTokensSaved = input.required<number>();
-  readonly activeMode = input.required<IncidentMode>();
-  readonly isWorkflowRunning = input.required<boolean>();
-  readonly liveDemoKey = input.required<string>();
-  readonly healthyTrafficActive = input<boolean>(false);
-  readonly isTogglingTraffic = input.required<boolean>();
-  readonly isResetting = input.required<boolean>();
-  readonly isSimulating = input.required<boolean>();
-  readonly ttdDisplay = input.required<string>();
-  readonly ttprDisplay = input.required<string>();
-  readonly signalsRatio = input.required<string>();
-  readonly evidenceCoveragePercent = input.required<number>();
-  readonly reasoningSource = input<ReasoningSource | null>(null);
+  readonly sseConnectedSignal = signal<boolean>(false);
+  readonly targetStatusSignal = signal<TargetStatusResponse | null>(null);
+  readonly finopsReductionSignal = signal<number>(0);
+  readonly estimatedTokensSavedSignal = signal<number>(0);
+  readonly activeModeSignal = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
+  readonly isWorkflowRunningSignal = signal<boolean>(false);
+  readonly liveDemoKeySignal = signal<string>('');
+  readonly healthyTrafficActiveSignal = signal<boolean>(false);
+  readonly isTogglingTrafficSignal = signal<boolean>(false);
+  readonly isResettingSignal = signal<boolean>(false);
+  readonly isSimulatingSignal = signal<boolean>(false);
+  readonly ttdDisplaySignal = signal<string>('--');
+  readonly ttprDisplaySignal = signal<string>('--');
+  readonly signalsRatioSignal = signal<string>('0/4');
+  readonly evidenceCoveragePercentSignal = signal<number>(0);
+  readonly reasoningSourceSignal = signal<ReasoningSource | null>(null);
 
-  readonly modeChange = output<IncidentMode>();
-  readonly liveKeyChange = output<string>();
-  readonly langChange = output<Language>();
-  readonly toggleHealthyTraffic = output<void>();
-  readonly triggerChaos = output<void>();
-  readonly resetService = output<void>();
+  @Input({ required: true })
+  set sseConnected(value: boolean) {
+    this.sseConnectedSignal.set(value);
+  }
+
+  @Input()
+  set targetStatus(value: TargetStatusResponse | null) {
+    this.targetStatusSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set finopsReduction(value: number) {
+    this.finopsReductionSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set estimatedTokensSaved(value: number) {
+    this.estimatedTokensSavedSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set activeMode(value: IncidentMode) {
+    this.activeModeSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set isWorkflowRunning(value: boolean) {
+    this.isWorkflowRunningSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set liveDemoKey(value: string) {
+    this.liveDemoKeySignal.set(value);
+  }
+
+  @Input()
+  set healthyTrafficActive(value: boolean) {
+    this.healthyTrafficActiveSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set isTogglingTraffic(value: boolean) {
+    this.isTogglingTrafficSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set isResetting(value: boolean) {
+    this.isResettingSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set isSimulating(value: boolean) {
+    this.isSimulatingSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set ttdDisplay(value: string) {
+    this.ttdDisplaySignal.set(value);
+  }
+
+  @Input({ required: true })
+  set ttprDisplay(value: string) {
+    this.ttprDisplaySignal.set(value);
+  }
+
+  @Input({ required: true })
+  set signalsRatio(value: string) {
+    this.signalsRatioSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set evidenceCoveragePercent(value: number) {
+    this.evidenceCoveragePercentSignal.set(value);
+  }
+
+  @Input()
+  set reasoningSource(value: ReasoningSource | null) {
+    this.reasoningSourceSignal.set(value);
+  }
+
+  @Output() readonly modeChange = new EventEmitter<IncidentMode>();
+  @Output() readonly liveKeyChange = new EventEmitter<string>();
+  @Output() readonly langChange = new EventEmitter<Language>();
+  @Output() readonly toggleHealthyTraffic = new EventEmitter<void>();
+  @Output() readonly triggerChaos = new EventEmitter<void>();
+  @Output() readonly resetService = new EventEmitter<void>();
 
   readonly modeOptions: ModeOption[] = [
     { label: '⚡ Live API Mode', value: IncidentExecutionMode.LIVE },
@@ -69,7 +157,8 @@ export class WarRoomHeaderComponent {
     { label: '🇺🇸 EN', value: 'en' }
   ];
 
-  constructor(i18n?: I18nService) {
+  constructor(...args: [I18nService?]) {
+    const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
   }
 

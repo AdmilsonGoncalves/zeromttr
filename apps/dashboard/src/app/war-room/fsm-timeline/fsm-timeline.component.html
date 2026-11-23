@@ -16,7 +16,12 @@
     </span>
   </div>
 
-  <p-timeline [value]="stages()" layout="horizontal" align="top" styleClass="fsm-timeline w-full">
+  <p-timeline
+    [value]="stagesSignal()"
+    layout="horizontal"
+    align="top"
+    styleClass="fsm-timeline w-full"
+  >
     <ng-template #marker let-stage>
       <span
         [pTooltip]="i18n.t(stage.tooltipKey)"

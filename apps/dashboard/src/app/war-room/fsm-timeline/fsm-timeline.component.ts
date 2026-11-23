@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Timeline } from 'primeng/timeline';
 import { Tooltip } from 'primeng/tooltip';
@@ -18,15 +18,33 @@ import type { FsmStageItem } from '../../core/incident.service.js';
 export class FsmTimelineComponent {
   readonly i18n: I18nService;
 
-  readonly stages = input.required<FsmStageItem[]>();
-  readonly hintKey = input.required<keyof TranslationDictionary>();
-  readonly liveWaitSeconds = input.required<number>();
+  readonly stagesSignal = signal<FsmStageItem[]>([]);
+  readonly hintKeySignal = signal<keyof TranslationDictionary>('fsmHintAwaitingAlert');
+  readonly liveWaitSecondsSignal = signal<number>(0);
+
+  @Input({ required: true })
+  set stages(value: FsmStageItem[]) {
+    this.stagesSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set hintKey(value: keyof TranslationDictionary) {
+    this.hintKeySignal.set(value);
+  }
+
+  @Input({ required: true })
+  set liveWaitSeconds(value: number) {
+    this.liveWaitSecondsSignal.set(value);
+  }
 
   readonly formattedHint = computed<string>(() => {
-    return this.i18n.t(this.hintKey()).replace('{N}', this.liveWaitSeconds().toString());
+    return this.i18n
+      .t(this.hintKeySignal())
+      .replace('{N}', this.liveWaitSecondsSignal().toString());
   });
 
-  constructor(i18n?: I18nService) {
+  constructor(...args: [I18nService?]) {
+    const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
   }
 }

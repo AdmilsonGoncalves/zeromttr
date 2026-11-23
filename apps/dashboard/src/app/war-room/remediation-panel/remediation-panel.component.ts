@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  computed,
+  inject,
+  signal
+} from '@angular/core';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { escapeHtml, isNonEmptyString } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
@@ -20,13 +29,23 @@ export class RemediationPanelComponent {
   readonly i18n: I18nService;
   readonly sanitizer: DomSanitizer;
 
-  readonly incident = input<IncidentDetail | null>(null);
-  readonly displayedFsmState = input<IncidentState | undefined>(undefined);
+  readonly incidentSignal = signal<IncidentDetail | null>(null);
+  readonly displayedFsmStateSignal = signal<IncidentState | undefined>(undefined);
 
-  readonly simulateDecision = output<void>();
+  @Input()
+  set incident(value: IncidentDetail | null) {
+    this.incidentSignal.set(value);
+  }
+
+  @Input()
+  set displayedFsmState(value: IncidentState | undefined) {
+    this.displayedFsmStateSignal.set(value);
+  }
+
+  @Output() readonly simulateDecision = new EventEmitter<void>();
 
   readonly safeResendPreview = computed<SafeHtml>(() => {
-    const notification = this.incident()?.notification;
+    const notification = this.incidentSignal()?.notification;
     const raw = notification?.htmlPreview;
 
     if (
@@ -65,7 +84,8 @@ export class RemediationPanelComponent {
     return this.sanitizer.bypassSecurityTrustHtml(raw ?? defaultPreview);
   });
 
-  constructor(i18n?: I18nService, sanitizer?: DomSanitizer) {
+  constructor(...args: [I18nService?, DomSanitizer?]) {
+    const [i18n, sanitizer] = args;
     this.i18n = i18n ?? inject(I18nService);
     if (sanitizer) {
       this.sanitizer = sanitizer;

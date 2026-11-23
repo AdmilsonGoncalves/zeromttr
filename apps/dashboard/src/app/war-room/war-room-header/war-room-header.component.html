@@ -10,11 +10,11 @@
             {{ i18n.t('appTitle') }}
           </h1>
           <p-tag
-            [value]="sseConnected() ? 'SSE Connected' : 'SSE Offline'"
-            [severity]="sseConnected() ? 'success' : 'danger'"
+            [value]="sseConnectedSignal() ? 'SSE Connected' : 'SSE Offline'"
+            [severity]="sseConnectedSignal() ? 'success' : 'danger'"
             styleClass="text-[10px] py-0"
           />
-          @if (targetStatus(); as ts) {
+          @if (targetStatusSignal(); as ts) {
             <p-tag
               [value]="
                 ts.service +
@@ -42,8 +42,8 @@
       class="bg-slate-950/90 border border-cyan-500/50 rounded px-2.5 py-1 flex items-center gap-2 shadow-inner"
     >
       <span class="text-xs font-mono text-cyan-300 font-semibold">
-        {{ i18n.t('finopsPayloadReduction') }}: {{ finopsReduction() }}% (Est. ~{{
-          estimatedTokensSaved()
+        {{ i18n.t('finopsPayloadReduction') }}: {{ finopsReductionSignal() }}% (Est. ~{{
+          estimatedTokensSavedSignal()
         }}
         {{ i18n.t('finopsTokensSaved') }})
       </span>
@@ -53,9 +53,9 @@
     <div class="flex items-center gap-1.5 shrink-0">
       <p-selectbutton
         [options]="modeOptions"
-        [ngModel]="activeMode()"
+        [ngModel]="activeModeSignal()"
         (ngModelChange)="onModeSelect($event)"
-        [disabled]="isWorkflowRunning()"
+        [disabled]="isWorkflowRunningSignal()"
         optionLabel="label"
         optionValue="value"
         [pTooltip]="i18n.t('tooltipModeSelector')"
@@ -63,7 +63,7 @@
         styleClass="text-[10px]"
       />
 
-      @if (activeMode() === 'live') {
+      @if (activeModeSignal() === 'live') {
         <form (submit)="$event.preventDefault()" class="inline-flex m-0 p-0">
           <input
             type="text"
@@ -78,8 +78,8 @@
             type="password"
             autocomplete="current-password"
             [placeholder]="i18n.t('liveKeyPlaceholder')"
-            [value]="liveDemoKey()"
-            [disabled]="isWorkflowRunning()"
+            [value]="liveDemoKeySignal()"
+            [disabled]="isWorkflowRunningSignal()"
             (input)="onLiveKeyInput($event)"
             [pTooltip]="i18n.t('tooltipLiveKeyInput')"
             tooltipPosition="bottom"
@@ -88,16 +88,16 @@
         </form>
       }
 
-      @if (activeMode() === 'live') {
+      @if (activeModeSignal() === 'live') {
         <p-button
           [label]="
-            healthyTrafficActive()
+            healthyTrafficActiveSignal()
               ? i18n.t('healthyTrafficStopBtn')
               : i18n.t('healthyTrafficStartBtn')
           "
-          [severity]="healthyTrafficActive() ? 'warn' : 'success'"
+          [severity]="healthyTrafficActiveSignal() ? 'warn' : 'success'"
           size="small"
-          [disabled]="isTogglingTraffic()"
+          [disabled]="isTogglingTrafficSignal()"
           (onClick)="toggleHealthyTraffic.emit()"
           [pTooltip]="i18n.t('tooltipHealthyTraffic')"
           tooltipPosition="bottom"
@@ -108,7 +108,7 @@
         [label]="i18n.t('simulateIncident')"
         severity="danger"
         size="small"
-        [disabled]="isWorkflowRunning()"
+        [disabled]="isWorkflowRunningSignal()"
         (onClick)="triggerChaos.emit()"
         [pTooltip]="i18n.t('tooltipSimulateIncident')"
         tooltipPosition="bottom"
@@ -118,7 +118,7 @@
         [label]="i18n.t('restoreService')"
         severity="secondary"
         size="small"
-        [disabled]="isResetting() || isSimulating()"
+        [disabled]="isResettingSignal() || isSimulatingSignal()"
         (onClick)="resetService.emit()"
         [pTooltip]="i18n.t('tooltipRestoreService')"
         tooltipPosition="bottom"
@@ -139,7 +139,7 @@
   </div>
 
   <!-- Replay Notice if Replay Mode -->
-  @if (activeMode() === 'replay') {
+  @if (activeModeSignal() === 'replay') {
     <div
       class="bg-amber-950/50 border border-amber-700/60 rounded px-2.5 py-1 text-xs text-amber-200 flex items-center gap-2"
     >
@@ -155,34 +155,34 @@
     <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
       <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtdLabel') }}</span>
       <span class="text-base font-mono font-bold text-emerald-400">
-        {{ ttdDisplay() }}
+        {{ ttdDisplaySignal() }}
       </span>
       <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtdTarget') }}</span>
     </div>
     <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
       <span class="text-[11px] text-slate-400">{{ i18n.t('kpiTtprLabel') }}</span>
       <span class="text-base font-mono font-bold text-emerald-400">
-        {{ ttprDisplay() }}
+        {{ ttprDisplaySignal() }}
       </span>
       <span class="text-[9px] text-slate-400">{{ i18n.t('kpiTtprTarget') }}</span>
     </div>
     <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
       <span class="text-[11px] text-slate-400">{{ i18n.t('evidenceCoverageLabel') }}</span>
       <span class="text-base font-mono font-bold text-cyan-400">
-        {{ signalsRatio() }} ({{ evidenceCoveragePercent() }}%)
+        {{ signalsRatioSignal() }} ({{ evidenceCoveragePercentSignal() }}%)
       </span>
       <span class="text-[9px] text-slate-400">PromQL + Exemplar + Tempo + Diff</span>
     </div>
     <div class="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 flex flex-col">
       <span class="text-[11px] text-slate-400">{{ i18n.t('reasoningSourceLabel') }}</span>
       <div class="mt-0.5">
-        @if (reasoningSource() === 'llm') {
+        @if (reasoningSourceSignal() === 'llm') {
           <span
             class="bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
           >
             {{ i18n.t('reasoningSourceLlm') }}
           </span>
-        } @else if (reasoningSource() === 'fallback') {
+        } @else if (reasoningSourceSignal() === 'fallback') {
           <span
             class="bg-amber-950 border border-amber-500 text-amber-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
           >

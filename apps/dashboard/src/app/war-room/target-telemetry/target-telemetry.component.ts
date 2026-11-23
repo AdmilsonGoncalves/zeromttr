@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Knob } from 'primeng/knob';
@@ -22,10 +22,15 @@ import { I18nService } from '../../core/i18n.service.js';
 export class TargetTelemetryComponent {
   readonly i18n: I18nService;
 
-  readonly metrics = input<TargetLiveMetrics | null>(null);
+  readonly metricsSignal = signal<TargetLiveMetrics | null>(null);
+
+  @Input()
+  set metrics(value: TargetLiveMetrics | null) {
+    this.metricsSignal.set(value);
+  }
 
   readonly throughputPercent = computed<number>(() => {
-    const rps = this.metrics()?.requestsPerSecond ?? 0;
+    const rps = this.metricsSignal()?.requestsPerSecond ?? 0;
     return Math.min(
       100,
       Math.round((rps / TARGET_TELEMETRY_THRESHOLDS.THROUGHPUT_SCALE_MAX_RPS) * 100)
@@ -33,7 +38,7 @@ export class TargetTelemetryComponent {
   });
 
   readonly latencyPercent = computed<number>(() => {
-    const p95 = this.metrics()?.p95LatencyMs ?? 0;
+    const p95 = this.metricsSignal()?.p95LatencyMs ?? 0;
     return Math.min(
       100,
       Math.round((p95 / TARGET_TELEMETRY_THRESHOLDS.LATENCY_P95_SCALE_MAX_MS) * 100)
@@ -41,7 +46,7 @@ export class TargetTelemetryComponent {
   });
 
   readonly throughputLevel = computed<TelemetryHealthLevel>(() => {
-    const current = this.metrics();
+    const current = this.metricsSignal();
     if (!current || !current.healthyTrafficActive) {
       return TelemetryHealthLevel.HEALTHY;
     }
@@ -52,7 +57,7 @@ export class TargetTelemetryComponent {
   });
 
   readonly error5xxLevel = computed<TelemetryHealthLevel>(() => {
-    const err = this.metrics()?.errorRate5xxPercent ?? 0;
+    const err = this.metricsSignal()?.errorRate5xxPercent ?? 0;
     if (err >= TARGET_TELEMETRY_THRESHOLDS.ERROR_5XX_CRITICAL_PERCENT) {
       return TelemetryHealthLevel.CRITICAL;
     }
@@ -63,7 +68,7 @@ export class TargetTelemetryComponent {
   });
 
   readonly latencyLevel = computed<TelemetryHealthLevel>(() => {
-    const p95 = this.metrics()?.p95LatencyMs ?? 0;
+    const p95 = this.metricsSignal()?.p95LatencyMs ?? 0;
     if (p95 >= TARGET_TELEMETRY_THRESHOLDS.LATENCY_P95_CRITICAL_MS) {
       return TelemetryHealthLevel.CRITICAL;
     }
@@ -74,7 +79,7 @@ export class TargetTelemetryComponent {
   });
 
   readonly poolLevel = computed<TelemetryHealthLevel>(() => {
-    const current = this.metrics();
+    const current = this.metricsSignal();
     if (!current || current.poolMax <= 0) {
       return TelemetryHealthLevel.HEALTHY;
     }
@@ -100,7 +105,7 @@ export class TargetTelemetryComponent {
   });
 
   readonly poolMax = computed<number>(() => {
-    const current = this.metrics();
+    const current = this.metricsSignal();
     if (!current) {
       return 10;
     }
@@ -108,7 +113,7 @@ export class TargetTelemetryComponent {
   });
 
   readonly poolMeters = computed<MeterItem[]>(() => {
-    const current = this.metrics();
+    const current = this.metricsSignal();
     if (!current) {
       return [];
     }
@@ -136,7 +141,8 @@ export class TargetTelemetryComponent {
     return items;
   });
 
-  constructor(i18n?: I18nService) {
+  constructor(...args: [I18nService?]) {
+    const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
   }
 }

@@ -193,15 +193,31 @@ export class DispatchRemediation {
           synthesis = rawSynthesis;
           reasoningSource = ReasoningProvider.LLM;
         } else {
+          this.logger?.warn({
+            event: OrchestratorLogEvent.LLM_PATCH_REJECTED,
+            incidentId: incident.id,
+            message:
+              'LLM synthesis patch rejected by defensive validation; routing to deterministic fallback'
+          });
           synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
           reasoningSource = ReasoningProvider.FALLBACK;
         }
-      } catch {
+      } catch (err) {
+        this.logger?.warn({
+          event: OrchestratorLogEvent.LLM_SYNTHESIS_FAILED,
+          incidentId: incident.id,
+          message: toErrorMessage(err)
+        });
         synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
         reasoningSource = ReasoningProvider.FALLBACK;
       }
     } else {
       // Fail-closed! Route directly to fallback
+      this.logger?.warn({
+        event: OrchestratorLogEvent.PII_PROMPT_GUARD_BLOCKED,
+        incidentId: incident.id,
+        message: `Fail-closed PII guard blocked LLM dispatch (${piiAudit.detectedTypes.join(', ')})`
+      });
       synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
       reasoningSource = ReasoningProvider.FALLBACK;
     }
