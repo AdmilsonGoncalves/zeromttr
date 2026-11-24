@@ -68,8 +68,21 @@ export interface FsmStageItem {
   status: FsmStageStatus;
 }
 
+export interface TelemetryHistoryPoint {
+  timestampMs: number;
+  label: string;
+  requestsPerSecond: number;
+  errorRate5xxPercent: number;
+  p95LatencyMs: number;
+  poolActive: number;
+  poolWaiting: number;
+  poolMax: number;
+  healthyTrafficActive: boolean;
+}
+
 const LIVE_DEMO_KEY_STORAGE_KEY = 'zeromttr_live_demo_key';
 const VISUAL_STEP_INTERVAL_MS = 450;
+const MAX_TELEMETRY_HISTORY_POINTS = 45;
 
 /**
  * Signal-based state manager handling SSE incident streaming, polling, demo triggers, and signed decisions.
@@ -99,6 +112,7 @@ export class IncidentService {
   readonly currentIncident = signal<IncidentDetail | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
   readonly targetMetrics = computed(() => this.targetStatus()?.metrics ?? null);
+  readonly telemetryHistory = signal<TelemetryHistoryPoint[]>([]);
   readonly sseConnected = signal<boolean>(false);
   readonly activeMode = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly liveDemoKey = signal<string>('');
@@ -952,6 +966,35 @@ export class IncidentService {
     }
   }
 
+  private appendTelemetrySample(status: TargetStatusResponse): void {
+    const metrics = status.metrics;
+    if (!metrics) {
+      return;
+    }
+    const timestampMs = Date.now();
+    const now = new Date(timestampMs);
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    const label = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const point: TelemetryHistoryPoint = {
+      timestampMs,
+      label,
+      requestsPerSecond: metrics.requestsPerSecond,
+      errorRate5xxPercent: metrics.errorRate5xxPercent,
+      p95LatencyMs: metrics.p95LatencyMs,
+      poolActive: metrics.poolActive,
+      poolWaiting: metrics.poolWaiting,
+      poolMax: metrics.poolMax,
+      healthyTrafficActive: metrics.healthyTrafficActive
+    };
+    this.telemetryHistory.update((prev) => {
+      const next = [...prev, point];
+      if (next.length > MAX_TELEMETRY_HISTORY_POINTS) {
+        return next.slice(next.length - MAX_TELEMETRY_HISTORY_POINTS);
+      }
+      return next;
+    });
+  }
+
   /**
    * Polls the current health and version status of the target service.
    */
@@ -961,6 +1004,7 @@ export class IncidentService {
       if (res.ok) {
         const status = (await res.json()) as TargetStatusResponse;
         this.targetStatus.set(status);
+        this.appendTelemetrySample(status);
         this.loadError.set(null);
       } else {
         this.loadError.set(`Failed to fetch target status: HTTP ${res.status}`);

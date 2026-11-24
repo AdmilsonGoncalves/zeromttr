@@ -1,22 +1,30 @@
-import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { isFilled, isNonEmptyString, isObject, safeJsonParse } from '@zeromttr/utils';
-import { ProgressBar } from 'primeng/progressbar';
+import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angular/core';
+import { isFilled } from '@zeromttr/utils';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
-import {
-  MASKED_POST_OTTL_LOG,
-  MOCK_GIT_DIFF,
-  RAW_PRE_COLLECTOR_LOG
-} from '../../core/constants.js';
 import type { IncidentDetail, TargetStatusResponse } from '../../core/contract.js';
+import type { TelemetryHistoryPoint } from '../../core/incident.service.js';
 import { I18nService } from '../../core/i18n.service.js';
+import { GitDiffFinopsTabComponent } from './git-diff-finops-tab/git-diff-finops-tab.component.js';
+import { LiveMetricsTabComponent } from './live-metrics-tab/live-metrics-tab.component.js';
+import { LokiPiiTabComponent } from './loki-pii-tab/loki-pii-tab.component.js';
+import { TraceTreeTabComponent } from './trace-tree-tab/trace-tree-tab.component.js';
 
 /**
- * Center War Room quadrant displaying OTel trace tree, Loki PII masking comparison, and Git diff / FinOps.
+ * Center War Room quadrant composing tabbed evidence views: Live Metrics, Trace Tree, Loki PII, and Git Diff/FinOps.
  */
 @Component({
   selector: 'app-evidence-panel',
-  imports: [CommonModule, Tabs, TabList, Tab, TabPanels, TabPanel, ProgressBar],
+  imports: [
+    Tabs,
+    TabList,
+    Tab,
+    TabPanels,
+    TabPanel,
+    LiveMetricsTabComponent,
+    TraceTreeTabComponent,
+    LokiPiiTabComponent,
+    GitDiffFinopsTabComponent
+  ],
   templateUrl: './evidence-panel.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -25,12 +33,14 @@ export class EvidencePanelComponent {
 
   readonly incidentSignal = signal<IncidentDetail | null>(null);
   readonly targetStatusSignal = signal<TargetStatusResponse | null>(null);
+  readonly telemetryHistorySignal = signal<TelemetryHistoryPoint[]>([]);
   readonly signalsRatioSignal = signal<string>('0/4');
   readonly evidenceCoveragePercentSignal = signal<number>(0);
   readonly isPiiPassedSignal = signal<boolean | null>(null);
   readonly leakedPatternsCountSignal = signal<number>(0);
   readonly finopsReductionSignal = signal<number>(0);
   readonly estimatedTokensSavedSignal = signal<number>(0);
+  readonly activeTab = signal<string>('0');
 
   @Input()
   set incident(value: IncidentDetail | null) {
@@ -40,6 +50,11 @@ export class EvidencePanelComponent {
   @Input()
   set targetStatus(value: TargetStatusResponse | null) {
     this.targetStatusSignal.set(value);
+  }
+
+  @Input()
+  set telemetryHistory(value: TelemetryHistoryPoint[]) {
+    this.telemetryHistorySignal.set(value);
   }
 
   @Input({ required: true })
@@ -71,48 +86,6 @@ export class EvidencePanelComponent {
   set estimatedTokensSaved(value: number) {
     this.estimatedTokensSavedSignal.set(value);
   }
-
-  readonly activeTab = signal<string>('0');
-  readonly mockGitDiff = MOCK_GIT_DIFF;
-  readonly rawPreCollectorLog = RAW_PRE_COLLECTOR_LOG;
-  readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
-
-  readonly displayedPreCollectorLog = computed<string>(() => {
-    return (
-      this.incidentSignal()?.rca?.rawEdgeLogPreCollector ??
-      this.targetStatusSignal()?.rawEdgeLogPreCollector ??
-      this.rawPreCollectorLog
-    );
-  });
-
-  readonly displayedPostOttlLog = computed<string>(() => {
-    if (this.isPiiPassedSignal() === false) {
-      const types = (this.incidentSignal()?.rca?.piiGuardAudit?.detectedTypes ?? []).join(', ');
-      return this.i18n.t('piiLogWithheldMessage').replace('{TYPES}', types);
-    }
-
-    const sample = this.incidentSignal()?.rca?.logSample;
-    if (!isNonEmptyString(sample)) {
-      return this.maskedPostOttlLog;
-    }
-
-    const lines = sample
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    for (const line of lines) {
-      const parsed = safeJsonParse<Record<string, unknown>>(line);
-      if (isObject(parsed) && isNonEmptyString(parsed.body)) {
-        return parsed.body;
-      }
-      const bodyMatch = line.match(/^\{"body":"((?:[^"\\]|\\.)*)"/);
-      if (bodyMatch?.[1]) {
-        return bodyMatch[1].replace(/\\"/g, '"');
-      }
-    }
-
-    return lines[0] ?? this.maskedPostOttlLog;
-  });
 
   constructor(...args: [I18nService?]) {
     const [i18n] = args;

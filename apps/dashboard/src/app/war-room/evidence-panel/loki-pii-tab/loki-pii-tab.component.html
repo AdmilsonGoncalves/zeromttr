@@ -1,0 +1,50 @@
+<div class="flex flex-col gap-2.5 pt-1.5">
+  <div class="flex justify-center p-0.5">
+    @if (isPiiPassedSignal() === true) {
+      <div
+        class="bg-emerald-950 border border-emerald-500 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
+      >
+        <i class="pi pi-check-circle text-emerald-400"></i>
+        <span>{{ i18n.t('piiGuardVerifiedBadge') }}</span>
+      </div>
+    } @else if (isPiiPassedSignal() === false) {
+      <div
+        class="bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
+      >
+        <i class="pi pi-exclamation-triangle text-rose-400"></i>
+        <span>
+          {{
+            i18n.t('piiGuardBlockedBadge').replace('{N}', leakedPatternsCountSignal().toString())
+          }}
+        </span>
+      </div>
+    } @else {
+      <div
+        class="bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 shadow"
+      >
+        <i class="pi pi-hourglass text-slate-400"></i>
+        <span>{{ i18n.t('awaitingAuditBadge') }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+    <div class="bg-slate-950 border border-rose-900/60 rounded p-2 flex flex-col gap-1">
+      <span class="text-xs font-bold text-rose-400">
+        {{ i18n.t('preCollectorLogLabel') }}
+      </span>
+      <pre
+        class="font-mono text-[11px] text-rose-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-rose-950 max-h-64 overflow-y-auto"
+        >{{ displayedPreCollectorLog() }}</pre>
+    </div>
+
+    <div class="bg-slate-950 border border-emerald-900/60 rounded p-2 flex flex-col gap-1">
+      <span class="text-xs font-bold text-emerald-400">
+        {{ i18n.t('postOttlLogLabel') }}
+      </span>
+      <pre
+        class="font-mono text-[11px] text-emerald-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-emerald-950 max-h-64 overflow-y-auto"
+        >{{ displayedPostOttlLog() }}</pre>
+    </div>
+  </div>
+</div>

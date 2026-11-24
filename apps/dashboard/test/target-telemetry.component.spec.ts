@@ -61,4 +61,36 @@ describe('TargetTelemetryComponent', () => {
     expect(component.poolLevel()).toBe(TelemetryHealthLevel.WARN);
     expect(component.poolMeters()).toHaveLength(1);
   });
+
+  it('should_compute_card_sparkline_paths_from_telemetry_history', () => {
+    component.history = [
+      {
+        timestampMs: 1000,
+        label: '11:00:00',
+        requestsPerSecond: 1.5,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 20,
+        poolActive: 1,
+        poolWaiting: 0,
+        poolMax: 10,
+        healthyTrafficActive: true
+      },
+      {
+        timestampMs: 3000,
+        label: '11:00:02',
+        requestsPerSecond: 3.2,
+        errorRate5xxPercent: 80,
+        p95LatencyMs: 1400,
+        poolActive: 2,
+        poolWaiting: 4,
+        poolMax: 2,
+        healthyTrafficActive: true
+      }
+    ];
+
+    expect(component.rpsSparkline().linePath).toContain('M ');
+    expect(component.error5xxSparkline().linePath).toContain('M ');
+    expect(component.latencySparkline().linePath).toContain('M ');
+    expect(component.poolSparkline().linePath).toContain('M ');
+  });
 });

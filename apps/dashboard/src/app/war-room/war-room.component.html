@@ -36,7 +36,10 @@
       [hintKey]="incidentService.fsmHintKey()"
       [liveWaitSeconds]="incidentService.liveWaitSeconds()"
     />
-    <app-target-telemetry [metrics]="incidentService.targetMetrics()" />
+    <app-target-telemetry
+      [metrics]="incidentService.targetMetrics()"
+      [history]="incidentService.telemetryHistory()"
+    />
   </app-war-room-header>
 
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
@@ -44,6 +47,7 @@
       class="lg:col-span-8 flex flex-col min-h-0"
       [incident]="incidentService.currentIncident()"
       [targetStatus]="incidentService.targetStatus()"
+      [telemetryHistory]="incidentService.telemetryHistory()"
       [signalsRatio]="incidentService.signalsRatio()"
       [evidenceCoveragePercent]="incidentService.evidenceCoveragePercent()"
       [isPiiPassed]="incidentService.isPiiPassed()"

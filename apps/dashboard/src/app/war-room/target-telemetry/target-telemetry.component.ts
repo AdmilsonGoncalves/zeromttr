@@ -7,6 +7,11 @@ import { ProgressBar } from 'primeng/progressbar';
 import { Tag } from 'primeng/tag';
 import { TARGET_TELEMETRY_THRESHOLDS, TelemetryHealthLevel } from '../../core/constants.js';
 import type { TargetLiveMetrics } from '../../core/contract.js';
+import type { TelemetryHistoryPoint } from '../../core/incident.service.js';
+import {
+  buildSparklineGeometry,
+  type SparklineGeometry
+} from '../../core/telemetry-chart.utils.js';
 import { I18nService } from '../../core/i18n.service.js';
 
 /**
@@ -23,11 +28,53 @@ export class TargetTelemetryComponent {
   readonly i18n: I18nService;
 
   readonly metricsSignal = signal<TargetLiveMetrics | null>(null);
+  readonly historySignal = signal<TelemetryHistoryPoint[]>([]);
 
   @Input()
   set metrics(value: TargetLiveMetrics | null) {
     this.metricsSignal.set(value);
   }
+
+  @Input()
+  set history(value: TelemetryHistoryPoint[]) {
+    this.historySignal.set(value);
+  }
+
+  readonly rpsSparkline = computed<SparklineGeometry>(() =>
+    buildSparklineGeometry(
+      this.historySignal().map((pt) => pt.requestsPerSecond),
+      120,
+      22,
+      { min: 0 }
+    )
+  );
+
+  readonly error5xxSparkline = computed<SparklineGeometry>(() =>
+    buildSparklineGeometry(
+      this.historySignal().map((pt) => pt.errorRate5xxPercent),
+      120,
+      22,
+      { min: 0, max: 100 }
+    )
+  );
+
+  readonly latencySparkline = computed<SparklineGeometry>(() =>
+    buildSparklineGeometry(
+      this.historySignal().map((pt) => pt.p95LatencyMs),
+      120,
+      22,
+      { min: 0 }
+    )
+  );
+
+  readonly poolSparkline = computed<SparklineGeometry>(() =>
+    buildSparklineGeometry(
+      this.historySignal().map((pt) => pt.poolActive + pt.poolWaiting),
+      120,
+      22,
+      { min: 0 }
+    )
+  );
 
   readonly throughputPercent = computed<number>(() => {
     const rps = this.metricsSignal()?.requestsPerSecond ?? 0;

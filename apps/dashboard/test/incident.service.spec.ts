@@ -538,4 +538,43 @@ describe('IncidentService', () => {
 
     fetchSpy.mockRestore();
   });
+
+  it('should_buffer_bounded_telemetryHistory_across_fetchTargetStatus_polls_and_retain_recovery_curve', async () => {
+    const service = new IncidentService();
+    let sampleIdx = 0;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      sampleIdx += 1;
+      const isDegraded = sampleIdx <= 25;
+      return new Response(
+        JSON.stringify({
+          status: isDegraded ? TargetHealthStatus.DEGRADED : TargetHealthStatus.HEALTHY,
+          service: 'api-pagamentos-core',
+          version: isDegraded ? 'v2.14.8' : 'v2.14.7',
+          previousHealthyVersion: 'v2.14.7',
+          metrics: {
+            requestsPerSecond: Number((1.2 + sampleIdx * 0.1).toFixed(1)),
+            errorRate5xxPercent: isDegraded ? 100 : 0,
+            p95LatencyMs: isDegraded ? 1200 : 22,
+            poolActive: isDegraded ? 2 : 1,
+            poolWaiting: isDegraded ? 3 : 0,
+            poolMax: isDegraded ? 2 : 10,
+            healthyTrafficActive: true
+          }
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    for (let i = 0; i < 50; i++) {
+      await service.fetchTargetStatus('http://localhost:8080');
+    }
+
+    const history = service.telemetryHistory();
+    expect(history).toHaveLength(45);
+    expect(history[0]?.errorRate5xxPercent).toBe(100);
+    expect(history[history.length - 1]?.errorRate5xxPercent).toBe(0);
+    expect(history[history.length - 1]?.p95LatencyMs).toBe(22);
+
+    fetchSpy.mockRestore();
+  });
 });

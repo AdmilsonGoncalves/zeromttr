@@ -1,0 +1,49 @@
+<div class="flex flex-col gap-2.5 pt-1.5">
+  <div class="flex justify-between items-center text-xs text-slate-300">
+    <span class="font-bold font-mono text-cyan-300">
+      {{ i18n.t('gitDiffTitle') }}
+    </span>
+    <span class="font-mono text-slate-400 text-[11px]">
+      apps/target-app-demo/src/repositories/payment.repository.ts
+    </span>
+  </div>
+
+  <pre
+    class="bg-slate-950 border border-slate-800 rounded p-2.5 font-mono text-[11px] text-slate-200 overflow-x-auto leading-relaxed max-h-56 overflow-y-auto"
+    >{{ mockGitDiff }}</pre>
+
+  <div
+    class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-950 border border-slate-800 rounded p-2"
+  >
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsBytesFetched') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-slate-200">
+        {{ incidentSignal()?.finops?.rawBytesFetched ?? 48200 }} B
+      </div>
+    </div>
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsBytesSent') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-slate-200">
+        {{ incidentSignal()?.finops?.compactedBytesSent ?? 7712 }} B
+      </div>
+    </div>
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsPayloadReduction') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-emerald-400">{{ finopsReductionSignal() }}%</div>
+    </div>
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsTokensSaved') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-cyan-400">
+        ~{{ estimatedTokensSavedSignal() }}
+      </div>
+    </div>
+  </div>
+</div>

@@ -40,6 +40,7 @@ export interface TranslationDictionary {
   tabTraceTree: string;
   tabLokiLogs: string;
   tabGitDiff: string;
+  tabLiveMetrics: string;
   evidenceCoverageLabel: string;
   reasoningSourceLabel: string;
   reasoningSourceLlm: string;
@@ -156,6 +157,14 @@ export interface TranslationDictionary {
   targetSloLatencyHint: string;
   targetSlaErrorOk: string;
   targetSlaErrorBreach: string;
+  chartLatencyErrorTitle: string;
+  chartThroughputPoolTitle: string;
+  chartPoolGaugeLabel: string;
+  chartFinopsGaugeLabel: string;
+  chartFinopsBarsTitle: string;
+  chartMttrBarsTitle: string;
+  chartAwaitingSamples: string;
+  chartSloThreshold: string;
 }
 
 const PT_TRANSLATIONS: TranslationDictionary = {
@@ -200,6 +209,7 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   tabTraceTree: 'Trace Tree & Evidências',
   tabLokiLogs: 'Logs Loki & Mascaramento PII',
   tabGitDiff: 'Git Deploy Diff & FinOps',
+  tabLiveMetrics: 'Telemetria ao Vivo',
   evidenceCoverageLabel: 'Evidence Coverage',
   reasoningSourceLabel: 'Reasoning Source',
   reasoningSourceLlm: 'Gemini LLM',
@@ -341,7 +351,15 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   targetPoolWaitingLabel: 'Em espera',
   targetSloLatencyHint: 'SLO: ≤ 500ms',
   targetSlaErrorOk: 'SLA Saudável',
-  targetSlaErrorBreach: 'Falhas 5xx Ativas'
+  targetSlaErrorBreach: 'Falhas 5xx Ativas',
+  chartLatencyErrorTitle: 'Latência p95 (ms) & Taxa de Erro 5xx (%)',
+  chartThroughputPoolTitle: 'Throughput (req/s) & Uso do Pool DB',
+  chartPoolGaugeLabel: 'Saturação do Pool',
+  chartFinopsGaugeLabel: 'Redução FinOps',
+  chartFinopsBarsTitle: 'Payload LLM (Bruto vs Compactado)',
+  chartMttrBarsTitle: 'MTTR Autônomo vs Manual (~30m)',
+  chartAwaitingSamples: 'Aguardando amostras ao vivo do serviço alvo (polling 2s)...',
+  chartSloThreshold: 'SLO 500ms'
 };
 
 const EN_TRANSLATIONS: TranslationDictionary = {
@@ -385,6 +403,7 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   tabTraceTree: 'Trace Tree & Evidence',
   tabLokiLogs: 'Loki Logs & PII Masking',
   tabGitDiff: 'Git Deploy Diff & FinOps',
+  tabLiveMetrics: 'Live Metrics',
   evidenceCoverageLabel: 'Evidence Coverage',
   reasoningSourceLabel: 'Reasoning Source',
   reasoningSourceLlm: 'Gemini LLM',
@@ -522,7 +541,15 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   targetPoolWaitingLabel: 'Waiting',
   targetSloLatencyHint: 'SLO: ≤ 500ms',
   targetSlaErrorOk: 'Healthy SLA',
-  targetSlaErrorBreach: '5xx Errors Active'
+  targetSlaErrorBreach: '5xx Errors Active',
+  chartLatencyErrorTitle: 'p95 Latency (ms) & 5xx Error Rate (%)',
+  chartThroughputPoolTitle: 'Throughput (req/s) & DB Pool Usage',
+  chartPoolGaugeLabel: 'Pool Saturation',
+  chartFinopsGaugeLabel: 'FinOps Reduction',
+  chartFinopsBarsTitle: 'LLM Payload (Raw vs Compacted)',
+  chartMttrBarsTitle: 'Autonomous vs Manual MTTR (~30m)',
+  chartAwaitingSamples: 'Awaiting live target service samples (2s polling)...',
+  chartSloThreshold: 'SLO 500ms'
 };
 
 /**

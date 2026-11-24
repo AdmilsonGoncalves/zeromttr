@@ -7,202 +7,45 @@
     class="flex flex-col flex-1 min-h-0"
   >
     <p-tablist class="shrink-0">
-      <p-tab value="0"><i class="pi pi-sitemap mr-1"></i> {{ i18n.t('tabTraceTree') }}</p-tab>
-      <p-tab value="1"><i class="pi pi-shield mr-1"></i> {{ i18n.t('tabLokiLogs') }}</p-tab>
-      <p-tab value="2"><i class="pi pi-file-edit mr-1"></i> {{ i18n.t('tabGitDiff') }}</p-tab>
+      <p-tab value="0"><i class="pi pi-chart-line mr-1"></i> {{ i18n.t('tabLiveMetrics') }}</p-tab>
+      <p-tab value="1"><i class="pi pi-sitemap mr-1"></i> {{ i18n.t('tabTraceTree') }}</p-tab>
+      <p-tab value="2"><i class="pi pi-shield mr-1"></i> {{ i18n.t('tabLokiLogs') }}</p-tab>
+      <p-tab value="3"><i class="pi pi-file-edit mr-1"></i> {{ i18n.t('tabGitDiff') }}</p-tab>
     </p-tablist>
 
     <p-tabpanels class="flex-1 min-h-0 overflow-y-auto pr-1">
-      <!-- Tab 1: Trace Tree & Evidence Coverage -->
       <p-tabpanel value="0">
-        <div class="flex flex-col gap-2.5 pt-1.5">
-          <div class="bg-slate-950 border border-slate-800 rounded p-2">
-            <div class="flex justify-between items-center mb-1 text-xs">
-              <span class="font-bold text-slate-300">
-                {{ i18n.t('evidenceCoverageLabel') }}: {{ signalsRatioSignal() }} Signals ({{
-                  evidenceCoveragePercentSignal()
-                }}%)
-              </span>
-              <span class="font-mono text-cyan-400"> {{ evidenceCoveragePercentSignal() }}% </span>
-            </div>
-            <p-progressbar [value]="evidenceCoveragePercentSignal()" [showValue]="false" />
-          </div>
-
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-xs font-semibold text-slate-400">
-              {{ i18n.t('blastRadiusLabel') }}:
-            </span>
-            @for (svc of incidentSignal()?.rca?.blastRadius ?? []; track svc) {
-              <span
-                class="bg-rose-950/70 border border-rose-700/80 text-rose-300 text-xs px-2 py-0.5 rounded font-mono font-semibold"
-              >
-                {{ svc }}
-              </span>
-            }
-          </div>
-
-          @if (incidentSignal()?.rca?.summary; as summary) {
-            <div class="bg-slate-950 border border-slate-800 rounded p-2">
-              <div class="text-[11px] font-bold text-slate-400 uppercase mb-0.5">
-                Root Cause Analysis (RCA)
-              </div>
-              <p class="text-xs font-mono text-slate-200 leading-relaxed">
-                {{ summary }}
-              </p>
-            </div>
-          }
-
-          <div class="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1">
-            <div
-              class="flex justify-between items-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-1"
-            >
-              <span>Span Hierarchy (Trace ID: {{ incidentSignal()?.rca?.traceId }})</span>
-              <span>Duration / Status</span>
-            </div>
-
-            <div class="flex flex-col gap-1 font-mono text-xs max-h-56 overflow-y-auto pr-0.5">
-              @for (span of incidentSignal()?.rca?.spans ?? []; track span.spanId) {
-                <div
-                  class="p-1.5 rounded border transition-colors flex justify-between items-center"
-                  [ngClass]="{
-                    'bg-rose-950/40 border-rose-800/80 text-rose-200': span.hasError,
-                    'bg-slate-900/40 border-slate-800/60 text-slate-300': !span.hasError,
-                    'ml-5 border-l-2 border-l-cyan-500/40': !!span.parentSpanId
-                  }"
-                >
-                  <div class="flex items-center gap-1.5">
-                    <i
-                      [class]="
-                        span.hasError
-                          ? 'pi pi-times-circle text-rose-400 text-xs'
-                          : 'pi pi-check-circle text-emerald-400 text-xs'
-                      "
-                    ></i>
-                    <span class="font-bold text-xs">{{ span.operationName }}</span>
-                    <span class="text-[10px] text-slate-400">({{ span.serviceName }})</span>
-                  </div>
-                  <span
-                    class="font-mono text-xs font-bold"
-                    [ngClass]="span.hasError ? 'text-rose-400' : 'text-slate-400'"
-                  >
-                    {{ span.durationMs }}ms
-                  </span>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
+        <app-live-metrics-tab
+          [incident]="incidentSignal()"
+          [targetStatus]="targetStatusSignal()"
+          [telemetryHistory]="telemetryHistorySignal()"
+          [finopsReduction]="finopsReductionSignal()"
+        />
       </p-tabpanel>
 
-      <!-- Tab 2: Loki Logs & PII Masking -->
       <p-tabpanel value="1">
-        <div class="flex flex-col gap-2.5 pt-1.5">
-          <div class="flex justify-center p-0.5">
-            @if (isPiiPassedSignal() === true) {
-              <div
-                class="bg-emerald-950 border border-emerald-500 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
-              >
-                <i class="pi pi-check-circle text-emerald-400"></i>
-                <span>{{ i18n.t('piiGuardVerifiedBadge') }}</span>
-              </div>
-            } @else if (isPiiPassedSignal() === false) {
-              <div
-                class="bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
-              >
-                <i class="pi pi-exclamation-triangle text-rose-400"></i>
-                <span>
-                  {{
-                    i18n
-                      .t('piiGuardBlockedBadge')
-                      .replace('{N}', leakedPatternsCountSignal().toString())
-                  }}
-                </span>
-              </div>
-            } @else {
-              <div
-                class="bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 shadow"
-              >
-                <i class="pi pi-hourglass text-slate-400"></i>
-                <span>{{ i18n.t('awaitingAuditBadge') }}</span>
-              </div>
-            }
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div class="bg-slate-950 border border-rose-900/60 rounded p-2 flex flex-col gap-1">
-              <span class="text-xs font-bold text-rose-400">
-                {{ i18n.t('preCollectorLogLabel') }}
-              </span>
-              <pre
-                class="font-mono text-[11px] text-rose-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-rose-950 max-h-64 overflow-y-auto"
-                >{{ displayedPreCollectorLog() }}</pre>
-            </div>
-
-            <div class="bg-slate-950 border border-emerald-900/60 rounded p-2 flex flex-col gap-1">
-              <span class="text-xs font-bold text-emerald-400">
-                {{ i18n.t('postOttlLogLabel') }}
-              </span>
-              <pre
-                class="font-mono text-[11px] text-emerald-200/90 whitespace-pre-wrap break-all bg-slate-950/80 p-2 rounded border border-emerald-950 max-h-64 overflow-y-auto"
-                >{{ displayedPostOttlLog() }}</pre>
-            </div>
-          </div>
-        </div>
+        <app-trace-tree-tab
+          [incident]="incidentSignal()"
+          [signalsRatio]="signalsRatioSignal()"
+          [evidenceCoveragePercent]="evidenceCoveragePercentSignal()"
+        />
       </p-tabpanel>
 
-      <!-- Tab 3: Git Deploy Diff & FinOps -->
       <p-tabpanel value="2">
-        <div class="flex flex-col gap-2.5 pt-1.5">
-          <div class="flex justify-between items-center text-xs text-slate-300">
-            <span class="font-bold font-mono text-cyan-300">
-              {{ i18n.t('gitDiffTitle') }}
-            </span>
-            <span class="font-mono text-slate-400 text-[11px]">
-              apps/target-app-demo/src/repositories/payment.repository.ts
-            </span>
-          </div>
+        <app-loki-pii-tab
+          [incident]="incidentSignal()"
+          [targetStatus]="targetStatusSignal()"
+          [isPiiPassed]="isPiiPassedSignal()"
+          [leakedPatternsCount]="leakedPatternsCountSignal()"
+        />
+      </p-tabpanel>
 
-          <pre
-            class="bg-slate-950 border border-slate-800 rounded p-2.5 font-mono text-[11px] text-slate-200 overflow-x-auto leading-relaxed max-h-56 overflow-y-auto"
-            >{{ mockGitDiff }}</pre>
-
-          <div
-            class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-950 border border-slate-800 rounded p-2"
-          >
-            <div>
-              <div class="text-[9px] text-slate-400 uppercase">
-                {{ i18n.t('finopsBytesFetched') }}
-              </div>
-              <div class="text-xs font-mono font-bold text-slate-200">
-                {{ incidentSignal()?.finops?.rawBytesFetched ?? 48200 }} B
-              </div>
-            </div>
-            <div>
-              <div class="text-[9px] text-slate-400 uppercase">
-                {{ i18n.t('finopsBytesSent') }}
-              </div>
-              <div class="text-xs font-mono font-bold text-slate-200">
-                {{ incidentSignal()?.finops?.compactedBytesSent ?? 7712 }} B
-              </div>
-            </div>
-            <div>
-              <div class="text-[9px] text-slate-400 uppercase">
-                {{ i18n.t('finopsPayloadReduction') }}
-              </div>
-              <div class="text-xs font-mono font-bold text-emerald-400">
-                {{ finopsReductionSignal() }}%
-              </div>
-            </div>
-            <div>
-              <div class="text-[9px] text-slate-400 uppercase">
-                {{ i18n.t('finopsTokensSaved') }}
-              </div>
-              <div class="text-xs font-mono font-bold text-cyan-400">
-                ~{{ estimatedTokensSavedSignal() }}
-              </div>
-            </div>
-          </div>
-        </div>
+      <p-tabpanel value="3">
+        <app-git-diff-finops-tab
+          [incident]="incidentSignal()"
+          [finopsReduction]="finopsReductionSignal()"
+          [estimatedTokensSaved]="estimatedTokensSavedSignal()"
+        />
       </p-tabpanel>
     </p-tabpanels>
   </p-tabs>
