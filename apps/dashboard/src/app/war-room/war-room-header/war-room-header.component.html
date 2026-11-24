@@ -97,12 +97,18 @@
           "
           [severity]="healthyTrafficActiveSignal() ? 'warn' : 'success'"
           size="small"
-          [disabled]="isTogglingTrafficSignal() || simulationLockedByTurnstileSignal()"
+          [disabled]="
+            isTogglingTrafficSignal() ||
+            simulationLockedByTurnstileSignal() ||
+            isHealthyTrafficStartBlockedSignal()
+          "
           (onClick)="toggleHealthyTraffic.emit()"
           [pTooltip]="
             simulationLockedByTurnstileSignal()
               ? i18n.t('tooltipTurnstilePending')
-              : i18n.t('tooltipHealthyTraffic')
+              : isHealthyTrafficStartBlockedSignal()
+                ? i18n.t('tooltipHealthyTrafficRequiresRestore')
+                : i18n.t('tooltipHealthyTraffic')
           "
           tooltipPosition="bottom"
           styleClass="text-xs py-1"

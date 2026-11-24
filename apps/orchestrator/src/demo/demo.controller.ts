@@ -253,10 +253,10 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
             }
           }
 
-          lastChaosTimestamp = 0;
-          lastChaosMode = IncidentExecutionMode.REPLAY;
           dependencies.replayRunner?.stop();
           await dependencies.demoControlPort.reset();
+          lastChaosTimestamp = 0;
+          lastChaosMode = IncidentExecutionMode.REPLAY;
 
           if (failedIncidentIds.length > 0) {
             res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -296,84 +296,86 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
         }
 
         const { incidentId, action } = parsed.data;
-        let requiresLiveAuth =
-          action === DecisionAction.APPROVE &&
-          lastChaosTimestamp > 0 &&
-          lastChaosMode === IncidentExecutionMode.LIVE;
+        await runSerialized(async () => {
+          let existingIncident: Awaited<ReturnType<IncidentRepository['findById']>> = null;
+          let completeApprovalReset: (() => Promise<void>) | null = null;
+          try {
+            existingIncident = dependencies.repository
+              ? await dependencies.repository.findById(incidentId)
+              : null;
 
-        let existingIncident = null;
-        if (dependencies.repository) {
-          existingIncident = await dependencies.repository.findById(incidentId);
-          if (existingIncident && existingIncident.mode === IncidentExecutionMode.LIVE) {
-            requiresLiveAuth = true;
-          }
-        }
+            const isLiveSessionActive =
+              lastChaosTimestamp > 0 && lastChaosMode === IncidentExecutionMode.LIVE;
+            const requiresLiveAuth =
+              (existingIncident !== null && existingIncident.mode === IncidentExecutionMode.LIVE) ||
+              (action === DecisionAction.APPROVE && isLiveSessionActive);
 
-        if (requiresLiveAuth) {
-          const allowed = await runExpressMiddleware(liveDemoAuth, req, res);
-          if (!allowed) {
-            return;
-          }
-        }
-
-        const completeApprovalReset = async (): Promise<void> => {
-          pendingTargetResetIncidentIds.add(incidentId);
-          lastChaosTimestamp = 0;
-          lastChaosMode = IncidentExecutionMode.REPLAY;
-          dependencies.replayRunner?.stop();
-          await dependencies.demoControlPort.reset();
-          pendingTargetResetIncidentIds.delete(incidentId);
-        };
-
-        try {
-          const incident = await dependencies.simulateDemoDecision.execute(incidentId, action);
-          if (action === DecisionAction.APPROVE) {
-            await completeApprovalReset();
-          }
-          res.status(HTTP_STATUS.OK).json({
-            success: true,
-            simulated: true,
-            incidentId: incident.id,
-            state: incident.state,
-            decision: incident.decision,
-            decisionSource: incident.decisionSource
-          });
-        } catch (err) {
-          if (err instanceof IncidentNotFoundError) {
-            res.status(HTTP_STATUS.NOT_FOUND).json({ error: err.message });
-            return;
-          }
-          if (err instanceof IncidentAlreadyResolvedError) {
-            if (
-              action === DecisionAction.APPROVE &&
-              pendingTargetResetIncidentIds.has(incidentId) &&
-              existingIncident
-            ) {
-              try {
-                await completeApprovalReset();
-                res.status(HTTP_STATUS.OK).json({
-                  success: true,
-                  simulated: true,
-                  incidentId: existingIncident.id,
-                  state: existingIncident.state,
-                  decision: existingIncident.decision,
-                  decisionSource: existingIncident.decisionSource
-                });
-                return;
-              } catch (resetErr) {
-                res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-                  error: toErrorMessage(resetErr, 'Failed to restore service after decision')
-                });
+            if (requiresLiveAuth) {
+              const allowed = await runExpressMiddleware(liveDemoAuth, req, res);
+              if (!allowed) {
                 return;
               }
             }
-            res.status(HTTP_STATUS.CONFLICT).json({ error: err.message });
-            return;
+
+            completeApprovalReset = async (): Promise<void> => {
+              pendingTargetResetIncidentIds.add(incidentId);
+              dependencies.replayRunner?.stop();
+              await dependencies.demoControlPort.reset();
+              lastChaosTimestamp = 0;
+              lastChaosMode = IncidentExecutionMode.REPLAY;
+              pendingTargetResetIncidentIds.delete(incidentId);
+            };
+
+            const incident = await dependencies.simulateDemoDecision.execute(incidentId, action);
+            if (action === DecisionAction.APPROVE) {
+              await completeApprovalReset();
+            }
+            res.status(HTTP_STATUS.OK).json({
+              success: true,
+              simulated: true,
+              incidentId: incident.id,
+              state: incident.state,
+              decision: incident.decision,
+              decisionSource: incident.decisionSource
+            });
+          } catch (err) {
+            if (err instanceof IncidentNotFoundError) {
+              res.status(HTTP_STATUS.NOT_FOUND).json({ error: err.message });
+              return;
+            }
+            if (err instanceof IncidentAlreadyResolvedError) {
+              if (
+                action === DecisionAction.APPROVE &&
+                pendingTargetResetIncidentIds.has(incidentId) &&
+                existingIncident &&
+                completeApprovalReset
+              ) {
+                try {
+                  await completeApprovalReset();
+                  res.status(HTTP_STATUS.OK).json({
+                    success: true,
+                    simulated: true,
+                    incidentId: existingIncident.id,
+                    state: existingIncident.state,
+                    decision: existingIncident.decision,
+                    decisionSource: existingIncident.decisionSource
+                  });
+                  return;
+                } catch (resetErr) {
+                  res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+                    error: toErrorMessage(resetErr, 'Failed to restore service after decision')
+                  });
+                  return;
+                }
+              }
+              res.status(HTTP_STATUS.CONFLICT).json({ error: err.message });
+              return;
+            }
+            res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+              error: toErrorMessage(err, 'Failed to simulate decision')
+            });
           }
-          res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            error: toErrorMessage(err, 'Failed to simulate decision')
-          });
-        }
+        });
       })();
     }
   );

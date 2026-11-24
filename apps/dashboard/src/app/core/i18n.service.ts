@@ -139,6 +139,7 @@ export interface TranslationDictionary {
   healthyTrafficStartBtn: string;
   healthyTrafficStopBtn: string;
   tooltipHealthyTraffic: string;
+  tooltipHealthyTrafficRequiresRestore: string;
   targetTelemetryLabel: string;
   targetRpsLabel: string;
   targetError5xxLabel: string;
@@ -322,6 +323,8 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   healthyTrafficStopBtn: '⏹ Parar Tráfego',
   tooltipHealthyTraffic:
     'Inicia ou interrompe fluxo contínuo de requisições saudáveis em api-pagamentos-core para demonstrar Antes → Durante → Depois.',
+  tooltipHealthyTrafficRequiresRestore:
+    'Serviço alvo degradado (v2.14.8). Use "Restaurar Serviço" antes de iniciar o tráfego saudável.',
   targetTelemetryLabel: 'Telemetria Alvo',
   targetRpsLabel: 'Req/s',
   targetError5xxLabel: 'Erro 5xx',
@@ -502,6 +505,8 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   healthyTrafficStopBtn: '⏹ Stop Traffic',
   tooltipHealthyTraffic:
     'Starts or stops continuous healthy traffic on api-pagamentos-core to demonstrate Before → During → After.',
+  tooltipHealthyTrafficRequiresRestore:
+    'Target service is degraded (v2.14.8). Click "Restore Service" before starting healthy traffic.',
   targetTelemetryLabel: 'Target Telemetry',
   targetRpsLabel: 'Req/s',
   targetError5xxLabel: '5xx Error',

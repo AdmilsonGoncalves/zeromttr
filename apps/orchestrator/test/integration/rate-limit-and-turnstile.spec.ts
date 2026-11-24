@@ -436,6 +436,12 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
     expect(failedResetRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
 
+    // Live-session state must remain intact after reset failure so unauthenticated /demo/reset is still rejected
+    const unauthResetAfterFailure = await request(app)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(unauthResetAfterFailure.status).toBe(HTTP_STATUS.FORBIDDEN);
+
     const retryRes = await request(app)
       .post('/api/demo/simulate-decision')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
@@ -443,5 +449,75 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
     expect(retryRes.status).toBe(HTTP_STATUS.OK);
     expect(demoControlPort.reset).toHaveBeenCalledTimes(2);
+  });
+
+  it('should serialize simulate-decision with in-flight live chaos and require X-Live-Demo-Key if a live session starts concurrently', async () => {
+    const replayIncident = new Incident({
+      id: 'inc-replay-race',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:replay-race',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.REPLAY
+    });
+    await repository.save(replayIncident);
+
+    let resolveTrigger!: () => void;
+    const triggerDeferred = new Promise<void>((resolve) => {
+      resolveTrigger = resolve;
+    });
+
+    const demoControlPort = createMockDemoControlPort();
+    vi.mocked(demoControlPort.triggerChaos).mockImplementationOnce(async () => {
+      await triggerDeferred;
+    });
+    const toolsPort = createMockToolsPort();
+    const broadcaster = new SseEventBroadcaster();
+    const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster);
+
+    const app = createApp({
+      repository,
+      targetStatusPort: createMockTargetStatusPort(),
+      handleAlert: createStubHandleAlert(),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: createStubRecordDecision(),
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      grafanaWebhookToken: 'test-grafana-token',
+      demoRouter: createDemoRouterFactory({
+        repository,
+        demoControlPort,
+        simulateDemoDecision,
+        liveDemoKey: 'strict-live-key',
+        cooldownMs: 0
+      }),
+      enableRateLimiting: false
+    });
+
+    const liveChaosPromise = request(app)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'strict-live-key')
+      .send({ mode: IncidentExecutionMode.LIVE });
+
+    // Wait a tick so /api/demo/chaos enters runSerialized and pauses inside triggerChaos
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const concurrentReplayApprovePromise = request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    resolveTrigger();
+
+    const [liveChaosRes, concurrentReplayRes] = await Promise.all([
+      liveChaosPromise,
+      concurrentReplayApprovePromise
+    ]);
+
+    expect(liveChaosRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(concurrentReplayRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(demoControlPort.reset).not.toHaveBeenCalled();
   });
 });

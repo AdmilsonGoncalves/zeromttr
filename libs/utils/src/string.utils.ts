@@ -57,12 +57,17 @@ export function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function codePointToChar(codePoint: number): string {
+  if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
+    return '\uFFFD';
+  }
+  return String.fromCodePoint(codePoint);
+}
+
 function decodeHtmlEntitiesForUriCheck(value: string): string {
   return value
-    .replace(/&#x([0-9a-f]+);?/gi, (_, hex: string) =>
-      String.fromCodePoint(Number.parseInt(hex, 16))
-    )
-    .replace(/&#([0-9]+);?/g, (_, dec: string) => String.fromCodePoint(Number.parseInt(dec, 10)));
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex: string) => codePointToChar(Number.parseInt(hex, 16)))
+    .replace(/&#([0-9]+);?/g, (_, dec: string) => codePointToChar(Number.parseInt(dec, 10)));
 }
 
 /**

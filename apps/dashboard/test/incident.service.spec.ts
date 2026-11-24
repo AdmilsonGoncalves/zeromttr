@@ -403,4 +403,30 @@ describe('IncidentService', () => {
 
     fetchSpy.mockRestore();
   });
+
+  it('should_retry_fetchDemoConfig_on_failed_or_thrown_requests_and_store_turnstile_config_when_recovered', async () => {
+    const service = new IncidentService();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+      .mockResolvedValueOnce(new Response('Service Unavailable', { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            publicLiveDemo: true,
+            turnstileSiteKey: '0x4AAAAAAARetryKey',
+            turnstileRequired: true
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+    await service.fetchDemoConfig('http://localhost:8080', 3, 1);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(service.publicLiveDemo()).toBe(true);
+    expect(service.turnstileSiteKey()).toBe('0x4AAAAAAARetryKey');
+    expect(service.turnstileRequired()).toBe(true);
+
+    fetchSpy.mockRestore();
+  });
 });

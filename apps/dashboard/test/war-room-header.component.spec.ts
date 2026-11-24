@@ -1,6 +1,6 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { IncidentExecutionMode } from '../src/app/core/contract.js';
+import { IncidentExecutionMode, TargetHealthStatus } from '../src/app/core/contract.js';
 import { I18nService } from '../src/app/core/i18n.service.js';
 import { WarRoomHeaderComponent } from '../src/app/war-room/war-room-header/war-room-header.component.js';
 
@@ -47,5 +47,31 @@ describe('WarRoomHeaderComponent', () => {
     expect(modeSpy).not.toHaveBeenCalled();
     expect(keySpy).not.toHaveBeenCalled();
     expect(langSpy).not.toHaveBeenCalled();
+  });
+
+  it('should block starting healthy traffic while target is degraded unless traffic is already active', () => {
+    expect(component.isHealthyTrafficStartBlockedSignal()).toBe(false);
+
+    component.targetStatus = {
+      status: TargetHealthStatus.DEGRADED,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.8',
+      previousHealthyVersion: 'v2.14.7',
+      rawEdgeLogPreCollector: 'raw'
+    };
+    expect(component.isHealthyTrafficStartBlockedSignal()).toBe(true);
+
+    component.healthyTrafficActive = true;
+    expect(component.isHealthyTrafficStartBlockedSignal()).toBe(false);
+
+    component.healthyTrafficActive = false;
+    component.targetStatus = {
+      status: TargetHealthStatus.HEALTHY,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.7',
+      previousHealthyVersion: 'v2.14.7',
+      rawEdgeLogPreCollector: 'raw'
+    };
+    expect(component.isHealthyTrafficStartBlockedSignal()).toBe(false);
   });
 });

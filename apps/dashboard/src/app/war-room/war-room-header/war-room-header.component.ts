@@ -7,6 +7,7 @@ import {
   OnDestroy,
   Output,
   ViewChild,
+  computed,
   effect,
   inject,
   signal
@@ -19,6 +20,7 @@ import { Tag } from 'primeng/tag';
 import { Tooltip } from 'primeng/tooltip';
 import {
   IncidentExecutionMode,
+  TargetHealthStatus,
   type IncidentMode,
   type ReasoningSource,
   type TargetStatusResponse
@@ -94,6 +96,11 @@ export class WarRoomHeaderComponent implements OnDestroy {
   readonly evidenceCoveragePercentSignal = signal<number>(0);
   readonly reasoningSourceSignal = signal<ReasoningSource | null>(null);
   readonly turnstileLoadErrorSignal = signal<boolean>(false);
+  readonly isHealthyTrafficStartBlockedSignal = computed<boolean>(
+    () =>
+      !this.healthyTrafficActiveSignal() &&
+      this.targetStatusSignal()?.status === TargetHealthStatus.DEGRADED
+  );
 
   private readonly turnstileHostSignal = signal<HTMLElement | null>(null);
   private turnstileWidgetId: string | null = null;

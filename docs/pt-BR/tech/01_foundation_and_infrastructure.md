@@ -148,7 +148,7 @@ LLM_MODEL=gemini-3.5-flash
 LLM_API_KEY=
 
 # Flags do Workload
-CHAOS_ENABLED=true
+CHAOS_ENABLED=false
 DEMO_MODE=true
 ```
 

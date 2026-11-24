@@ -83,6 +83,11 @@ export class IncidentService {
   private targetStatusPollTimer: ReturnType<typeof setInterval> | null = null;
   private sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private visualStepTimer: ReturnType<typeof setTimeout> | null = null;
+  private demoConfigRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private demoConfigRetryResolve: (() => void) | null = null;
+  private demoConfigInFlight: Promise<void> | null = null;
+  private demoConfigLoaded = false;
+  private demoConfigCancelToken = 0;
   private visualStateQueue: IncidentState[] = [];
   private readonly dismissedIncidentIds = new Set<string>();
   private activeIncidentFetchToken = 0;
@@ -964,23 +969,68 @@ export class IncidentService {
     }
   }
 
-  /**
-   * Fetches runtime demo configuration (`publicLiveDemo`, `turnstileSiteKey`, `turnstileRequired`).
-   */
-  async fetchDemoConfig(baseUrl = ''): Promise<void> {
-    try {
-      const res = await fetch(`${baseUrl}/api/demo/config`);
-      if (res.ok) {
-        const config = (await res.json()) as Partial<DemoConfigResponse>;
-        this.publicLiveDemo.set(config.publicLiveDemo === true);
-        this.turnstileSiteKey.set(
-          isNonEmptyString(config.turnstileSiteKey) ? config.turnstileSiteKey : null
-        );
-        this.turnstileRequired.set(config.turnstileRequired === true);
-      }
-    } catch {
-      // Keep safe defaults if config endpoint is unavailable
+  private cancelPendingDemoConfigRetry(): void {
+    this.demoConfigCancelToken++;
+    if (this.demoConfigRetryTimer) {
+      clearTimeout(this.demoConfigRetryTimer);
+      this.demoConfigRetryTimer = null;
     }
+    if (this.demoConfigRetryResolve) {
+      const resolve = this.demoConfigRetryResolve;
+      this.demoConfigRetryResolve = null;
+      resolve();
+    }
+  }
+
+  /**
+   * Fetches runtime demo configuration (`publicLiveDemo`, `turnstileSiteKey`, `turnstileRequired`)
+   * with bounded retry on failed or thrown requests.
+   */
+  async fetchDemoConfig(baseUrl = '', maxAttempts = 3, retryDelayMs = 1500): Promise<void> {
+    if (this.demoConfigInFlight) {
+      return this.demoConfigInFlight;
+    }
+
+    const totalAttempts = Math.max(1, maxAttempts);
+    const cancelToken = this.demoConfigCancelToken;
+
+    this.demoConfigInFlight = (async () => {
+      for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+        if (this.demoConfigCancelToken !== cancelToken) {
+          return;
+        }
+        try {
+          const res = await fetch(`${baseUrl}/api/demo/config`);
+          if (res.ok) {
+            const config = (await res.json()) as Partial<DemoConfigResponse>;
+            this.publicLiveDemo.set(config.publicLiveDemo === true);
+            this.turnstileSiteKey.set(
+              isNonEmptyString(config.turnstileSiteKey) ? config.turnstileSiteKey : null
+            );
+            this.turnstileRequired.set(config.turnstileRequired === true);
+            this.demoConfigLoaded = true;
+            return;
+          }
+        } catch {
+          // Retry transient fetch/parse errors up to totalAttempts
+        }
+
+        if (attempt < totalAttempts && retryDelayMs > 0) {
+          await new Promise<void>((resolve) => {
+            this.demoConfigRetryResolve = resolve;
+            this.demoConfigRetryTimer = setTimeout(() => {
+              this.demoConfigRetryTimer = null;
+              this.demoConfigRetryResolve = null;
+              resolve();
+            }, retryDelayMs * attempt);
+          });
+        }
+      }
+    })().finally(() => {
+      this.demoConfigInFlight = null;
+    });
+
+    return this.demoConfigInFlight;
   }
 
   /**
@@ -1070,6 +1120,9 @@ export class IncidentService {
     this.stopTargetStatusPolling();
     this.targetStatusPollTimer = setInterval(() => {
       void this.fetchTargetStatus(baseUrl);
+      if (!this.demoConfigLoaded) {
+        void this.fetchDemoConfig(baseUrl, 1, 0);
+      }
       if (this.awaitingIncidentStart() || !this.sseConnected()) {
         void this.syncIncidentFallback(baseUrl);
       }
@@ -1134,6 +1187,7 @@ export class IncidentService {
    * Stops periodic polling of `/api/target/status`.
    */
   stopTargetStatusPolling(): void {
+    this.cancelPendingDemoConfigRetry();
     if (this.targetStatusPollTimer) {
       clearInterval(this.targetStatusPollTimer);
       this.targetStatusPollTimer = null;

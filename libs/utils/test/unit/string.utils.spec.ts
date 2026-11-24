@@ -115,6 +115,17 @@ describe('string.utils', () => {
       expect(cleaned).toContain('href="blocked:"');
       expect(cleaned).toContain('https://example.com/ok');
     });
+
+    it('should handle out-of-range numeric character references safely without throwing and preserve valid hex/decimal decoding', () => {
+      const input =
+        '<a href="https://example.com/?q=&#x110000;&#99999999;">OutOfRange</a><a href="&#x6a;avascript:alert(1)">HexJs</a><a href="&#106;avascript:alert(2)">DecJs</a><a href="https://example.com/&#x41;&#66;">Valid</a>';
+      const cleaned = stripUnsafeHtml(input);
+      expect(cleaned).toContain('https://example.com/?q=&#x110000;&#99999999;');
+      expect(cleaned).not.toContain('&#x6a;avascript:');
+      expect(cleaned).not.toContain('&#106;avascript:');
+      expect(cleaned).toContain('href="blocked:"');
+      expect(cleaned).toContain('https://example.com/&#x41;&#66;');
+    });
   });
 
   describe('isSafeRelativePath', () => {
