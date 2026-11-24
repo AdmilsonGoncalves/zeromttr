@@ -57,6 +57,7 @@ export interface DemoActionResult {
   ok: boolean;
   status?: number;
   error?: string;
+  errorCode?: string;
   retryAfterSeconds?: number;
 }
 
@@ -1007,20 +1008,30 @@ export class IncidentService {
 
   private async readErrorPayload(
     res: Response
-  ): Promise<{ error: string; retryAfterSeconds?: number }> {
+  ): Promise<{ error: string; errorCode?: string; retryAfterSeconds?: number }> {
     try {
-      const body = (await res.json()) as { error?: unknown; retryAfterSeconds?: unknown };
+      const body = (await res.json()) as {
+        error?: unknown;
+        code?: unknown;
+        retryAfterSeconds?: unknown;
+      };
+      const errorCode = isNonEmptyString(body?.code) ? body.code : undefined;
       const retryAfterSeconds = isNumber(body?.retryAfterSeconds)
         ? body.retryAfterSeconds
         : undefined;
       if (isNonEmptyString(body?.error)) {
         return {
           error: body.error,
+          ...(errorCode !== undefined ? { errorCode } : {}),
           ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {})
         };
       }
-      if (retryAfterSeconds !== undefined) {
-        return { error: `HTTP ${res.status}`, retryAfterSeconds };
+      if (retryAfterSeconds !== undefined || errorCode !== undefined) {
+        return {
+          error: `HTTP ${res.status}`,
+          ...(errorCode !== undefined ? { errorCode } : {}),
+          ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {})
+        };
       }
     } catch {
       // Ignore non-JSON error payloads

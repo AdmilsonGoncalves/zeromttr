@@ -102,6 +102,16 @@ describe('string.utils', () => {
     it('should return empty string for empty input', () => {
       expect(stripUnsafeHtml('')).toBe('');
     });
+
+    it('should strip slash-delimited event handlers, svg/iframe tags, and data:text/html URIs', () => {
+      const dirty =
+        '<img/onerror=alert(1) src=x><svg onload=alert(1)></svg><iframe srcdoc="<script>1</script>"></iframe><a href="data:text/html,<script>1</script>">Bad</a>';
+      const cleaned = stripUnsafeHtml(dirty);
+      expect(cleaned).not.toMatch(/onerror/i);
+      expect(cleaned).not.toMatch(/<svg/i);
+      expect(cleaned).not.toMatch(/<iframe/i);
+      expect(cleaned).toContain('blocked:text/html');
+    });
   });
 
   describe('isSafeRelativePath', () => {

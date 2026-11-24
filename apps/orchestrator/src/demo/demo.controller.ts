@@ -99,6 +99,7 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
   const cooldownMs = dependencies.cooldownMs ?? 120_000;
   let lastChaosTimestamp = 0;
   let lastChaosMode: IncidentMode = IncidentExecutionMode.REPLAY;
+  const pendingTargetResetIncidentIds = new Set<string>();
 
   const publicLiveDemo = dependencies.publicLiveDemo === true;
   const turnstileSiteKey = dependencies.turnstileSiteKey?.trim() || null;
@@ -153,6 +154,7 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
         if (lastChaosTimestamp > 0 && now - lastChaosTimestamp < cooldownMs) {
           const remainingSeconds = Math.ceil((cooldownMs - (now - lastChaosTimestamp)) / 1000);
           res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
+            code: 'SIMULATION_COOLDOWN',
             error: `Chaos simulation is in cooldown. Please wait ${remainingSeconds} seconds before triggering again.`,
             retryAfterSeconds: remainingSeconds
           });
@@ -245,6 +247,17 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
             return;
           }
 
+          if (
+            !hasLiveSessionOrIncident &&
+            lastChaosTimestamp > 0 &&
+            lastChaosMode === IncidentExecutionMode.LIVE
+          ) {
+            const allowedAfterSave = await runExpressMiddleware(liveDemoAuth, req, res);
+            if (!allowedAfterSave) {
+              return;
+            }
+          }
+
           lastChaosTimestamp = 0;
           lastChaosMode = IncidentExecutionMode.REPLAY;
           dependencies.replayRunner?.stop();
@@ -279,24 +292,39 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
         }
 
         const { incidentId, action } = parsed.data;
+        let requiresLiveAuth =
+          action === DecisionAction.APPROVE &&
+          lastChaosTimestamp > 0 &&
+          lastChaosMode === IncidentExecutionMode.LIVE;
 
+        let existingIncident = null;
         if (dependencies.repository) {
-          const existing = await dependencies.repository.findById(incidentId);
-          if (existing && existing.mode === IncidentExecutionMode.LIVE) {
-            const allowed = await runExpressMiddleware(liveDemoAuth, req, res);
-            if (!allowed) {
-              return;
-            }
+          existingIncident = await dependencies.repository.findById(incidentId);
+          if (existingIncident && existingIncident.mode === IncidentExecutionMode.LIVE) {
+            requiresLiveAuth = true;
           }
         }
+
+        if (requiresLiveAuth) {
+          const allowed = await runExpressMiddleware(liveDemoAuth, req, res);
+          if (!allowed) {
+            return;
+          }
+        }
+
+        const completeApprovalReset = async (): Promise<void> => {
+          pendingTargetResetIncidentIds.add(incidentId);
+          lastChaosTimestamp = 0;
+          lastChaosMode = IncidentExecutionMode.REPLAY;
+          dependencies.replayRunner?.stop();
+          await dependencies.demoControlPort.reset();
+          pendingTargetResetIncidentIds.delete(incidentId);
+        };
 
         try {
           const incident = await dependencies.simulateDemoDecision.execute(incidentId, action);
           if (action === DecisionAction.APPROVE) {
-            lastChaosTimestamp = 0;
-            lastChaosMode = IncidentExecutionMode.REPLAY;
-            dependencies.replayRunner?.stop();
-            await dependencies.demoControlPort.reset();
+            await completeApprovalReset();
           }
           res.status(HTTP_STATUS.OK).json({
             success: true,
@@ -312,6 +340,29 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
             return;
           }
           if (err instanceof IncidentAlreadyResolvedError) {
+            if (
+              action === DecisionAction.APPROVE &&
+              pendingTargetResetIncidentIds.has(incidentId) &&
+              existingIncident
+            ) {
+              try {
+                await completeApprovalReset();
+                res.status(HTTP_STATUS.OK).json({
+                  success: true,
+                  simulated: true,
+                  incidentId: existingIncident.id,
+                  state: existingIncident.state,
+                  decision: existingIncident.decision,
+                  decisionSource: existingIncident.decisionSource
+                });
+                return;
+              } catch (resetErr) {
+                res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+                  error: toErrorMessage(resetErr, 'Failed to restore service after decision')
+                });
+                return;
+              }
+            }
             res.status(HTTP_STATUS.CONFLICT).json({ error: err.message });
             return;
           }

@@ -78,8 +78,8 @@ export const PII_PATTERNS = {
    - For interactive on-screen demonstration purposes when the evaluator is in `replay` mode (or authenticated with `X-Live-Demo-Key`), exposes `POST /api/demo/simulate-decision`, clearly separated from the production cryptographic endpoint.
 
 ## 4. "Live API" Mode vs. "Accelerated Replay Mode" & Access Segregation
-- On the public VPS (`https://zeromttr.agjworks.com`), anonymous visitors without an `X-Live-Demo-Key` header operate by default in **`replay`** mode (which replays in ~25 seconds the real SSE stream previously recorded in `data/last-recorded-incident.json`, without creating GitHub PRs or consuming email quota).
-- When triggered locally (empty `LIVE_DEMO_KEY`) or on the VPS with a valid `X-Live-Demo-Key`, executes true end-to-end **`live` mode**.
+- On the public VPS (`https://zeromttr.agjworks.com`), anonymous visitors without an `X-Live-Demo-Key` header operate by default in **`replay`** mode (which replays in ~25 seconds the real SSE stream previously recorded in `data/last-recorded-incident.json`, without creating GitHub PRs or consuming email quota), unless `PUBLIC_LIVE_DEMO=true` is enabled (recommended with Cloudflare Turnstile verification).
+- When triggered locally (empty `LIVE_DEMO_KEY`), with `PUBLIC_LIVE_DEMO=true` + Turnstile, or on the VPS with a valid `X-Live-Demo-Key`, executes true end-to-end **`live` mode**.
 - **Global Cooldown (`SIMULATION_COOLDOWN_MS=120000`):** Prevents simultaneous clicks from opening concurrent runs.
 
 ## 5. HTTP Interface and Token Segregation
@@ -91,7 +91,7 @@ export const PII_PATTERNS = {
 | `POST /api/demo/simulate-decision` | Simulates decision in the War Room (labeled as simulation) | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` if incident is `live` on VPS) |
 | `GET /api/events` | SSE stream (see [08 §4.2](./08_dashboard_frontend.md)) | Bearer `DASHBOARD_API_TOKEN` (injected by Nginx) |
 | `GET /api/target/status` | State of `api-pagamentos-core` | Bearer `DASHBOARD_API_TOKEN` |
-| `POST /api/demo/chaos` | Triggers `live` or `replay` simulation | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` for `mode: 'live'` on VPS) |
+| `POST /api/demo/chaos` | Triggers `live` or `replay` simulation | Bearer `DASHBOARD_API_TOKEN` (+ Turnstile when configured; `X-Live-Demo-Key` for `mode: 'live'` unless `PUBLIC_LIVE_DEMO=true`) |
 | `POST /api/demo/reset` | Restores service and cleans up demo PRs in target repo | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` if an active `live` session exists) |
 | `GET /health` | Liveness check | Public |
 

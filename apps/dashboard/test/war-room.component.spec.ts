@@ -131,6 +131,7 @@ describe('WarRoomComponent', () => {
       ok: false,
       status: 429,
       error: 'Cooldown active',
+      errorCode: 'SIMULATION_COOLDOWN',
       retryAfterSeconds: 42
     });
     await component.onTriggerChaos();
@@ -139,6 +140,22 @@ describe('WarRoomComponent', () => {
         severity: 'warn',
         summary: i18n.t('toastCooldownSummary'),
         detail: i18n.t('toastCooldownDetailWithSeconds').replace('{N}', '42')
+      })
+    );
+
+    vi.spyOn(incidentService, 'resetChaos').mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      error: 'Too many requests',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfterSeconds: 15
+    });
+    await component.onResetService();
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastRateLimitSummary'),
+        detail: i18n.t('toastRateLimitDetailWithSeconds').replace('{N}', '15')
       })
     );
 

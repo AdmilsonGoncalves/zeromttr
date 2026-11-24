@@ -83,6 +83,9 @@ export interface TranslationDictionary {
   toastCooldownSummary: string;
   toastCooldownDetail: string;
   toastCooldownDetailWithSeconds: string;
+  toastRateLimitSummary: string;
+  toastRateLimitDetail: string;
+  toastRateLimitDetailWithSeconds: string;
   toastActionErrorSummary: string;
   toastActionErrorDetail: string;
   toastChaosStartedSummary: string;
@@ -243,6 +246,11 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   toastCooldownDetail: 'Aguarde o intervalo de cooldown antes de disparar outro incidente.',
   toastCooldownDetailWithSeconds:
     'Simulação em cooldown. Aguarde {N} segundos antes de disparar novamente.',
+  toastRateLimitSummary: 'Limite de requisições atingido',
+  toastRateLimitDetail:
+    'Muitas requisições deste IP. Aguarde alguns instantes antes de tentar novamente.',
+  toastRateLimitDetailWithSeconds:
+    'Muitas requisições deste IP. Aguarde {N} segundos antes de tentar novamente.',
   toastActionErrorSummary: 'Falha na ação de demonstração',
   toastActionErrorDetail: 'Não foi possível concluir a operação no orquestrador.',
   toastChaosStartedSummary: 'Incidente disparado',
@@ -416,6 +424,10 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   toastCooldownDetail: 'Please wait for the cooldown window before triggering another incident.',
   toastCooldownDetailWithSeconds:
     'Chaos simulation is in cooldown. Please wait {N} seconds before triggering again.',
+  toastRateLimitSummary: 'Rate limit exceeded',
+  toastRateLimitDetail: 'Too many requests from this IP. Please wait a moment before trying again.',
+  toastRateLimitDetailWithSeconds:
+    'Too many requests from this IP. Please wait {N} seconds before trying again.',
   toastActionErrorSummary: 'Demo action failed',
   toastActionErrorDetail: 'Could not complete the operation on the orchestrator.',
   toastChaosStartedSummary: 'Incident triggered',

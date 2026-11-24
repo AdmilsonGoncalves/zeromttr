@@ -106,15 +106,20 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     }
 
     if (result.status === 429) {
+      const isRateLimit = result.errorCode === 'RATE_LIMIT_EXCEEDED';
+      const summaryKey = isRateLimit ? 'toastRateLimitSummary' : 'toastCooldownSummary';
+      const detailWithSecondsKey = isRateLimit
+        ? 'toastRateLimitDetailWithSeconds'
+        : 'toastCooldownDetailWithSeconds';
+      const detailKey = isRateLimit ? 'toastRateLimitDetail' : 'toastCooldownDetail';
+
       const detail =
         result.retryAfterSeconds !== undefined
-          ? this.i18n
-              .t('toastCooldownDetailWithSeconds')
-              .replace('{N}', String(result.retryAfterSeconds))
-          : this.i18n.t('toastCooldownDetail');
+          ? this.i18n.t(detailWithSecondsKey).replace('{N}', String(result.retryAfterSeconds))
+          : this.i18n.t(detailKey);
       this.messageService.add({
         severity: 'warn',
-        summary: this.i18n.t('toastCooldownSummary'),
+        summary: this.i18n.t(summaryKey),
         detail,
         life: 6000
       });

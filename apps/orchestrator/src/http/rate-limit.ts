@@ -7,6 +7,7 @@ export interface IpRateLimitOptions {
   maxRequests: number;
   message?: string;
   clock?: () => number;
+  trustCloudflareHeaders?: boolean;
 }
 
 interface RateLimitBucket {
@@ -32,7 +33,10 @@ function isTrustedProxyIp(ip: string): boolean {
 /**
  * Extracts the client IP address from trusted proxy headers or the direct socket peer.
  */
-export function extractClientIp(req: Request): string {
+export function extractClientIp(
+  req: Request,
+  options: { trustCloudflareHeaders?: boolean } = {}
+): string {
   const rawPeerIp = isNonEmptyString(req.socket?.remoteAddress)
     ? req.socket.remoteAddress
     : isNonEmptyString(req.ip)
@@ -40,10 +44,16 @@ export function extractClientIp(req: Request): string {
       : '';
   const peerIp = isNonEmptyString(rawPeerIp) ? normalizeIp(rawPeerIp) : 'unknown';
 
+  const trustCloudflare =
+    options.trustCloudflareHeaders ??
+    (process.env.NODE_ENV === 'test' || process.env.TRUST_CLOUDFLARE_HEADERS === 'true');
+
   if (peerIp !== 'unknown' && isTrustedProxyIp(peerIp)) {
-    const cfIp = parseForwardedIp(req.headers['cf-connecting-ip']);
-    if (cfIp) {
-      return cfIp;
+    if (trustCloudflare) {
+      const cfIp = parseForwardedIp(req.headers['cf-connecting-ip']);
+      if (cfIp) {
+        return cfIp;
+      }
     }
 
     const forwardedIp = parseForwardedIp(req.headers['x-forwarded-for']);
@@ -86,7 +96,7 @@ export function createIpRateLimitMiddleware(options: IpRateLimitOptions) {
     const now = clock();
     pruneExpiredBuckets(now);
 
-    const ip = extractClientIp(req);
+    const ip = extractClientIp(req, { trustCloudflareHeaders: options.trustCloudflareHeaders });
     const existing = buckets.get(ip);
 
     if (!existing || existing.resetAtMs <= now) {
@@ -106,6 +116,7 @@ export function createIpRateLimitMiddleware(options: IpRateLimitOptions) {
       const retryAfterSeconds = Math.max(1, Math.ceil((existing.resetAtMs - now) / 1000));
       res.setHeader('Retry-After', String(retryAfterSeconds));
       res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
+        code: 'RATE_LIMIT_EXCEEDED',
         error: errorMessage,
         retryAfterSeconds
       });

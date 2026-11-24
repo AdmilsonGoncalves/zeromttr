@@ -176,6 +176,7 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       .set('CF-Connecting-IP', '198.51.100.10');
 
     expect(throttledRes.status).toBe(HTTP_STATUS.TOO_MANY_REQUESTS);
+    expect(throttledRes.body.code).toBe('RATE_LIMIT_EXCEEDED');
     expect(throttledRes.body.retryAfterSeconds).toBeGreaterThanOrEqual(1);
 
     // Different IPv6 client should still be allowed
@@ -279,6 +280,17 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       socket: { remoteAddress: '172.18.0.5' }
     } as unknown as Request;
     expect(extractClientIp(trustedNginxReq)).toBe('203.0.113.88');
+
+    const cloudflareDisabledReq = {
+      headers: {
+        'cf-connecting-ip': '203.0.113.99',
+        'x-real-ip': '203.0.113.88'
+      },
+      socket: { remoteAddress: '172.18.0.5' }
+    } as unknown as Request;
+    expect(extractClientIp(cloudflareDisabledReq, { trustCloudflareHeaders: false })).toBe(
+      '203.0.113.88'
+    );
   });
 
   it('should keep strict 30 req/min RateLimit-Limit header on POST /api/incidents/:id/decision', async () => {
@@ -343,5 +355,74 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       .post('/api/demo/reset')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
     expect(resetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+  });
+
+  it('should require X-Live-Demo-Key when approving a replay incident during an active live session and allow retry if reset fails', async () => {
+    const replayIncident = new Incident({
+      id: 'inc-replay-active-live',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:replay-active-live',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.REPLAY
+    });
+    await repository.save(replayIncident);
+
+    const demoControlPort = createMockDemoControlPort();
+    const toolsPort = createMockToolsPort();
+    const broadcaster = new SseEventBroadcaster();
+    const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster);
+
+    const app = createApp({
+      repository,
+      targetStatusPort: createMockTargetStatusPort(),
+      handleAlert: createStubHandleAlert(),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: createStubRecordDecision(),
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      grafanaWebhookToken: 'test-grafana-token',
+      demoRouter: createDemoRouterFactory({
+        repository,
+        demoControlPort,
+        simulateDemoDecision,
+        liveDemoKey: 'strict-live-key',
+        cooldownMs: 0
+      }),
+      enableRateLimiting: false
+    });
+
+    // Start an authorized live session
+    const liveChaosRes = await request(app)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'strict-live-key')
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(liveChaosRes.status).toBe(HTTP_STATUS.ACCEPTED);
+
+    // Approving a replay incident without X-Live-Demo-Key while live session is active must fail with 403
+    const deniedReplayRes = await request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    expect(deniedReplayRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(demoControlPort.reset).not.toHaveBeenCalled();
+
+    // With X-Live-Demo-Key, if target reset fails once, retry succeeds idempotently
+    vi.mocked(demoControlPort.reset).mockRejectedValueOnce(new Error('Target unreachable'));
+    const failedResetRes = await request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'strict-live-key')
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    expect(failedResetRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+
+    const retryRes = await request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'strict-live-key')
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    expect(retryRes.status).toBe(HTTP_STATUS.OK);
+    expect(demoControlPort.reset).toHaveBeenCalledTimes(2);
   });
 });

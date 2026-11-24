@@ -58,16 +58,18 @@ export function escapeHtml(unsafe: string): string {
 }
 
 /**
- * Strips script tags, inline event handlers, and javascript: URIs from HTML fragments.
+ * Strips dangerous tags, inline event handlers, and executable URIs from HTML fragments.
  */
 export function stripUnsafeHtml(html: string): string {
   if (!html) {
     return '';
   }
   return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/javascript\s*:/gi, 'blocked:');
+    .replace(/<(script|iframe|object|embed|svg|math|style)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(script|iframe|object|embed|svg|math|meta|base)\b[^>]*\/?>/gi, '')
+    .replace(/([\s/]+)on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '$1')
+    .replace(/(?:javascript|vbscript)\s*:/gi, 'blocked:')
+    .replace(/data\s*:\s*text\/html/gi, 'blocked:text/html');
 }
 
 /**
