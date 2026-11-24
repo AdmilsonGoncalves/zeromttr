@@ -451,7 +451,63 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
     expect(demoControlPort.reset).toHaveBeenCalledTimes(2);
   });
 
-  it('should serialize simulate-decision with in-flight live chaos and require X-Live-Demo-Key if a live session starts concurrently', async () => {
+  it('should clear pending target restorations when an explicit /demo/reset succeeds', async () => {
+    const replayIncident = new Incident({
+      id: 'inc-replay-explicit-reset',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:replay-explicit-reset',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.REPLAY
+    });
+    await repository.save(replayIncident);
+
+    const demoControlPort = createMockDemoControlPort();
+    const toolsPort = createMockToolsPort();
+    const broadcaster = new SseEventBroadcaster();
+    const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster);
+
+    const app = createApp({
+      repository,
+      targetStatusPort: createMockTargetStatusPort(),
+      handleAlert: createStubHandleAlert(),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: createStubRecordDecision(),
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      grafanaWebhookToken: 'test-grafana-token',
+      demoRouter: createDemoRouterFactory({
+        repository,
+        demoControlPort,
+        simulateDemoDecision,
+        liveDemoKey: 'strict-live-key',
+        cooldownMs: 0
+      }),
+      enableRateLimiting: false
+    });
+
+    vi.mocked(demoControlPort.reset).mockRejectedValueOnce(new Error('Target unreachable'));
+    const failedApproveRes = await request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    expect(failedApproveRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+
+    const explicitResetRes = await request(app)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(explicitResetRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(demoControlPort.reset).toHaveBeenCalledTimes(2);
+
+    const staleRetryRes = await request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    expect(staleRetryRes.status).toBe(HTTP_STATUS.CONFLICT);
+    expect(demoControlPort.reset).toHaveBeenCalledTimes(2);
+  });
+
+  it('should serialize simulate-decision with live chaos using explicit lookup and trigger barriers', async () => {
     const replayIncident = new Incident({
       id: 'inc-replay-race',
       service: 'api-pagamentos-core',
@@ -462,14 +518,35 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
     });
     await repository.save(replayIncident);
 
-    let resolveTrigger!: () => void;
-    const triggerDeferred = new Promise<void>((resolve) => {
-      resolveTrigger = resolve;
+    let signalFindByIdEntered!: () => void;
+    const findByIdEntered = new Promise<void>((resolve) => {
+      signalFindByIdEntered = resolve;
+    });
+    let releaseFindById!: () => void;
+    const findByIdGate = new Promise<void>((resolve) => {
+      releaseFindById = resolve;
     });
 
+    const originalFindById = repository.findById.bind(repository);
+    let findByIdCalls = 0;
+    vi.spyOn(repository, 'findById').mockImplementation(async (id: string) => {
+      findByIdCalls += 1;
+      if (findByIdCalls === 1) {
+        signalFindByIdEntered();
+        await findByIdGate;
+      }
+      return originalFindById(id);
+    });
+
+    const callOrder: string[] = [];
+    let triggerChaosEntered = false;
     const demoControlPort = createMockDemoControlPort();
-    vi.mocked(demoControlPort.triggerChaos).mockImplementationOnce(async () => {
-      await triggerDeferred;
+    vi.mocked(demoControlPort.reset).mockImplementation(async () => {
+      callOrder.push('reset');
+    });
+    vi.mocked(demoControlPort.triggerChaos).mockImplementation(async () => {
+      triggerChaosEntered = true;
+      callOrder.push('triggerChaos');
     });
     const toolsPort = createMockToolsPort();
     const broadcaster = new SseEventBroadcaster();
@@ -494,30 +571,32 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       enableRateLimiting: false
     });
 
+    // Subscribe immediately so Supertest dispatches the unkeyed replay approval now
+    const approvalPromise = request(app)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE })
+      .then((res) => res);
+
+    await findByIdEntered;
+
+    // Dispatch keyed live chaos while replay approval is paused inside runSerialized
     const liveChaosPromise = request(app)
       .post('/api/demo/chaos')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
       .set('X-Live-Demo-Key', 'strict-live-key')
-      .send({ mode: IncidentExecutionMode.LIVE });
+      .send({ mode: IncidentExecutionMode.LIVE })
+      .then((res) => res);
 
-    // Wait a tick so /api/demo/chaos enters runSerialized and pauses inside triggerChaos
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Yield across network/event-loop turns so liveChaos reaches runSerialized queue
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(triggerChaosEntered).toBe(false);
 
-    const concurrentReplayApprovePromise = request(app)
-      .post('/api/demo/simulate-decision')
-      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
-      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    releaseFindById();
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    resolveTrigger();
-
-    const [liveChaosRes, concurrentReplayRes] = await Promise.all([
-      liveChaosPromise,
-      concurrentReplayApprovePromise
-    ]);
-
+    const [approvalRes, liveChaosRes] = await Promise.all([approvalPromise, liveChaosPromise]);
+    expect(approvalRes.status).toBe(HTTP_STATUS.OK);
     expect(liveChaosRes.status).toBe(HTTP_STATUS.ACCEPTED);
-    expect(concurrentReplayRes.status).toBe(HTTP_STATUS.FORBIDDEN);
-    expect(demoControlPort.reset).not.toHaveBeenCalled();
+    expect(callOrder).toEqual(['reset', 'triggerChaos']);
   });
 });

@@ -85,6 +85,7 @@ export class IncidentService {
   private visualStepTimer: ReturnType<typeof setTimeout> | null = null;
   private demoConfigRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private demoConfigRetryResolve: (() => void) | null = null;
+  private demoConfigAbortController: AbortController | null = null;
   private demoConfigInFlight: Promise<void> | null = null;
   private demoConfigLoaded = false;
   private demoConfigCancelToken = 0;
@@ -971,6 +972,10 @@ export class IncidentService {
 
   private cancelPendingDemoConfigRetry(): void {
     this.demoConfigCancelToken++;
+    if (this.demoConfigAbortController) {
+      this.demoConfigAbortController.abort();
+      this.demoConfigAbortController = null;
+    }
     if (this.demoConfigRetryTimer) {
       clearTimeout(this.demoConfigRetryTimer);
       this.demoConfigRetryTimer = null;
@@ -982,11 +987,39 @@ export class IncidentService {
     }
   }
 
+  private parseJsonWithAbort<T>(res: Response, signal: AbortSignal): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+        return;
+      }
+      const onAbort = (): void => {
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      res
+        .json()
+        .then((data) => {
+          signal.removeEventListener('abort', onAbort);
+          resolve(data as T);
+        })
+        .catch((err) => {
+          signal.removeEventListener('abort', onAbort);
+          reject(err);
+        });
+    });
+  }
+
   /**
    * Fetches runtime demo configuration (`publicLiveDemo`, `turnstileSiteKey`, `turnstileRequired`)
-   * with bounded retry on failed or thrown requests.
+   * with per-attempt deadline, terminal handling for 404, and bounded retry on transient errors.
    */
-  async fetchDemoConfig(baseUrl = '', maxAttempts = 3, retryDelayMs = 1500): Promise<void> {
+  async fetchDemoConfig(
+    baseUrl = '',
+    maxAttempts = 3,
+    retryDelayMs = 1500,
+    attemptTimeoutMs = 5000
+  ): Promise<void> {
     if (this.demoConfigInFlight) {
       return this.demoConfigInFlight;
     }
@@ -999,10 +1032,23 @@ export class IncidentService {
         if (this.demoConfigCancelToken !== cancelToken) {
           return;
         }
+        const controller = new AbortController();
+        this.demoConfigAbortController = controller;
+        const timeoutId =
+          attemptTimeoutMs > 0 ? setTimeout(() => controller.abort(), attemptTimeoutMs) : null;
         try {
-          const res = await fetch(`${baseUrl}/api/demo/config`);
+          const res = await fetch(`${baseUrl}/api/demo/config`, {
+            signal: controller.signal
+          });
+          if (res.status === 404) {
+            this.demoConfigLoaded = true;
+            return;
+          }
           if (res.ok) {
-            const config = (await res.json()) as Partial<DemoConfigResponse>;
+            const config = await this.parseJsonWithAbort<Partial<DemoConfigResponse>>(
+              res,
+              controller.signal
+            );
             this.publicLiveDemo.set(config.publicLiveDemo === true);
             this.turnstileSiteKey.set(
               isNonEmptyString(config.turnstileSiteKey) ? config.turnstileSiteKey : null
@@ -1012,7 +1058,14 @@ export class IncidentService {
             return;
           }
         } catch {
-          // Retry transient fetch/parse errors up to totalAttempts
+          // Retry transient fetch/timeout/parse errors up to totalAttempts
+        } finally {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          if (this.demoConfigAbortController === controller) {
+            this.demoConfigAbortController = null;
+          }
         }
 
         if (attempt < totalAttempts && retryDelayMs > 0) {
@@ -1053,10 +1106,14 @@ export class IncidentService {
   }
 
   private resetTurnstileAfterRequest(reservedToken: string | null): void {
-    if (this.turnstileRequired() && isNonEmptyString(reservedToken)) {
-      if (this.turnstileToken() === reservedToken) {
-        this.turnstileToken.set(null);
-      }
+    if (!this.turnstileRequired() || !isNonEmptyString(reservedToken)) {
+      return;
+    }
+    const currentToken = this.turnstileToken();
+    if (currentToken === reservedToken) {
+      this.turnstileToken.set(null);
+    }
+    if (!isNonEmptyString(currentToken) || currentToken === reservedToken) {
       this.turnstileResetCounter.update((c) => c + 1);
     }
   }

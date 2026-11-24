@@ -255,6 +255,7 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
 
           dependencies.replayRunner?.stop();
           await dependencies.demoControlPort.reset();
+          pendingTargetResetIncidentIds.clear();
           lastChaosTimestamp = 0;
           lastChaosMode = IncidentExecutionMode.REPLAY;
 

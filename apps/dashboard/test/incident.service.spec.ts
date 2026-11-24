@@ -429,4 +429,113 @@ describe('IncidentService', () => {
 
     fetchSpy.mockRestore();
   });
+
+  it('should_abort_stalled_fetchDemoConfig_after_deadline_and_recover_on_retry', async () => {
+    const service = new IncidentService();
+    let callCount = 0;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        });
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            publicLiveDemo: true,
+            turnstileSiteKey: '0x4AAAAAAADeadlineRecovered',
+            turnstileRequired: true
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    });
+
+    await service.fetchDemoConfig('http://localhost:8080', 2, 1, 20);
+    expect(callCount).toBe(2);
+    expect(service.turnstileSiteKey()).toBe('0x4AAAAAAADeadlineRecovered');
+    expect(service.turnstileRequired()).toBe(true);
+
+    fetchSpy.mockRestore();
+  });
+
+  it('should_treat_404_from_fetchDemoConfig_as_terminal_without_retrying_or_polling', async () => {
+    const service = new IncidentService();
+    const configCalls: string[] = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/api/demo/config')) {
+        configCalls.push(url);
+        return new Response('Not Found', { status: 404 });
+      }
+      return new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.HEALTHY,
+          service: 'api-pagamentos-core',
+          version: 'v2.14.7',
+          previousHealthyVersion: 'v2.14.7'
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    await service.fetchDemoConfig('http://localhost:8080', 3, 1);
+    expect(configCalls).toHaveLength(1);
+    expect(service.publicLiveDemo()).toBe(false);
+    expect(service.turnstileSiteKey()).toBeNull();
+
+    service.startTargetStatusPolling('http://localhost:8080', 15);
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    service.stopTargetStatusPolling();
+
+    expect(configCalls).toHaveLength(1);
+    fetchSpy.mockRestore();
+  });
+
+  it('should_preserve_newer_turnstile_token_and_skip_widget_reset_when_slow_request_finishes', async () => {
+    const service = new IncidentService();
+    service.turnstileRequired.set(true);
+    service.setTurnstileToken('token-1');
+
+    let resolveChaos!: (res: Response) => void;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/api/demo/chaos')) {
+        return new Promise<Response>((resolve) => {
+          resolveChaos = resolve;
+        });
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            status: TargetHealthStatus.HEALTHY,
+            service: 'api-pagamentos-core',
+            version: 'v2.14.7',
+            previousHealthyVersion: 'v2.14.7'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    });
+
+    const pendingChaos = service.triggerChaos('http://localhost:8080');
+    expect(service.turnstileToken()).toBeNull();
+
+    service.setTurnstileToken('token-2');
+    resolveChaos(
+      new Response(JSON.stringify({ status: 'accepted', mode: 'replay' }), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+    const result = await pendingChaos;
+    expect(result).toEqual({ ok: true, status: 202 });
+    expect(service.turnstileToken()).toBe('token-2');
+    expect(service.turnstileResetCounter()).toBe(0);
+
+    fetchSpy.mockRestore();
+  });
 });
