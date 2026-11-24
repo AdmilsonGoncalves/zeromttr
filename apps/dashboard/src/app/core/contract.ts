@@ -37,5 +37,6 @@ export type {
   ReasoningSource,
   SimulateDecisionPayload,
   SpanNode,
+  TargetLiveMetrics,
   TargetStatusResponse
 } from '@zeromttr/contracts';

@@ -1,0 +1,13 @@
+:host ::ng-deep .fsm-timeline .p-timeline-event-opposite {
+  display: none;
+}
+
+:host ::ng-deep .fsm-timeline .p-timeline-event-content {
+  padding-left: 0;
+  padding-right: 0.75rem;
+}
+
+:host ::ng-deep .fsm-timeline .p-timeline-event-connector {
+  background-color: #334155;
+  height: 2px;
+}

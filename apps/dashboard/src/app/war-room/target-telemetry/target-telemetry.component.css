@@ -1,0 +1,11 @@
+:host ::ng-deep .telemetry-bar-healthy .p-progressbar-value {
+  background: #10b981;
+}
+
+:host ::ng-deep .telemetry-bar-warn .p-progressbar-value {
+  background: #f59e0b;
+}
+
+:host ::ng-deep .telemetry-bar-critical .p-progressbar-value {
+  background: #f43f5e;
+}

@@ -272,7 +272,7 @@ groups:
     rules:
       - uid: payment-core-high-latency
         title: PaymentCoreHighLatencyOrPoolSaturation
-        condition: C
+        condition: A
         noDataState: OK
         execErrState: Error
         data:
@@ -385,4 +385,4 @@ When in `replay` mode on the public VPS, the orchestrator streams the events rec
 ```
 
 ### Recording Procedure (`scripts/record-replay.sh`)
-At the end of Phase 5 (Live rehearsal), the script executes a complete `live` simulation with `LIVE_DEMO_KEY` and captures the SSE stream from `GET /api/events`, saving the consolidated payload to `data/last-recorded-incident.json` to power the public VPS experience.
+At the end of Phase 5 (Live rehearsal), the script executes a complete `live` simulation with `LIVE_DEMO_KEY`, reads the completed incident from `GET /api/incidents/{id}` and target status from `GET /api/target/status`, writes `eventsTimeline` with fixed step names and delays, validates the snapshot with `ReplaySnapshotSchema`, and saves it to `data/last-recorded-incident.json` to power the public VPS experience.

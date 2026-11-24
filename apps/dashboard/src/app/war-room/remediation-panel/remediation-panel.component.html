@@ -1,0 +1,85 @@
+<section
+  class="flex-1 bg-slate-900 border border-slate-800 rounded-lg p-2.5 flex flex-col gap-2 min-h-0 shadow-md"
+>
+  <!-- GitHub Pull Request Card -->
+  <div class="shrink-0 bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1.5">
+    <div class="flex items-center justify-between">
+      <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+        <i class="pi pi-github text-white"></i>
+        {{ i18n.t('githubPrTitle') }}
+      </span>
+      <p-tag value="Open" severity="success" styleClass="text-[10px] py-0" />
+    </div>
+
+    <p class="text-[11px] text-slate-400 leading-snug">
+      Branch:
+      <code class="text-cyan-300 font-mono text-[10px]">{{
+        incident()?.remediation?.branchName ?? 'hotfix/zeromttr-pool-timeout'
+      }}</code>
+    </p>
+
+    <a
+      [href]="
+        incident()?.remediation?.pullRequestUrl ??
+        'https://github.com/AdmilsonGoncalves/zeromttr/pull/42'
+      "
+      target="_blank"
+      rel="noopener noreferrer"
+      [pTooltip]="i18n.t('tooltipViewPr')"
+      tooltipPosition="left"
+      class="inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-1 px-2.5 rounded transition-colors"
+    >
+      <i class="pi pi-external-link text-xs"></i>
+      <span>{{ i18n.t('githubPrViewBtn') }}</span>
+    </a>
+  </div>
+
+  <!-- Resend Email Preview -->
+  <div class="flex-1 min-h-0 bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1">
+    <span class="shrink-0 text-xs font-bold text-slate-300 flex items-center gap-1.5">
+      <i class="pi pi-envelope text-cyan-400"></i>
+      {{ i18n.t('resendPreviewTitle') }}
+    </span>
+
+    <div
+      class="flex-1 min-h-0 overflow-y-auto bg-slate-900 border border-slate-800 rounded p-2 text-xs text-slate-300"
+      [innerHTML]="safeResendPreview()"
+    ></div>
+  </div>
+
+  <!-- Human-in-the-Loop Decision Controls -->
+  @if (displayedFsmState() === 'NOTIFIED') {
+    <div
+      class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center gap-1.5"
+    >
+      <i class="pi pi-lock text-amber-400 shrink-0"></i>
+      <span class="leading-tight text-[11px]">{{ i18n.t('awaitingDecisionBadge') }}</span>
+    </div>
+
+    <p-button
+      [label]="i18n.t('simulateDecisionBtn')"
+      severity="warn"
+      size="small"
+      [pTooltip]="i18n.t('tooltipSimulateDecision')"
+      tooltipPosition="left"
+      styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
+      (onClick)="simulateDecision.emit()"
+    />
+  } @else if (displayedFsmState() === 'RESOLVED') {
+    <div
+      class="shrink-0 bg-emerald-950/60 border border-emerald-500/70 rounded p-2 text-xs text-emerald-200 flex items-center gap-1.5"
+    >
+      <i class="pi pi-check-circle text-emerald-400 shrink-0"></i>
+      <span class="leading-tight text-[11px] font-semibold">{{
+        i18n.t('decisionSuccessMsg')
+      }}</span>
+    </div>
+  } @else if (displayedFsmState() === 'REJECTED') {
+    <div
+      class="shrink-0 bg-rose-950/60 border border-rose-500/70 rounded p-2 text-xs text-rose-200 flex items-center gap-1.5"
+    >
+      <i class="pi pi-times-circle text-rose-400 shrink-0"></i>
+      <span class="leading-tight text-[11px] font-semibold">{{ i18n.t('fsmHintRejected') }}</span>
+    </div>
+  }
+</section>

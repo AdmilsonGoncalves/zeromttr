@@ -2,7 +2,7 @@ import type http from 'node:http';
 import { chaosController } from '../controllers/chaos.controller.js';
 
 /**
- * Dispatches `/chaos/pool-saturation` and `/chaos/status` HTTP routes to `ChaosController`.
+ * Dispatches `/chaos/pool-saturation`, `/chaos/healthy-traffic`, and `/chaos/status` HTTP routes to `ChaosController`.
  */
 export function handleChaosRoutes(
   req: http.IncomingMessage,
@@ -14,6 +14,12 @@ export function handleChaosRoutes(
   if (req.method === 'POST' && pathname === '/chaos/pool-saturation') {
     const enable = parsedUrl.searchParams.get('enable') || undefined;
     chaosController.togglePoolSaturation(req, res, enable);
+    return true;
+  }
+
+  if (req.method === 'POST' && pathname === '/chaos/healthy-traffic') {
+    const enable = parsedUrl.searchParams.get('enable') || undefined;
+    chaosController.toggleHealthyTraffic(req, res, enable);
     return true;
   }
 

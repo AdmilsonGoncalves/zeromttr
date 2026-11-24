@@ -58,4 +58,26 @@ export const DecisionUiStatus = {
   SUCCESS: 'success',
   ERROR: 'error'
 } as const;
+
+export const TelemetryHealthLevel = {
+  HEALTHY: 'healthy',
+  WARN: 'warn',
+  CRITICAL: 'critical'
+} as const;
+export type TelemetryHealthLevel = (typeof TelemetryHealthLevel)[keyof typeof TelemetryHealthLevel];
+
+/**
+ * Acceptable SLO/health thresholds for target-app-demo live telemetry cards.
+ */
+export const TARGET_TELEMETRY_THRESHOLDS = {
+  THROUGHPUT_SCALE_MAX_RPS: 4,
+  THROUGHPUT_WARN_MIN_RPS: 0.5,
+  ERROR_5XX_WARN_PERCENT: 1,
+  ERROR_5XX_CRITICAL_PERCENT: 5,
+  LATENCY_P95_WARN_MS: 250,
+  LATENCY_P95_CRITICAL_MS: 500,
+  LATENCY_P95_SCALE_MAX_MS: 500,
+  POOL_USAGE_WARN_RATIO: 0.7,
+  POOL_USAGE_CRITICAL_RATIO: 0.9
+} as const;
 export type DecisionUiStatus = (typeof DecisionUiStatus)[keyof typeof DecisionUiStatus];

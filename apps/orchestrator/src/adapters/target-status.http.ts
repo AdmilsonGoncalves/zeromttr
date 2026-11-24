@@ -4,6 +4,16 @@ import { OrchestratorDefault, TargetHealthStatus } from '../domain/incident-enum
 import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
 import type { TargetStatus, TargetStatusPort } from '../ports/target-status.port.js';
 
+const TargetLiveMetricsSchema = z.object({
+  requestsPerSecond: z.number().nonnegative(),
+  errorRate5xxPercent: z.number().min(0).max(100),
+  p95LatencyMs: z.number().nonnegative(),
+  poolActive: z.number().int().nonnegative(),
+  poolWaiting: z.number().int().nonnegative(),
+  poolMax: z.number().int().nonnegative(),
+  healthyTrafficActive: z.boolean()
+});
+
 const TargetStatusSchema = z.object({
   status: z.enum([
     TargetHealthStatus.HEALTHY,
@@ -15,7 +25,8 @@ const TargetStatusSchema = z.object({
   previousHealthyVersion: z.string(),
   targetRepo: z.string(),
   suspectFilePath: z.string(),
-  rawEdgeLogPreCollector: z.string()
+  rawEdgeLogPreCollector: z.string(),
+  metrics: TargetLiveMetricsSchema.optional()
 });
 
 /**

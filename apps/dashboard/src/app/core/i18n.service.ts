@@ -126,6 +126,25 @@ export interface TranslationDictionary {
   resendDispatchedBody: string;
   resendDegradedTitle: string;
   resendDegradedBody: string;
+  healthyTrafficStartBtn: string;
+  healthyTrafficStopBtn: string;
+  tooltipHealthyTraffic: string;
+  targetTelemetryLabel: string;
+  targetRpsLabel: string;
+  targetError5xxLabel: string;
+  targetP95Label: string;
+  targetPoolLabel: string;
+  healthyTrafficActiveBadge: string;
+  healthyTrafficIdleBadge: string;
+  toastHealthyTrafficStartedSummary: string;
+  toastHealthyTrafficStartedDetail: string;
+  toastHealthyTrafficStoppedSummary: string;
+  toastHealthyTrafficStoppedDetail: string;
+  targetPoolActiveLabel: string;
+  targetPoolWaitingLabel: string;
+  targetSloLatencyHint: string;
+  targetSlaErrorOk: string;
+  targetSlaErrorBreach: string;
 }
 
 const PT_TRANSLATIONS: TranslationDictionary = {
@@ -274,7 +293,28 @@ const PT_TRANSLATIONS: TranslationDictionary = {
     'Link de decisão assinado via HMAC entregue exclusivamente no #fragment do e-mail.',
   resendDegradedTitle: '⚠️ Envio Resend em Modo Degradado',
   resendDegradedBody:
-    'A API do Resend recusou o domínio remetente configurado (HTTP 403/erro de entrega). O incidente permanece ativo para decisão simulada no painel.'
+    'A API do Resend recusou o domínio remetente configurado (HTTP 403/erro de entrega). O incidente permanece ativo para decisão simulada no painel.',
+  healthyTrafficStartBtn: '▶ Tráfego Saudável',
+  healthyTrafficStopBtn: '⏹ Parar Tráfego',
+  tooltipHealthyTraffic:
+    'Inicia ou interrompe fluxo contínuo de requisições saudáveis em api-pagamentos-core para demonstrar Antes → Durante → Depois.',
+  targetTelemetryLabel: 'Telemetria Alvo',
+  targetRpsLabel: 'Req/s',
+  targetError5xxLabel: 'Erro 5xx',
+  targetP95Label: 'Latência p95',
+  targetPoolLabel: 'Pool DB',
+  healthyTrafficActiveBadge: 'Tráfego Ativo',
+  healthyTrafficIdleBadge: 'Ocioso',
+  toastHealthyTrafficStartedSummary: 'Tráfego saudável ativado',
+  toastHealthyTrafficStartedDetail:
+    'Requisições PIX contínuas sendo enviadas para api-pagamentos-core.',
+  toastHealthyTrafficStoppedSummary: 'Tráfego saudável interrompido',
+  toastHealthyTrafficStoppedDetail: 'Fluxo contínuo de requisições encerrado.',
+  targetPoolActiveLabel: 'Ativas',
+  targetPoolWaitingLabel: 'Em espera',
+  targetSloLatencyHint: 'SLO: ≤ 500ms',
+  targetSlaErrorOk: 'SLA Saudável',
+  targetSlaErrorBreach: 'Falhas 5xx Ativas'
 };
 
 const EN_TRANSLATIONS: TranslationDictionary = {
@@ -420,7 +460,27 @@ const EN_TRANSLATIONS: TranslationDictionary = {
     'HMAC-signed decision link delivered exclusively inside the email URL #fragment.',
   resendDegradedTitle: '⚠️ Resend Delivery in Degraded Mode',
   resendDegradedBody:
-    'The Resend API rejected the configured sender domain (HTTP 403/delivery error). The incident remains active for simulated decision in the dashboard.'
+    'The Resend API rejected the configured sender domain (HTTP 403/delivery error). The incident remains active for simulated decision in the dashboard.',
+  healthyTrafficStartBtn: '▶ Healthy Traffic',
+  healthyTrafficStopBtn: '⏹ Stop Traffic',
+  tooltipHealthyTraffic:
+    'Starts or stops continuous healthy traffic on api-pagamentos-core to demonstrate Before → During → After.',
+  targetTelemetryLabel: 'Target Telemetry',
+  targetRpsLabel: 'Req/s',
+  targetError5xxLabel: '5xx Error',
+  targetP95Label: 'p95 Latency',
+  targetPoolLabel: 'DB Pool',
+  healthyTrafficActiveBadge: 'Traffic Active',
+  healthyTrafficIdleBadge: 'Idle',
+  toastHealthyTrafficStartedSummary: 'Healthy traffic started',
+  toastHealthyTrafficStartedDetail: 'Continuous PIX requests streaming to api-pagamentos-core.',
+  toastHealthyTrafficStoppedSummary: 'Healthy traffic stopped',
+  toastHealthyTrafficStoppedDetail: 'Continuous request stream stopped.',
+  targetPoolActiveLabel: 'Active',
+  targetPoolWaitingLabel: 'Waiting',
+  targetSloLatencyHint: 'SLO: ≤ 500ms',
+  targetSlaErrorOk: 'Healthy SLA',
+  targetSlaErrorBreach: '5xx Errors Active'
 };
 
 /**

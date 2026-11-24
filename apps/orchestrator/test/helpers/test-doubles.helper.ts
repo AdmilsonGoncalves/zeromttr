@@ -118,6 +118,7 @@ export function createMockDemoControlPort(
 ): DemoControlPort {
   return {
     triggerChaos: vi.fn(async () => {}),
+    toggleHealthyTraffic: vi.fn(async () => {}),
     reset: vi.fn(async () => {}),
     ...overrides
   };

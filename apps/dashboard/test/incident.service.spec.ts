@@ -301,4 +301,49 @@ describe('IncidentService', () => {
     expect(service.currentIncident()).toBeNull();
     fetchSpy.mockRestore();
   });
+
+  it('should_toggle_healthy_traffic_and_expose_target_metrics', async () => {
+    const service = new IncidentService();
+    service.setLiveDemoKey('secret-key');
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true, healthyTrafficActive: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'healthy',
+            service: 'api-pagamentos-core',
+            version: 'v2.14.7',
+            previousHealthyVersion: 'v2.14.7',
+            metrics: {
+              requestsPerSecond: 2.4,
+              errorRate5xxPercent: 0,
+              p95LatencyMs: 18,
+              poolActive: 1,
+              poolWaiting: 0,
+              poolMax: 10,
+              healthyTrafficActive: true
+            }
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        )
+      );
+
+    const result = await service.toggleHealthyTraffic(true, 'http://localhost:8080');
+    expect(result).toEqual({ ok: true, status: 200 });
+    expect(service.targetMetrics()?.healthyTrafficActive).toBe(true);
+    expect(service.targetMetrics()?.requestsPerSecond).toBe(2.4);
+    expect(service.targetMetrics()?.poolMax).toBe(10);
+
+    fetchSpy.mockRestore();
+  });
 });

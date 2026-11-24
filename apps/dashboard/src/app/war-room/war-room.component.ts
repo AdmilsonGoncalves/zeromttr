@@ -1,70 +1,28 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  OnInit,
-  OnDestroy,
-  computed,
-  inject,
-  signal
-} from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import {
-  escapeHtml,
-  isFilled,
-  isNonEmptyString,
-  isObject,
-  isString,
-  safeJsonParse
-} from '@zeromttr/utils';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { isNonEmptyString } from '@zeromttr/utils';
 import { MessageService } from 'primeng/api';
-import { SelectButton } from 'primeng/selectbutton';
-import { Tag } from 'primeng/tag';
-import { Button } from 'primeng/button';
-import { Tabs, TabList, Tab, TabPanels, TabPanel } from 'primeng/tabs';
-import { ProgressBar } from 'primeng/progressbar';
 import { Toast } from 'primeng/toast';
-import { Tooltip } from 'primeng/tooltip';
+import { DecisionAction, type IncidentMode } from '../core/contract.js';
 import { I18nService, type Language } from '../core/i18n.service.js';
-import {
-  DecisionAction,
-  IncidentExecutionMode,
-  NotificationStatus,
-  type IncidentMode
-} from '../core/contract.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
-import { MASKED_POST_OTTL_LOG, MOCK_GIT_DIFF, RAW_PRE_COLLECTOR_LOG } from '../core/constants.js';
-
-interface ModeOption {
-  label: string;
-  value: IncidentMode;
-}
-
-interface LangOption {
-  label: string;
-  value: Language;
-}
+import { EvidencePanelComponent } from './evidence-panel/evidence-panel.component.js';
+import { FsmTimelineComponent } from './fsm-timeline/fsm-timeline.component.js';
+import { RemediationPanelComponent } from './remediation-panel/remediation-panel.component.js';
+import { TargetTelemetryComponent } from './target-telemetry/target-telemetry.component.js';
+import { WarRoomHeaderComponent } from './war-room-header/war-room-header.component.js';
 
 /**
- * Single-pane War Room mission control component displaying live telemetry, PII audit, diffs, and FinOps.
+ * Single-pane War Room mission control orchestrator composing quadrant child components via signals.
  */
 @Component({
   selector: 'app-war-room',
   imports: [
-    CommonModule,
-    FormsModule,
-    SelectButton,
-    Tag,
-    Button,
-    Tabs,
-    TabList,
-    Tab,
-    TabPanels,
-    TabPanel,
-    ProgressBar,
     Toast,
-    Tooltip
+    WarRoomHeaderComponent,
+    FsmTimelineComponent,
+    TargetTelemetryComponent,
+    EvidencePanelComponent,
+    RemediationPanelComponent
   ],
   providers: [MessageService],
   templateUrl: './war-room.component.html',
@@ -74,115 +32,10 @@ interface LangOption {
 export class WarRoomComponent implements OnInit, OnDestroy {
   readonly i18n: I18nService;
   readonly incidentService: IncidentService;
-  readonly sanitizer: DomSanitizer;
   readonly messageService: MessageService;
 
-  readonly activeTab = signal<string>('0');
-  readonly mockGitDiff = MOCK_GIT_DIFF;
-  readonly rawPreCollectorLog = RAW_PRE_COLLECTOR_LOG;
-  readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
-
-  readonly displayedPreCollectorLog = computed<string>(() => {
-    return (
-      this.incidentService.currentIncident()?.rca?.rawEdgeLogPreCollector ??
-      this.incidentService.targetStatus()?.rawEdgeLogPreCollector ??
-      this.rawPreCollectorLog
-    );
-  });
-
-  readonly displayedPostOttlLog = computed<string>(() => {
-    if (this.incidentService.isPiiPassed() === false) {
-      const types = (
-        this.incidentService.currentIncident()?.rca?.piiGuardAudit?.detectedTypes ?? []
-      ).join(', ');
-      return this.i18n.t('piiLogWithheldMessage').replace('{TYPES}', types);
-    }
-
-    const sample = this.incidentService.currentIncident()?.rca?.logSample;
-    if (!isNonEmptyString(sample)) {
-      return this.maskedPostOttlLog;
-    }
-
-    const lines = sample
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    for (const line of lines) {
-      const parsed = safeJsonParse<Record<string, unknown>>(line);
-      if (isObject(parsed) && isNonEmptyString(parsed.body)) {
-        return parsed.body;
-      }
-      const bodyMatch = line.match(/^\{"body":"((?:[^"\\]|\\.)*)"/);
-      if (bodyMatch?.[1]) {
-        return bodyMatch[1].replace(/\\"/g, '"');
-      }
-    }
-
-    return lines[0] ?? this.maskedPostOttlLog;
-  });
-
-  /**
-   * Updates the selected dashboard tab signal when a valid tab value is provided.
-   */
-  onTabChange(tab: string | number | undefined): void {
-    if (isFilled(tab)) {
-      this.activeTab.set(String(tab));
-    }
-  }
-
-  readonly safeResendPreview = computed<SafeHtml>(() => {
-    const incident = this.incidentService.currentIncident();
-    const notification = incident?.notification;
-    const raw = notification?.htmlPreview;
-
-    if (
-      notification?.status === NotificationStatus.DEGRADED ||
-      (isNonEmptyString(raw) && raw.startsWith('Warning: Resend delivery failed'))
-    ) {
-      const degradedHtml = `
-      <div style="font-family: sans-serif; color: #fde68a;">
-        <h3 style="color: #fbbf24; margin-top: 0; font-size: 12px;">${this.i18n.t('resendDegradedTitle')}</h3>
-        <p style="font-size: 11px; color: #cbd5e1; margin-bottom: 6px;">${this.i18n.t('resendDegradedBody')}</p>
-      </div>
-    `;
-      return this.sanitizer.bypassSecurityTrustHtml(degradedHtml);
-    }
-
-    if (
-      notification?.status === NotificationStatus.DISPATCHED &&
-      (!isNonEmptyString(raw) || !raw.trim().startsWith('<'))
-    ) {
-      const dispatchedHtml = `
-      <div style="font-family: sans-serif; color: #cbd5e1;">
-        <h3 style="color: #34d399; margin-top: 0; font-size: 12px;">✅ ${this.i18n.t('resendDispatchedBadge')}</h3>
-        <p style="font-size: 11px; margin-bottom: 4px;">${this.i18n.t('resendDispatchedBody')}</p>
-        <p style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${escapeHtml(notification.emailId ?? '')}</p>
-      </div>
-    `;
-      return this.sanitizer.bypassSecurityTrustHtml(dispatchedHtml);
-    }
-
-    const defaultPreview = `
-    <div style="font-family: sans-serif; color: #cbd5e1;">
-      <h3 style="color: #ef4444; margin-top: 0;">🚨 ZeroMTTR Incident Post-Mortem</h3>
-      <p style="font-size: 11px;">${this.i18n.t('resendDefaultBody')}</p>
-    </div>
-  `;
-    return this.sanitizer.bypassSecurityTrustHtml(raw ?? defaultPreview);
-  });
-
-  readonly modeOptions: ModeOption[] = [
-    { label: '⚡ Live API Mode', value: IncidentExecutionMode.LIVE },
-    { label: '🎬 Replay Mode', value: IncidentExecutionMode.REPLAY }
-  ];
-
-  readonly langOptions: LangOption[] = [
-    { label: '🇧🇷 PT', value: 'pt' },
-    { label: '🇺🇸 EN', value: 'en' }
-  ];
-
-  constructor(...args: [I18nService?, IncidentService?, DomSanitizer?, MessageService?]) {
-    const [i18n, incidentService, sanitizer, messageService] = args;
+  constructor(...args: [I18nService?, IncidentService?, MessageService?]) {
+    const [i18n, incidentService, messageService] = args;
     this.i18n = i18n ?? inject(I18nService);
     this.incidentService = incidentService ?? inject(IncidentService);
     if (messageService) {
@@ -194,30 +47,17 @@ export class WarRoomComponent implements OnInit, OnDestroy {
         this.messageService = new MessageService();
       }
     }
-    if (sanitizer) {
-      this.sanitizer = sanitizer;
-    } else {
-      try {
-        this.sanitizer =
-          inject(DomSanitizer, { optional: true }) ??
-          ({
-            bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
-          } as DomSanitizer);
-      } catch {
-        this.sanitizer = {
-          bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
-        } as DomSanitizer;
-      }
-    }
   }
 
   ngOnInit(): void {
     this.incidentService.connectSse();
     void this.incidentService.fetchTargetStatus();
+    this.incidentService.startTargetStatusPolling();
     void this.incidentService.fetchIncidents();
   }
 
   ngOnDestroy(): void {
+    this.incidentService.stopTargetStatusPolling();
     this.incidentService.disconnectSse();
   }
 
@@ -231,13 +71,10 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Captures the live demo key from the input element and stores it in the service.
+   * Stores the live demo key in the incident service.
    */
-  onLiveKeyInput(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    if (target && isString(target.value)) {
-      this.incidentService.setLiveDemoKey(target.value);
-    }
+  onLiveKeyChange(key: string): void {
+    this.incidentService.setLiveDemoKey(key);
   }
 
   /**
@@ -284,6 +121,29 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       summary: this.i18n.t('toastActionErrorSummary'),
       detail: fallbackDetail,
       life: 6000
+    });
+  }
+
+  /**
+   * Toggles continuous healthy synthetic traffic on the target workload.
+   */
+  async onToggleHealthyTraffic(): Promise<void> {
+    const nextEnable = !(this.incidentService.targetMetrics()?.healthyTrafficActive ?? false);
+    const result = await this.incidentService.toggleHealthyTraffic(nextEnable);
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+
+    this.messageService.add({
+      severity: 'info',
+      summary: this.i18n.t(
+        nextEnable ? 'toastHealthyTrafficStartedSummary' : 'toastHealthyTrafficStoppedSummary'
+      ),
+      detail: this.i18n.t(
+        nextEnable ? 'toastHealthyTrafficStartedDetail' : 'toastHealthyTrafficStoppedDetail'
+      ),
+      life: 4000
     });
   }
 

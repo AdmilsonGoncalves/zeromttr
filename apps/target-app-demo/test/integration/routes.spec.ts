@@ -149,7 +149,7 @@ describe('target-app-demo routes integration', () => {
     it('should return complete status on GET /chaos/status', async () => {
       const res = await getChaosStatus(server);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({
+      expect(res.body).toMatchObject({
         status: 'healthy',
         service: 'api-pagamentos-core',
         version: 'v2.14.7',
@@ -157,7 +157,11 @@ describe('target-app-demo routes integration', () => {
         targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
         suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
         rawEdgeLogPreCollector:
-          'ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig'
+          'ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig',
+        metrics: expect.objectContaining({
+          healthyTrafficActive: false,
+          poolMax: 10
+        })
       });
     });
   });
