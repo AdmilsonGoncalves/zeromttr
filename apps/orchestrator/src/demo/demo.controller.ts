@@ -16,7 +16,7 @@ import { DecisionAction, IncidentExecutionMode } from '../domain/incident-enums.
 import type { IncidentMode } from '../domain/incident.js';
 import { IncidentState } from '../domain/incident-state.js';
 import { createLiveDemoKeyMiddleware } from '../http/auth.js';
-import { createTurnstileMiddleware } from '../http/turnstile.js';
+import { createTurnstileMiddleware, validateTurnstileConfigPair } from '../http/turnstile.js';
 import { HttpResponseStatus } from '../http/http-constants.js';
 import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { DemoControlPort } from './demo-control.port.js';
@@ -114,6 +114,7 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
   const publicLiveDemo = dependencies.publicLiveDemo === true;
   const turnstileSiteKey = dependencies.turnstileSiteKey?.trim() || null;
   const turnstileSecretKey = dependencies.turnstileSecretKey?.trim() || undefined;
+  validateTurnstileConfigPair(turnstileSiteKey, turnstileSecretKey);
 
   const liveDemoAuth =
     dependencies.liveDemoMiddleware ??

@@ -95,7 +95,7 @@ describe('string.utils', () => {
       const cleaned = stripUnsafeHtml(dirty);
       expect(cleaned).not.toContain('<script');
       expect(cleaned).not.toContain('onclick=');
-      expect(cleaned).toContain('blocked:void(0)');
+      expect(cleaned).toContain('href="blocked:"');
       expect(cleaned).toContain('<p>Safe</p>');
     });
 
@@ -103,14 +103,17 @@ describe('string.utils', () => {
       expect(stripUnsafeHtml('')).toBe('');
     });
 
-    it('should strip slash-delimited event handlers, svg/iframe tags, and data:text/html URIs', () => {
+    it('should strip slash-delimited event handlers, svg/iframe tags, and encoded/data URIs', () => {
       const dirty =
-        '<img/onerror=alert(1) src=x><svg onload=alert(1)></svg><iframe srcdoc="<script>1</script>"></iframe><a href="data:text/html,<script>1</script>">Bad</a>';
+        '<img/onerror=alert(1) src=x><svg onload=alert(1)></svg><iframe srcdoc="<script>1</script>"></iframe><a href="data:text/html,<script>1</script>">Bad</a><a href="&#106;avascript:alert(1)">Encoded</a><a href="https://example.com/ok">Safe</a>';
       const cleaned = stripUnsafeHtml(dirty);
       expect(cleaned).not.toMatch(/onerror/i);
       expect(cleaned).not.toMatch(/<svg/i);
       expect(cleaned).not.toMatch(/<iframe/i);
-      expect(cleaned).toContain('blocked:text/html');
+      expect(cleaned).not.toContain('data:text/html');
+      expect(cleaned).not.toContain('&#106;avascript:');
+      expect(cleaned).toContain('href="blocked:"');
+      expect(cleaned).toContain('https://example.com/ok');
     });
   });
 

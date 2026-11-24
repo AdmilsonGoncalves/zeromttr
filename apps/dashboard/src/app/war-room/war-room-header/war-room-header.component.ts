@@ -93,6 +93,7 @@ export class WarRoomHeaderComponent implements OnDestroy {
   readonly signalsRatioSignal = signal<string>('0/4');
   readonly evidenceCoveragePercentSignal = signal<number>(0);
   readonly reasoningSourceSignal = signal<ReasoningSource | null>(null);
+  readonly turnstileLoadErrorSignal = signal<boolean>(false);
 
   private readonly turnstileHostSignal = signal<HTMLElement | null>(null);
   private turnstileWidgetId: string | null = null;
@@ -255,11 +256,25 @@ export class WarRoomHeaderComponent implements OnDestroy {
     }
   }
 
+  /**
+   * Retries loading the Cloudflare Turnstile script after a load failure.
+   */
+  retryTurnstileLoad(): void {
+    const host = this.turnstileHostSignal();
+    const siteKey = this.turnstileSiteKeySignal();
+    if (!host || !isNonEmptyString(siteKey)) {
+      return;
+    }
+    this.turnstileLoadErrorSignal.set(false);
+    this.mountTurnstileWidget(host, siteKey);
+  }
+
   private mountTurnstileWidget(host: HTMLElement, siteKey: string): void {
     const renderWidget = (): void => {
       if (!globalThis.window?.turnstile || this.turnstileWidgetId) {
         return;
       }
+      this.turnstileLoadErrorSignal.set(false);
       this.turnstileWidgetId = globalThis.window.turnstile.render(host, {
         sitekey: siteKey,
         theme: 'dark',
@@ -276,6 +291,12 @@ export class WarRoomHeaderComponent implements OnDestroy {
       });
     };
 
+    const handleScriptError = (scriptEl: HTMLScriptElement): void => {
+      this.turnstileLoadErrorSignal.set(true);
+      this.turnstileTokenChange.emit(null);
+      scriptEl.remove();
+    };
+
     if (globalThis.window?.turnstile) {
       renderWidget();
       return;
@@ -288,6 +309,9 @@ export class WarRoomHeaderComponent implements OnDestroy {
     const existingScript = doc.getElementById(TURNSTILE_SCRIPT_ID) as HTMLScriptElement | null;
     if (existingScript) {
       existingScript.addEventListener('load', renderWidget, { once: true });
+      existingScript.addEventListener('error', () => handleScriptError(existingScript), {
+        once: true
+      });
       return;
     }
 
@@ -297,6 +321,7 @@ export class WarRoomHeaderComponent implements OnDestroy {
     script.async = true;
     script.defer = true;
     script.addEventListener('load', renderWidget, { once: true });
+    script.addEventListener('error', () => handleScriptError(script), { once: true });
     doc.head.appendChild(script);
   }
 

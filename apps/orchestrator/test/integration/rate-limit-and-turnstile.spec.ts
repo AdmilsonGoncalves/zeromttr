@@ -140,6 +140,7 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       .send({ mode: IncidentExecutionMode.REPLAY });
 
     expect(missingRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(missingRes.body.code).toBe('TURNSTILE_REQUIRED');
     expect(missingRes.body.error).toContain('Turnstile verification required');
 
     nock('https://challenges.cloudflare.com')
@@ -152,7 +153,24 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
       .set('CF-Turnstile-Response', 'expired-or-fake-token');
 
     expect(invalidRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(invalidRes.body.code).toBe('TURNSTILE_REJECTED');
     expect(invalidRes.body.error).toContain('Turnstile verification rejected');
+  });
+
+  it('should reject partial Turnstile configuration (siteKey without secretKey or vice versa)', () => {
+    expect(() =>
+      buildTestApp({
+        publicLiveDemo: true,
+        turnstileSiteKey: '0x4AAAAAAATestSiteKey'
+      })
+    ).toThrow(/TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY/);
+
+    expect(() =>
+      buildTestApp({
+        publicLiveDemo: true,
+        turnstileSecretKey: '0x4AAAAAAATestSecretKey'
+      })
+    ).toThrow(/TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY/);
   });
 
   it('should enforce per-IP rate limiting on simulation endpoints using CF-Connecting-IP (IPv4 and IPv6)', async () => {
@@ -354,7 +372,8 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
     const resetRes = await request(app)
       .post('/api/demo/reset')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
-    expect(resetRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(resetRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(demoControlPort.reset).toHaveBeenCalledTimes(1);
   });
 
   it('should require X-Live-Demo-Key when approving a replay incident during an active live session and allow retry if reset fails', async () => {

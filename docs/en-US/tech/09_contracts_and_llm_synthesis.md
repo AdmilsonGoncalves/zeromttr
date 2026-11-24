@@ -44,7 +44,7 @@ export const ExecutePromqlRangeOutputSchema = z.object({
     p95: z.number(),
     max: z.number(),
     sampleCount: z.number(),
-  })).max(5),
+  })),
   exemplarTraceId: z.string().regex(/^[0-9a-f]{32}$/i).optional(),
   finops: FinOpsMetricsSchema,
 });
@@ -96,7 +96,7 @@ export const QueryLokiLogsOutputSchema = z.object({
     timestamp: z.string(),
     stream: z.record(z.string()),
     line: z.string().max(500),
-  })).max(100),
+  })),
   finops: FinOpsMetricsSchema,
 });
 

@@ -13,6 +13,22 @@ export interface TurnstileMiddlewareOptions {
 }
 
 /**
+ * Validates that Turnstile site key and secret key are either both configured or both unset.
+ */
+export function validateTurnstileConfigPair(
+  siteKey?: string | null,
+  secretKey?: string | null
+): void {
+  const hasSiteKey = isNonEmptyString(siteKey);
+  const hasSecretKey = isNonEmptyString(secretKey);
+  if (hasSiteKey !== hasSecretKey) {
+    throw new Error(
+      'FATAL: TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY must both be configured or both be unset.'
+    );
+  }
+}
+
+/**
  * Extracts a Cloudflare Turnstile token from the request header or body.
  */
 function extractTurnstileToken(req: Request): string | null {
@@ -46,6 +62,7 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
     const token = extractTurnstileToken(req);
     if (!token) {
       res.status(HTTP_STATUS.FORBIDDEN).json({
+        code: 'TURNSTILE_REQUIRED',
         error: 'Forbidden: Cloudflare Turnstile verification required'
       });
       return;
@@ -71,6 +88,7 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
 
         if (!verifyRes.ok) {
           res.status(HTTP_STATUS.FORBIDDEN).json({
+            code: 'TURNSTILE_FAILED',
             error: 'Forbidden: Cloudflare Turnstile verification failed'
           });
           return;
@@ -79,6 +97,7 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
         const payload = (await verifyRes.json()) as { success?: unknown };
         if (payload?.success !== true) {
           res.status(HTTP_STATUS.FORBIDDEN).json({
+            code: 'TURNSTILE_REJECTED',
             error: 'Forbidden: Cloudflare Turnstile verification rejected'
           });
           return;
@@ -87,6 +106,7 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
         next();
       } catch {
         res.status(HTTP_STATUS.FORBIDDEN).json({
+          code: 'TURNSTILE_UNAVAILABLE',
           error: 'Forbidden: Cloudflare Turnstile verification unavailable'
         });
       } finally {

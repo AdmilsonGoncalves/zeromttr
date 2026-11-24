@@ -990,14 +990,31 @@ export class IncidentService {
     this.turnstileToken.set(isNonEmptyString(token) ? token.trim() : null);
   }
 
-  private consumeTurnstileToken(): void {
+  private reserveTurnstileToken(): string | null {
+    const token = this.turnstileToken();
+    if (!isNonEmptyString(token)) {
+      return null;
+    }
+    const trimmed = token.trim();
     if (this.turnstileRequired()) {
       this.turnstileToken.set(null);
+    }
+    return trimmed;
+  }
+
+  private resetTurnstileAfterRequest(reservedToken: string | null): void {
+    if (this.turnstileRequired() && isNonEmptyString(reservedToken)) {
+      if (this.turnstileToken() === reservedToken) {
+        this.turnstileToken.set(null);
+      }
       this.turnstileResetCounter.update((c) => c + 1);
     }
   }
 
-  private buildDemoHeaders(includeJsonContentType = false): Record<string, string> {
+  private buildDemoHeaders(
+    includeJsonContentType = false,
+    turnstileToken: string | null = this.turnstileToken()
+  ): Record<string, string> {
     const headers: Record<string, string> = {};
     if (includeJsonContentType) {
       headers['Content-Type'] = 'application/json';
@@ -1006,9 +1023,8 @@ export class IncidentService {
     if (isNonEmptyString(key)) {
       headers['X-Live-Demo-Key'] = key.trim();
     }
-    const turnstile = this.turnstileToken();
-    if (isNonEmptyString(turnstile)) {
-      headers['CF-Turnstile-Response'] = turnstile.trim();
+    if (isNonEmptyString(turnstileToken)) {
+      headers['CF-Turnstile-Response'] = turnstileToken.trim();
     }
     return headers;
   }
@@ -1129,10 +1145,11 @@ export class IncidentService {
    */
   async toggleHealthyTraffic(enable: boolean, baseUrl = ''): Promise<DemoActionResult> {
     this.isTogglingTraffic.set(true);
+    const reservedToken = this.reserveTurnstileToken();
     try {
       const res = await fetch(`${baseUrl}/api/demo/healthy-traffic`, {
         method: 'POST',
-        headers: this.buildDemoHeaders(true),
+        headers: this.buildDemoHeaders(true, reservedToken),
         body: JSON.stringify({ enable })
       });
 
@@ -1151,7 +1168,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
-      this.consumeTurnstileToken();
+      this.resetTurnstileAfterRequest(reservedToken);
       this.isTogglingTraffic.set(false);
     }
   }
@@ -1161,13 +1178,14 @@ export class IncidentService {
    */
   async triggerChaos(baseUrl = ''): Promise<DemoActionResult> {
     this.isSimulating.set(true);
+    const reservedToken = this.reserveTurnstileToken();
 
     try {
       const mode = this.activeMode();
       const previousIncident = this.currentIncident();
       const res = await fetch(`${baseUrl}/api/demo/chaos`, {
         method: 'POST',
-        headers: this.buildDemoHeaders(true),
+        headers: this.buildDemoHeaders(true, reservedToken),
         body: JSON.stringify({ mode })
       });
 
@@ -1201,7 +1219,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
-      this.consumeTurnstileToken();
+      this.resetTurnstileAfterRequest(reservedToken);
       this.isSimulating.set(false);
     }
   }
@@ -1211,10 +1229,11 @@ export class IncidentService {
    */
   async resetChaos(baseUrl = '', clearIncident = false): Promise<DemoActionResult> {
     this.isResetting.set(true);
+    const reservedToken = this.reserveTurnstileToken();
     try {
       const res = await fetch(`${baseUrl}/api/demo/reset`, {
         method: 'POST',
-        headers: this.buildDemoHeaders()
+        headers: this.buildDemoHeaders(false, reservedToken)
       });
       await this.fetchTargetStatus(baseUrl);
       if (!res.ok) {
@@ -1246,7 +1265,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
-      this.consumeTurnstileToken();
+      this.resetTurnstileAfterRequest(reservedToken);
       this.isResetting.set(false);
     }
   }
@@ -1260,6 +1279,7 @@ export class IncidentService {
       return { ok: false, error: 'No active incident selected' };
     }
 
+    const reservedToken = this.reserveTurnstileToken();
     const payload: SimulateDecisionPayload = {
       incidentId: incident.id,
       action
@@ -1268,7 +1288,7 @@ export class IncidentService {
     try {
       const res = await fetch(`${baseUrl}/api/demo/simulate-decision`, {
         method: 'POST',
-        headers: this.buildDemoHeaders(true),
+        headers: this.buildDemoHeaders(true, reservedToken),
         body: JSON.stringify(payload)
       });
 
@@ -1300,7 +1320,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
-      this.consumeTurnstileToken();
+      this.resetTurnstileAfterRequest(reservedToken);
     }
   }
 

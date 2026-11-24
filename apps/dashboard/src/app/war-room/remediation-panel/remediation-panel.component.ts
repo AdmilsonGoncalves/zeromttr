@@ -4,11 +4,12 @@ import {
   EventEmitter,
   Input,
   Output,
+  SecurityContext,
   computed,
   inject,
   signal
 } from '@angular/core';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer } from '@angular/platform-browser';
 import { escapeHtml, isNonEmptyString, stripUnsafeHtml } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { Tag } from 'primeng/tag';
@@ -50,9 +51,12 @@ export class RemediationPanelComponent {
 
   @Output() readonly simulateDecision = new EventEmitter<void>();
 
-  readonly safeResendPreview = computed<SafeHtml | string>(() => {
+  readonly safeResendPreview = computed<string>(() => {
     const html = this.buildPreviewHtml();
-    return this.sanitizer ? this.sanitizer.bypassSecurityTrustHtml(html) : html;
+    if (this.sanitizer) {
+      return this.sanitizer.sanitize(SecurityContext.HTML, html) ?? '';
+    }
+    return stripUnsafeHtml(html);
   });
 
   constructor(...args: [I18nService?, DomSanitizer?]) {

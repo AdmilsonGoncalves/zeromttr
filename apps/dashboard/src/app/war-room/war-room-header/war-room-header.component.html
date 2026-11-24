@@ -168,7 +168,17 @@
       class="bg-slate-950/90 border border-slate-700/80 rounded px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-2"
     >
       <div class="flex items-center gap-2 text-xs">
-        @if (simulationLockedByTurnstileSignal()) {
+        @if (turnstileLoadErrorSignal()) {
+          <i class="pi pi-exclamation-triangle text-rose-400"></i>
+          <span class="text-rose-300">{{ i18n.t('turnstileLoadFailedNotice') }}</span>
+          <p-button
+            [label]="i18n.t('turnstileRetryBtn')"
+            severity="secondary"
+            size="small"
+            (onClick)="retryTurnstileLoad()"
+            styleClass="text-[11px] py-0.5 px-2"
+          />
+        } @else if (simulationLockedByTurnstileSignal()) {
           <i class="pi pi-lock text-amber-400"></i>
           <span class="text-amber-200">{{ i18n.t('turnstilePendingNotice') }}</span>
         } @else {

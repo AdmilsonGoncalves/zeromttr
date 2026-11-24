@@ -86,6 +86,10 @@ export interface TranslationDictionary {
   toastRateLimitSummary: string;
   toastRateLimitDetail: string;
   toastRateLimitDetailWithSeconds: string;
+  toastTurnstileRequiredSummary: string;
+  toastTurnstileRequiredDetail: string;
+  turnstileLoadFailedNotice: string;
+  turnstileRetryBtn: string;
   toastActionErrorSummary: string;
   toastActionErrorDetail: string;
   toastChaosStartedSummary: string;
@@ -251,6 +255,11 @@ const PT_TRANSLATIONS: TranslationDictionary = {
     'Muitas requisições deste IP. Aguarde alguns instantes antes de tentar novamente.',
   toastRateLimitDetailWithSeconds:
     'Muitas requisições deste IP. Aguarde {N} segundos antes de tentar novamente.',
+  toastTurnstileRequiredSummary: 'Verificação humana necessária',
+  toastTurnstileRequiredDetail:
+    'Complete novamente o desafio Cloudflare Turnstile antes de executar esta ação.',
+  turnstileLoadFailedNotice: 'Falha ao carregar a verificação Cloudflare Turnstile.',
+  turnstileRetryBtn: 'Tentar novamente',
   toastActionErrorSummary: 'Falha na ação de demonstração',
   toastActionErrorDetail: 'Não foi possível concluir a operação no orquestrador.',
   toastChaosStartedSummary: 'Incidente disparado',
@@ -428,6 +437,11 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   toastRateLimitDetail: 'Too many requests from this IP. Please wait a moment before trying again.',
   toastRateLimitDetailWithSeconds:
     'Too many requests from this IP. Please wait {N} seconds before trying again.',
+  toastTurnstileRequiredSummary: 'Human verification required',
+  toastTurnstileRequiredDetail:
+    'Please complete the Cloudflare Turnstile challenge again before running this action.',
+  turnstileLoadFailedNotice: 'Failed to load Cloudflare Turnstile verification.',
+  turnstileRetryBtn: 'Retry',
   toastActionErrorSummary: 'Demo action failed',
   toastActionErrorDetail: 'Could not complete the operation on the orchestrator.',
   toastChaosStartedSummary: 'Incident triggered',

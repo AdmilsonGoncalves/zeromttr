@@ -95,6 +95,16 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   private notifyActionError(result: DemoActionResult): void {
+    if (result.status === 403 && result.errorCode?.startsWith('TURNSTILE_')) {
+      this.messageService.add({
+        severity: 'error',
+        summary: this.i18n.t('toastTurnstileRequiredSummary'),
+        detail: this.i18n.t('toastTurnstileRequiredDetail'),
+        life: 6000
+      });
+      return;
+    }
+
     if (result.status === 403) {
       this.messageService.add({
         severity: 'error',

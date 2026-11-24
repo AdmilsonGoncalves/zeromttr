@@ -52,14 +52,17 @@ describe('RemediationPanelComponent', () => {
     unsafeIncident.notification = {
       emailId: 'email-unsafe-1',
       status: NotificationStatus.DISPATCHED,
-      htmlPreview: '<div onclick="alert(1)"><script>evil()</script><p>Safe body</p></div>'
+      htmlPreview:
+        '<div onclick="alert(1)"><script>evil()</script><a href="&#106;avascript:alert(1)">Bad</a><a href="https://example.com/pr/1">Safe Link</a><p>Safe body</p></div>'
     };
     component.incident = unsafeIncident;
 
     const preview = String(component.safeResendPreview());
     expect(preview).toContain('Safe body');
+    expect(preview).toContain('https://example.com/pr/1');
     expect(preview).not.toContain('<script');
     expect(preview).not.toContain('onclick=');
+    expect(preview).not.toContain('&#106;avascript:');
   });
 
   it('should_emit_simulate_decision_when_triggered', () => {
