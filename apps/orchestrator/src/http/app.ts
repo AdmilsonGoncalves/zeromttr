@@ -15,6 +15,7 @@ import type { OrchestratorWorkflow } from '../application/orchestrator-workflow.
 import type { RecordDecision } from '../application/record-decision.js';
 import { createInitialIncident } from '../application/create-initial-incident.js';
 import { createGrafanaAuthMiddleware, createDashboardAuthMiddleware } from './auth.js';
+import { createIpRateLimitMiddleware } from './rate-limit.js';
 import { SseEventBroadcaster } from './events.sse.js';
 import { createWebhookRouter } from './webhook.controller.js';
 import { createApiRouter } from './api.controller.js';
@@ -35,6 +36,7 @@ export interface AppDependencies {
   grafanaWebhookToken?: string;
   dashboardApiToken?: string;
   demoRouter?: Router | PluggableRouterFactory;
+  enableRateLimiting?: boolean;
 }
 
 /**
@@ -75,6 +77,29 @@ export function createApp(dependencies: AppDependencies): Express {
 
   const grafanaAuth = createGrafanaAuthMiddleware(grafanaToken, dashboardToken);
   const dashboardAuth = createDashboardAuthMiddleware(dashboardToken);
+
+  const shouldRateLimit = dependencies.enableRateLimiting ?? !isTest;
+  if (shouldRateLimit) {
+    const strictActionLimiter = createIpRateLimitMiddleware({
+      windowMs: 60_000,
+      maxRequests: 30,
+      message: 'Rate limit exceeded for simulation/decision actions. Please wait a minute.'
+    });
+    const readApiLimiter = createIpRateLimitMiddleware({
+      windowMs: 60_000,
+      maxRequests: 600,
+      message: 'Rate limit exceeded for API read endpoints. Please slow down.'
+    });
+
+    app.use('/api/demo/chaos', strictActionLimiter);
+    app.use('/api/demo/reset', strictActionLimiter);
+    app.use('/api/demo/simulate-decision', strictActionLimiter);
+    app.use('/api/demo/healthy-traffic', strictActionLimiter);
+    app.use('/api/incidents/:id/decision', strictActionLimiter);
+    app.get('/api/incidents', readApiLimiter);
+    app.get('/api/incidents/:id', readApiLimiter);
+    app.get('/api/target/status', readApiLimiter);
+  }
 
   const initialIncident = createInitialIncident();
 

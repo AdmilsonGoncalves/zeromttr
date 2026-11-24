@@ -40,3 +40,9 @@ export type {
   TargetLiveMetrics,
   TargetStatusResponse
 } from '@zeromttr/contracts';
+
+export interface DemoConfigResponse {
+  publicLiveDemo: boolean;
+  turnstileSiteKey: string | null;
+  turnstileRequired: boolean;
+}

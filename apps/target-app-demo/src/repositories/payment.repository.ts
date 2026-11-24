@@ -204,7 +204,7 @@ export class PaymentRepository {
 
       // Emit synthetic PII error log matching TECH 03 specification
       const txId = `TX-${Math.floor(1000 + Math.random() * 9000)}`;
-      const logBody = `ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #${txId} for payer CPF ${input.payerCpf} merchant CNPJ ${input.merchantCnpj} pixKey ${input.pixKey} auth ${input.authHeader || 'Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig'}`;
+      const logBody = `ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #${txId} for payer CPF ${input.payerCpf} merchant CNPJ ${input.merchantCnpj} pixKey ${input.pixKey} auth ${input.authHeader || 'none'}`;
 
       telemetry.emitLog('ERROR', logBody, {
         traceId,

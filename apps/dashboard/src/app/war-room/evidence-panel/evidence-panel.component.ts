@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { isFilled, isNonEmptyString, isObject, safeJsonParse } from '@zeromttr/utils';
 import { ProgressBar } from 'primeng/progressbar';
@@ -23,14 +23,54 @@ import { I18nService } from '../../core/i18n.service.js';
 export class EvidencePanelComponent {
   readonly i18n: I18nService;
 
-  readonly incident = input<IncidentDetail | null>(null);
-  readonly targetStatus = input<TargetStatusResponse | null>(null);
-  readonly signalsRatio = input.required<string>();
-  readonly evidenceCoveragePercent = input.required<number>();
-  readonly isPiiPassed = input<boolean | null>(null);
-  readonly leakedPatternsCount = input.required<number>();
-  readonly finopsReduction = input.required<number>();
-  readonly estimatedTokensSaved = input.required<number>();
+  readonly incidentSignal = signal<IncidentDetail | null>(null);
+  readonly targetStatusSignal = signal<TargetStatusResponse | null>(null);
+  readonly signalsRatioSignal = signal<string>('0/4');
+  readonly evidenceCoveragePercentSignal = signal<number>(0);
+  readonly isPiiPassedSignal = signal<boolean | null>(null);
+  readonly leakedPatternsCountSignal = signal<number>(0);
+  readonly finopsReductionSignal = signal<number>(0);
+  readonly estimatedTokensSavedSignal = signal<number>(0);
+
+  @Input()
+  set incident(value: IncidentDetail | null) {
+    this.incidentSignal.set(value);
+  }
+
+  @Input()
+  set targetStatus(value: TargetStatusResponse | null) {
+    this.targetStatusSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set signalsRatio(value: string) {
+    this.signalsRatioSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set evidenceCoveragePercent(value: number) {
+    this.evidenceCoveragePercentSignal.set(value);
+  }
+
+  @Input()
+  set isPiiPassed(value: boolean | null) {
+    this.isPiiPassedSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set leakedPatternsCount(value: number) {
+    this.leakedPatternsCountSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set finopsReduction(value: number) {
+    this.finopsReductionSignal.set(value);
+  }
+
+  @Input({ required: true })
+  set estimatedTokensSaved(value: number) {
+    this.estimatedTokensSavedSignal.set(value);
+  }
 
   readonly activeTab = signal<string>('0');
   readonly mockGitDiff = MOCK_GIT_DIFF;
@@ -39,19 +79,19 @@ export class EvidencePanelComponent {
 
   readonly displayedPreCollectorLog = computed<string>(() => {
     return (
-      this.incident()?.rca?.rawEdgeLogPreCollector ??
-      this.targetStatus()?.rawEdgeLogPreCollector ??
+      this.incidentSignal()?.rca?.rawEdgeLogPreCollector ??
+      this.targetStatusSignal()?.rawEdgeLogPreCollector ??
       this.rawPreCollectorLog
     );
   });
 
   readonly displayedPostOttlLog = computed<string>(() => {
-    if (this.isPiiPassed() === false) {
-      const types = (this.incident()?.rca?.piiGuardAudit?.detectedTypes ?? []).join(', ');
+    if (this.isPiiPassedSignal() === false) {
+      const types = (this.incidentSignal()?.rca?.piiGuardAudit?.detectedTypes ?? []).join(', ');
       return this.i18n.t('piiLogWithheldMessage').replace('{TYPES}', types);
     }
 
-    const sample = this.incident()?.rca?.logSample;
+    const sample = this.incidentSignal()?.rca?.logSample;
     if (!isNonEmptyString(sample)) {
       return this.maskedPostOttlLog;
     }
@@ -74,7 +114,8 @@ export class EvidencePanelComponent {
     return lines[0] ?? this.maskedPostOttlLog;
   });
 
-  constructor(i18n?: I18nService) {
+  constructor(...args: [I18nService?]) {
+    const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
   }
 

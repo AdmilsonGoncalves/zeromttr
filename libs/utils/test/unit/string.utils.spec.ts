@@ -6,6 +6,7 @@ import {
   isSafeRelativePath,
   isString,
   sanitizeWhitespace,
+  stripUnsafeHtml,
   truncate
 } from '../../src/string.utils.js';
 
@@ -84,6 +85,46 @@ describe('string.utils', () => {
     it('should return empty string for falsy/empty values', () => {
       expect(escapeHtml('')).toBe('');
       expect(escapeHtml(null as any)).toBe('');
+    });
+  });
+
+  describe('stripUnsafeHtml', () => {
+    it('should strip script tags, inline event handlers, and javascript: URIs', () => {
+      const dirty =
+        '<div onclick="alert(1)"><script>alert("xss")</script><a href="javascript:void(0)">Link</a><p>Safe</p></div>';
+      const cleaned = stripUnsafeHtml(dirty);
+      expect(cleaned).not.toContain('<script');
+      expect(cleaned).not.toContain('onclick=');
+      expect(cleaned).toContain('href="blocked:"');
+      expect(cleaned).toContain('<p>Safe</p>');
+    });
+
+    it('should return empty string for empty input', () => {
+      expect(stripUnsafeHtml('')).toBe('');
+    });
+
+    it('should strip slash-delimited event handlers, svg/iframe tags, and encoded/data URIs', () => {
+      const dirty =
+        '<img/onerror=alert(1) src=x><svg onload=alert(1)></svg><iframe srcdoc="<script>1</script>"></iframe><a href="data:text/html,<script>1</script>">Bad</a><a href="&#106;avascript:alert(1)">Encoded</a><a href="https://example.com/ok">Safe</a>';
+      const cleaned = stripUnsafeHtml(dirty);
+      expect(cleaned).not.toMatch(/onerror/i);
+      expect(cleaned).not.toMatch(/<svg/i);
+      expect(cleaned).not.toMatch(/<iframe/i);
+      expect(cleaned).not.toContain('data:text/html');
+      expect(cleaned).not.toContain('&#106;avascript:');
+      expect(cleaned).toContain('href="blocked:"');
+      expect(cleaned).toContain('https://example.com/ok');
+    });
+
+    it('should handle out-of-range numeric character references safely without throwing and preserve valid hex/decimal decoding', () => {
+      const input =
+        '<a href="https://example.com/?q=&#x110000;&#99999999;">OutOfRange</a><a href="&#x6a;avascript:alert(1)">HexJs</a><a href="&#106;avascript:alert(2)">DecJs</a><a href="https://example.com/&#x41;&#66;">Valid</a>';
+      const cleaned = stripUnsafeHtml(input);
+      expect(cleaned).toContain('https://example.com/?q=&#x110000;&#99999999;');
+      expect(cleaned).not.toContain('&#x6a;avascript:');
+      expect(cleaned).not.toContain('&#106;avascript:');
+      expect(cleaned).toContain('href="blocked:"');
+      expect(cleaned).toContain('https://example.com/&#x41;&#66;');
     });
   });
 

@@ -1,6 +1,6 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@10.5.2 --activate
+RUN npm install -g pnpm@12.23.0
 
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json nx.json ./
 COPY libs ./libs

@@ -245,6 +245,8 @@ export class DispatchRemediation {
       throw new Error('Cannot create remediation PR without an authoritative suspectFilePath');
     }
 
+    let transitionedBeforeSynthesis = false;
+
     // Ensure valid lifecycle transitions to REMEDIATING before synthesis so UI and TTD reflect start of remediation
     if (incident.state === IncidentState.INVESTIGATING) {
       this.transitionAndBroadcast(
@@ -252,6 +254,7 @@ export class DispatchRemediation {
         IncidentState.ENRICHING,
         TransitionReason.ENRICHING_BEFORE_REMEDIATION
       );
+      transitionedBeforeSynthesis = true;
     }
     if (incident.state === IncidentState.ENRICHING) {
       this.transitionAndBroadcast(
@@ -259,9 +262,15 @@ export class DispatchRemediation {
         IncidentState.REMEDIATING,
         TransitionReason.REMEDIATING_SYNTHESIS
       );
+      transitionedBeforeSynthesis = true;
+    }
+
+    if (transitionedBeforeSynthesis) {
+      await this.repository.save(incident);
     }
 
     const { synthesis, reasoningSource, piiAudit } = await this.synthesizeWithGuardrails(
+      incident.id,
       evidence,
       authoritativeSuspectPath
     );
@@ -329,6 +338,7 @@ export class DispatchRemediation {
   }
 
   private async synthesizeWithGuardrails(
+    incidentId: string,
     evidence: CollectedEvidence,
     authoritativeSuspectPath: string
   ): Promise<{
@@ -359,15 +369,31 @@ export class DispatchRemediation {
           synthesis = rawSynthesis;
           reasoningSource = ReasoningProvider.LLM;
         } else {
+          this.logger?.warn({
+            event: OrchestratorLogEvent.LLM_PATCH_REJECTED,
+            incidentId,
+            message:
+              'LLM synthesis patch rejected by defensive validation; routing to deterministic fallback'
+          });
           synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
           reasoningSource = ReasoningProvider.FALLBACK;
         }
-      } catch {
+      } catch (err) {
+        this.logger?.warn({
+          event: OrchestratorLogEvent.LLM_SYNTHESIS_FAILED,
+          incidentId,
+          message: toErrorMessage(err)
+        });
         synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
         reasoningSource = ReasoningProvider.FALLBACK;
       }
     } else {
       // Fail-closed! Route directly to fallback
+      this.logger?.warn({
+        event: OrchestratorLogEvent.PII_PROMPT_GUARD_BLOCKED,
+        incidentId,
+        message: `Fail-closed PII guard blocked LLM dispatch (${piiAudit.detectedTypes.join(', ')})`
+      });
       synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
       reasoningSource = ReasoningProvider.FALLBACK;
     }

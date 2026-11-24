@@ -24,7 +24,7 @@ export const GrafanaAlertItemSchema = z
         severity: z.string().optional().default(AlertSeverity.CRITICAL)
       })
       .passthrough(),
-    annotations: z.record(z.unknown()).optional(),
+    annotations: z.record(z.string(), z.unknown()).optional(),
     startsAt: z.string().optional(),
     endsAt: z.string().optional(),
     fingerprint: z.string().optional()

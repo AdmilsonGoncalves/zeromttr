@@ -13,6 +13,7 @@ import {
 import {
   DecisionAction,
   type DecisionPayload,
+  type DemoConfigResponse,
   DecisionSource,
   type IncidentCreatedEvent,
   type IncidentDecisionAction,
@@ -56,6 +57,7 @@ export interface DemoActionResult {
   ok: boolean;
   status?: number;
   error?: string;
+  errorCode?: string;
   retryAfterSeconds?: number;
 }
 
@@ -81,6 +83,12 @@ export class IncidentService {
   private targetStatusPollTimer: ReturnType<typeof setInterval> | null = null;
   private sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private visualStepTimer: ReturnType<typeof setTimeout> | null = null;
+  private demoConfigRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private demoConfigRetryResolve: (() => void) | null = null;
+  private demoConfigAbortController: AbortController | null = null;
+  private demoConfigInFlight: Promise<void> | null = null;
+  private demoConfigLoaded = false;
+  private demoConfigCancelToken = 0;
   private visualStateQueue: IncidentState[] = [];
   private readonly dismissedIncidentIds = new Set<string>();
   private activeIncidentFetchToken = 0;
@@ -94,6 +102,14 @@ export class IncidentService {
   readonly sseConnected = signal<boolean>(false);
   readonly activeMode = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly liveDemoKey = signal<string>('');
+  readonly publicLiveDemo = signal<boolean>(false);
+  readonly turnstileSiteKey = signal<string | null>(null);
+  readonly turnstileRequired = signal<boolean>(false);
+  readonly turnstileToken = signal<string | null>(null);
+  readonly turnstileResetCounter = signal<number>(0);
+  readonly isSimulationLockedByTurnstile = computed<boolean>(
+    () => this.turnstileRequired() && !isNonEmptyString(this.turnstileToken())
+  );
   readonly isSimulating = signal<boolean>(false);
   readonly isResetting = signal<boolean>(false);
   readonly isTogglingTraffic = signal<boolean>(false);
@@ -954,7 +970,158 @@ export class IncidentService {
     }
   }
 
-  private buildDemoHeaders(includeJsonContentType = false): Record<string, string> {
+  private cancelPendingDemoConfigRetry(): void {
+    this.demoConfigCancelToken++;
+    if (this.demoConfigAbortController) {
+      this.demoConfigAbortController.abort();
+      this.demoConfigAbortController = null;
+    }
+    if (this.demoConfigRetryTimer) {
+      clearTimeout(this.demoConfigRetryTimer);
+      this.demoConfigRetryTimer = null;
+    }
+    if (this.demoConfigRetryResolve) {
+      const resolve = this.demoConfigRetryResolve;
+      this.demoConfigRetryResolve = null;
+      resolve();
+    }
+  }
+
+  private parseJsonWithAbort<T>(res: Response, signal: AbortSignal): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+        return;
+      }
+      const onAbort = (): void => {
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      res
+        .json()
+        .then((data) => {
+          signal.removeEventListener('abort', onAbort);
+          resolve(data as T);
+        })
+        .catch((err) => {
+          signal.removeEventListener('abort', onAbort);
+          reject(err);
+        });
+    });
+  }
+
+  /**
+   * Fetches runtime demo configuration (`publicLiveDemo`, `turnstileSiteKey`, `turnstileRequired`)
+   * with per-attempt deadline, terminal handling for 404, and bounded retry on transient errors.
+   */
+  async fetchDemoConfig(
+    baseUrl = '',
+    maxAttempts = 3,
+    retryDelayMs = 1500,
+    attemptTimeoutMs = 5000
+  ): Promise<void> {
+    if (this.demoConfigInFlight) {
+      return this.demoConfigInFlight;
+    }
+
+    const totalAttempts = Math.max(1, maxAttempts);
+    const cancelToken = this.demoConfigCancelToken;
+
+    this.demoConfigInFlight = (async () => {
+      for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+        if (this.demoConfigCancelToken !== cancelToken) {
+          return;
+        }
+        const controller = new AbortController();
+        this.demoConfigAbortController = controller;
+        const timeoutId =
+          attemptTimeoutMs > 0 ? setTimeout(() => controller.abort(), attemptTimeoutMs) : null;
+        try {
+          const res = await fetch(`${baseUrl}/api/demo/config`, {
+            signal: controller.signal
+          });
+          if (res.status === 404) {
+            this.demoConfigLoaded = true;
+            return;
+          }
+          if (res.ok) {
+            const config = await this.parseJsonWithAbort<Partial<DemoConfigResponse>>(
+              res,
+              controller.signal
+            );
+            this.publicLiveDemo.set(config.publicLiveDemo === true);
+            this.turnstileSiteKey.set(
+              isNonEmptyString(config.turnstileSiteKey) ? config.turnstileSiteKey : null
+            );
+            this.turnstileRequired.set(config.turnstileRequired === true);
+            this.demoConfigLoaded = true;
+            return;
+          }
+        } catch {
+          // Retry transient fetch/timeout/parse errors up to totalAttempts
+        } finally {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          if (this.demoConfigAbortController === controller) {
+            this.demoConfigAbortController = null;
+          }
+        }
+
+        if (attempt < totalAttempts && retryDelayMs > 0) {
+          await new Promise<void>((resolve) => {
+            this.demoConfigRetryResolve = resolve;
+            this.demoConfigRetryTimer = setTimeout(() => {
+              this.demoConfigRetryTimer = null;
+              this.demoConfigRetryResolve = null;
+              resolve();
+            }, retryDelayMs * attempt);
+          });
+        }
+      }
+    })().finally(() => {
+      this.demoConfigInFlight = null;
+    });
+
+    return this.demoConfigInFlight;
+  }
+
+  /**
+   * Updates the active Cloudflare Turnstile verification token.
+   */
+  setTurnstileToken(token: string | null): void {
+    this.turnstileToken.set(isNonEmptyString(token) ? token.trim() : null);
+  }
+
+  private reserveTurnstileToken(): string | null {
+    const token = this.turnstileToken();
+    if (!isNonEmptyString(token)) {
+      return null;
+    }
+    const trimmed = token.trim();
+    if (this.turnstileRequired()) {
+      this.turnstileToken.set(null);
+    }
+    return trimmed;
+  }
+
+  private resetTurnstileAfterRequest(reservedToken: string | null): void {
+    if (!this.turnstileRequired() || !isNonEmptyString(reservedToken)) {
+      return;
+    }
+    const currentToken = this.turnstileToken();
+    if (currentToken === reservedToken) {
+      this.turnstileToken.set(null);
+    }
+    if (!isNonEmptyString(currentToken) || currentToken === reservedToken) {
+      this.turnstileResetCounter.update((c) => c + 1);
+    }
+  }
+
+  private buildDemoHeaders(
+    includeJsonContentType = false,
+    turnstileToken: string | null = this.turnstileToken()
+  ): Record<string, string> {
     const headers: Record<string, string> = {};
     if (includeJsonContentType) {
       headers['Content-Type'] = 'application/json';
@@ -963,25 +1130,38 @@ export class IncidentService {
     if (isNonEmptyString(key)) {
       headers['X-Live-Demo-Key'] = key.trim();
     }
+    if (isNonEmptyString(turnstileToken)) {
+      headers['CF-Turnstile-Response'] = turnstileToken.trim();
+    }
     return headers;
   }
 
   private async readErrorPayload(
     res: Response
-  ): Promise<{ error: string; retryAfterSeconds?: number }> {
+  ): Promise<{ error: string; errorCode?: string; retryAfterSeconds?: number }> {
     try {
-      const body = (await res.json()) as { error?: unknown; retryAfterSeconds?: unknown };
+      const body = (await res.json()) as {
+        error?: unknown;
+        code?: unknown;
+        retryAfterSeconds?: unknown;
+      };
+      const errorCode = isNonEmptyString(body?.code) ? body.code : undefined;
       const retryAfterSeconds = isNumber(body?.retryAfterSeconds)
         ? body.retryAfterSeconds
         : undefined;
       if (isNonEmptyString(body?.error)) {
         return {
           error: body.error,
+          ...(errorCode !== undefined ? { errorCode } : {}),
           ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {})
         };
       }
-      if (retryAfterSeconds !== undefined) {
-        return { error: `HTTP ${res.status}`, retryAfterSeconds };
+      if (retryAfterSeconds !== undefined || errorCode !== undefined) {
+        return {
+          error: `HTTP ${res.status}`,
+          ...(errorCode !== undefined ? { errorCode } : {}),
+          ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {})
+        };
       }
     } catch {
       // Ignore non-JSON error payloads
@@ -997,6 +1177,9 @@ export class IncidentService {
     this.stopTargetStatusPolling();
     this.targetStatusPollTimer = setInterval(() => {
       void this.fetchTargetStatus(baseUrl);
+      if (!this.demoConfigLoaded) {
+        void this.fetchDemoConfig(baseUrl, 1, 0);
+      }
       if (this.awaitingIncidentStart() || !this.sseConnected()) {
         void this.syncIncidentFallback(baseUrl);
       }
@@ -1061,6 +1244,7 @@ export class IncidentService {
    * Stops periodic polling of `/api/target/status`.
    */
   stopTargetStatusPolling(): void {
+    this.cancelPendingDemoConfigRetry();
     if (this.targetStatusPollTimer) {
       clearInterval(this.targetStatusPollTimer);
       this.targetStatusPollTimer = null;
@@ -1072,10 +1256,11 @@ export class IncidentService {
    */
   async toggleHealthyTraffic(enable: boolean, baseUrl = ''): Promise<DemoActionResult> {
     this.isTogglingTraffic.set(true);
+    const reservedToken = this.reserveTurnstileToken();
     try {
       const res = await fetch(`${baseUrl}/api/demo/healthy-traffic`, {
         method: 'POST',
-        headers: this.buildDemoHeaders(true),
+        headers: this.buildDemoHeaders(true, reservedToken),
         body: JSON.stringify({ enable })
       });
 
@@ -1094,6 +1279,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
+      this.resetTurnstileAfterRequest(reservedToken);
       this.isTogglingTraffic.set(false);
     }
   }
@@ -1103,13 +1289,14 @@ export class IncidentService {
    */
   async triggerChaos(baseUrl = ''): Promise<DemoActionResult> {
     this.isSimulating.set(true);
+    const reservedToken = this.reserveTurnstileToken();
 
     try {
       const mode = this.activeMode();
       const previousIncident = this.currentIncident();
       const res = await fetch(`${baseUrl}/api/demo/chaos`, {
         method: 'POST',
-        headers: this.buildDemoHeaders(true),
+        headers: this.buildDemoHeaders(true, reservedToken),
         body: JSON.stringify({ mode })
       });
 
@@ -1143,6 +1330,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
+      this.resetTurnstileAfterRequest(reservedToken);
       this.isSimulating.set(false);
     }
   }
@@ -1152,10 +1340,11 @@ export class IncidentService {
    */
   async resetChaos(baseUrl = '', clearIncident = false): Promise<DemoActionResult> {
     this.isResetting.set(true);
+    const reservedToken = this.reserveTurnstileToken();
     try {
       const res = await fetch(`${baseUrl}/api/demo/reset`, {
         method: 'POST',
-        headers: this.buildDemoHeaders()
+        headers: this.buildDemoHeaders(false, reservedToken)
       });
       await this.fetchTargetStatus(baseUrl);
       if (!res.ok) {
@@ -1187,6 +1376,7 @@ export class IncidentService {
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
     } finally {
+      this.resetTurnstileAfterRequest(reservedToken);
       this.isResetting.set(false);
     }
   }
@@ -1200,6 +1390,7 @@ export class IncidentService {
       return { ok: false, error: 'No active incident selected' };
     }
 
+    const reservedToken = this.reserveTurnstileToken();
     const payload: SimulateDecisionPayload = {
       incidentId: incident.id,
       action
@@ -1208,7 +1399,7 @@ export class IncidentService {
     try {
       const res = await fetch(`${baseUrl}/api/demo/simulate-decision`, {
         method: 'POST',
-        headers: this.buildDemoHeaders(true),
+        headers: this.buildDemoHeaders(true, reservedToken),
         body: JSON.stringify(payload)
       });
 
@@ -1227,6 +1418,7 @@ export class IncidentService {
               action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED
           };
         });
+        await this.fetchTargetStatus(baseUrl);
         return { ok: true, status: res.status };
       }
 
@@ -1238,6 +1430,8 @@ export class IncidentService {
       };
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };
+    } finally {
+      this.resetTurnstileAfterRequest(reservedToken);
     }
   }
 

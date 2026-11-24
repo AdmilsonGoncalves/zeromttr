@@ -57,6 +57,46 @@ export function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function codePointToChar(codePoint: number): string {
+  if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
+    return '\uFFFD';
+  }
+  return String.fromCodePoint(codePoint);
+}
+
+function decodeHtmlEntitiesForUriCheck(value: string): string {
+  return value
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex: string) => codePointToChar(Number.parseInt(hex, 16)))
+    .replace(/&#([0-9]+);?/g, (_, dec: string) => codePointToChar(Number.parseInt(dec, 10)));
+}
+
+/**
+ * Strips dangerous tags, inline event handlers, and executable URIs from HTML fragments.
+ */
+export function stripUnsafeHtml(html: string): string {
+  if (!html) {
+    return '';
+  }
+  return html
+    .replace(/<(script|iframe|object|embed|svg|math|style)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(script|iframe|object|embed|svg|math|meta|base)\b[^>]*\/?>/gi, '')
+    .replace(/([\s/]+)on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '$1')
+    .replace(
+      /(\b(?:href|src|action|formaction)\s*=\s*)(["'])([^"']*)\2/gi,
+      (full, prefix, q, uri) => {
+        const decoded = Array.from(decodeHtmlEntitiesForUriCheck(uri))
+          .filter((ch) => ch.charCodeAt(0) > 0x20)
+          .join('');
+        if (/^(?:javascript|vbscript):/i.test(decoded) || /^data:text\/html/i.test(decoded)) {
+          return `${prefix}${q}blocked:${q}`;
+        }
+        return full;
+      }
+    )
+    .replace(/(?:javascript|vbscript)\s*:/gi, 'blocked:')
+    .replace(/data\s*:\s*text\/html/gi, 'blocked:text/html');
+}
+
 /**
  * Validates that a file path is repository-relative and safe from directory traversal.
  * Rejects leading slashes, backslashes, empty paths, and '.' or '..' segments.

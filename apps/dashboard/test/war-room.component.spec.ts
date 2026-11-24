@@ -17,6 +17,7 @@ describe('WarRoomComponent', () => {
     // Mock fetch calls for ngOnInit
     vi.spyOn(incidentService, 'connectSse').mockImplementation(() => {});
     vi.spyOn(incidentService, 'disconnectSse').mockImplementation(() => {});
+    vi.spyOn(incidentService, 'fetchDemoConfig').mockImplementation(async () => {});
     vi.spyOn(incidentService, 'fetchTargetStatus').mockImplementation(async () => {});
     vi.spyOn(incidentService, 'fetchIncidents').mockImplementation(async () => {});
 
@@ -24,11 +25,23 @@ describe('WarRoomComponent', () => {
     component = new WarRoomComponent(i18n, incidentService);
   });
 
-  it('should initialize and connect SSE on ngOnInit', () => {
+  it('should initialize, fetch demo config, and connect SSE on ngOnInit', () => {
     component.ngOnInit();
     expect(incidentService.connectSse).toHaveBeenCalled();
+    expect(incidentService.fetchDemoConfig).toHaveBeenCalled();
     expect(incidentService.fetchTargetStatus).toHaveBeenCalled();
     expect(incidentService.fetchIncidents).toHaveBeenCalled();
+  });
+
+  it('should lock simulations when Turnstile is required until a token is provided', () => {
+    incidentService.turnstileRequired.set(true);
+    expect(incidentService.isSimulationLockedByTurnstile()).toBe(true);
+
+    component.onTurnstileTokenChange('cf-valid-token');
+    expect(incidentService.isSimulationLockedByTurnstile()).toBe(false);
+
+    component.onTurnstileTokenChange(null);
+    expect(incidentService.isSimulationLockedByTurnstile()).toBe(true);
   });
 
   it('should disconnect SSE on ngOnDestroy', () => {
@@ -80,7 +93,7 @@ describe('WarRoomComponent', () => {
 
     await component.onSimulateDecision();
     expect(simSpy).toHaveBeenCalledWith('approve');
-    expect(resetSpy).toHaveBeenCalledWith('', false);
+    expect(resetSpy).toHaveBeenCalledTimes(1);
     expect(toastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         severity: 'success',
@@ -118,6 +131,7 @@ describe('WarRoomComponent', () => {
       ok: false,
       status: 429,
       error: 'Cooldown active',
+      errorCode: 'SIMULATION_COOLDOWN',
       retryAfterSeconds: 42
     });
     await component.onTriggerChaos();
@@ -126,6 +140,22 @@ describe('WarRoomComponent', () => {
         severity: 'warn',
         summary: i18n.t('toastCooldownSummary'),
         detail: i18n.t('toastCooldownDetailWithSeconds').replace('{N}', '42')
+      })
+    );
+
+    vi.spyOn(incidentService, 'resetChaos').mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      error: 'Too many requests',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      retryAfterSeconds: 15
+    });
+    await component.onResetService();
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastRateLimitSummary'),
+        detail: i18n.t('toastRateLimitDetailWithSeconds').replace('{N}', '15')
       })
     );
 

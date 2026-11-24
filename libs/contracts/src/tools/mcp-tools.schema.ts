@@ -13,7 +13,7 @@ export const ExecutePromqlRangeInputSchema = z.object({
 });
 
 export const SummarizedPromqlSeriesSchema = z.object({
-  metric: z.record(z.string()),
+  metric: z.record(z.string(), z.string()),
   p50: z.number(),
   p95: z.number(),
   max: z.number(),
@@ -79,7 +79,7 @@ export const QueryLokiLogsInputSchema = z.object({
 
 export const LokiLogEntrySchema = z.object({
   timestamp: z.string(),
-  stream: z.record(z.string()),
+  stream: z.record(z.string(), z.string()),
   line: z.string().max(500)
 });
 

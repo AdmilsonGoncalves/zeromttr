@@ -58,6 +58,7 @@ export const DecisionUiStatus = {
   SUCCESS: 'success',
   ERROR: 'error'
 } as const;
+export type DecisionUiStatus = (typeof DecisionUiStatus)[keyof typeof DecisionUiStatus];
 
 export const TelemetryHealthLevel = {
   HEALTHY: 'healthy',
@@ -80,4 +81,3 @@ export const TARGET_TELEMETRY_THRESHOLDS = {
   POOL_USAGE_WARN_RATIO: 0.7,
   POOL_USAGE_CRITICAL_RATIO: 0.9
 } as const;
-export type DecisionUiStatus = (typeof DecisionUiStatus)[keyof typeof DecisionUiStatus];

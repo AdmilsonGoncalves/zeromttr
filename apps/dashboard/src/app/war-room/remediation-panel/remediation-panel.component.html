@@ -14,13 +14,13 @@
     <p class="text-[11px] text-slate-400 leading-snug">
       Branch:
       <code class="text-cyan-300 font-mono text-[10px]">{{
-        incident()?.remediation?.branchName ?? 'hotfix/zeromttr-pool-timeout'
+        incidentSignal()?.remediation?.branchName ?? 'hotfix/zeromttr-pool-timeout'
       }}</code>
     </p>
 
     <a
       [href]="
-        incident()?.remediation?.pullRequestUrl ??
+        incidentSignal()?.remediation?.pullRequestUrl ??
         'https://github.com/AdmilsonGoncalves/zeromttr/pull/42'
       "
       target="_blank"
@@ -48,7 +48,7 @@
   </div>
 
   <!-- Human-in-the-Loop Decision Controls -->
-  @if (displayedFsmState() === 'NOTIFIED') {
+  @if (displayedFsmStateSignal() === 'NOTIFIED') {
     <div
       class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center gap-1.5"
     >
@@ -60,12 +60,17 @@
       [label]="i18n.t('simulateDecisionBtn')"
       severity="warn"
       size="small"
-      [pTooltip]="i18n.t('tooltipSimulateDecision')"
+      [disabled]="simulationLockedByTurnstileSignal()"
+      [pTooltip]="
+        simulationLockedByTurnstileSignal()
+          ? i18n.t('tooltipTurnstilePending')
+          : i18n.t('tooltipSimulateDecision')
+      "
       tooltipPosition="left"
       styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
       (onClick)="simulateDecision.emit()"
     />
-  } @else if (displayedFsmState() === 'RESOLVED') {
+  } @else if (displayedFsmStateSignal() === 'RESOLVED') {
     <div
       class="shrink-0 bg-emerald-950/60 border border-emerald-500/70 rounded p-2 text-xs text-emerald-200 flex items-center gap-1.5"
     >
@@ -74,7 +79,7 @@
         i18n.t('decisionSuccessMsg')
       }}</span>
     </div>
-  } @else if (displayedFsmState() === 'REJECTED') {
+  } @else if (displayedFsmStateSignal() === 'REJECTED') {
     <div
       class="shrink-0 bg-rose-950/60 border border-rose-500/70 rounded p-2 text-xs text-rose-200 flex items-center gap-1.5"
     >

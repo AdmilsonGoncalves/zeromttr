@@ -51,6 +51,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.incidentService.connectSse();
+    void this.incidentService.fetchDemoConfig();
     void this.incidentService.fetchTargetStatus();
     this.incidentService.startTargetStatusPolling();
     void this.incidentService.fetchIncidents();
@@ -78,6 +79,13 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Stores the active Cloudflare Turnstile token in the incident service.
+   */
+  onTurnstileTokenChange(token: string | null): void {
+    this.incidentService.setTurnstileToken(token);
+  }
+
+  /**
    * Switches the active dashboard language.
    */
   onLangChange(lang: Language): void {
@@ -87,6 +95,16 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   private notifyActionError(result: DemoActionResult): void {
+    if (result.status === 403 && result.errorCode?.startsWith('TURNSTILE_')) {
+      this.messageService.add({
+        severity: 'error',
+        summary: this.i18n.t('toastTurnstileRequiredSummary'),
+        detail: this.i18n.t('toastTurnstileRequiredDetail'),
+        life: 6000
+      });
+      return;
+    }
+
     if (result.status === 403) {
       this.messageService.add({
         severity: 'error',
@@ -98,15 +116,20 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     }
 
     if (result.status === 429) {
+      const isRateLimit = result.errorCode === 'RATE_LIMIT_EXCEEDED';
+      const summaryKey = isRateLimit ? 'toastRateLimitSummary' : 'toastCooldownSummary';
+      const detailWithSecondsKey = isRateLimit
+        ? 'toastRateLimitDetailWithSeconds'
+        : 'toastCooldownDetailWithSeconds';
+      const detailKey = isRateLimit ? 'toastRateLimitDetail' : 'toastCooldownDetail';
+
       const detail =
         result.retryAfterSeconds !== undefined
-          ? this.i18n
-              .t('toastCooldownDetailWithSeconds')
-              .replace('{N}', String(result.retryAfterSeconds))
-          : this.i18n.t('toastCooldownDetail');
+          ? this.i18n.t(detailWithSecondsKey).replace('{N}', String(result.retryAfterSeconds))
+          : this.i18n.t(detailKey);
       this.messageService.add({
         severity: 'warn',
-        summary: this.i18n.t('toastCooldownSummary'),
+        summary: this.i18n.t(summaryKey),
         detail,
         life: 6000
       });
@@ -188,12 +211,6 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     const result = await this.incidentService.simulateDecision(DecisionAction.APPROVE);
     if (!result.ok) {
       this.notifyActionError(result);
-      return;
-    }
-
-    const resetResult = await this.incidentService.resetChaos('', false);
-    if (!resetResult.ok) {
-      this.notifyActionError(resetResult);
       return;
     }
 
