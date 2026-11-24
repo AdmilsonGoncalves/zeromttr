@@ -11,4 +11,5 @@ export interface ReasoningPort {
  */
 export interface PatchSyntaxValidatorPort {
   isValidSyntax(filePath: string, content: string): boolean;
+  getExportedSymbols?(filePath: string, content: string): string[] | null;
 }

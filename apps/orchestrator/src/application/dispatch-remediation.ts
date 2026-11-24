@@ -14,6 +14,7 @@ import {
   ReasoningProvider,
   TransitionReason
 } from '../domain/incident-enums.js';
+import type { Incident } from '../domain/incident.js';
 import { IncidentState } from '../domain/incident-state.js';
 import { OrchestratorLogEvent } from '../domain/log-enums.js';
 import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
@@ -71,41 +72,145 @@ function extractRequiredExportPatterns(suspectFileContent?: string): RegExp[] {
   return patterns;
 }
 
+function hasValidPatchTargetAndSyntax(
+  synthesis: RcaAndPatchSynthesis,
+  expectedSuspectPath?: string,
+  syntaxValidator?: PatchSyntaxValidatorPort
+): synthesis is RcaAndPatchSynthesis & { suspectFilePath: string; patchedContent: string } {
+  const isPathValid =
+    isNonEmptyString(expectedSuspectPath) &&
+    isNonEmptyString(synthesis.suspectFilePath) &&
+    synthesis.suspectFilePath === expectedSuspectPath;
+
+  const isContentValid =
+    isNonEmptyString(synthesis.patchedContent) &&
+    (!syntaxValidator ||
+      syntaxValidator.isValidSyntax(synthesis.suspectFilePath, synthesis.patchedContent));
+
+  return isPathValid && isContentValid;
+}
+
 function validatePatchDefensively(
   synthesis: RcaAndPatchSynthesis,
   expectedSuspectPath?: string,
   options: DispatchRemediationOptions = {},
   suspectFileContent?: string
 ): boolean {
-  if (!isNonEmptyString(expectedSuspectPath) || !isNonEmptyString(synthesis.suspectFilePath)) {
+  if (!hasValidPatchTargetAndSyntax(synthesis, expectedSuspectPath, options.syntaxValidator)) {
     return false;
   }
-  if (synthesis.suspectFilePath !== expectedSuspectPath) {
-    return false;
-  }
+
   const content = synthesis.patchedContent;
-  if (!isNonEmptyString(content)) {
-    return false;
-  }
-  if (
-    options.syntaxValidator &&
-    !options.syntaxValidator.isValidSyntax(synthesis.suspectFilePath, content)
-  ) {
-    return false;
-  }
-  const requiredPatterns = [
-    ...(options.requiredContentPatterns ?? []),
-    ...extractRequiredExportPatterns(suspectFileContent)
-  ];
-  for (const pattern of requiredPatterns) {
-    if (pattern.global || pattern.sticky) {
-      pattern.lastIndex = 0;
-    }
-    if (!pattern.test(content)) {
+  const originalExports =
+    options.syntaxValidator?.getExportedSymbols && isNonEmptyString(suspectFileContent)
+      ? options.syntaxValidator.getExportedSymbols(synthesis.suspectFilePath, suspectFileContent)
+      : null;
+  const patchedExports = originalExports
+    ? (options.syntaxValidator?.getExportedSymbols?.(synthesis.suspectFilePath, content) ?? null)
+    : null;
+
+  if (originalExports && patchedExports) {
+    const patchedSet = new Set(patchedExports);
+    if (originalExports.some((symbol) => !patchedSet.has(symbol))) {
       return false;
     }
   }
-  return true;
+
+  const requiredPatterns = [
+    ...(options.requiredContentPatterns ?? []),
+    ...(originalExports && patchedExports ? [] : extractRequiredExportPatterns(suspectFileContent))
+  ];
+  return requiredPatterns.every((pattern) => {
+    if (pattern.global || pattern.sticky) {
+      pattern.lastIndex = 0;
+    }
+    return pattern.test(content);
+  });
+}
+
+type PiiAuditSummary = ReturnType<typeof PiiPromptGuard.inspectAndEnforceFailClosed>;
+
+function buildRcaReport(
+  incident: Incident,
+  evidence: CollectedEvidence,
+  synthesis: RcaAndPatchSynthesis,
+  reasoningSource: ReasoningSource,
+  piiAudit: PiiAuditSummary,
+  annotationId: number | undefined
+): RcaReport {
+  const hasPromqlAnomaly =
+    evidence.signals?.hasPromqlAnomaly ??
+    Boolean(
+      evidence.promqlSummary &&
+      ((evidence.promqlSummary.p95LatencyMs ?? 0) > 2000 ||
+        (evidence.promqlSummary.dbPoolWaiting ?? 0) > 0)
+    );
+  const hasMetricExemplar =
+    evidence.signals?.hasMetricExemplar ?? Boolean(evidence.traceAnalysis?.traceId);
+  const hasTempoErrorSpan =
+    evidence.signals?.hasTempoErrorSpan ??
+    Boolean(evidence.traceAnalysis?.errorMessage || evidence.traceAnalysis?.criticalOperation);
+  const hasLokiLogAndGitDiff =
+    evidence.signals?.hasLokiLogAndGitDiff ??
+    Boolean(evidence.gitDiff?.patch && evidence.logSample);
+
+  const coverage = calculateEvidenceCoverage({
+    hasPromqlAnomaly,
+    hasMetricExemplar,
+    hasTempoErrorSpan,
+    hasLokiLogAndGitDiff
+  });
+
+  const safeCriticalSpan = piiAudit.passed
+    ? evidence.traceAnalysis?.criticalOperation || OrchestratorDefault.CRITICAL_ERROR_SPAN
+    : OrchestratorDefault.CRITICAL_ERROR_SPAN;
+
+  const safeSpans: SpanNode[] = piiAudit.passed
+    ? [
+        {
+          spanId: 'span-001',
+          serviceName: incident.service,
+          operationName:
+            evidence.traceAnalysis?.criticalOperation || OrchestratorDefault.CRITICAL_ERROR_SPAN,
+          durationMs: evidence.traceAnalysis?.durationMs || 4600,
+          hasError: true
+        }
+      ]
+    : [
+        {
+          spanId: 'span-001',
+          serviceName: incident.service,
+          operationName: OrchestratorDefault.CRITICAL_ERROR_SPAN,
+          durationMs: 4600,
+          hasError: true
+        }
+      ];
+
+  const safeBlastRadius = piiAudit.passed
+    ? evidence.traceAnalysis?.servicesInvolved || [incident.service]
+    : [incident.service];
+
+  return {
+    summary: synthesis.summary,
+    rootCause: synthesis.rootCause,
+    reasoningSource,
+    evidenceCoveragePercent: coverage.score,
+    signalsCollected: coverage.signalsCollected,
+    signalsTotal: coverage.signalsTotal,
+    evidenceBreakdown: coverage.breakdown,
+    blastRadius: safeBlastRadius,
+    diagnosisSeconds: Math.max(0, round(diffInSeconds(incident.startedAt, nowIso()), 1)),
+    traceId: evidence.traceAnalysis?.traceId || OrchestratorDefault.UNKNOWN_TRACE_ID,
+    criticalSpan: safeCriticalSpan,
+    spans: safeSpans,
+    logSample: piiAudit.passed
+      ? evidence.logSample
+      : `[WITHHELD DUE TO PII VIOLATION: ${piiAudit.detectedTypes.join(', ')}]`,
+    piiGuardAudit: piiAudit,
+    deployVersion: evidence.gitDiff?.headRef || OrchestratorDefault.UNKNOWN,
+    mitigations: [synthesis.explanation || synthesis.rootCause],
+    grafanaAnnotationId: annotationId
+  };
 }
 
 /**
@@ -142,41 +247,102 @@ export class DispatchRemediation {
 
     // Ensure valid lifecycle transitions to REMEDIATING before synthesis so UI and TTD reflect start of remediation
     if (incident.state === IncidentState.INVESTIGATING) {
-      const transitionEnriching = incident.transition(
+      this.transitionAndBroadcast(
+        incident,
         IncidentState.ENRICHING,
         TransitionReason.ENRICHING_BEFORE_REMEDIATION
       );
-      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-        incidentId: incident.id,
-        from: transitionEnriching.from,
-        to: transitionEnriching.to,
-        at: transitionEnriching.at,
-        reason: transitionEnriching.reason
-      });
     }
-
     if (incident.state === IncidentState.ENRICHING) {
-      const transitionRemediating = incident.transition(
+      this.transitionAndBroadcast(
+        incident,
         IncidentState.REMEDIATING,
         TransitionReason.REMEDIATING_SYNTHESIS
       );
-      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-        incidentId: incident.id,
-        from: transitionRemediating.from,
-        to: transitionRemediating.to,
-        at: transitionRemediating.at,
-        reason: transitionRemediating.reason
-      });
     }
 
-    // Inspect complete evidence object before LLM synthesis
+    const { synthesis, reasoningSource, piiAudit } = await this.synthesizeWithGuardrails(
+      evidence,
+      authoritativeSuspectPath
+    );
+
+    const annotationId = await this.annotateRemediationStart(incident.id, synthesis.summary);
+
+    const rcaReport = buildRcaReport(
+      incident,
+      evidence,
+      synthesis,
+      reasoningSource,
+      piiAudit,
+      annotationId
+    );
+    incident.rca = rcaReport;
+    this.broadcaster.broadcast(IncidentEventType.RCA, {
+      incidentId: incident.id,
+      ...rcaReport
+    });
+
+    const prResult = await this.openRemediationPr(
+      incident,
+      evidence,
+      synthesis,
+      reasoningSource,
+      blobSha
+    );
+
+    // Transition to AWAITING_PR only after createRemediationPr succeeds
+    if (incident.state === IncidentState.REMEDIATING) {
+      this.transitionAndBroadcast(
+        incident,
+        IncidentState.AWAITING_PR,
+        TransitionReason.AWAITING_PR
+      );
+    }
+
+    await this.repository.save(incident);
+
+    this.broadcaster.broadcast(IncidentEventType.REMEDIATION, {
+      incidentId: incident.id,
+      ...prResult
+    });
+
+    return {
+      rcaReport,
+      prResult,
+      reasoningSource
+    };
+  }
+
+  private transitionAndBroadcast(
+    incident: Incident,
+    targetState: IncidentState,
+    reason: TransitionReason
+  ): void {
+    const transition = incident.transition(targetState, reason);
+    this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
+      incidentId: incident.id,
+      from: transition.from,
+      to: transition.to,
+      at: transition.at,
+      reason: transition.reason
+    });
+  }
+
+  private async synthesizeWithGuardrails(
+    evidence: CollectedEvidence,
+    authoritativeSuspectPath: string
+  ): Promise<{
+    synthesis: RcaAndPatchSynthesis;
+    reasoningSource: ReasoningSource;
+    piiAudit: PiiAuditSummary;
+  }> {
     const promptToAudit = JSON.stringify(evidence);
     const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
+    const suspectFileContent = evidence.gitDiff?.suspectFileContent;
 
     let synthesis: RcaAndPatchSynthesis;
     let reasoningSource: ReasoningSource;
 
-    const suspectFileContent = evidence.gitDiff?.suspectFileContent;
     if (piiAudit.passed) {
       try {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
@@ -218,108 +384,40 @@ export class DispatchRemediation {
       throw new Error('Fallback remediation patch failed defensive validation');
     }
 
-    // Annotate Grafana
-    let annotationId: number | undefined;
+    return { synthesis, reasoningSource, piiAudit };
+  }
+
+  private async annotateRemediationStart(
+    incidentId: string,
+    summary: string
+  ): Promise<number | undefined> {
     try {
       const annRes = await this.tools.annotateGrafanaIncident({
         time: Date.now(),
-        text: `[REMEDIATING] Incident ${incident.id}: ${synthesis.summary}`,
+        text: `[REMEDIATING] Incident ${incidentId}: ${summary}`,
         tags: [GrafanaAnnotationTag.REMEDIATION]
       });
-      annotationId = annRes.annotationId;
+      return annRes.annotationId;
     } catch (err) {
       // Ignore non-fatal annotation failure
       this.logger?.warn({
         event: OrchestratorLogEvent.GRAFANA_ANNOTATION_FAILED,
-        incidentId: incident.id,
+        incidentId,
         message: toErrorMessage(err)
       });
+      return undefined;
     }
+  }
 
-    // Evidence coverage calculation using actual collected signals
-    const hasPromqlAnomaly =
-      evidence.signals?.hasPromqlAnomaly ??
-      Boolean(
-        evidence.promqlSummary &&
-        ((evidence.promqlSummary.p95LatencyMs ?? 0) > 2000 ||
-          (evidence.promqlSummary.dbPoolWaiting ?? 0) > 0)
-      );
-    const hasMetricExemplar =
-      evidence.signals?.hasMetricExemplar ?? Boolean(evidence.traceAnalysis?.traceId);
-    const hasTempoErrorSpan =
-      evidence.signals?.hasTempoErrorSpan ??
-      Boolean(evidence.traceAnalysis?.errorMessage || evidence.traceAnalysis?.criticalOperation);
-    const hasLokiLogAndGitDiff =
-      evidence.signals?.hasLokiLogAndGitDiff ??
-      Boolean(evidence.gitDiff?.patch && evidence.logSample);
-
-    const coverage = calculateEvidenceCoverage({
-      hasPromqlAnomaly,
-      hasMetricExemplar,
-      hasTempoErrorSpan,
-      hasLokiLogAndGitDiff
-    });
-
-    const safeCriticalSpan = piiAudit.passed
-      ? evidence.traceAnalysis?.criticalOperation || OrchestratorDefault.CRITICAL_ERROR_SPAN
-      : OrchestratorDefault.CRITICAL_ERROR_SPAN;
-
-    const safeSpans: SpanNode[] = piiAudit.passed
-      ? [
-          {
-            spanId: 'span-001',
-            serviceName: incident.service,
-            operationName:
-              evidence.traceAnalysis?.criticalOperation || OrchestratorDefault.CRITICAL_ERROR_SPAN,
-            durationMs: evidence.traceAnalysis?.durationMs || 4600,
-            hasError: true
-          }
-        ]
-      : [
-          {
-            spanId: 'span-001',
-            serviceName: incident.service,
-            operationName: OrchestratorDefault.CRITICAL_ERROR_SPAN,
-            durationMs: 4600,
-            hasError: true
-          }
-        ];
-
-    const safeBlastRadius = piiAudit.passed
-      ? evidence.traceAnalysis?.servicesInvolved || [incident.service]
-      : [incident.service];
-
-    const rcaReport: RcaReport = {
-      summary: synthesis.summary,
-      rootCause: synthesis.rootCause,
-      reasoningSource,
-      evidenceCoveragePercent: coverage.score,
-      signalsCollected: coverage.signalsCollected,
-      signalsTotal: coverage.signalsTotal,
-      evidenceBreakdown: coverage.breakdown,
-      blastRadius: safeBlastRadius,
-      diagnosisSeconds: Math.max(0, round(diffInSeconds(incident.startedAt, nowIso()), 1)),
-      traceId: evidence.traceAnalysis?.traceId || OrchestratorDefault.UNKNOWN_TRACE_ID,
-      criticalSpan: safeCriticalSpan,
-      spans: safeSpans,
-      logSample: piiAudit.passed
-        ? evidence.logSample
-        : `[WITHHELD DUE TO PII VIOLATION: ${piiAudit.detectedTypes.join(', ')}]`,
-      piiGuardAudit: piiAudit,
-      deployVersion: evidence.gitDiff?.headRef || OrchestratorDefault.UNKNOWN,
-      mitigations: [synthesis.explanation || synthesis.rootCause],
-      grafanaAnnotationId: annotationId
-    };
-
-    incident.rca = rcaReport;
-
-    this.broadcaster.broadcast(IncidentEventType.RCA, {
-      incidentId: incident.id,
-      ...rcaReport
-    });
-
+  private async openRemediationPr(
+    incident: Incident,
+    evidence: CollectedEvidence,
+    synthesis: RcaAndPatchSynthesis,
+    reasoningSource: ReasoningSource,
+    blobSha?: string
+  ): Promise<CreateRemediationPrOutput> {
     // Re-check persisted state right before opening an external PR (e.g. if operator reset raced)
-    const persistedIncident = await this.repository.findById(incidentId);
+    const persistedIncident = await this.repository.findById(incident.id);
     if (
       !persistedIncident ||
       persistedIncident.state === IncidentState.FAILED ||
@@ -327,7 +425,7 @@ export class DispatchRemediation {
       persistedIncident.state === IncidentState.REJECTED
     ) {
       throw new Error(
-        `Aborted remediation PR creation: incident '${incidentId}' is in terminal state '${persistedIncident?.state ?? 'missing'}'`
+        `Aborted remediation PR creation: incident '${incident.id}' is in terminal state '${persistedIncident?.state ?? 'missing'}'`
       );
     }
 
@@ -354,32 +452,6 @@ export class DispatchRemediation {
       suspectCommitSha: evidence.gitDiff?.suspectCommit
     };
 
-    // Transition to AWAITING_PR only after createRemediationPr succeeds
-    if (incident.state === IncidentState.REMEDIATING) {
-      const transitionAwaiting = incident.transition(
-        IncidentState.AWAITING_PR,
-        TransitionReason.AWAITING_PR
-      );
-      this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-        incidentId: incident.id,
-        from: transitionAwaiting.from,
-        to: transitionAwaiting.to,
-        at: transitionAwaiting.at,
-        reason: transitionAwaiting.reason
-      });
-    }
-
-    await this.repository.save(incident);
-
-    this.broadcaster.broadcast(IncidentEventType.REMEDIATION, {
-      incidentId: incident.id,
-      ...prResult
-    });
-
-    return {
-      rcaReport,
-      prResult,
-      reasoningSource
-    };
+    return prResult;
   }
 }

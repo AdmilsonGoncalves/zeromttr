@@ -84,6 +84,8 @@ export class IncidentService {
   private visualStateQueue: IncidentState[] = [];
   private readonly dismissedIncidentIds = new Set<string>();
   private activeIncidentFetchToken = 0;
+  private isSyncingFallback = false;
+  private readonly incidentUpdateGeneration = new Map<string, number>();
   private chaosTriggeredAtMs = 0;
 
   readonly currentIncident = signal<IncidentDetail | null>(null);
@@ -641,211 +643,199 @@ export class IncidentService {
     }
 
     try {
-      const url = `${baseUrl}/api/events`;
-      const es = new EventSource(url);
+      const es = new EventSource(`${baseUrl}/api/events`);
       this.eventSource = es;
-
-      es.onopen = (): void => {
-        this.sseConnected.set(true);
-      };
-
-      es.onerror = (): void => {
-        this.sseConnected.set(false);
-        if (es.readyState === EventSource.CLOSED && !this.sseReconnectTimer) {
-          this.sseReconnectTimer = setTimeout(() => {
-            this.sseReconnectTimer = null;
-            this.connectSse(baseUrl);
-          }, 3000);
-        }
-      };
-
-      es.addEventListener('heartbeat', (_evt: MessageEvent) => {
-        this.sseConnected.set(true);
-      });
-
-      es.addEventListener(IncidentEventType.CREATED, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentCreatedEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        this.awaitingIncidentStart.set(false);
-        this.stopLiveWaitTimer();
-        const current = this.currentIncident();
-        if (!current || current.id !== payload.incidentId) {
-          this.activeIncidentFetchToken++;
-          this.clearVisualStateQueue();
-          this.currentIncident.set({
-            id: payload.incidentId,
-            service: payload.service,
-            severity: payload.severity,
-            state: IncidentState.RECEIVED,
-            mode: payload.mode,
-            startedAt: payload.at,
-            transitions: [{ from: null, to: IncidentState.RECEIVED, at: payload.at }]
-          });
-          this.enqueueVisualState(IncidentState.RECEIVED);
-        }
-      });
-
-      es.addEventListener(IncidentEventType.TRANSITION, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentTransitionEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        const currBefore = this.currentIncident();
-        if (!currBefore || currBefore.id !== payload.incidentId) {
-          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
-          return;
-        }
-        this.currentIncident.update((curr) => {
-          if (!curr || curr.id !== payload.incidentId) {
-            return curr;
-          }
-          const updatedTransitions = [
-            ...curr.transitions,
-            { from: payload.from, to: payload.to, at: payload.at, reason: payload.reason }
-          ];
-          return {
-            ...curr,
-            state: payload.to,
-            transitions: updatedTransitions
-          };
-        });
-        this.enqueueVisualState(payload.to);
-      });
-
-      es.addEventListener(IncidentEventType.RCA, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentRcaEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        const currBefore = this.currentIncident();
-        if (!currBefore || currBefore.id !== payload.incidentId) {
-          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
-          return;
-        }
-        const { incidentId: _incidentId, ...rca } = payload;
-        this.currentIncident.update((curr) => {
-          if (!curr || curr.id !== payload.incidentId) {
-            return curr;
-          }
-          return {
-            ...curr,
-            rca
-          };
-        });
-      });
-
-      es.addEventListener(IncidentEventType.FINOPS, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentFinopsEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        const { incidentId: _incidentId, ...finops } = payload;
-        this.currentIncident.update((curr) => {
-          if (!curr || curr.id !== payload.incidentId) {
-            return curr;
-          }
-          return {
-            ...curr,
-            finops
-          };
-        });
-      });
-
-      es.addEventListener(IncidentEventType.DOCS, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentDocsEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        const { incidentId: _incidentId, sources } = payload;
-        this.currentIncident.update((curr) => {
-          if (!curr || curr.id !== payload.incidentId) {
-            return curr;
-          }
-          return {
-            ...curr,
-            docs: sources
-          };
-        });
-      });
-
-      es.addEventListener(IncidentEventType.REMEDIATION, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentRemediationEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        const currBefore = this.currentIncident();
-        if (!currBefore || currBefore.id !== payload.incidentId) {
-          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
-          return;
-        }
-        this.currentIncident.update((curr) => {
-          if (!curr || curr.id !== payload.incidentId) {
-            return curr;
-          }
-          return {
-            ...curr,
-            remediation: {
-              branchName: payload.branchName,
-              branchUrl: payload.branchUrl,
-              pullRequestUrl: payload.pullRequestUrl,
-              commitSha: payload.commitSha,
-              suspectCommitSha: payload.suspectCommitSha
-            }
-          };
-        });
-      });
-
-      es.addEventListener(IncidentEventType.NOTIFIED, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentNotifiedEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        const currBefore = this.currentIncident();
-        if (!currBefore || currBefore.id !== payload.incidentId) {
-          this.hydrateMissedIncidentFromSse(payload.incidentId, baseUrl);
-          return;
-        }
-        this.currentIncident.update((curr) => {
-          if (!curr || curr.id !== payload.incidentId) {
-            return curr;
-          }
-          return {
-            ...curr,
-            notification: {
-              emailId: payload.emailId,
-              htmlPreview: payload.htmlPreview,
-              status: payload.status
-            }
-          };
-        });
-      });
-
-      es.addEventListener(IncidentEventType.DECISION, (evt: MessageEvent) => {
-        const payload = safeJsonParse<IncidentDecisionEvent>(evt.data);
-        if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
-          return;
-        }
-        this.clearVisualStateQueue();
-        this.currentIncident.update((curr) => {
-          if (!curr || curr.id !== payload.incidentId) {
-            return curr;
-          }
-          return {
-            ...curr,
-            decision: payload.action,
-            decisionSource: payload.source,
-            state:
-              payload.action === DecisionAction.APPROVE
-                ? IncidentState.RESOLVED
-                : IncidentState.REJECTED
-          };
-        });
-      });
+      this.attachSseLifecycle(es, baseUrl);
+      this.registerSseEventHandlers(es, baseUrl);
     } catch {
       this.sseConnected.set(false);
     }
+  }
+
+  private attachSseLifecycle(es: EventSource, baseUrl: string): void {
+    es.onopen = (): void => {
+      this.sseConnected.set(true);
+    };
+
+    es.onerror = (): void => {
+      this.sseConnected.set(false);
+      if (es.readyState === EventSource.CLOSED && !this.sseReconnectTimer) {
+        this.sseReconnectTimer = setTimeout(() => {
+          this.sseReconnectTimer = null;
+          this.connectSse(baseUrl);
+        }, 3000);
+      }
+    };
+
+    es.addEventListener('heartbeat', (_evt: MessageEvent) => {
+      this.sseConnected.set(true);
+    });
+  }
+
+  private registerSseEventHandlers(es: EventSource, baseUrl: string): void {
+    this.registerIncidentListener<IncidentCreatedEvent>(es, IncidentEventType.CREATED, (payload) =>
+      this.handleCreatedEvent(payload)
+    );
+    this.registerIncidentListener<IncidentTransitionEvent>(
+      es,
+      IncidentEventType.TRANSITION,
+      (payload) => this.handleTransitionEvent(payload, baseUrl)
+    );
+    this.registerIncidentListener<IncidentRcaEvent>(es, IncidentEventType.RCA, (payload) =>
+      this.handleRcaEvent(payload, baseUrl)
+    );
+    this.registerIncidentListener<IncidentFinopsEvent>(es, IncidentEventType.FINOPS, (payload) =>
+      this.handleFinopsEvent(payload, baseUrl)
+    );
+    this.registerIncidentListener<IncidentDocsEvent>(es, IncidentEventType.DOCS, (payload) =>
+      this.handleDocsEvent(payload, baseUrl)
+    );
+    this.registerIncidentListener<IncidentRemediationEvent>(
+      es,
+      IncidentEventType.REMEDIATION,
+      (payload) => this.handleRemediationEvent(payload, baseUrl)
+    );
+    this.registerIncidentListener<IncidentNotifiedEvent>(
+      es,
+      IncidentEventType.NOTIFIED,
+      (payload) => this.handleNotifiedEvent(payload, baseUrl)
+    );
+    this.registerIncidentListener<IncidentDecisionEvent>(
+      es,
+      IncidentEventType.DECISION,
+      (payload) => this.handleDecisionEvent(payload, baseUrl)
+    );
+  }
+
+  private registerIncidentListener<T extends { incidentId: string }>(
+    es: EventSource,
+    eventType: string,
+    handler: (payload: T) => void
+  ): void {
+    es.addEventListener(eventType, (evt: MessageEvent) => {
+      const payload = safeJsonParse<T>(evt.data);
+      if (!payload || this.dismissedIncidentIds.has(payload.incidentId)) {
+        return;
+      }
+      handler(payload);
+    });
+  }
+
+  private patchCurrentIncident(
+    incidentId: string,
+    baseUrl: string,
+    hydrateIfMissing: boolean,
+    updater: (curr: IncidentDetail) => IncidentDetail
+  ): boolean {
+    if (hydrateIfMissing) {
+      const currBefore = this.currentIncident();
+      if (!currBefore || currBefore.id !== incidentId) {
+        this.hydrateMissedIncidentFromSse(incidentId, baseUrl);
+        return false;
+      }
+    }
+
+    this.bumpIncidentGeneration(incidentId);
+    this.currentIncident.update((curr) => {
+      if (!curr || curr.id !== incidentId) {
+        return curr;
+      }
+      return updater(curr);
+    });
+    return true;
+  }
+
+  private handleCreatedEvent(payload: IncidentCreatedEvent): void {
+    this.awaitingIncidentStart.set(false);
+    this.stopLiveWaitTimer();
+    const current = this.currentIncident();
+    if (!current || current.id !== payload.incidentId) {
+      this.activeIncidentFetchToken++;
+      this.bumpIncidentGeneration(payload.incidentId);
+      this.clearVisualStateQueue();
+      this.currentIncident.set({
+        id: payload.incidentId,
+        service: payload.service,
+        severity: payload.severity,
+        state: IncidentState.RECEIVED,
+        mode: payload.mode,
+        startedAt: payload.at,
+        transitions: [{ from: null, to: IncidentState.RECEIVED, at: payload.at }]
+      });
+      this.enqueueVisualState(IncidentState.RECEIVED);
+    }
+  }
+
+  private handleTransitionEvent(payload: IncidentTransitionEvent, baseUrl: string): void {
+    const applied = this.patchCurrentIncident(payload.incidentId, baseUrl, true, (curr) => ({
+      ...curr,
+      state: payload.to,
+      transitions: [
+        ...curr.transitions,
+        { from: payload.from, to: payload.to, at: payload.at, reason: payload.reason }
+      ]
+    }));
+    if (applied) {
+      this.enqueueVisualState(payload.to);
+    }
+  }
+
+  private handleRcaEvent(payload: IncidentRcaEvent, baseUrl: string): void {
+    const { incidentId, ...rca } = payload;
+    this.patchCurrentIncident(incidentId, baseUrl, true, (curr) => ({
+      ...curr,
+      rca
+    }));
+  }
+
+  private handleFinopsEvent(payload: IncidentFinopsEvent, baseUrl: string): void {
+    const { incidentId, ...finops } = payload;
+    this.patchCurrentIncident(incidentId, baseUrl, false, (curr) => ({
+      ...curr,
+      finops
+    }));
+  }
+
+  private handleDocsEvent(payload: IncidentDocsEvent, baseUrl: string): void {
+    this.patchCurrentIncident(payload.incidentId, baseUrl, false, (curr) => ({
+      ...curr,
+      docs: payload.sources
+    }));
+  }
+
+  private handleRemediationEvent(payload: IncidentRemediationEvent, baseUrl: string): void {
+    this.patchCurrentIncident(payload.incidentId, baseUrl, true, (curr) => ({
+      ...curr,
+      remediation: {
+        branchName: payload.branchName,
+        branchUrl: payload.branchUrl,
+        pullRequestUrl: payload.pullRequestUrl,
+        commitSha: payload.commitSha,
+        suspectCommitSha: payload.suspectCommitSha
+      }
+    }));
+  }
+
+  private handleNotifiedEvent(payload: IncidentNotifiedEvent, baseUrl: string): void {
+    this.patchCurrentIncident(payload.incidentId, baseUrl, true, (curr) => ({
+      ...curr,
+      notification: {
+        emailId: payload.emailId,
+        htmlPreview: payload.htmlPreview,
+        status: payload.status
+      }
+    }));
+  }
+
+  private handleDecisionEvent(payload: IncidentDecisionEvent, baseUrl: string): void {
+    this.clearVisualStateQueue();
+    this.patchCurrentIncident(payload.incidentId, baseUrl, false, (curr) => ({
+      ...curr,
+      decision: payload.action,
+      decisionSource: payload.source,
+      state:
+        payload.action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED
+    }));
   }
 
   /**
@@ -900,32 +890,49 @@ export class IncidentService {
     }
   }
 
+  private bumpIncidentGeneration(incidentId: string): void {
+    this.incidentUpdateGeneration.set(
+      incidentId,
+      (this.incidentUpdateGeneration.get(incidentId) ?? 0) + 1
+    );
+  }
+
   /**
    * Fetches full details for a specific incident by ID.
    */
-  async fetchIncident(id: string, baseUrl = ''): Promise<void> {
+  async fetchIncident(id: string, baseUrl = ''): Promise<boolean> {
     if (this.dismissedIncidentIds.has(id)) {
-      return;
+      return false;
     }
     const token = ++this.activeIncidentFetchToken;
+    const generationAtStart = this.incidentUpdateGeneration.get(id) ?? 0;
     try {
       const res = await fetch(`${baseUrl}/api/incidents/${encodeURIComponent(id)}`);
       if (token !== this.activeIncidentFetchToken || this.dismissedIncidentIds.has(id)) {
-        return;
+        return false;
       }
       if (res.ok) {
         const detail = (await res.json()) as IncidentDetail;
-        if (token === this.activeIncidentFetchToken && !this.dismissedIncidentIds.has(id)) {
+        const currentGeneration = this.incidentUpdateGeneration.get(id) ?? 0;
+        if (
+          token === this.activeIncidentFetchToken &&
+          !this.dismissedIncidentIds.has(id) &&
+          currentGeneration === generationAtStart
+        ) {
           this.currentIncident.set(detail);
           this.loadError.set(null);
+          return true;
         }
+        return false;
       } else {
         this.loadError.set(`Failed to fetch incident ${id}: HTTP ${res.status}`);
+        return false;
       }
     } catch (err) {
       if (token === this.activeIncidentFetchToken && !this.dismissedIncidentIds.has(id)) {
         this.loadError.set(toErrorMessage(err));
       }
+      return false;
     }
   }
 
@@ -997,46 +1004,56 @@ export class IncidentService {
   }
 
   private async syncIncidentFallback(baseUrl = ''): Promise<void> {
-    if (this.awaitingIncidentStart()) {
-      try {
-        const res = await fetch(`${baseUrl}/api/incidents`);
-        if (res.ok) {
-          const list = (await res.json()) as Array<{ id: string; startedAt?: string }>;
-          const minStartedAt = this.chaosTriggeredAtMs > 0 ? this.chaosTriggeredAtMs - 5000 : 0;
-          const latest = Array.isArray(list)
-            ? list.find((inc) => {
-                if (!isNonEmptyString(inc?.id) || this.dismissedIncidentIds.has(inc.id)) {
-                  return false;
-                }
-                if (minStartedAt > 0 && isNonEmptyString(inc.startedAt)) {
-                  const startedMs = new Date(inc.startedAt).getTime();
-                  if (!Number.isNaN(startedMs) && startedMs < minStartedAt) {
-                    return false;
-                  }
-                }
-                return true;
-              })
-            : undefined;
-          if (latest) {
-            this.awaitingIncidentStart.set(false);
-            this.stopLiveWaitTimer();
-            await this.fetchIncident(latest.id, baseUrl);
-          }
-        }
-      } catch {
-        // Ignore transient polling errors
-      }
+    if (this.isSyncingFallback) {
       return;
     }
+    this.isSyncingFallback = true;
+    try {
+      if (this.awaitingIncidentStart()) {
+        try {
+          const res = await fetch(`${baseUrl}/api/incidents`);
+          if (res.ok) {
+            const list = (await res.json()) as Array<{ id: string; startedAt?: string }>;
+            const minStartedAt = this.chaosTriggeredAtMs > 0 ? this.chaosTriggeredAtMs - 5000 : 0;
+            const latest = Array.isArray(list)
+              ? list.find((inc) => {
+                  if (!isNonEmptyString(inc?.id) || this.dismissedIncidentIds.has(inc.id)) {
+                    return false;
+                  }
+                  if (minStartedAt > 0 && isNonEmptyString(inc.startedAt)) {
+                    const startedMs = new Date(inc.startedAt).getTime();
+                    if (!Number.isNaN(startedMs) && startedMs < minStartedAt) {
+                      return false;
+                    }
+                  }
+                  return true;
+                })
+              : undefined;
+            if (latest) {
+              const loaded = await this.fetchIncident(latest.id, baseUrl);
+              if (loaded) {
+                this.awaitingIncidentStart.set(false);
+                this.stopLiveWaitTimer();
+              }
+            }
+          }
+        } catch {
+          // Ignore transient polling errors
+        }
+        return;
+      }
 
-    const curr = this.currentIncident();
-    if (
-      curr &&
-      curr.state !== IncidentState.RESOLVED &&
-      curr.state !== IncidentState.REJECTED &&
-      curr.state !== IncidentState.FAILED
-    ) {
-      await this.fetchIncident(curr.id, baseUrl);
+      const curr = this.currentIncident();
+      if (
+        curr &&
+        curr.state !== IncidentState.RESOLVED &&
+        curr.state !== IncidentState.REJECTED &&
+        curr.state !== IncidentState.FAILED
+      ) {
+        await this.fetchIncident(curr.id, baseUrl);
+      }
+    } finally {
+      this.isSyncingFallback = false;
     }
   }
 
@@ -1196,6 +1213,7 @@ export class IncidentService {
       });
 
       if (res.ok) {
+        this.bumpIncidentGeneration(payload.incidentId);
         this.clearVisualStateQueue();
         this.currentIncident.update((curr) => {
           if (!curr) {

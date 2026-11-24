@@ -2,6 +2,7 @@ import type http from 'node:http';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
+import { paymentService } from '../services/payment.service.js';
 import { telemetry } from '../telemetry/otel.js';
 import { requestMetrics } from '../telemetry/request-metrics.js';
 
@@ -164,7 +165,7 @@ export class ChaosController {
   }
 
   private buildStatusPayload() {
-    const pool = paymentRepository.getPoolStats();
+    const pool = paymentService.getPoolStats();
     const snapshot = requestMetrics.getSnapshot();
     return {
       ...chaosManager.getStatus(),

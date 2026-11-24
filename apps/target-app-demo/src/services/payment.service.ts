@@ -54,6 +54,13 @@ export class PaymentService {
       pool: stats
     };
   }
+
+  /**
+   * Exposes current database connection pool statistics through the service boundary.
+   */
+  public getPoolStats(): { active: number; waiting: number; max: number } {
+    return this.repository.getPoolStats();
+  }
 }
 
 export const paymentService = new PaymentService();
