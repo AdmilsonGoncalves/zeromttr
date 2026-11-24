@@ -1,7 +1,13 @@
 :host {
   display: block;
-  height: 100vh;
-  max-height: 100vh;
-  min-height: 0;
-  overflow: hidden;
+  min-height: 100dvh;
+}
+
+@media (min-width: 1024px) {
+  :host {
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
 }

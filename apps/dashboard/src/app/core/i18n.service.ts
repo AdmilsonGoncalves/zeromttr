@@ -165,6 +165,8 @@ export interface TranslationDictionary {
   chartMttrBarsTitle: string;
   chartAwaitingSamples: string;
   chartSloThreshold: string;
+  headerMenuBtn: string;
+  headerMenuAriaLabel: string;
 }
 
 const PT_TRANSLATIONS: TranslationDictionary = {
@@ -359,7 +361,9 @@ const PT_TRANSLATIONS: TranslationDictionary = {
   chartFinopsBarsTitle: 'Payload LLM (Bruto vs Compactado)',
   chartMttrBarsTitle: 'MTTR Autônomo vs Manual (~30m)',
   chartAwaitingSamples: 'Aguardando amostras ao vivo do serviço alvo (polling 2s)...',
-  chartSloThreshold: 'SLO 500ms'
+  chartSloThreshold: 'SLO 500ms',
+  headerMenuBtn: 'Menu',
+  headerMenuAriaLabel: 'Alternar menu de controles'
 };
 
 const EN_TRANSLATIONS: TranslationDictionary = {
@@ -549,7 +553,9 @@ const EN_TRANSLATIONS: TranslationDictionary = {
   chartFinopsBarsTitle: 'LLM Payload (Raw vs Compacted)',
   chartMttrBarsTitle: 'Autonomous vs Manual MTTR (~30m)',
   chartAwaitingSamples: 'Awaiting live target service samples (2s polling)...',
-  chartSloThreshold: 'SLO 500ms'
+  chartSloThreshold: 'SLO 500ms',
+  headerMenuBtn: 'Menu',
+  headerMenuAriaLabel: 'Toggle command menu'
 };
 
 /**

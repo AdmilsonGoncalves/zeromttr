@@ -1,50 +1,59 @@
 <p-toast position="top-right" />
 <div
-  class="h-full max-h-full bg-slate-950 text-slate-100 font-sans p-2.5 flex flex-col gap-2.5 overflow-hidden"
+  class="min-h-dvh lg:h-full lg:max-h-full bg-slate-950 text-slate-100 font-sans p-2 sm:p-2.5 flex flex-col gap-2 lg:overflow-hidden"
 >
   <app-war-room-header
     [sseConnected]="incidentService.sseConnected()"
     [targetStatus]="incidentService.targetStatus()"
-    [finopsReduction]="incidentService.finopsReduction()"
-    [estimatedTokensSaved]="incidentService.estimatedTokensSaved()"
     [activeMode]="incidentService.activeMode()"
     [isWorkflowRunning]="incidentService.isWorkflowRunning()"
     [liveDemoKey]="incidentService.liveDemoKey()"
     [publicLiveDemo]="incidentService.publicLiveDemo()"
-    [turnstileSiteKey]="incidentService.turnstileSiteKey()"
     [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"
-    [turnstileResetTrigger]="incidentService.turnstileResetCounter()"
     [healthyTrafficActive]="incidentService.targetMetrics()?.healthyTrafficActive ?? false"
     [isTogglingTraffic]="incidentService.isTogglingTraffic()"
     [isResetting]="incidentService.isResetting()"
     [isSimulating]="incidentService.isSimulating()"
+    (modeChange)="onModeChange($event)"
+    (liveKeyChange)="onLiveKeyChange($event)"
+    (langChange)="onLangChange($event)"
+    (toggleHealthyTraffic)="onToggleHealthyTraffic()"
+    (triggerChaos)="onTriggerChaos()"
+    (resetService)="onResetService()"
+  />
+
+  <app-war-room-notices
+    [activeMode]="incidentService.activeMode()"
+    [turnstileSiteKey]="incidentService.turnstileSiteKey()"
+    [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"
+    [turnstileResetTrigger]="incidentService.turnstileResetCounter()"
+    (turnstileTokenChange)="onTurnstileTokenChange($event)"
+  />
+
+  <app-fsm-timeline
+    [stages]="incidentService.fsmStages()"
+    [hintKey]="incidentService.fsmHintKey()"
+    [liveWaitSeconds]="incidentService.liveWaitSeconds()"
+  />
+
+  <app-target-telemetry
+    [metrics]="incidentService.targetMetrics()"
+    [history]="incidentService.telemetryHistory()"
+  />
+
+  <app-war-room-kpis
     [ttdDisplay]="incidentService.ttdDisplay()"
     [ttprDisplay]="incidentService.ttprDisplay()"
     [signalsRatio]="incidentService.signalsRatio()"
     [evidenceCoveragePercent]="incidentService.evidenceCoveragePercent()"
     [reasoningSource]="incidentService.reasoningSource()"
-    (modeChange)="onModeChange($event)"
-    (liveKeyChange)="onLiveKeyChange($event)"
-    (langChange)="onLangChange($event)"
-    (turnstileTokenChange)="onTurnstileTokenChange($event)"
-    (toggleHealthyTraffic)="onToggleHealthyTraffic()"
-    (triggerChaos)="onTriggerChaos()"
-    (resetService)="onResetService()"
-  >
-    <app-fsm-timeline
-      [stages]="incidentService.fsmStages()"
-      [hintKey]="incidentService.fsmHintKey()"
-      [liveWaitSeconds]="incidentService.liveWaitSeconds()"
-    />
-    <app-target-telemetry
-      [metrics]="incidentService.targetMetrics()"
-      [history]="incidentService.telemetryHistory()"
-    />
-  </app-war-room-header>
+    [finopsReduction]="incidentService.finopsReduction()"
+    [estimatedTokensSaved]="incidentService.estimatedTokensSaved()"
+  />
 
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1 min-h-0">
     <app-evidence-panel
-      class="lg:col-span-8 flex flex-col min-h-0"
+      class="lg:col-span-8 flex flex-col min-h-[360px] lg:min-h-0"
       [incident]="incidentService.currentIncident()"
       [targetStatus]="incidentService.targetStatus()"
       [telemetryHistory]="incidentService.telemetryHistory()"
@@ -57,7 +66,7 @@
     />
 
     <app-remediation-panel
-      class="lg:col-span-4 flex flex-col min-h-0"
+      class="lg:col-span-4 flex flex-col min-h-[280px] lg:min-h-0"
       [incident]="incidentService.currentIncident()"
       [displayedFsmState]="incidentService.displayedFsmState()"
       [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"

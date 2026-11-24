@@ -1,0 +1,35 @@
+@if (activeModeSignal() === 'replay') {
+  <div
+    class="shrink-0 bg-amber-950/50 border border-amber-700/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-200 flex items-center gap-2"
+  >
+    <i class="pi pi-info-circle text-amber-400 shrink-0"></i>
+    <span>{{ i18n.t('replayNotice') }}</span>
+  </div>
+}
+
+@if (turnstileSiteKeySignal()) {
+  <div
+    class="shrink-0 bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-2"
+  >
+    <div class="flex items-center gap-2 text-xs">
+      @if (turnstileLoadErrorSignal()) {
+        <i class="pi pi-exclamation-triangle text-rose-400"></i>
+        <span class="text-rose-300">{{ i18n.t('turnstileLoadFailedNotice') }}</span>
+        <p-button
+          [label]="i18n.t('turnstileRetryBtn')"
+          severity="secondary"
+          size="small"
+          (onClick)="retryTurnstileLoad()"
+          styleClass="text-[11px] py-0.5 px-2"
+        />
+      } @else if (simulationLockedByTurnstileSignal()) {
+        <i class="pi pi-lock text-amber-400"></i>
+        <span class="text-amber-200">{{ i18n.t('turnstilePendingNotice') }}</span>
+      } @else {
+        <i class="pi pi-verified text-emerald-400"></i>
+        <span class="text-emerald-300 font-semibold">{{ i18n.t('turnstileVerifiedBadge') }}</span>
+      }
+    </div>
+    <div #turnstileContainer class="shrink-0"></div>
+  </div>
+}
