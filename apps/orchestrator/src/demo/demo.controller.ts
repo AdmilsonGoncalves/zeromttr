@@ -100,6 +100,16 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
   let lastChaosTimestamp = 0;
   let lastChaosMode: IncidentMode = IncidentExecutionMode.REPLAY;
   const pendingTargetResetIncidentIds = new Set<string>();
+  let lifecycleQueue: Promise<void> = Promise.resolve();
+
+  const runSerialized = <T>(fn: () => Promise<T>): Promise<T> => {
+    const next = lifecycleQueue.then(fn, fn);
+    lifecycleQueue = next.then(
+      () => undefined,
+      () => undefined
+    );
+    return next;
+  };
 
   const publicLiveDemo = dependencies.publicLiveDemo === true;
   const turnstileSiteKey = dependencies.turnstileSiteKey?.trim() || null;
@@ -150,43 +160,45 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
           }
         }
 
-        const now = Date.now();
-        if (lastChaosTimestamp > 0 && now - lastChaosTimestamp < cooldownMs) {
-          const remainingSeconds = Math.ceil((cooldownMs - (now - lastChaosTimestamp)) / 1000);
-          res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
-            code: 'SIMULATION_COOLDOWN',
-            error: `Chaos simulation is in cooldown. Please wait ${remainingSeconds} seconds before triggering again.`,
-            retryAfterSeconds: remainingSeconds
-          });
-          return;
-        }
-
-        const previousTimestamp = lastChaosTimestamp;
-        const previousMode = lastChaosMode;
-        lastChaosTimestamp = now;
-        lastChaosMode = mode;
-
-        try {
-          let incidentId: string | undefined;
-          if (mode === IncidentExecutionMode.LIVE) {
-            dependencies.replayRunner?.stop();
-            await dependencies.demoControlPort.triggerChaos(true);
-          } else if (dependencies.replayRunner) {
-            incidentId = await dependencies.replayRunner.trigger();
+        await runSerialized(async () => {
+          const now = Date.now();
+          if (lastChaosTimestamp > 0 && now - lastChaosTimestamp < cooldownMs) {
+            const remainingSeconds = Math.ceil((cooldownMs - (now - lastChaosTimestamp)) / 1000);
+            res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
+              code: 'SIMULATION_COOLDOWN',
+              error: `Chaos simulation is in cooldown. Please wait ${remainingSeconds} seconds before triggering again.`,
+              retryAfterSeconds: remainingSeconds
+            });
+            return;
           }
-          res.status(HTTP_STATUS.ACCEPTED).json({
-            status: HttpResponseStatus.ACCEPTED,
-            mode,
-            ...(incidentId ? { incidentId } : {}),
-            message: 'Chaos simulation initialized'
-          });
-        } catch (err) {
-          lastChaosTimestamp = previousTimestamp;
-          lastChaosMode = previousMode;
-          res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            error: toErrorMessage(err, 'Failed to initialize chaos')
-          });
-        }
+
+          const previousTimestamp = lastChaosTimestamp;
+          const previousMode = lastChaosMode;
+          lastChaosTimestamp = now;
+          lastChaosMode = mode;
+
+          try {
+            let incidentId: string | undefined;
+            if (mode === IncidentExecutionMode.LIVE) {
+              dependencies.replayRunner?.stop();
+              await dependencies.demoControlPort.triggerChaos(true);
+            } else if (dependencies.replayRunner) {
+              incidentId = await dependencies.replayRunner.trigger();
+            }
+            res.status(HTTP_STATUS.ACCEPTED).json({
+              status: HttpResponseStatus.ACCEPTED,
+              mode,
+              ...(incidentId ? { incidentId } : {}),
+              message: 'Chaos simulation initialized'
+            });
+          } catch (err) {
+            lastChaosTimestamp = previousTimestamp;
+            lastChaosMode = previousMode;
+            res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+              error: toErrorMessage(err, 'Failed to initialize chaos')
+            });
+          }
+        });
       })();
     }
   );
@@ -197,9 +209,8 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
     ...authMiddlewares,
     turnstileAuth,
     (req: Request, res: Response): void => {
-      void (async () => {
+      void runSerialized(async () => {
         let openIncidents: Awaited<ReturnType<IncidentRepository['findAll']>> = [];
-        let repositoryLookupFailed = false;
         if (dependencies.repository) {
           try {
             const allIncidents = await dependencies.repository.findAll();
@@ -209,13 +220,15 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
                 inc.state !== IncidentState.REJECTED &&
                 inc.state !== IncidentState.FAILED
             );
-          } catch {
-            repositoryLookupFailed = true;
+          } catch (err) {
+            res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+              error: toErrorMessage(err, 'Failed to inspect open incidents before reset')
+            });
+            return;
           }
         }
 
         const hasLiveSessionOrIncident =
-          repositoryLookupFailed ||
           (lastChaosTimestamp > 0 && lastChaosMode === IncidentExecutionMode.LIVE) ||
           openIncidents.some((inc) => inc.mode === IncidentExecutionMode.LIVE);
 
@@ -239,6 +252,11 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
             }
           }
 
+          lastChaosTimestamp = 0;
+          lastChaosMode = IncidentExecutionMode.REPLAY;
+          dependencies.replayRunner?.stop();
+          await dependencies.demoControlPort.reset();
+
           if (failedIncidentIds.length > 0) {
             res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
               error: `Failed to transition/save open incidents during reset: ${failedIncidentIds.join(', ')}`,
@@ -247,21 +265,6 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
             return;
           }
 
-          if (
-            !hasLiveSessionOrIncident &&
-            lastChaosTimestamp > 0 &&
-            lastChaosMode === IncidentExecutionMode.LIVE
-          ) {
-            const allowedAfterSave = await runExpressMiddleware(liveDemoAuth, req, res);
-            if (!allowedAfterSave) {
-              return;
-            }
-          }
-
-          lastChaosTimestamp = 0;
-          lastChaosMode = IncidentExecutionMode.REPLAY;
-          dependencies.replayRunner?.stop();
-          await dependencies.demoControlPort.reset();
           res.status(HTTP_STATUS.ACCEPTED).json({
             status: HttpResponseStatus.ACCEPTED,
             message: 'Service restored and demo state reset'
@@ -271,7 +274,7 @@ export function createDemoRouter(dependencies: DemoRouterDependencies): Router {
             error: toErrorMessage(err, 'Failed to reset demo')
           });
         }
-      })();
+      });
     }
   );
 

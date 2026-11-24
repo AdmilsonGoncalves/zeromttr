@@ -45,10 +45,17 @@ function requestJson(
 
 describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
   let server: http.Server | null = null;
+  let originalPort: string | undefined;
 
   afterEach(async () => {
     chaosController.stopHealthyTraffic();
     requestMetrics.reset();
+    if (originalPort !== undefined) {
+      process.env.PORT = originalPort;
+    } else {
+      delete process.env.PORT;
+    }
+    originalPort = undefined;
     if (server) {
       await new Promise<void>((resolve) => server?.close(() => resolve()));
       server = null;
@@ -56,8 +63,14 @@ describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
   });
 
   it('should_expose_live_metrics_and_toggle_healthy_traffic_on_chaos_routes', async () => {
+    originalPort = process.env.PORT;
     server = http.createServer(createApp());
     await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Server address unavailable');
+    }
+    process.env.PORT = String(address.port);
 
     const initialStatus = await requestJson(server, 'GET', '/chaos/status');
     expect(initialStatus.status).toBe(200);
@@ -75,6 +88,18 @@ describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
       (enableRes.body.status as { metrics: { healthyTrafficActive: boolean } }).metrics
         .healthyTrafficActive
     ).toBe(true);
+
+    let measuredRps = 0;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const statusRes = await requestJson(server, 'GET', '/chaos/status');
+      const metrics = statusRes.body.metrics as { requestsPerSecond: number };
+      if (metrics.requestsPerSecond > 0) {
+        measuredRps = metrics.requestsPerSecond;
+        break;
+      }
+    }
+    expect(measuredRps).toBeGreaterThan(0);
 
     const disableRes = await requestJson(server, 'POST', '/chaos/healthy-traffic?enable=false');
     expect(disableRes.status).toBe(200);

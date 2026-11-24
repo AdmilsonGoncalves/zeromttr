@@ -171,6 +171,114 @@ export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort 
   }
 
   private getScriptKind(ext: string): ts.ScriptKind {
+    return this.getScriptKindForExtension(ext);
+  }
+
+  /**
+   * Enumerates exported symbol names (including named export lists and default exports) via TypeScript AST.
+   */
+  public getExportedSymbols(filePath: string, content: string): string[] | null {
+    if (!isNonEmptyString(filePath) || !isNonEmptyString(content)) {
+      return null;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    if (!JS_EXTENSIONS.has(ext) && !TS_EXTENSIONS.has(ext)) {
+      return null;
+    }
+
+    const sourceFile = ts.createSourceFile(
+      filePath,
+      content,
+      ts.ScriptTarget.ES2024,
+      true,
+      this.getScriptKind(ext)
+    );
+
+    const exported = new Set<string>();
+    for (const stmt of sourceFile.statements) {
+      this.collectStatementExports(stmt, exported);
+    }
+    return Array.from(exported);
+  }
+
+  private collectStatementExports(stmt: ts.Statement, exported: Set<string>): void {
+    if (ts.isExportAssignment(stmt)) {
+      exported.add('default');
+      return;
+    }
+
+    if (ts.isExportDeclaration(stmt)) {
+      this.collectExportDeclarationNames(stmt, exported);
+      return;
+    }
+
+    const modifiers = ts.canHaveModifiers(stmt) ? ts.getModifiers(stmt) : undefined;
+    if (!modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword)) {
+      return;
+    }
+
+    if (modifiers.some((mod) => mod.kind === ts.SyntaxKind.DefaultKeyword)) {
+      exported.add('default');
+    }
+
+    if (this.isNamedExportableDeclaration(stmt) && stmt.name) {
+      exported.add(stmt.name.text);
+      return;
+    }
+
+    if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) {
+        this.collectBindingNames(decl.name, exported);
+      }
+    }
+  }
+
+  private collectExportDeclarationNames(stmt: ts.ExportDeclaration, exported: Set<string>): void {
+    if (!stmt.exportClause) {
+      return;
+    }
+    if (ts.isNamedExports(stmt.exportClause)) {
+      for (const spec of stmt.exportClause.elements) {
+        exported.add(spec.name.text);
+      }
+      return;
+    }
+    if (ts.isNamespaceExport(stmt.exportClause)) {
+      exported.add(stmt.exportClause.name.text);
+    }
+  }
+
+  private collectBindingNames(name: ts.BindingName, exported: Set<string>): void {
+    if (ts.isIdentifier(name)) {
+      exported.add(name.text);
+      return;
+    }
+    for (const element of name.elements) {
+      if (ts.isBindingElement(element)) {
+        this.collectBindingNames(element.name, exported);
+      }
+    }
+  }
+
+  private isNamedExportableDeclaration(
+    stmt: ts.Statement
+  ): stmt is
+    | ts.FunctionDeclaration
+    | ts.ClassDeclaration
+    | ts.InterfaceDeclaration
+    | ts.TypeAliasDeclaration
+    | ts.EnumDeclaration {
+    return (
+      ts.isFunctionDeclaration(stmt) ||
+      ts.isClassDeclaration(stmt) ||
+      ts.isInterfaceDeclaration(stmt) ||
+      ts.isTypeAliasDeclaration(stmt) ||
+      ts.isEnumDeclaration(stmt)
+    );
+  }
+
+  private getScriptKindForExtension(ext: string): ts.ScriptKind {
     if (ext === '.tsx') {
       return ts.ScriptKind.TSX;
     }

@@ -371,4 +371,4 @@ Quando em modo `replay` na VPS pública, o orquestrador transmite os eventos gra
 ```
 
 ### Procedimento de Gravação (`scripts/record-replay.sh`)
-Ao final da Fase 5 (ensaio do Live), o script executa uma simulação `live` completa com `LIVE_DEMO_KEY` e captura o stream SSE de `GET /api/events`, salvando o payload consolidado em `data/last-recorded-incident.json` para alimentar a experiência pública da VPS.
+Ao final da Fase 5 (ensaio do Live), o script executa uma simulação `live` completa com `LIVE_DEMO_KEY`, lê o incidente concluído em `GET /api/incidents/{id}` e o status do target em `GET /api/target/status`, grava `eventsTimeline` com nomes de etapas e atrasos fixos, valida o snapshot com `ReplaySnapshotSchema` e salva em `data/last-recorded-incident.json` para alimentar a experiência pública da VPS.

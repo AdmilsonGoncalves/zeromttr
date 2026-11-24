@@ -66,7 +66,7 @@ export const PII_PATTERNS = {
 4. **DispatchRemediation:**
    - Audits the assembled prompt with **`PiiPromptGuard.inspectAndEnforceFailClosed`**.
    - If `passed === true`, synthesizes the RCA and surgical patch via `ReasoningPort` (`GeminiReasoningAdapter` configurable via `LLM_MODEL`, default `gemini-3.5-flash`) and records `reasoningSource: 'llm'`. If the guard rejects (`fail-closed`) or the LLM API fails, uses `DeterministicFallbackReasoningAdapter` and explicitly records `reasoningSource: 'fallback'`.
-   - Injects a Grafana annotation via `annotate_grafana_incident` (`REMEDIATING`), transitions to `AWAITING_PR`, and triggers `create_remediation_pr` (targeting `release/target-v2.14.8` and including `reasoningSource` in the PR body), receiving `branchUrl`, `pullRequestUrl`, and `commitSha`.
+   - Injects a Grafana annotation via `annotate_grafana_incident` (`REMEDIATING`), triggers `create_remediation_pr` (targeting `release/target-v2.14.8` and including `reasoningSource` in the PR body), receives `branchUrl`, `pullRequestUrl`, and `commitSha`, and only then transitions to `AWAITING_PR`.
 5. **NotifyOnCall (HMAC Exclusively in the Email URI `#` Fragment):**
    - Computes `approveSig`, `rejectSig`, and `exp` (Unix timestamp in seconds, short TTL of 15 min / 900 s).
    - Signed canonical string: `canonicalMessage = `${incidentId}:${action}:${exp}`` signed with HMAC-SHA256 (`DECISION_HMAC_SECRET`).

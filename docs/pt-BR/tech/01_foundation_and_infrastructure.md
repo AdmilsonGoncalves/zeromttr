@@ -399,35 +399,41 @@ processors:
         statements:
           # Mascara CPF formatado (ex.: 123.456.789-00 -> [REDACTED_CPF])
           - replace_pattern(body, "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
-          # Mascara CNPJ (ex.: 12.345.678/0001-99 -> [REDACTED_CNPJ])
+          # Mascara CNPJ (formatado e 14 dígitos sem formatação)
           - replace_pattern(body, "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
+          - replace_pattern(body, "(?:\\b|_)\\d{14}(?:\\b|_)", "[REDACTED_CNPJ]")
           # Mascara tokens Bearer / JWT (case-insensitive para Bearer)
           - replace_pattern(body, "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
           # Mascara JWT cru sem prefixo Bearer (iniciado por eyJ)
           - replace_pattern(body, "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b", "[REDACTED_JWT]")
           # Mascara chaves PIX de e-mail antes de CPF 11 dígitos para não truncar local-parts numéricos
           - replace_pattern(body, "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "[REDACTED_PIX_EMAIL]")
-          # Mascara CPF apenas 11 dígitos em duas passagens RE2 para cobrir CPFs adjacentes separados por _ (ex.: 12345678901_98765432100 -> [REDACTED_CPF][REDACTED_CPF])
+          # Mascara CPF apenas 11 dígitos (inclusive prefixado por letras como CPF12345678901 e separado por _)
+          - replace_pattern(body, "(?i:cpf)\\d{11}(?:\\b|_)", "CPF[REDACTED_CPF]")
           - replace_pattern(body, "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
           - replace_pattern(body, "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
-          # Mascara telefones celulares (9 dígitos) e fixos ([2-5] + 7 dígitos) segundo regras da ANATEL
+          # Mascara telefones celulares (9 dígitos), fixos ([2-5] + 7 dígitos) ANATEL e números sem formatação em campos contextuais
           - replace_pattern(body, "(?:\\+55\\s?[1-9]{2}\\s?(?:9\\d{8}|[2-5]\\d{7})\\b|(?:\\+?55\\s?)?\\([1-9]{2}\\)\\s?(?:9\\d{4}|[2-5]\\d{3})-?\\d{4}\\b|(?:\\+?55\\s?)?\\b[1-9]{2}\\s?(?:9\\d{4}|[2-5]\\d{3})-\\d{4}\\b)", "[REDACTED_PHONE]")
+          - replace_pattern(body, "(?i:(?:phone|telefone|celular|tel|fone)[\"'=:\\s]+)(?:\\+?55\\s?)?[1-9]{2}(?:9\\d{8}|[2-5]\\d{7})\\b", "phone=[REDACTED_PHONE]")
           # Mascara Chave PIX Aleatória (EVP / UUID v4 RFC 4122 do BACEN em contexto PIX, case-insensitive no padrão inteiro)
           - replace_pattern(body, "(?i:(?:pix(?:_?key)?|chave_?pix|evp)[\"'=:\\s]+[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\b", "pixKey=[REDACTED_PIX_EVP]")
           # Aplica o mesmo mascaramento sobre atributos string do log
           - replace_all_patterns(attributes, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b", "[REDACTED_CNPJ]")
+          - replace_all_patterns(attributes, "value", "(?:\\b|_)\\d{14}(?:\\b|_)", "[REDACTED_CNPJ]")
           - replace_all_patterns(attributes, "value", "(?i:bearer)\\s+[A-Za-z0-9\\-._~+/]+=*", "Bearer [REDACTED_TOKEN]")
           - replace_all_patterns(attributes, "value", "\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{2,}\\.[A-Za-z0-9_-]{2,}\\b", "[REDACTED_JWT]")
           - replace_all_patterns(attributes, "value", "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", "[REDACTED_PIX_EMAIL]")
+          - replace_all_patterns(attributes, "value", "(?i:cpf)\\d{11}(?:\\b|_)", "CPF[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "(?:\\b|_)\\d{11}(?:\\b|_)", "[REDACTED_CPF]")
           - replace_all_patterns(attributes, "value", "(?:\\+55\\s?[1-9]{2}\\s?(?:9\\d{8}|[2-5]\\d{7})\\b|(?:\\+?55\\s?)?\\([1-9]{2}\\)\\s?(?:9\\d{4}|[2-5]\\d{3})-?\\d{4}\\b|(?:\\+?55\\s?)?\\b[1-9]{2}\\s?(?:9\\d{4}|[2-5]\\d{3})-\\d{4}\\b)", "[REDACTED_PHONE]")
+          - replace_all_patterns(attributes, "value", "(?i:(?:phone|telefone|celular|tel|fone)[\"'=:\\s]+)(?:\\+?55\\s?)?[1-9]{2}(?:9\\d{8}|[2-5]\\d{7})\\b", "phone=[REDACTED_PHONE]")
           - replace_all_patterns(attributes, "value", "(?i:(?:pix(?:_?key)?|chave_?pix|evp)[\"'=:\\s]+[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\\b", "pixKey=[REDACTED_PIX_EVP]")
-          # Mascara Chave PIX Aleatória (EVP) quando enviada diretamente em atributo nomeado de PIX
-          - replace_pattern(attributes["pixKey"], "\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["pixKey"] != nil
-          - replace_pattern(attributes["chave_pix"], "\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["chave_pix"] != nil
-          - replace_pattern(attributes["evp"], "\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b", "[REDACTED_PIX_EVP]") where attributes["evp"] != nil
+          # Mascara Chave PIX Aleatória (EVP) quando enviada diretamente em atributo nomeado de PIX (case-insensitive)
+          - replace_pattern(attributes["pixKey"], "(?i:\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b)", "[REDACTED_PIX_EVP]") where attributes["pixKey"] != nil
+          - replace_pattern(attributes["chave_pix"], "(?i:\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b)", "[REDACTED_PIX_EVP]") where attributes["chave_pix"] != nil
+          - replace_pattern(attributes["evp"], "(?i:\\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b)", "[REDACTED_PIX_EVP]") where attributes["evp"] != nil
           # Promove service.name do resource para label de stream "service" no Loki
           - set(resource.attributes["loki.resource.labels"], "service.name")
           - set(attributes["service"], resource.attributes["service.name"])
