@@ -2,7 +2,7 @@ import '@angular/compiler';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
 import { NotificationStatus } from '../src/app/core/contract.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
 import { RemediationPanelComponent } from '../src/app/war-room/remediation-panel/remediation-panel.component.js';
 
 describe('RemediationPanelComponent', () => {
@@ -14,8 +14,30 @@ describe('RemediationPanelComponent', () => {
     component = new RemediationPanelComponent(i18n);
   });
 
-  it('should_render_default_preview_when_no_incident_notification_is_set', () => {
+  it('should_render_idle_preview_when_no_incident_is_active', () => {
+    expect(component.safeResendPreview()).toContain(i18n.t('resendIdleBody'));
+    expect(component.safeResendPreview()).not.toContain('🚨 ZeroMTTR Incident Post-Mortem');
+    expect(component.safeResendPreview()).not.toContain(i18n.t('resendDefaultBody'));
+  });
+
+  it('should_render_default_preview_when_active_incident_has_no_notification', () => {
+    const activeIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    delete activeIncident.notification;
+    component.incident = activeIncident;
+
     expect(component.safeResendPreview()).toContain('🚨 ZeroMTTR Incident Post-Mortem');
+    expect(component.safeResendPreview()).toContain(i18n.t('resendDefaultBody'));
+  });
+
+  it('should_reset_preview_back_to_idle_when_incident_is_cleared', () => {
+    component.incident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    expect(component.safeResendPreview()).not.toContain(i18n.t('resendIdleBody'));
+
+    component.incident = null;
+    expect(component.safeResendPreview()).toContain(i18n.t('resendIdleBody'));
+
+    i18n.setLang(Language.EN_US);
+    expect(component.safeResendPreview()).toContain(i18n.t('resendIdleBody'));
   });
 
   it('should_render_degraded_html_preview_across_languages', () => {
@@ -29,7 +51,7 @@ describe('RemediationPanelComponent', () => {
 
     expect(component.safeResendPreview()).toContain(i18n.t('resendDegradedTitle'));
 
-    i18n.setLang('en');
+    i18n.setLang(Language.EN_US);
     expect(component.safeResendPreview()).toContain(i18n.t('resendDegradedTitle'));
   });
 
@@ -63,6 +85,20 @@ describe('RemediationPanelComponent', () => {
     expect(preview).not.toContain('<script');
     expect(preview).not.toContain('onclick=');
     expect(preview).not.toContain('&#106;avascript:');
+  });
+
+  it('should_not_emit_inline_style_attributes_that_trigger_angular_sanitizer_warnings', () => {
+    expect(component.safeResendPreview()).not.toMatch(/\sstyle\s*=/i);
+
+    const htmlIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    htmlIncident.notification.htmlPreview =
+      '<div style="color: #0f172a;"><h2 style="color: red;">Title</h2><p>Clean body</p></div>';
+    component.incident = htmlIncident;
+
+    const rendered = component.safeResendPreview();
+    expect(rendered).toContain('Title');
+    expect(rendered).toContain('Clean body');
+    expect(rendered).not.toMatch(/\sstyle\s*=/i);
   });
 
   it('should_emit_simulate_decision_when_triggered', () => {
