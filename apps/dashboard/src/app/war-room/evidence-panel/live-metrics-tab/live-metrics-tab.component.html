@@ -1,38 +1,40 @@
 <div class="flex flex-col gap-2.5 pt-1.5">
   @if (telemetryHistorySignal().length === 0) {
     <div
-      class="bg-slate-950 border border-slate-800 rounded p-4 text-center text-xs text-slate-400 font-mono"
+      class="bg-slate-950 border border-slate-800 rounded p-6 text-center text-xs text-slate-400 font-mono"
     >
       <i class="pi pi-spin pi-spinner mr-2 text-cyan-400"></i>
       <span>{{ i18n.t('chartAwaitingSamples') }}</span>
     </div>
   } @else {
-    <!-- Row 1: Two Grafana-style Time Series Charts -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       <!-- Chart A: p95 Latency & 5xx Error Rate -->
-      <figure class="bg-slate-950 border border-slate-800 rounded p-2.5 flex flex-col gap-1.5 m-0">
-        <figcaption class="flex items-center justify-between text-[11px]">
+      <figure class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 m-0">
+        <figcaption class="flex items-center justify-between text-xs">
           <span class="font-bold text-slate-200">{{ i18n.t('chartLatencyErrorTitle') }}</span>
-          <span class="font-mono text-[10px] text-slate-400">
+          <span class="font-mono text-[11px] text-amber-300">
             {{ latencyTimeSeries().max }}ms ·
             {{ errorTimeSeries().points[errorTimeSeries().points.length - 1]?.value ?? 0 }}%
           </span>
         </figcaption>
         <svg
           role="img"
-          viewBox="0 0 380 110"
-          class="w-full h-28 bg-slate-900/60 rounded border border-slate-800/80"
+          viewBox="0 0 420 145"
+          class="w-full h-40 sm:h-44 bg-slate-900/60 rounded border border-slate-800/80"
         >
           <title>{{ i18n.t('chartLatencyErrorTitle') }}</title>
           @for (tick of latencyTimeSeries().yTicks; track tick.y) {
             <line
               x1="6"
-              x2="374"
+              x2="414"
               [attr.y1]="tick.y"
               [attr.y2]="tick.y"
               stroke="#1e293b"
               stroke-width="1"
             />
+            <text x="10" [attr.y]="tick.y + 9" class="fill-slate-500 text-[9px] font-mono">
+              {{ tick.label }}
+            </text>
           }
           <path [attr.d]="latencyTimeSeries().areaPath" fill="#f59e0b" fill-opacity="0.16" />
           <path
@@ -50,16 +52,16 @@
             stroke-dasharray="4 2"
           />
           @for (pt of latencyTimeSeries().points; track $index) {
-            <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="2" fill="#fbbf24" />
+            <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="2.2" fill="#fbbf24" />
           }
         </svg>
         <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
-          <span class="flex items-center gap-2">
+          <span class="flex items-center gap-2.5">
             <span class="inline-flex items-center gap-1 text-amber-300">
-              <span class="w-2 h-0.5 bg-amber-400 inline-block"></span> p95 (ms)
+              <span class="w-2.5 h-0.5 bg-amber-400 inline-block"></span> p95 (ms)
             </span>
             <span class="inline-flex items-center gap-1 text-rose-300">
-              <span class="w-2 h-0.5 bg-rose-400 inline-block"></span> 5xx (%)
+              <span class="w-2.5 h-0.5 bg-rose-400 inline-block"></span> 5xx (%)
             </span>
           </span>
           <span>
@@ -70,10 +72,10 @@
       </figure>
 
       <!-- Chart B: Throughput Req/s & Pool Usage -->
-      <figure class="bg-slate-950 border border-slate-800 rounded p-2.5 flex flex-col gap-1.5 m-0">
-        <figcaption class="flex items-center justify-between text-[11px]">
+      <figure class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 m-0">
+        <figcaption class="flex items-center justify-between text-xs">
           <span class="font-bold text-slate-200">{{ i18n.t('chartThroughputPoolTitle') }}</span>
-          <span class="font-mono text-[10px] text-slate-400">
+          <span class="font-mono text-[11px] text-cyan-300">
             {{
               throughputTimeSeries().points[throughputTimeSeries().points.length - 1]?.value ?? 0
             }}
@@ -82,19 +84,22 @@
         </figcaption>
         <svg
           role="img"
-          viewBox="0 0 380 110"
-          class="w-full h-28 bg-slate-900/60 rounded border border-slate-800/80"
+          viewBox="0 0 420 145"
+          class="w-full h-40 sm:h-44 bg-slate-900/60 rounded border border-slate-800/80"
         >
           <title>{{ i18n.t('chartThroughputPoolTitle') }}</title>
           @for (tick of throughputTimeSeries().yTicks; track tick.y) {
             <line
               x1="6"
-              x2="374"
+              x2="414"
               [attr.y1]="tick.y"
               [attr.y2]="tick.y"
               stroke="#1e293b"
               stroke-width="1"
             />
+            <text x="10" [attr.y]="tick.y + 9" class="fill-slate-500 text-[9px] font-mono">
+              {{ tick.label }}
+            </text>
           }
           <path [attr.d]="throughputTimeSeries().areaPath" fill="#06b6d4" fill-opacity="0.18" />
           <path
@@ -111,16 +116,16 @@
             stroke-width="1.75"
           />
           @for (pt of throughputTimeSeries().points; track $index) {
-            <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="2" fill="#22d3ee" />
+            <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="2.2" fill="#22d3ee" />
           }
         </svg>
         <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
-          <span class="flex items-center gap-2">
+          <span class="flex items-center gap-2.5">
             <span class="inline-flex items-center gap-1 text-cyan-300">
-              <span class="w-2 h-0.5 bg-cyan-400 inline-block"></span> Req/s
+              <span class="w-2.5 h-0.5 bg-cyan-400 inline-block"></span> Req/s
             </span>
             <span class="inline-flex items-center gap-1 text-emerald-300">
-              <span class="w-2 h-0.5 bg-emerald-400 inline-block"></span> Pool Conn
+              <span class="w-2.5 h-0.5 bg-emerald-400 inline-block"></span> Pool Conn
             </span>
           </span>
           <span>
@@ -131,120 +136,4 @@
       </figure>
     </div>
   }
-
-  <!-- Row 2: Grafana Semi-Circular Gauges + FinOps / MTTR Comparison Bars -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-    <!-- Gauge 1: Pool Saturation -->
-    <figure class="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col items-center m-0">
-      <figcaption class="text-[10px] font-bold text-slate-300 uppercase">
-        {{ i18n.t('chartPoolGaugeLabel') }}
-      </figcaption>
-      <svg role="img" viewBox="0 0 96 76" class="w-24 h-20">
-        <title>{{ i18n.t('chartPoolGaugeLabel') }}: {{ poolUsageGauge().clampedPercent }}%</title>
-        <path
-          [attr.d]="poolUsageGauge().trackPath"
-          fill="none"
-          stroke="#1e293b"
-          stroke-width="8"
-          stroke-linecap="round"
-        />
-        @if (poolUsageGauge().valuePath; as valPath) {
-          <path
-            [attr.d]="valPath"
-            fill="none"
-            [attr.stroke]="poolUsageColor()"
-            stroke-width="8"
-            stroke-linecap="round"
-          />
-        }
-        <text x="48" y="49" text-anchor="middle" class="fill-slate-100 text-xs font-mono font-bold">
-          {{ poolUsageGauge().clampedPercent }}%
-        </text>
-      </svg>
-    </figure>
-
-    <!-- Gauge 2: FinOps Reduction -->
-    <figure class="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col items-center m-0">
-      <figcaption class="text-[10px] font-bold text-slate-300 uppercase">
-        {{ i18n.t('chartFinopsGaugeLabel') }}
-      </figcaption>
-      <svg role="img" viewBox="0 0 96 76" class="w-24 h-20">
-        <title>{{ i18n.t('chartFinopsGaugeLabel') }}: {{ finopsGauge().clampedPercent }}%</title>
-        <path
-          [attr.d]="finopsGauge().trackPath"
-          fill="none"
-          stroke="#1e293b"
-          stroke-width="8"
-          stroke-linecap="round"
-        />
-        @if (finopsGauge().valuePath; as finPath) {
-          <path
-            [attr.d]="finPath"
-            fill="none"
-            stroke="#22d3ee"
-            stroke-width="8"
-            stroke-linecap="round"
-          />
-        }
-        <text x="48" y="49" text-anchor="middle" class="fill-cyan-300 text-xs font-mono font-bold">
-          {{ finopsGauge().clampedPercent }}%
-        </text>
-      </svg>
-    </figure>
-
-    <!-- Bar Card 1: FinOps Payload Bars -->
-    <div
-      class="bg-slate-950 border border-slate-800 rounded p-2.5 flex flex-col justify-between gap-1.5"
-    >
-      <span class="text-[10px] font-bold text-slate-300 uppercase">
-        {{ i18n.t('chartFinopsBarsTitle') }}
-      </span>
-      <div class="flex flex-col gap-1 text-[10px] font-mono">
-        <div class="flex justify-between text-slate-400">
-          <span>Raw</span>
-          <span>{{ incidentSignal()?.finops?.rawBytesFetched ?? 48200 }} B</span>
-        </div>
-        <div class="w-full h-2 bg-slate-800 rounded overflow-hidden">
-          <div class="h-full bg-slate-500 w-full"></div>
-        </div>
-        <div class="flex justify-between text-cyan-300">
-          <span>LLM</span>
-          <span>{{ incidentSignal()?.finops?.compactedBytesSent ?? 7712 }} B</span>
-        </div>
-        <div class="w-full h-2 bg-slate-800 rounded overflow-hidden">
-          <div class="h-full bg-cyan-400" [style.width.%]="finopsSavingsBarPercent()"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bar Card 2: Autonomous MTTR vs Manual -->
-    <div
-      class="bg-slate-950 border border-slate-800 rounded p-2.5 flex flex-col justify-between gap-1.5"
-    >
-      <span class="text-[10px] font-bold text-slate-300 uppercase">
-        {{ i18n.t('chartMttrBarsTitle') }}
-      </span>
-      <div class="flex flex-col gap-1 text-[10px] font-mono">
-        <div class="flex justify-between text-slate-400">
-          <span>Manual</span>
-          <span>30m</span>
-        </div>
-        <div class="w-full h-2 bg-slate-800 rounded overflow-hidden">
-          <div class="h-full bg-rose-500/80 w-full"></div>
-        </div>
-        <div class="flex justify-between text-emerald-300">
-          <span>TTD / TTPR</span>
-          <span
-            >{{ mttrComparisonBars().ttdSeconds }}s / {{ mttrComparisonBars().ttprSeconds }}s</span
-          >
-        </div>
-        <div class="w-full h-2 bg-slate-800 rounded overflow-hidden">
-          <div
-            class="h-full bg-emerald-400"
-            [style.width.%]="mttrComparisonBars().ttprPercentOfManual"
-          ></div>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>

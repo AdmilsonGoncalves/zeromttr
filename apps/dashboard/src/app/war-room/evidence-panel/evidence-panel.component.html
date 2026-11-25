@@ -15,12 +15,7 @@
 
     <p-tabpanels class="flex-1 min-h-0 overflow-y-auto pr-1">
       <p-tabpanel value="0">
-        <app-live-metrics-tab
-          [incident]="incidentSignal()"
-          [targetStatus]="targetStatusSignal()"
-          [telemetryHistory]="telemetryHistorySignal()"
-          [finopsReduction]="finopsReductionSignal()"
-        />
+        <app-live-metrics-tab [telemetryHistory]="telemetryHistorySignal()" />
       </p-tabpanel>
 
       <p-tabpanel value="1">

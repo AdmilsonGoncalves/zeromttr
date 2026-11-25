@@ -36,10 +36,7 @@
     [liveWaitSeconds]="incidentService.liveWaitSeconds()"
   />
 
-  <app-target-telemetry
-    [metrics]="incidentService.targetMetrics()"
-    [history]="incidentService.telemetryHistory()"
-  />
+  <app-target-telemetry [metrics]="incidentService.targetMetrics()" />
 
   <app-war-room-kpis
     [ttdDisplay]="incidentService.ttdDisplay()"

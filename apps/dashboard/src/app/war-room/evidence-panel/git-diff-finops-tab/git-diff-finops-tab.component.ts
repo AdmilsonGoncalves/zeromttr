@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
+import { round } from '@zeromttr/utils';
 import { MOCK_GIT_DIFF } from '../../../core/constants.js';
 import type { IncidentDetail } from '../../../core/contract.js';
-import { I18nService } from '../../../core/i18n.service.js';
+import { I18nService } from '../../../core/i18n/i18n.service.js';
 
 /**
  * Displays Git deploy diff context and FinOps payload/token reduction metrics.
@@ -34,6 +35,16 @@ export class GitDiffFinopsTabComponent {
   set estimatedTokensSaved(value: number) {
     this.estimatedTokensSavedSignal.set(value);
   }
+
+  readonly finopsCompactedBarPercent = computed<number>(() => {
+    const finops = this.incidentSignal()?.finops;
+    const raw = finops?.rawBytesFetched ?? 48200;
+    const compacted = finops?.compactedBytesSent ?? 7712;
+    if (raw <= 0) {
+      return 0;
+    }
+    return Math.min(100, Math.max(2, round((compacted / raw) * 100, 1)));
+  });
 
   constructor(...args: [I18nService?]) {
     const [i18n] = args;

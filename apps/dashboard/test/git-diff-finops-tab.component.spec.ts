@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService } from '../src/app/core/i18n/i18n.service.js';
 import { GitDiffFinopsTabComponent } from '../src/app/war-room/evidence-panel/git-diff-finops-tab/git-diff-finops-tab.component.js';
 
 describe('GitDiffFinopsTabComponent', () => {
@@ -21,5 +21,7 @@ describe('GitDiffFinopsTabComponent', () => {
     expect(component.mockGitDiff).toContain('acquireTimeoutMillis: 5000');
     expect(component.finopsReductionSignal()).toBe(84);
     expect(component.estimatedTokensSavedSignal()).toBe(10122);
+    expect(component.finopsCompactedBarPercent()).toBeGreaterThan(0);
+    expect(component.finopsCompactedBarPercent()).toBeLessThan(100);
   });
 });
