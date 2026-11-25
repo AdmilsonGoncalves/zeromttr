@@ -3,16 +3,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import nock from 'nock';
-import {
-  McpClientAdapter,
-  FileIncidentRepository,
-  HttpTargetStatusAdapter,
-  DeterministicFallbackReasoningAdapter,
-  TypeScriptPatchSyntaxValidator
-} from '../../../src/adapters/index.js';
-import { HttpDemoControlAdapter } from '../../../src/demo/index.js';
-import { Incident, IncidentState } from '../../../src/domain/index.js';
-import type { CollectedEvidence } from '../../../src/ports/index.js';
+import { McpClientAdapter } from '../../../src/adapters/mcp.client.js';
+import { FileIncidentRepository } from '../../../src/adapters/repo.file.js';
+import { HttpTargetStatusAdapter } from '../../../src/adapters/target-status.http.js';
+import { DeterministicFallbackReasoningAdapter } from '../../../src/adapters/llm.fallback.js';
+import { TypeScriptPatchSyntaxValidator } from '../../../src/adapters/patch-syntax-validator.js';
+import { HttpDemoControlAdapter } from '../../../src/demo/demo-control.http.js';
+import { Incident } from '../../../src/domain/incident.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import type { CollectedEvidence } from '../../../src/ports/reasoning.port.js';
 
 describe('Adapters Unit Tests', () => {
   const tempDir = path.join(os.tmpdir(), `zeromttr-adapters-test-${process.pid}`);
@@ -465,6 +464,56 @@ describe('Adapters Unit Tests', () => {
         errorMessage: 'KnexTimeoutError: pool exhausted'
       });
       expect(trace.criticalSpans?.[1]?.hasError).toBe(true);
+    });
+
+    it('should preserve query parameters when normalizing MCP_URL endpoint', async () => {
+      const prevMcpServerUrl = process.env.MCP_SERVER_URL;
+      const prevMcpUrl = process.env.MCP_URL;
+      const mockFetch = vi.fn(async () => ({
+        status: 200,
+        ok: true,
+        text: async () => '',
+        json: async () => ({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            content: [{ type: 'text', text: JSON.stringify({ traces: [] }) }],
+            isError: false
+          }
+        })
+      }));
+      vi.stubGlobal('fetch', mockFetch);
+
+      try {
+        process.env.MCP_SERVER_URL = '';
+        process.env.MCP_URL = 'https://mcp.example/mcp?tenant=blue';
+
+        const adapterWithMcp = new McpClientAdapter(undefined, 'token-123');
+        await adapterWithMcp.searchTracesByTraceQL({ query: '{}' });
+        expect(mockFetch).toHaveBeenLastCalledWith(
+          'https://mcp.example/mcp?tenant=blue',
+          expect.objectContaining({ method: 'POST' })
+        );
+
+        process.env.MCP_URL = 'https://mcp.example/base?tenant=blue';
+        const adapterWithBase = new McpClientAdapter(undefined, 'token-123');
+        await adapterWithBase.searchTracesByTraceQL({ query: '{}' });
+        expect(mockFetch).toHaveBeenLastCalledWith(
+          'https://mcp.example/base/mcp?tenant=blue',
+          expect.objectContaining({ method: 'POST' })
+        );
+      } finally {
+        if (prevMcpServerUrl === undefined) {
+          delete process.env.MCP_SERVER_URL;
+        } else {
+          process.env.MCP_SERVER_URL = prevMcpServerUrl;
+        }
+        if (prevMcpUrl === undefined) {
+          delete process.env.MCP_URL;
+        } else {
+          process.env.MCP_URL = prevMcpUrl;
+        }
+      }
     });
   });
 

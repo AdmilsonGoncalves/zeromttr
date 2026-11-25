@@ -1,24 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  ExecutePromqlRange,
-  QueryLokiLogs,
-  AnalyzeOtelTrace,
-  SearchTracesByTraceQL,
-  InspectGitDeployDiff,
-  CreateRemediationPr,
-  SendPostMortemResend,
-  AnnotateGrafanaIncident,
-  validateTimeRange
-} from '../../src/application/index.js';
-import type {
-  MetricsPort,
-  LogsPort,
-  TracesPort,
-  RepoInspectorPort,
-  RemediationPort,
-  NotifierPort,
-  AnnotationPort
-} from '../../src/ports/index.js';
+import { ExecutePromqlRange } from '../../src/application/execute-promql-range.js';
+import { QueryLokiLogs } from '../../src/application/query-loki-logs.js';
+import { AnalyzeOtelTrace } from '../../src/application/analyze-otel-trace.js';
+import { SearchTracesByTraceQL } from '../../src/application/search-traces-by-traceql.js';
+import { InspectGitDeployDiff } from '../../src/application/inspect-git-deploy-diff.js';
+import { CreateRemediationPr } from '../../src/application/create-remediation-pr.js';
+import { SendPostMortemResend } from '../../src/application/send-post-mortem-resend.js';
+import { AnnotateGrafanaIncident } from '../../src/application/annotate-grafana-incident.js';
+import { validateTimeRange } from '../../src/application/validate-time-range.js';
+import type { MetricsPort } from '../../src/ports/metrics.port.js';
+import type { LogsPort } from '../../src/ports/logs.port.js';
+import type { TracesPort } from '../../src/ports/traces.port.js';
+import type { RepoInspectorPort } from '../../src/ports/repo-inspector.port.js';
+import type { RemediationPort } from '../../src/ports/remediation.port.js';
+import type { NotifierPort } from '../../src/ports/notifier.port.js';
+import type { AnnotationPort } from '../../src/ports/annotation.port.js';
 
 describe('Application Use Cases Unit Tests', () => {
   describe('validateTimeRange', () => {
@@ -165,6 +161,31 @@ describe('Application Use Cases Unit Tests', () => {
 
       expect(mockTracesPort.searchTraces).toHaveBeenCalledWith('{ status = error }', 20);
       expect(out.count).toBe(2);
+    });
+
+    it('should reject end-only or inverted time windows', async () => {
+      const mockTracesPort: TracesPort = {
+        getTrace: vi.fn(),
+        searchTraces: vi.fn()
+      };
+      const useCase = new SearchTracesByTraceQL(mockTracesPort);
+
+      await expect(
+        useCase.execute({
+          query: '{ status = error }',
+          end: '2026-11-20T01:00:00Z'
+        })
+      ).rejects.toThrow(/'start' is required/);
+
+      await expect(
+        useCase.execute({
+          query: '{ status = error }',
+          start: '2026-11-20T02:00:00Z',
+          end: '2026-11-20T01:00:00Z'
+        })
+      ).rejects.toThrow(/must be before end/);
+
+      expect(mockTracesPort.searchTraces).not.toHaveBeenCalled();
     });
   });
 

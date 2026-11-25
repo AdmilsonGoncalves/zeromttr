@@ -66,7 +66,7 @@ export const PII_PATTERNS = {
 4. **DispatchRemediation:**
    - Audita o prompt montado com **`PiiPromptGuard.inspectAndEnforceFailClosed`**.
    - Se `passed === true`, sintetiza o RCA e o patch cirúrgico via `ReasoningPort` (`GeminiReasoningAdapter` configurável via `LLM_MODEL`, padrão `gemini-3.5-flash`) e registra `reasoningSource: 'llm'`. Caso o guard reprove (`fail-closed`) ou a API do LLM falhe, utiliza `DeterministicFallbackReasoningAdapter` e registra explicitamente `reasoningSource: 'fallback'`.
-   - Injeta anotação no Grafana via `annotate_grafana_incident` (`REMEDIATING`), transiciona para `AWAITING_PR` e aciona `create_remediation_pr` (mirando `release/target-v2.14.8` e incluindo `reasoningSource` no corpo do PR), recebendo `branchUrl`, `pullRequestUrl` e `commitSha`.
+   - Injeta anotação no Grafana via `annotate_grafana_incident` (`REMEDIATING`), aciona `create_remediation_pr` (mirando `release/target-v2.14.8` e incluindo `reasoningSource` no corpo do PR), recebe `branchUrl`, `pullRequestUrl` e `commitSha`, e só então transiciona para `AWAITING_PR`.
 5. **NotifyOnCall (HMAC Exclusivo no URI Fragment `#` do E-mail):**
    - Calcula `approveSig`, `rejectSig` e `exp` (timestamp Unix em segundos, TTL curto de 15 min / 900 s).
    - String canônica assinada: `canonicalMessage = `${incidentId}:${action}:${exp}`` assinada com HMAC-SHA256 (`DECISION_HMAC_SECRET`).
@@ -78,8 +78,8 @@ export const PII_PATTERNS = {
    - Para fins de demonstração interativa na tela quando o avaliador está em modo `replay` (ou autenticado com `X-Live-Demo-Key`), expõe `POST /api/demo/simulate-decision` claramente separado do endpoint criptográfico de produção.
 
 ## 4. Modo "Live API" vs. "Accelerated Replay Mode" & Segregação de Acesso
-- Na VPS pública (`https://zeromttr.agjworks.com`), visitantes anônimos sem cabeçalho `X-Live-Demo-Key` operam por padrão no modo **`replay`** (que reproduz em ~25 segundos o stream SSE real previamente gravado em `data/last-recorded-incident.json`, sem criar PRs no GitHub nem consumir cota de e-mail).
-- Quando acionado localmente (`LIVE_DEMO_KEY` vazio) ou na VPS com `X-Live-Demo-Key` válida, executa o modo **`live` real de ponta a ponta**.
+- Na VPS pública (`https://zeromttr.agjworks.com`), visitantes anônimos sem cabeçalho `X-Live-Demo-Key` operam por padrão no modo **`replay`** (que reproduz em ~25 segundos o stream SSE real previamente gravado em `data/last-recorded-incident.json`, sem criar PRs no GitHub nem consumir cota de e-mail), salvo quando `PUBLIC_LIVE_DEMO=true` estiver habilitado (recomendado com verificação Cloudflare Turnstile).
+- Quando acionado localmente (`LIVE_DEMO_KEY` vazio), com `PUBLIC_LIVE_DEMO=true` + Turnstile ou na VPS com `X-Live-Demo-Key` válida, executa o modo **`live` real de ponta a ponta**.
 - **Cooldown Global (`SIMULATION_COOLDOWN_MS=120000`):** evita que cliques simultâneos abram execuções concorrentes.
 
 ## 5. Interface HTTP e Segregação de Tokens
@@ -91,7 +91,7 @@ export const PII_PATTERNS = {
 | `POST /api/demo/simulate-decision` | Simula decisão no War Room (rotulado como simulação) | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` se o incidente for `live` na VPS) |
 | `GET /api/events` | Stream SSE (ver [08 §4.2](./08_dashboard_frontend.md)) | Bearer `DASHBOARD_API_TOKEN` (injetado pelo Nginx) |
 | `GET /api/target/status` | Estado do `api-pagamentos-core` | Bearer `DASHBOARD_API_TOKEN` |
-| `POST /api/demo/chaos` | Dispara simulação `live` ou `replay` | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` para `mode: 'live'` na VPS) |
+| `POST /api/demo/chaos` | Dispara simulação `live` ou `replay` | Bearer `DASHBOARD_API_TOKEN` (+ Turnstile quando configurado; `X-Live-Demo-Key` para `mode: 'live'` salvo se `PUBLIC_LIVE_DEMO=true`) |
 | `POST /api/demo/reset` | Restaura serviço e limpa PRs de demo no repo-alvo | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` se houver sessão `live` ativa) |
 | `GET /health` | Liveness check | Público |
 

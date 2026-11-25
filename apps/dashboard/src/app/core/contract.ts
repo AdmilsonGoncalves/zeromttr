@@ -1,3 +1,15 @@
+export {
+  AlertSeverity,
+  DecisionAction,
+  DecisionSource,
+  IncidentEventType,
+  IncidentExecutionMode,
+  IncidentState,
+  NotificationStatus,
+  ReasoningProvider,
+  TargetHealthStatus
+} from '@zeromttr/contracts';
+
 export type {
   ChaosPayload,
   DecisionPayload,
@@ -18,7 +30,6 @@ export type {
   IncidentRcaEvent,
   IncidentRemediation,
   IncidentRemediationEvent,
-  IncidentState,
   IncidentSummary as Incident,
   IncidentTransition,
   IncidentTransitionEvent,
@@ -26,6 +37,12 @@ export type {
   ReasoningSource,
   SimulateDecisionPayload,
   SpanNode,
-  TargetHealthStatus,
+  TargetLiveMetrics,
   TargetStatusResponse
 } from '@zeromttr/contracts';
+
+export interface DemoConfigResponse {
+  publicLiveDemo: boolean;
+  turnstileSiteKey: string | null;
+  turnstileRequired: boolean;
+}

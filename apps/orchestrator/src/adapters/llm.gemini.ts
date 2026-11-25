@@ -1,9 +1,15 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { RcaAndPatchSynthesisSchema } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber, safeJsonParse } from '@zeromttr/utils';
-import { ReasoningProvider } from '../domain/index.js';
-import type { ReasoningPort, CollectedEvidence, RcaAndPatchSynthesis } from '../ports/index.js';
+import { ReasoningProvider } from '../domain/incident-enums.js';
+import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
+import type {
+  ReasoningPort,
+  CollectedEvidence,
+  RcaAndPatchSynthesis
+} from '../ports/reasoning.port.js';
 
+// System prompt instructing Gemini to synthesize full-file fixes and pt-BR RCA summaries
 export const GEMINI_SYSTEM_INSTRUCTION = `You are the ZeroMTTR Autonomous SRE Reasoner, a specialist in Root Cause Analysis (RCA) and remediation engineering for production microservices.
 
 Your mission:
@@ -25,6 +31,7 @@ export interface GeminiAdapterOptions {
   retryDelayMs?: number;
 }
 
+// Structured Gemini response schema enforcing deterministic RCA and patch JSON fields
 export const RCA_SYNTHESIS_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -64,6 +71,9 @@ export const RCA_SYNTHESIS_SCHEMA = {
   ]
 };
 
+/**
+ * Gemini reasoning adapter synthesizing structured RCA reports and full-file patches with retry/fallback.
+ */
 export class GeminiReasoningAdapter implements ReasoningPort {
   private readonly client: GoogleGenAI;
   private readonly apiKey: string;
@@ -74,7 +84,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
   private readonly retryDelayMs: number;
 
   public constructor(apiKey?: string, modelName?: string, options: GeminiAdapterOptions = {}) {
-    this.apiKey = apiKey || process.env.GEMINI_API_KEY || '';
+    this.apiKey = apiKey ?? (process.env.GEMINI_API_KEY || process.env.LLM_API_KEY || '');
     this.client = new GoogleGenAI({ apiKey: this.apiKey || 'placeholder-for-instantiation' });
     this.modelName = modelName || process.env.LLM_MODEL || 'gemini-3.5-flash';
     this.fallbackModelName =
@@ -137,12 +147,43 @@ export class GeminiReasoningAdapter implements ReasoningPort {
     };
   }
 
+  /**
+   * Calls Gemini with structured output schema and retry/fallback model handling to synthesize RCA and a patch.
+   */
   public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
     if (!isNonEmptyString(this.apiKey) || this.apiKey === 'change-me-gemini-api-key') {
       throw new Error('Gemini API key is not configured');
     }
 
-    const prompt = `Analyze the incident evidence and synthesize the RCA and surgical patch:\n${JSON.stringify(evidence, null, 2)}`;
+    const suspectFileHeader = isNonEmptyString(evidence.gitDiff?.suspectFileContent)
+      ? `Existing source code of '${evidence.gitDiff.suspectFilePath}':\n\`\`\`typescript\n${evidence.gitDiff.suspectFileContent}\n\`\`\`\n\n`
+      : '';
+
+    const sanitizedEvidenceForPrompt = {
+      ...evidence,
+      gitDiff: {
+        ...evidence.gitDiff,
+        suspectFileContent: undefined
+      }
+    };
+
+    const prompt = `Analyze the incident telemetry and deploy diff, then synthesize the RCA and surgical patch:
+${suspectFileHeader}Incident Telemetry & Evidence:
+${JSON.stringify(sanitizedEvidenceForPrompt, null, 2)}
+
+Strict instructions for patchedContent:
+- Return the COMPLETE source code file.
+- Keep all original imports, types, classes, methods, and exports intact.
+- Apply only the surgical fix for the regression identified in the deploy diff and telemetry, restoring healthy baseline behavior.
+- NEVER truncate, omit methods, or return partial placeholder stubs.`;
+
+    const promptAudit = PiiPromptGuard.inspectAndEnforceFailClosed(prompt);
+    if (!promptAudit.passed) {
+      throw new Error(
+        `Fail-closed PII guard blocked Gemini prompt dispatch (${promptAudit.detectedTypes.join(', ')})`
+      );
+    }
+
     const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 15_000);
 
     const modelsToTry = [this.modelName];

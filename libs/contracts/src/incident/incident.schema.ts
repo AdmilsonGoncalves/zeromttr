@@ -166,7 +166,7 @@ export type IncidentNotification = z.infer<typeof IncidentNotificationSchema>;
 export const IncidentSummarySchema = z.object({
   id: z.string(),
   service: z.string(),
-  severity: z.string(),
+  severity: AlertSeveritySchema,
   state: IncidentStateSchema,
   mode: IncidentModeSchema.optional(),
   startedAt: z.string()
@@ -187,12 +187,24 @@ export const IncidentDetailSchema = IncidentSummarySchema.extend({
 });
 export type IncidentDetail = z.infer<typeof IncidentDetailSchema>;
 
+export const TargetLiveMetricsSchema = z.object({
+  requestsPerSecond: z.number().nonnegative(),
+  errorRate5xxPercent: z.number().min(0).max(100),
+  p95LatencyMs: z.number().nonnegative(),
+  poolActive: z.number().int().nonnegative(),
+  poolWaiting: z.number().int().nonnegative(),
+  poolMax: z.number().int().nonnegative(),
+  healthyTrafficActive: z.boolean()
+});
+export type TargetLiveMetrics = z.infer<typeof TargetLiveMetricsSchema>;
+
 export const TargetStatusResponseSchema = z.object({
   status: TargetHealthStatusSchema,
   service: z.string(),
   version: z.string(),
   previousHealthyVersion: z.string(),
-  rawEdgeLogPreCollector: z.string().optional()
+  rawEdgeLogPreCollector: z.string().optional(),
+  metrics: TargetLiveMetricsSchema.optional()
 });
 export type TargetStatusResponse = z.infer<typeof TargetStatusResponseSchema>;
 
@@ -217,7 +229,7 @@ export type ChaosPayload = z.infer<typeof ChaosPayloadSchema>;
 export const IncidentCreatedEventSchema = z.object({
   incidentId: z.string(),
   service: z.string(),
-  severity: z.string(),
+  severity: AlertSeveritySchema,
   mode: IncidentModeSchema,
   at: z.string()
 });

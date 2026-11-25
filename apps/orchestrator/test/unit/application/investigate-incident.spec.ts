@@ -1,18 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { InvestigateIncident } from '../../../src/application/index.js';
+import { InvestigateIncident } from '../../../src/application/investigate-incident.js';
 import {
   AlertSeverity,
   IncidentEventType,
-  IncidentState,
-  Incident,
   TargetHealthStatus
-} from '../../../src/domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  TargetStatusPort,
-  EventBroadcasterPort
-} from '../../../src/ports/index.js';
+} from '../../../src/domain/incident-enums.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { ToolsPort } from '../../../src/ports/tools.port.js';
+import type { TargetStatusPort } from '../../../src/ports/target-status.port.js';
+import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 
 describe('InvestigateIncident Use Case', () => {
   const createMockIncident = () =>
@@ -24,7 +22,12 @@ describe('InvestigateIncident Use Case', () => {
       state: IncidentState.RECEIVED
     });
 
-  it('should transition to INVESTIGATING, query PromQL, trace and Loki, and collect signals', async () => {
+  const createHarness = (
+    overrides: {
+      exemplarTraceId?: string;
+      searchTracesByTraceQL?: ToolsPort['searchTracesByTraceQL'];
+    } = {}
+  ) => {
     const incident = createMockIncident();
     const repo: IncidentRepository = {
       findById: vi.fn(async () => incident),
@@ -44,7 +47,7 @@ describe('InvestigateIncident Use Case', () => {
             sampleCount: 10
           }
         ],
-        exemplarTraceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+        exemplarTraceId: overrides.exemplarTraceId,
         finops: {
           rawBytesFetched: 1000,
           compactedBytesSentToLlm: 100,
@@ -83,7 +86,7 @@ describe('InvestigateIncident Use Case', () => {
         ],
         servicesInvolved: ['api-pagamentos-core', 'postgres']
       })),
-      searchTracesByTraceQL: vi.fn(),
+      searchTracesByTraceQL: overrides.searchTracesByTraceQL ?? vi.fn(),
       inspectGitDeployDiff: vi.fn(),
       createRemediationPr: vi.fn(),
       sendPostMortemResend: vi.fn(),
@@ -107,6 +110,13 @@ describe('InvestigateIncident Use Case', () => {
     };
 
     const useCase = new InvestigateIncident(repo, tools, targetStatus, broadcaster);
+    return { incident, repo, tools, broadcaster, useCase };
+  };
+
+  it('should transition to INVESTIGATING, query PromQL, trace and Loki, and collect signals', async () => {
+    const { incident, broadcaster, useCase } = createHarness({
+      exemplarTraceId: '4bf92f3577b34da6a3ce929d0e0e4736'
+    });
     const result = await useCase.execute(incident.id);
 
     expect(incident.state).toBe(IncidentState.INVESTIGATING);
@@ -117,5 +127,56 @@ describe('InvestigateIncident Use Case', () => {
     expect(result.traceId).toBe('4bf92f3577b34da6a3ce929d0e0e4736');
     expect(result.criticalSpan).toBe('pg.pool.acquire');
     expect(result.servicesInvolved).toEqual(['api-pagamentos-core', 'postgres']);
+  });
+
+  it('should fallback to searchTracesByTraceQL when PromQL has no exemplarTraceId', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-20T00:10:00.000Z'));
+    try {
+      const fallbackTraceId = '025f21ef64d6bd75a7089b2a45e602a8';
+      const { incident, tools, useCase } = createHarness({
+        exemplarTraceId: undefined,
+        searchTracesByTraceQL: vi.fn(async () => ({
+          traces: [
+            {
+              traceId: fallbackTraceId,
+              rootServiceName: 'api-pagamentos-core',
+              errorCount: 1,
+              durationMs: 4600
+            }
+          ]
+        }))
+      });
+
+      const result = await useCase.execute(incident.id);
+
+      expect(tools.searchTracesByTraceQL).toHaveBeenCalledWith({
+        query: '{resource.service.name="api-pagamentos-core" && status=error}',
+        limit: 5,
+        start: '2026-11-20T00:05:00.000Z',
+        end: '2026-11-20T00:10:00.000Z'
+      });
+      expect(tools.analyzeOtelTrace).toHaveBeenCalledWith({ trace_id: fallbackTraceId });
+      expect(result.traceId).toBe(fallbackTraceId);
+      expect(result.criticalSpan).toBe('pg.pool.acquire');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should continue gracefully when TraceQL fallback throws', async () => {
+    const { incident, tools, useCase } = createHarness({
+      exemplarTraceId: undefined,
+      searchTracesByTraceQL: vi.fn(async () => {
+        throw new Error('Tempo unavailable');
+      })
+    });
+
+    const result = await useCase.execute(incident.id);
+
+    expect(tools.searchTracesByTraceQL).toHaveBeenCalledOnce();
+    expect(tools.analyzeOtelTrace).not.toHaveBeenCalled();
+    expect(result.traceId).toBeUndefined();
+    expect(result.lokiOutput.logs).toHaveLength(1);
   });
 });

@@ -1,9 +1,13 @@
 import { Router, type Request, type Response } from 'express';
 import { isArray, isObject, omit, safeJsonParse, toErrorMessage } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import type { IncidentRepository, TargetStatusPort } from '../ports/index.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { TargetStatusPort } from '../ports/target-status.port.js';
 import type { SseEventBroadcaster } from './events.sse.js';
 
+/**
+ * Mounts protected dashboard API routes (`/events`, `/incidents`, `/incidents/:id`, `/target/status`).
+ */
 export function createApiRouter(
   repository: IncidentRepository,
   targetStatusPort: TargetStatusPort,

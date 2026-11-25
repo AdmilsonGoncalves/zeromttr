@@ -1,15 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
-import { TypeScriptPatchSyntaxValidator } from '../../../src/adapters/index.js';
-import { DispatchRemediation } from '../../../src/application/index.js';
-import { IncidentState, Incident } from '../../../src/domain/index.js';
+import { TypeScriptPatchSyntaxValidator } from '../../../src/adapters/patch-syntax-validator.js';
+import { DispatchRemediation } from '../../../src/application/dispatch-remediation.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { ToolsPort } from '../../../src/ports/tools.port.js';
 import type {
-  IncidentRepository,
-  ToolsPort,
   ReasoningPort,
-  EventBroadcasterPort,
   CollectedEvidence,
   RcaAndPatchSynthesis
-} from '../../../src/ports/index.js';
+} from '../../../src/ports/reasoning.port.js';
+import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 
 describe('DispatchRemediation Use Case', () => {
   const createMockIncident = () =>
@@ -591,5 +592,240 @@ describe('DispatchRemediation Use Case', () => {
       'Fallback remediation patch failed defensive validation'
     );
     expect(tools.createRemediationPr).toHaveBeenCalledTimes(prCallsBefore);
+  });
+
+  it('should transition to AWAITING_PR only after createRemediationPr succeeds and not on PR failure', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+
+    let resolvePr!: (value: {
+      branchName: string;
+      branchUrl: string;
+      pullRequestUrl: string;
+      commitSha: string;
+    }) => void;
+    const prPromise = new Promise<{
+      branchName: string;
+      branchUrl: string;
+      pullRequestUrl: string;
+      commitSha: string;
+    }>((resolve) => {
+      resolvePr = resolve;
+    });
+
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(() => prPromise),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 105, success: true }))
+    };
+
+    const validPatch = ['export async function createPayment() {', '  return true;', '}'].join(
+      '\n'
+    );
+
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Release pooled connection',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'valid'
+      }))
+    };
+
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn()
+    };
+
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    const execPromise = useCase.execute(incident.id, validEvidence, 'blob123');
+    await vi.waitFor(() => {
+      expect(tools.createRemediationPr).toHaveBeenCalledOnce();
+    });
+
+    // While PR creation is in flight, incident must remain in REMEDIATING (TTPR accuracy)
+    expect(incident.state).toBe(IncidentState.REMEDIATING);
+    expect(broadcaster.broadcast).not.toHaveBeenCalledWith(
+      'incident.transition',
+      expect.objectContaining({ to: IncidentState.AWAITING_PR })
+    );
+
+    resolvePr({
+      branchName: 'hotfix/zeromttr-inc-test-001',
+      branchUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-test-001',
+      pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/46',
+      commitSha: 'commit-ordered'
+    });
+
+    await execPromise;
+    expect(incident.state).toBe(IncidentState.AWAITING_PR);
+
+    // Unhappy path: PR failure must NOT emit AWAITING_PR
+    const failedIncident = createMockIncident();
+    const failedBroadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    vi.mocked(repo.findById).mockResolvedValue(failedIncident);
+    vi.mocked(tools.createRemediationPr).mockRejectedValueOnce(new Error('GitHub 502'));
+
+    const failUseCase = new DispatchRemediation(
+      repo,
+      tools,
+      llmAdapter,
+      fallbackAdapter,
+      failedBroadcaster
+    );
+
+    await expect(failUseCase.execute(failedIncident.id, validEvidence, 'blob123')).rejects.toThrow(
+      'GitHub 502'
+    );
+    expect(failedIncident.state).toBe(IncidentState.REMEDIATING);
+    expect(failedBroadcaster.broadcast).not.toHaveBeenCalledWith(
+      'incident.transition',
+      expect.objectContaining({ to: IncidentState.AWAITING_PR })
+    );
+  });
+
+  it('should derive exported declarations from suspectFileContent for non-payment repositories and reject incomplete LLM stubs', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-inc-order-001',
+        branchUrl:
+          'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-order-001',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/99',
+        commitSha: 'commit999'
+      })),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 103, success: true }))
+    };
+
+    const orderBaseline = `
+      export class OrderRepository {
+        async saveOrder() { return true; }
+      }
+      export const orderRepository = new OrderRepository();
+      export const pool = 10;
+    `;
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Stub missing orderRepository singleton and renaming pool to pool$',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/orders/src/order.repository.ts',
+        patchedContent:
+          'export class OrderRepository { async saveOrder() { return true; } }\nexport const pool$ = 10;',
+        explanation: 'stub'
+      }))
+    };
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Fallback complete OrderRepository',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/orders/src/order.repository.ts',
+        patchedContent: orderBaseline,
+        explanation: 'complete'
+      }))
+    };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(
+      repo,
+      tools,
+      llmAdapter,
+      fallbackAdapter,
+      broadcaster,
+      undefined,
+      { syntaxValidator: new TypeScriptPatchSyntaxValidator() }
+    );
+
+    const orderEvidence: CollectedEvidence = {
+      ...validEvidence,
+      gitDiff: {
+        ...validEvidence.gitDiff,
+        suspectFilePath: 'apps/orders/src/order.repository.ts',
+        suspectFileContent: orderBaseline
+      }
+    };
+
+    const result = await useCase.execute(incident.id, orderEvidence, 'blob123');
+    expect(result.reasoningSource).toBe('fallback');
+    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalledTimes(1);
+    expect(tools.createRemediationPr).toHaveBeenCalledWith(
+      expect.objectContaining({ patched_content: orderBaseline })
+    );
+  });
+
+  it('should abort before createRemediationPr when persisted incident becomes terminal during synthesis', async () => {
+    const initialIncident = createMockIncident();
+    const resetIncident = new Incident({
+      id: 'inc-test-001',
+      service: 'api-pagamentos-core',
+      severity: 'critical',
+      fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
+      state: IncidentState.FAILED
+    });
+    const repo: IncidentRepository = {
+      findById: vi.fn().mockResolvedValueOnce(initialIncident).mockResolvedValueOnce(resetIncident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [resetIncident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 104, success: true }))
+    };
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => ({
+        summary: 'Fix',
+        rootCause: 'rc',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'fix'
+      }))
+    };
+    const fallbackAdapter: ReasoningPort = { synthesizeRcaAndPatch: vi.fn() };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    await expect(useCase.execute(initialIncident.id, validEvidence, 'blob123')).rejects.toThrow(
+      'terminal state'
+    );
+    expect(tools.createRemediationPr).not.toHaveBeenCalled();
+    expect(repo.save).toHaveBeenCalledTimes(1);
+    expect(broadcaster.broadcast).not.toHaveBeenCalledWith(
+      'incident.remediation',
+      expect.anything()
+    );
   });
 });

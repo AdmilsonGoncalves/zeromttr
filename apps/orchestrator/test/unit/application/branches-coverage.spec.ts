@@ -1,33 +1,26 @@
 import { describe, it, expect, vi } from 'vitest';
+import { DispatchRemediation } from '../../../src/application/dispatch-remediation.js';
+import { EnrichWithDeployDiff } from '../../../src/application/enrich-with-deploy-diff.js';
+import { InvestigateIncident } from '../../../src/application/investigate-incident.js';
+import { NotifyOnCall } from '../../../src/application/notify-on-call.js';
+import { RecordDecision } from '../../../src/application/record-decision.js';
+import { OrchestratorWorkflow } from '../../../src/application/orchestrator-workflow.js';
+import { HandleAlert } from '../../../src/application/handle-alert.js';
 import {
-  DispatchRemediation,
-  EnrichWithDeployDiff,
-  InvestigateIncident,
-  NotifyOnCall,
-  RecordDecision,
-  OrchestratorWorkflow,
-  HandleAlert,
   IncidentNotFoundError,
   IncidentAlreadyResolvedError
-} from '../../../src/application/index.js';
-import { SimulateDemoDecision } from '../../../src/demo/index.js';
-import {
-  canTransition,
-  DecisionAction,
-  IncidentState,
-  Incident,
-  TargetHealthStatus,
-  computeAlertFingerprint,
-  DecisionHmac
-} from '../../../src/domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  ReasoningPort,
-  TargetStatusPort,
-  Clock,
-  CollectedEvidence
-} from '../../../src/ports/index.js';
+} from '../../../src/application/decision-helpers.js';
+import { SimulateDemoDecision } from '../../../src/demo/simulate-demo-decision.js';
+import { canTransition, IncidentState } from '../../../src/domain/incident-state.js';
+import { DecisionAction, TargetHealthStatus } from '../../../src/domain/incident-enums.js';
+import { Incident } from '../../../src/domain/incident.js';
+import { computeAlertFingerprint } from '../../../src/domain/fingerprint.js';
+import { DecisionHmac } from '../../../src/domain/decision-hmac.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { ToolsPort } from '../../../src/ports/tools.port.js';
+import type { ReasoningPort, CollectedEvidence } from '../../../src/ports/reasoning.port.js';
+import type { TargetStatusPort } from '../../../src/ports/target-status.port.js';
+import type { Clock } from '../../../src/ports/clock.port.js';
 import {
   createMockBroadcaster,
   createMockClock,

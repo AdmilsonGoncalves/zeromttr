@@ -1,0 +1,67 @@
+<div
+  class="bg-slate-950/90 border border-slate-800 rounded-lg px-3 py-2 flex flex-col gap-2 shadow-sm"
+>
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <span
+      class="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5"
+    >
+      <i class="pi pi-sitemap text-cyan-400 text-xs"></i>
+      <span>{{ i18n.t('fsmFlowLabel') }}</span>
+    </span>
+    <span
+      class="text-[11px] text-slate-200 bg-slate-900 border border-slate-700/80 rounded-full px-2.5 py-0.5 flex items-center gap-1.5"
+    >
+      <i class="pi pi-compass text-cyan-400 text-[11px]"></i>
+      <span>{{ formattedHint() }}</span>
+    </span>
+  </div>
+
+  <p-timeline
+    [value]="stagesSignal()"
+    layout="horizontal"
+    align="top"
+    styleClass="fsm-timeline w-full"
+  >
+    <ng-template #marker let-stage>
+      <span
+        [pTooltip]="i18n.t(stage.tooltipKey)"
+        tooltipPosition="bottom"
+        class="w-7 h-7 rounded-full flex items-center justify-center border-2 cursor-help transition-all"
+        [ngClass]="{
+          'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.35)]':
+            stage.status === 'completed',
+          'bg-cyan-500/25 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.5)]':
+            stage.status === 'active',
+          'bg-rose-500/25 border-rose-400 text-rose-200 shadow-[0_0_8px_rgba(244,63,94,0.4)]':
+            stage.status === 'failed',
+          'bg-slate-900 border-slate-700 text-slate-500': stage.status === 'pending'
+        }"
+      >
+        @if (stage.status === 'completed') {
+          <i class="pi pi-check text-xs font-bold"></i>
+        } @else if (stage.status === 'active') {
+          <i class="pi pi-spin pi-spinner text-xs"></i>
+        } @else if (stage.status === 'failed') {
+          <i class="pi pi-times text-xs font-bold"></i>
+        } @else {
+          <i class="pi pi-circle text-[9px]"></i>
+        }
+      </span>
+    </ng-template>
+    <ng-template #content let-stage>
+      <div
+        [pTooltip]="i18n.t(stage.tooltipKey)"
+        tooltipPosition="bottom"
+        class="mt-1 text-[11px] font-mono leading-tight cursor-help whitespace-nowrap"
+        [ngClass]="{
+          'text-emerald-300 font-semibold': stage.status === 'completed',
+          'text-cyan-200 font-bold': stage.status === 'active',
+          'text-rose-300 font-bold': stage.status === 'failed',
+          'text-slate-500': stage.status === 'pending'
+        }"
+      >
+        {{ i18n.t(stage.labelKey) }}
+      </div>
+    </ng-template>
+  </p-timeline>
+</div>

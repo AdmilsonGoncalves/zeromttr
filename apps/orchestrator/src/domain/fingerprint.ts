@@ -7,6 +7,9 @@ export interface AlertLabels {
   [key: string]: unknown;
 }
 
+/**
+ * Computes a stable `alertname:service` deduplication fingerprint from Grafana alert labels.
+ */
 export function computeAlertFingerprint(labels: AlertLabels): string {
   const alertName = isNonEmptyString(labels.alertname)
     ? labels.alertname

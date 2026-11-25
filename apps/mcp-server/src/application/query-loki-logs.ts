@@ -1,6 +1,7 @@
 import { clamp } from '@zeromttr/utils';
-import type { LogsPort, LokiQueryInput } from '../ports/index.js';
-import { LogTruncator, FinOpsCalculator, type FinOpsMetrics } from '../domain/index.js';
+import type { LogsPort, LokiQueryInput } from '../ports/logs.port.js';
+import { LogTruncator } from '../domain/truncate.js';
+import { FinOpsCalculator, type FinOpsMetrics } from '../domain/finops.js';
 import { validateTimeRange } from './validate-time-range.js';
 
 export interface QueryLokiLogsOutput {
@@ -10,9 +11,15 @@ export interface QueryLokiLogsOutput {
   finops: FinOpsMetrics;
 }
 
+/**
+ * MCP use case querying Loki logs under bounded line limits with FinOps payload reduction metrics.
+ */
 export class QueryLokiLogs {
   constructor(private readonly logsPort: LogsPort) {}
 
+  /**
+   * Validates the time range, queries Loki logs with bounded line limits, and calculates FinOps reduction.
+   */
   async execute(input: LokiQueryInput): Promise<QueryLokiLogsOutput> {
     const { startIso, endIso } = validateTimeRange(input.start, input.end);
 

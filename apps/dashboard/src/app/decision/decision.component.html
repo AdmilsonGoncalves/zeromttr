@@ -37,15 +37,35 @@
       </div>
     </div>
 
-    <!-- Security Notice -->
+    <!-- Security Notice & RFC 7231 explanation -->
     <div
-      class="bg-slate-950/70 border border-slate-800 rounded p-3 text-xs text-slate-400 flex items-start gap-2"
+      class="bg-slate-950/70 border border-slate-800 rounded p-3 text-xs text-slate-400 flex flex-col gap-2"
     >
-      <i class="pi pi-lock text-emerald-400 mt-0.5"></i>
-      <p class="leading-relaxed">
-        {{ i18n.t('decisionTokenSecurityNote') }}
-      </p>
+      <div class="flex items-start gap-2">
+        <i class="pi pi-lock text-emerald-400 mt-0.5"></i>
+        <p class="leading-relaxed">
+          {{ i18n.t('decisionTokenSecurityNote') }}
+        </p>
+      </div>
+      <div
+        class="text-[11px] text-slate-500 flex items-start gap-1.5 border-t border-slate-800/80 pt-2"
+      >
+        <i class="pi pi-info-circle text-cyan-400/80 mt-0.5"></i>
+        <p class="leading-relaxed">
+          {{ i18n.t('decisionConfirmationHelp') }}
+        </p>
+      </div>
     </div>
+
+    <!-- Incident Already Closed Banner -->
+    @if (incidentClosed()) {
+      <div
+        class="bg-cyan-950/70 border border-cyan-500 rounded p-3 text-cyan-200 text-xs flex items-center gap-2"
+      >
+        <i class="pi pi-info-circle text-cyan-400 text-base"></i>
+        <span>{{ i18n.t('decisionAlreadyClosedBanner') }} ({{ incidentClosedState() }})</span>
+      </div>
+    }
 
     <!-- Feedback Messages -->
     @if (status() === 'success') {
@@ -74,7 +94,7 @@
             action() === 'reject' ? i18n.t('decisionRejectBtn') : i18n.t('decisionApproveBtn')
           "
           [severity]="action() === 'reject' ? 'danger' : 'success'"
-          [disabled]="isExpired() || !isValid() || isSubmitting()"
+          [disabled]="isExpired() || !isValid() || isSubmitting() || incidentClosed()"
           (onClick)="executeDecision()"
           styleClass="w-full font-bold"
         />

@@ -8,14 +8,14 @@ import express, {
 } from 'express';
 import { isEmpty } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import type { IncidentRepository, TargetStatusPort } from '../ports/index.js';
-import {
-  type HandleAlert,
-  type OrchestratorWorkflow,
-  type RecordDecision,
-  createInitialIncident
-} from '../application/index.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { TargetStatusPort } from '../ports/target-status.port.js';
+import type { HandleAlert } from '../application/handle-alert.js';
+import type { OrchestratorWorkflow } from '../application/orchestrator-workflow.js';
+import type { RecordDecision } from '../application/record-decision.js';
+import { createInitialIncident } from '../application/create-initial-incident.js';
 import { createGrafanaAuthMiddleware, createDashboardAuthMiddleware } from './auth.js';
+import { createIpRateLimitMiddleware } from './rate-limit.js';
 import { SseEventBroadcaster } from './events.sse.js';
 import { createWebhookRouter } from './webhook.controller.js';
 import { createApiRouter } from './api.controller.js';
@@ -36,8 +36,12 @@ export interface AppDependencies {
   grafanaWebhookToken?: string;
   dashboardApiToken?: string;
   demoRouter?: Router | PluggableRouterFactory;
+  enableRateLimiting?: boolean;
 }
 
+/**
+ * Builds the Express application with health endpoints, webhook, decision, API, and demo routers.
+ */
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
 
@@ -73,6 +77,29 @@ export function createApp(dependencies: AppDependencies): Express {
 
   const grafanaAuth = createGrafanaAuthMiddleware(grafanaToken, dashboardToken);
   const dashboardAuth = createDashboardAuthMiddleware(dashboardToken);
+
+  const shouldRateLimit = dependencies.enableRateLimiting ?? !isTest;
+  if (shouldRateLimit) {
+    const strictActionLimiter = createIpRateLimitMiddleware({
+      windowMs: 60_000,
+      maxRequests: 30,
+      message: 'Rate limit exceeded for simulation/decision actions. Please wait a minute.'
+    });
+    const readApiLimiter = createIpRateLimitMiddleware({
+      windowMs: 60_000,
+      maxRequests: 600,
+      message: 'Rate limit exceeded for API read endpoints. Please slow down.'
+    });
+
+    app.use('/api/demo/chaos', strictActionLimiter);
+    app.use('/api/demo/reset', strictActionLimiter);
+    app.use('/api/demo/simulate-decision', strictActionLimiter);
+    app.use('/api/demo/healthy-traffic', strictActionLimiter);
+    app.use('/api/incidents/:id/decision', strictActionLimiter);
+    app.get('/api/incidents', readApiLimiter);
+    app.get('/api/incidents/:id', readApiLimiter);
+    app.get('/api/target/status', readApiLimiter);
+  }
 
   const initialIncident = createInitialIncident();
 

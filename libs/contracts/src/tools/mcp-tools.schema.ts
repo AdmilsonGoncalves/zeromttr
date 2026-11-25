@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FinOpsMetricsSchema } from './finops.schema.js';
+import { ReasoningSourceSchema } from '../llm/reasoning.schema.js';
 
 const TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
 
@@ -12,7 +13,7 @@ export const ExecutePromqlRangeInputSchema = z.object({
 });
 
 export const SummarizedPromqlSeriesSchema = z.object({
-  metric: z.record(z.string()),
+  metric: z.record(z.string(), z.string()),
   p50: z.number(),
   p95: z.number(),
   max: z.number(),
@@ -52,7 +53,9 @@ export const AnalyzeOtelTraceOutputSchema = z.object({
 // 3. search_traces_by_traceql
 export const SearchTracesByTraceqlInputSchema = z.object({
   query: z.string().min(1),
-  limit: z.number().int().min(1).max(20).optional().default(5)
+  limit: z.number().int().min(1).max(20).optional().default(5),
+  start: z.string().datetime({ offset: true }).optional(),
+  end: z.string().datetime({ offset: true }).optional()
 });
 
 export const TraceqlSearchHitSchema = z.object({
@@ -76,7 +79,7 @@ export const QueryLokiLogsInputSchema = z.object({
 
 export const LokiLogEntrySchema = z.object({
   timestamp: z.string(),
-  stream: z.record(z.string()),
+  stream: z.record(z.string(), z.string()),
   line: z.string().max(500)
 });
 
@@ -101,6 +104,7 @@ export const InspectGitDeployDiffOutputSchema = z.object({
   suspectFilePath: z.string(),
   currentBlobSha: z.string(),
   truncatedPatch: z.string().max(1500),
+  suspectFileContent: z.string().optional(),
   finops: FinOpsMetricsSchema
 });
 
@@ -112,7 +116,7 @@ export const CreateRemediationPrInputSchema = z.object({
   blob_sha: z.string().optional(),
   title: z.string().min(1),
   rca_markdown: z.string(),
-  reasoning_source: z.enum(['llm', 'fallback'])
+  reasoning_source: ReasoningSourceSchema
 });
 
 export const CreateRemediationPrOutputSchema = z.object({
@@ -129,7 +133,7 @@ export const SendPostMortemResendInputSchema = z.object({
   title: z.string().min(1),
   rca_summary: z.string().min(1),
   evidence_coverage: z.string().min(1),
-  reasoning_source: z.enum(['llm', 'fallback']),
+  reasoning_source: ReasoningSourceSchema,
   blast_radius: z.array(z.string()),
   regression_commit: z.string().min(1),
   pull_request_url: z.string(),

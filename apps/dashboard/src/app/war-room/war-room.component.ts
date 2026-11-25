@@ -1,58 +1,30 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  OnInit,
-  OnDestroy,
-  computed,
-  inject,
-  signal
-} from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { isFilled, isNonEmptyString, isString } from '@zeromttr/utils';
-import { SelectButton } from 'primeng/selectbutton';
-import { Tag } from 'primeng/tag';
-import { Button } from 'primeng/button';
-import { Timeline } from 'primeng/timeline';
-import { Tabs, TabList, Tab, TabPanels, TabPanel } from 'primeng/tabs';
-import { ProgressBar } from 'primeng/progressbar';
-import {
-  I18nService,
-  type IncidentMode,
-  IncidentService,
-  type Language,
-  MASKED_POST_OTTL_LOG,
-  MOCK_GIT_DIFF,
-  RAW_PRE_COLLECTOR_LOG
-} from '../core/index.js';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { isNonEmptyString } from '@zeromttr/utils';
+import { MessageService } from 'primeng/api';
+import { Toast } from 'primeng/toast';
+import { DecisionAction, type IncidentMode } from '../core/contract.js';
+import { I18nService, type Language } from '../core/i18n.service.js';
+import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
+import { EvidencePanelComponent } from './evidence-panel/evidence-panel.component.js';
+import { FsmTimelineComponent } from './fsm-timeline/fsm-timeline.component.js';
+import { RemediationPanelComponent } from './remediation-panel/remediation-panel.component.js';
+import { TargetTelemetryComponent } from './target-telemetry/target-telemetry.component.js';
+import { WarRoomHeaderComponent } from './war-room-header/war-room-header.component.js';
 
-interface ModeOption {
-  label: string;
-  value: IncidentMode;
-}
-
-interface LangOption {
-  label: string;
-  value: Language;
-}
-
+/**
+ * Single-pane War Room mission control orchestrator composing quadrant child components via signals.
+ */
 @Component({
   selector: 'app-war-room',
   imports: [
-    CommonModule,
-    FormsModule,
-    SelectButton,
-    Tag,
-    Button,
-    Timeline,
-    Tabs,
-    TabList,
-    Tab,
-    TabPanels,
-    TabPanel,
-    ProgressBar
+    Toast,
+    WarRoomHeaderComponent,
+    FsmTimelineComponent,
+    TargetTelemetryComponent,
+    EvidencePanelComponent,
+    RemediationPanelComponent
   ],
+  providers: [MessageService],
   templateUrl: './war-room.component.html',
   styleUrl: './war-room.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -60,99 +32,193 @@ interface LangOption {
 export class WarRoomComponent implements OnInit, OnDestroy {
   readonly i18n: I18nService;
   readonly incidentService: IncidentService;
-  readonly sanitizer: DomSanitizer;
+  readonly messageService: MessageService;
 
-  readonly activeTab = signal<string>('0');
-  readonly mockGitDiff = MOCK_GIT_DIFF;
-  readonly rawPreCollectorLog = RAW_PRE_COLLECTOR_LOG;
-  readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
-
-  onTabChange(tab: string | number | undefined): void {
-    if (isFilled(tab)) {
-      this.activeTab.set(String(tab));
-    }
-  }
-
-  readonly safeResendPreview = computed<SafeHtml>(() => {
-    const defaultPreview = `
-    <div style="font-family: sans-serif; color: #cbd5e1;">
-      <h3 style="color: #ef4444; margin-top: 0;">🚨 ZeroMTTR Incident Post-Mortem</h3>
-      <p style="font-size: 11px;">${this.i18n.t('resendDefaultBody')}</p>
-    </div>
-  `;
-    const raw = this.incidentService.currentIncident()?.notification?.htmlPreview ?? defaultPreview;
-    return this.sanitizer.bypassSecurityTrustHtml(raw);
-  });
-
-  readonly modeOptions: ModeOption[] = [
-    { label: '⚡ Live API Mode', value: 'live' },
-    { label: '🎬 Replay Mode', value: 'replay' }
-  ];
-
-  readonly langOptions: LangOption[] = [
-    { label: '🇧🇷 PT', value: 'pt' },
-    { label: '🇺🇸 EN', value: 'en' }
-  ];
-
-  constructor(...args: [I18nService?, IncidentService?, DomSanitizer?]) {
-    const [i18n, incidentService, sanitizer] = args;
+  constructor(...args: [I18nService?, IncidentService?, MessageService?]) {
+    const [i18n, incidentService, messageService] = args;
     this.i18n = i18n ?? inject(I18nService);
     this.incidentService = incidentService ?? inject(IncidentService);
-    if (sanitizer) {
-      this.sanitizer = sanitizer;
+    if (messageService) {
+      this.messageService = messageService;
     } else {
       try {
-        this.sanitizer =
-          inject(DomSanitizer, { optional: true }) ??
-          ({
-            bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
-          } as DomSanitizer);
+        this.messageService = inject(MessageService, { optional: true }) ?? new MessageService();
       } catch {
-        this.sanitizer = {
-          bypassSecurityTrustHtml: (html: string) => html as unknown as SafeHtml
-        } as DomSanitizer;
+        this.messageService = new MessageService();
       }
     }
   }
 
   ngOnInit(): void {
     this.incidentService.connectSse();
+    void this.incidentService.fetchDemoConfig();
     void this.incidentService.fetchTargetStatus();
+    this.incidentService.startTargetStatusPolling();
     void this.incidentService.fetchIncidents();
   }
 
   ngOnDestroy(): void {
+    this.incidentService.stopTargetStatusPolling();
     this.incidentService.disconnectSse();
   }
 
+  /**
+   * Applies the selected execution mode to the incident service.
+   */
   onModeChange(mode: IncidentMode): void {
     if (isNonEmptyString(mode)) {
       this.incidentService.setActiveMode(mode);
     }
   }
 
-  onLiveKeyInput(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    if (target && isString(target.value)) {
-      this.incidentService.setLiveDemoKey(target.value);
-    }
+  /**
+   * Stores the live demo key in the incident service.
+   */
+  onLiveKeyChange(key: string): void {
+    this.incidentService.setLiveDemoKey(key);
   }
 
+  /**
+   * Stores the active Cloudflare Turnstile token in the incident service.
+   */
+  onTurnstileTokenChange(token: string | null): void {
+    this.incidentService.setTurnstileToken(token);
+  }
+
+  /**
+   * Switches the active dashboard language.
+   */
   onLangChange(lang: Language): void {
     if (isNonEmptyString(lang)) {
       this.i18n.setLang(lang);
     }
   }
 
-  onTriggerChaos(): void {
-    void this.incidentService.triggerChaos();
+  private notifyActionError(result: DemoActionResult): void {
+    if (result.status === 403 && result.errorCode?.startsWith('TURNSTILE_')) {
+      this.messageService.add({
+        severity: 'error',
+        summary: this.i18n.t('toastTurnstileRequiredSummary'),
+        detail: this.i18n.t('toastTurnstileRequiredDetail'),
+        life: 6000
+      });
+      return;
+    }
+
+    if (result.status === 403) {
+      this.messageService.add({
+        severity: 'error',
+        summary: this.i18n.t('toastLiveKeyRequiredSummary'),
+        detail: this.i18n.t('toastLiveKeyRequiredDetail'),
+        life: 6000
+      });
+      return;
+    }
+
+    if (result.status === 429) {
+      const isRateLimit = result.errorCode === 'RATE_LIMIT_EXCEEDED';
+      const summaryKey = isRateLimit ? 'toastRateLimitSummary' : 'toastCooldownSummary';
+      const detailWithSecondsKey = isRateLimit
+        ? 'toastRateLimitDetailWithSeconds'
+        : 'toastCooldownDetailWithSeconds';
+      const detailKey = isRateLimit ? 'toastRateLimitDetail' : 'toastCooldownDetail';
+
+      const detail =
+        result.retryAfterSeconds !== undefined
+          ? this.i18n.t(detailWithSecondsKey).replace('{N}', String(result.retryAfterSeconds))
+          : this.i18n.t(detailKey);
+      this.messageService.add({
+        severity: 'warn',
+        summary: this.i18n.t(summaryKey),
+        detail,
+        life: 6000
+      });
+      return;
+    }
+
+    const fallbackDetail = result.status
+      ? `${this.i18n.t('toastActionErrorDetail')} (HTTP ${result.status})`
+      : this.i18n.t('toastActionErrorDetail');
+    this.messageService.add({
+      severity: 'error',
+      summary: this.i18n.t('toastActionErrorSummary'),
+      detail: fallbackDetail,
+      life: 6000
+    });
   }
 
-  onResetService(): void {
-    void this.incidentService.resetChaos();
+  /**
+   * Toggles continuous healthy synthetic traffic on the target workload.
+   */
+  async onToggleHealthyTraffic(): Promise<void> {
+    const nextEnable = !(this.incidentService.targetMetrics()?.healthyTrafficActive ?? false);
+    const result = await this.incidentService.toggleHealthyTraffic(nextEnable);
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+
+    this.messageService.add({
+      severity: 'info',
+      summary: this.i18n.t(
+        nextEnable ? 'toastHealthyTrafficStartedSummary' : 'toastHealthyTrafficStoppedSummary'
+      ),
+      detail: this.i18n.t(
+        nextEnable ? 'toastHealthyTrafficStartedDetail' : 'toastHealthyTrafficStoppedDetail'
+      ),
+      life: 4000
+    });
   }
 
-  onSimulateDecision(): void {
-    void this.incidentService.simulateDecision('approve');
+  /**
+   * Triggers a simulated failure or replay sequence and surfaces status feedback via toast.
+   */
+  async onTriggerChaos(): Promise<void> {
+    const result = await this.incidentService.triggerChaos();
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+    this.messageService.add({
+      severity: 'success',
+      summary: this.i18n.t('toastChaosStartedSummary'),
+      detail: this.i18n.t('toastChaosStartedDetail'),
+      life: 4000
+    });
+  }
+
+  /**
+   * Resets target service chaos, refreshes dashboard state, and notifies via toast.
+   */
+  async onResetService(): Promise<void> {
+    const result = await this.incidentService.resetChaos('', true);
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+    this.messageService.add({
+      severity: 'success',
+      summary: this.i18n.t('toastServiceRestoredSummary'),
+      detail: this.i18n.t('toastServiceRestoredDetail'),
+      life: 4000
+    });
+  }
+
+  /**
+   * Triggers a simulated approval decision in demo mode, restores target health, and keeps incident visible.
+   */
+  async onSimulateDecision(): Promise<void> {
+    const result = await this.incidentService.simulateDecision(DecisionAction.APPROVE);
+    if (!result.ok) {
+      this.notifyActionError(result);
+      return;
+    }
+
+    this.messageService.add({
+      severity: 'success',
+      summary: this.i18n.t('toastDecisionApprovedSummary'),
+      detail: this.i18n.t('toastDecisionApprovedDetail'),
+      life: 5000
+    });
   }
 }

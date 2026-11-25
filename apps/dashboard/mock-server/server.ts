@@ -4,6 +4,7 @@ import {
   isEmpty,
   isNonEmptyString,
   isNumber,
+  isObject,
   safeJsonParse,
   toErrorMessage
 } from '@zeromttr/utils';
@@ -29,6 +30,9 @@ class ClientError extends Error {
   }
 }
 
+/**
+ * Standalone HTTP and SSE mock server simulating orchestrator endpoints for local dashboard development.
+ */
 export class MockServer {
   private server: http.Server | null = null;
   private sseClients = new Set<ServerResponse>();
@@ -38,18 +42,30 @@ export class MockServer {
 
   constructor(private readonly options: MockServerOptions = {}) {}
 
+  /**
+   * Returns the current in-memory incident detail state.
+   */
   getIncident(): IncidentDetail {
     return this.currentIncident;
   }
 
+  /**
+   * Returns the current simulated target service status.
+   */
   getTargetStatus(): TargetStatusResponse {
     return this.targetStatus;
   }
 
+  /**
+   * Overrides the simulated target service status.
+   */
   setTargetStatus(status: TargetStatusResponse): void {
     this.targetStatus = status;
   }
 
+  /**
+   * Starts the HTTP and SSE mock server and returns the bound port.
+   */
   async start(): Promise<number> {
     const port = this.options.port ?? 0;
 
@@ -75,13 +91,16 @@ export class MockServer {
 
       this.server.listen(port, () => {
         const addr = this.server?.address();
-        const boundPort = typeof addr === 'object' && addr !== null ? addr.port : port;
+        const boundPort = isObject(addr) && isNumber(addr.port) ? addr.port : port;
         this.startHeartbeat();
         resolve(boundPort);
       });
     });
   }
 
+  /**
+   * Stops the heartbeat timer, closes active SSE streams, and shuts down the HTTP server.
+   */
   async stop(): Promise<void> {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
@@ -116,6 +135,9 @@ export class MockServer {
     }, interval);
   }
 
+  /**
+   * Sends a named SSE event payload to all connected dashboard clients.
+   */
   broadcastSse(eventName: string, data: unknown): void {
     const message = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of this.sseClients) {
@@ -259,6 +281,19 @@ export class MockServer {
     if (req.method === 'GET' && pathname === '/api/target/status') {
       res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(this.targetStatus));
+      return;
+    }
+
+    // GET /api/demo/config
+    if (req.method === 'GET' && pathname === '/api/demo/config') {
+      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          publicLiveDemo: true,
+          turnstileSiteKey: null,
+          turnstileRequired: false
+        })
+      );
       return;
     }
 
@@ -440,6 +475,9 @@ export class MockServer {
   }
 }
 
+/**
+ * Creates a new dashboard mock server instance.
+ */
 export function createMockServer(options?: MockServerOptions): MockServer {
   return new MockServer(options);
 }

@@ -2,9 +2,13 @@ import { Router, type Request, type Response } from 'express';
 import { ZodError } from 'zod';
 import { toErrorMessage } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import type { HandleAlert, OrchestratorWorkflow } from '../application/index.js';
+import type { HandleAlert } from '../application/handle-alert.js';
+import type { OrchestratorWorkflow } from '../application/orchestrator-workflow.js';
 import { HttpResponseStatus } from './http-constants.js';
 
+/**
+ * Mounts the Grafana Alert webhook receiver and asynchronously triggers incident orchestration.
+ */
 export function createWebhookRouter(
   handleAlert: HandleAlert,
   workflow: OrchestratorWorkflow,

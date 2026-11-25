@@ -3,7 +3,7 @@ import type {
   RemediationPort,
   RemediationPrRequest,
   RemediationPrReceipt
-} from '../ports/index.js';
+} from '../ports/remediation.port.js';
 import { isNonEmptyArray, isNonEmptyString, isSafeRelativePath } from '@zeromttr/utils';
 import {
   HTTP_STATUS,
@@ -40,6 +40,9 @@ export interface GithubRemediationConfig {
   apiBaseUrl?: string;
 }
 
+/**
+ * GitHub REST adapter that idempotently creates hotfix branches, commits patches, and opens remediation PRs.
+ */
 export class GithubRemediationHttpAdapter implements RemediationPort {
   private readonly baseUrl: string;
 
@@ -59,6 +62,9 @@ export class GithubRemediationHttpAdapter implements RemediationPort {
     return headers;
   }
 
+  /**
+   * Idempotently creates a hotfix branch, commits the patched file, and opens or reuses a remediation Pull Request.
+   */
   async createPullRequest(req: RemediationPrRequest): Promise<RemediationPrReceipt> {
     if (!/^[A-Za-z0-9._-]+$/.test(req.incident_id)) {
       throw new Error(

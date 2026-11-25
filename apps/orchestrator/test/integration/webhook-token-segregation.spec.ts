@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
-import { createApp } from '../../src/http/index.js';
-import { TargetHealthStatus } from '../../src/domain/index.js';
-import type { IncidentRepository, TargetStatusPort } from '../../src/ports/index.js';
-import { HandleAlert } from '../../src/application/index.js';
+import { createApp } from '../../src/http/app.js';
+import { TargetHealthStatus } from '../../src/domain/incident-enums.js';
+import type { IncidentRepository } from '../../src/ports/incident-repository.port.js';
+import type { TargetStatusPort } from '../../src/ports/target-status.port.js';
+import { HandleAlert } from '../../src/application/handle-alert.js';
 import { createStubRecordDecision, createStubWorkflow } from '../helpers/test-doubles.helper.js';
 
 describe('Webhook Token Segregation (Acceptance Criterion 1)', () => {

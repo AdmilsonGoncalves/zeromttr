@@ -93,6 +93,8 @@ services:
     container_name: zeromttr-otel-collector
     restart: unless-stopped
     command: ['--config=/etc/otelcol-contrib/config.yaml']
+    environment:
+      - GOMEMLIMIT=200MiB
     volumes:
       - ./infra/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
@@ -152,6 +154,18 @@ services:
       - PROMETHEUS_URL=http://prometheus:9090
       - LOKI_URL=http://loki:3100
       - TEMPO_URL=http://tempo:3200
+      - GRAFANA_URL=http://grafana:3000
+      - GRAFANA_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-change-me-strong-password}
+      - GRAFANA_SA_TOKEN=${GRAFANA_SA_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - TARGET_GITHUB_REPO=${TARGET_GITHUB_REPO:-AdmilsonGoncalves/zeromttr}
+      - TARGET_BASE_BRANCH=${TARGET_BASE_BRANCH:-release/target-v2.14.8}
+      - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH:-apps/target-app-demo}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM=${RESEND_FROM:-ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>}
+      - ON_CALL_ENGINEER_EMAIL=${ON_CALL_ENGINEER_EMAIL:-oncall-sre@example.com}
+      - PUBLIC_DASHBOARD_URL=${PUBLIC_DASHBOARD_URL:-http://localhost:4200}
     depends_on:
       prometheus:
         condition: service_healthy
@@ -174,7 +188,26 @@ services:
       - PORT=8080
       - GRAFANA_WEBHOOK_TOKEN=${GRAFANA_WEBHOOK_TOKEN:-change-me-grafana-webhook-token}
       - DASHBOARD_API_TOKEN=${DASHBOARD_API_TOKEN:-change-me-dashboard-api-token}
-      - MCP_URL=http://mcp-server:8000
+      - DECISION_HMAC_SECRET=${DECISION_HMAC_SECRET:-change-me-hmac-secret}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-change-me-mcp-token}
+      - MCP_SERVER_URL=http://mcp-server:8000/mcp
+      - TARGET_APP_URL=http://target-app-demo:3001
+      - PUBLIC_DASHBOARD_URL=${PUBLIC_DASHBOARD_URL:-http://localhost:4200}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-${LLM_API_KEY:-}}
+      - LLM_MODEL=${LLM_MODEL:-gemini-3.5-flash}
+      - LIVE_DEMO_KEY=${LIVE_DEMO_KEY:-}
+      - PUBLIC_LIVE_DEMO=${PUBLIC_LIVE_DEMO:-false}
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
+      - DEMO_COOLDOWN_MS=${DEMO_COOLDOWN_MS:-${SIMULATION_COOLDOWN_MS:-120000}}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - TARGET_GITHUB_REPO=${TARGET_GITHUB_REPO:-https://github.com/AdmilsonGoncalves/zeromttr}
+      - TARGET_REPO_URL=${TARGET_REPO_URL:-}
+      - TARGET_BASE_REF=v2.14.7
+      - TARGET_HEAD_REF=v2.14.8
+      - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH:-apps/target-app-demo}
+      - ON_CALL_ENGINEER_EMAIL=${ON_CALL_ENGINEER_EMAIL:-oncall-sre@example.com}
+      - REPLAY_SPEED_FACTOR=${REPLAY_SPEED_FACTOR:-1}
     depends_on:
       - mcp-server
     networks:
@@ -192,6 +225,8 @@ services:
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-zeromttr}:${POSTGRES_PASSWORD:-change-me-postgres-password}@postgres:5432/${POSTGRES_DB:-payments}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - CHAOS_ENABLED=${CHAOS_ENABLED:-false}
+      - DEMO_MODE=${DEMO_MODE:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -204,6 +239,8 @@ services:
     build:
       context: .
       dockerfile: apps/dashboard/Dockerfile
+      args:
+        - VITE_PRIMEUI_LICENSE_KEY=${VITE_PRIMEUI_LICENSE_KEY:-}
     container_name: zeromttr-dashboard
     restart: unless-stopped
     ports:

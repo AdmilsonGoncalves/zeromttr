@@ -1,23 +1,22 @@
 import { isFilled, isNonEmptyArray, nowIso, toErrorMessage } from '@zeromttr/utils';
 import {
   IncidentEventType,
-  IncidentState,
   OrchestratorDefault,
-  OrchestratorLogEvent,
-  TransitionReason,
-  type SpanNode
-} from '../domain/index.js';
+  TransitionReason
+} from '../domain/incident-enums.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
+import type { SpanNode } from '../domain/rca-report.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type {
-  IncidentRepository,
   ToolsPort,
-  TargetStatusPort,
-  EventBroadcasterPort,
-  LoggerPort,
-  TargetStatus,
   PromqlRangeOutput,
   LokiQueryOutput,
   TraceAnalysisOutput
-} from '../ports/index.js';
+} from '../ports/tools.port.js';
+import type { TargetStatusPort, TargetStatus } from '../ports/target-status.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 
 export interface InvestigateResult {
   incidentId: string;
@@ -35,6 +34,9 @@ export interface InvestigateResult {
   hasTempoErrorSpan: boolean;
 }
 
+/**
+ * Use case correlating PromQL, Tempo traces, Loki logs, and target status into evidence coverage.
+ */
 export class InvestigateIncident {
   public constructor(
     private readonly repository: IncidentRepository,
@@ -44,6 +46,9 @@ export class InvestigateIncident {
     private readonly logger?: LoggerPort
   ) {}
 
+  /**
+   * Collects PromQL metrics, Loki logs, Tempo traces, and target status to evaluate evidence coverage.
+   */
   public async execute(incidentId: string): Promise<InvestigateResult> {
     const incident = await this.repository.findById(incidentId);
     if (!incident) {
@@ -83,15 +88,32 @@ export class InvestigateIncident {
       promqlOutput.seriesCount > 0 &&
       promqlOutput.summarizedSeries.some((s) => (s.p95 ?? 0) > 2000);
 
-    const exemplarTraceId = promqlOutput.exemplarTraceId;
-    const hasMetricExemplar = Boolean(exemplarTraceId);
+    const hasMetricExemplar = Boolean(promqlOutput.exemplarTraceId);
+    let exemplarTraceId = promqlOutput.exemplarTraceId;
 
-    // 2. Trace Analysis
+    // 2. Trace Analysis (with TraceQL fallback if PromQL returned no exemplar)
     let traceAnalysis: TraceAnalysisOutput | undefined;
     let criticalSpan: string = OrchestratorDefault.CRITICAL_ERROR_SPAN;
     let spans: SpanNode[] = [];
     let servicesInvolved = [incident.service];
     let hasTempoErrorSpan = false;
+
+    if (!exemplarTraceId) {
+      try {
+        const searchRes = await this.tools.searchTracesByTraceQL({
+          query: `{resource.service.name="${incident.service}" && status=error}`,
+          limit: 5,
+          start: startIso,
+          end: endIso
+        });
+        const firstHit = searchRes?.traces?.[0]?.traceId;
+        if (firstHit) {
+          exemplarTraceId = firstHit;
+        }
+      } catch {
+        // Non-fatal TraceQL fallback failure
+      }
+    }
 
     if (exemplarTraceId) {
       try {

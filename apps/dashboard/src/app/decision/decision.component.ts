@@ -1,27 +1,31 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
   inject,
+  OnInit,
   signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { isEmpty, isNonEmptyString, parseNumber, toErrorMessage } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
-import { Card } from 'primeng/card';
 import { Tag } from 'primeng/tag';
 import {
+  DecisionAction,
+  IncidentState,
   type DecisionPayload,
-  I18nService,
-  type IncidentDecisionAction,
-  IncidentService
-} from '../core/index.js';
+  type IncidentDecisionAction
+} from '../core/contract.js';
+import { I18nService } from '../core/i18n.service.js';
+import { IncidentService } from '../core/incident.service.js';
 
+/**
+ * Standalone human-in-the-loop view parsing HMAC decision tokens from the URL fragment.
+ */
 @Component({
   selector: 'app-decision',
-  imports: [CommonModule, RouterModule, Button, Card, Tag],
+  imports: [CommonModule, RouterModule, Button, Tag],
   templateUrl: './decision.component.html',
   styleUrl: './decision.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -38,6 +42,8 @@ export class DecisionComponent implements OnInit {
   readonly isExpired = signal<boolean>(false);
   readonly isValid = signal<boolean>(false);
   readonly isSubmitting = signal<boolean>(false);
+  readonly incidentClosed = signal<boolean>(false);
+  readonly incidentClosedState = signal<string>('');
   readonly status = signal<'idle' | 'success' | 'error'>('idle');
   readonly errorMessage = signal<string>('');
 
@@ -61,8 +67,29 @@ export class DecisionComponent implements OnInit {
     this.incidentId.set(id);
 
     this.parseFragment();
+
+    if (isNonEmptyString(id)) {
+      void this.checkIncidentClosed(id);
+    }
   }
 
+  private async checkIncidentClosed(id: string): Promise<void> {
+    try {
+      const detail = await this.incidentService.getIncidentDetail(id);
+      if (detail && detail.id === id) {
+        if (detail.state === IncidentState.RESOLVED || detail.state === IncidentState.REJECTED) {
+          this.incidentClosed.set(true);
+          this.incidentClosedState.set(detail.state);
+        }
+      }
+    } catch {
+      // Ignore network fetch error during closed check
+    }
+  }
+
+  /**
+   * Extracts and validates `action`, `sig`, and `exp` from `window.location.hash`.
+   */
   parseFragment(): void {
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     if (isEmpty(hash) || hash.length < 2) {
@@ -79,7 +106,10 @@ export class DecisionComponent implements OnInit {
     const expRaw = params.get('exp');
     const expParam = parseNumber(expRaw, 0);
 
-    if (!isNonEmptyString(actionParam) || (actionParam !== 'approve' && actionParam !== 'reject')) {
+    if (
+      !isNonEmptyString(actionParam) ||
+      (actionParam !== DecisionAction.APPROVE && actionParam !== DecisionAction.REJECT)
+    ) {
       this.isValid.set(false);
       this.errorMessage.set(this.i18n.t('hmacInvalidActionError'));
       return;
@@ -113,8 +143,11 @@ export class DecisionComponent implements OnInit {
     this.isValid.set(true);
   }
 
+  /**
+   * Submits the validated HMAC decision payload to the orchestrator API.
+   */
   async executeDecision(): Promise<void> {
-    if (!this.isValid() || this.isExpired()) {
+    if (!this.isValid() || this.isExpired() || this.incidentClosed()) {
       return;
     }
 
@@ -134,6 +167,15 @@ export class DecisionComponent implements OnInit {
       if (success) {
         this.status.set('success');
       } else {
+        const statusCode = this.incidentService.decisionStatusCode();
+        if (statusCode === 409) {
+          this.incidentClosed.set(true);
+          this.errorMessage.set(this.i18n.t('decisionAlreadyResolvedError'));
+        } else {
+          this.errorMessage.set(
+            this.incidentService.decisionError() || this.i18n.t('decisionErrorMsg')
+          );
+        }
         this.status.set('error');
       }
     } catch (err: unknown) {

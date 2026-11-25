@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Incident, IncidentState } from '../../../src/domain/index.js';
+import { Incident } from '../../../src/domain/incident.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
 
 describe('Incident Entity', () => {
   it('should initialize with defaults and record initial transition', () => {

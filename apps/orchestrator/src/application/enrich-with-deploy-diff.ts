@@ -1,17 +1,18 @@
 import { round } from '@zeromttr/utils';
 import {
   IncidentEventType,
-  IncidentState,
   OrchestratorDefault,
   TransitionReason
-} from '../domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  EventBroadcasterPort,
-  GitDeployDiffOutput
-} from '../ports/index.js';
+} from '../domain/incident-enums.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { ToolsPort, GitDeployDiffOutput } from '../ports/tools.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
+/**
+ * Use case enriching an investigating incident with Git deploy diffs, docs references, and FinOps stats.
+ */
 export class EnrichWithDeployDiff {
   public constructor(
     private readonly repository: IncidentRepository,
@@ -20,6 +21,9 @@ export class EnrichWithDeployDiff {
     private readonly servicePath: string = process.env.TARGET_SERVICE_PATH || 'apps/target-app-demo'
   ) {}
 
+  /**
+   * Transitions the incident to `ENRICHING`, fetches Git deploy diff, and records FinOps savings.
+   */
   public async execute(
     incidentId: string,
     baseRef = process.env.TARGET_BASE_REF || OrchestratorDefault.DEFAULT_BASE_REF,
@@ -61,7 +65,7 @@ export class EnrichWithDeployDiff {
 
     incident.docs = [
       {
-        url: process.env.TARGET_REPO_URL || '',
+        url: resolveTargetRepoUrl(),
         title: `${incident.service} Deploy & Architecture Reference`,
         markdownExcerpt: `Deploy diff inspected for ${incident.service} (${baseRef} -> ${headRef}) at ${this.servicePath}.`
       }

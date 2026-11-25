@@ -10,13 +10,9 @@ import type {
   DeployDiffRequest,
   DeployDiffBundle,
   DeployDiffFile
-} from '../ports/index.js';
-import {
-  truncateDiff,
-  sanitizeAuthorLogin,
-  sanitizeCommitMessage,
-  calculateFinOps
-} from '../domain/index.js';
+} from '../ports/repo-inspector.port.js';
+import { truncateDiff, sanitizeAuthorLogin, sanitizeCommitMessage } from '../domain/truncate.js';
+import { calculateFinOps } from '../domain/finops.js';
 
 export interface GithubInspectorConfig {
   repo: string;
@@ -24,6 +20,9 @@ export interface GithubInspectorConfig {
   apiBaseUrl?: string;
 }
 
+/**
+ * GitHub REST adapter for comparing deploy refs with PII sanitization and bounded diff pruning.
+ */
 export class GithubInspectorHttpAdapter implements RepoInspectorPort {
   private readonly baseUrl: string;
 
@@ -42,6 +41,9 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
     return headers;
   }
 
+  /**
+   * Fetches commit metadata and file diffs between two Git refs, sanitizing PII and computing FinOps metrics.
+   */
   async inspectDeployDiff(req: DeployDiffRequest): Promise<DeployDiffBundle> {
     const compareUrl = buildUrl(
       this.baseUrl,

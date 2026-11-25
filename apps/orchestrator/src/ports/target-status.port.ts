@@ -1,4 +1,14 @@
-import type { TargetHealthStatus } from '../domain/index.js';
+import type { TargetHealthStatus } from '../domain/incident-enums.js';
+
+export interface TargetLiveMetrics {
+  requestsPerSecond: number;
+  errorRate5xxPercent: number;
+  p95LatencyMs: number;
+  poolActive: number;
+  poolWaiting: number;
+  poolMax: number;
+  healthyTrafficActive: boolean;
+}
 
 export interface TargetStatus {
   status: TargetHealthStatus | `${TargetHealthStatus}`;
@@ -8,6 +18,7 @@ export interface TargetStatus {
   targetRepo: string;
   suspectFilePath: string;
   rawEdgeLogPreCollector: string;
+  metrics?: TargetLiveMetrics;
 }
 
 export interface TargetStatusPort {

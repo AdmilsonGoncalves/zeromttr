@@ -1,8 +1,12 @@
 import type http from 'node:http';
+import { performance } from 'node:perf_hooks';
 import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
-import { handleChaosRoutes, handleHealthRoutes, handlePaymentsRoutes } from './routes/index.js';
-import { initTelemetry } from './telemetry/index.js';
+import { handleChaosRoutes } from './routes/chaos.routes.js';
+import { handleHealthRoutes } from './routes/health.routes.js';
+import { handlePaymentsRoutes } from './routes/payments.routes.js';
+import { initTelemetry } from './telemetry/otel.js';
+import { requestMetrics } from './telemetry/request-metrics.js';
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // Basic response defaults
@@ -10,6 +14,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
   const host = req.headers.host || 'localhost:3001';
   const parsedUrl = new URL(req.url || '/', `http://${host}`);
+
+  const shouldTrackMetrics =
+    !parsedUrl.pathname.startsWith('/chaos/') && parsedUrl.pathname !== '/health';
+  if (shouldTrackMetrics) {
+    const startedAt = performance.now();
+    res.once('finish', () => {
+      requestMetrics.record(performance.now() - startedAt, res.statusCode);
+    });
+  }
 
   // Parse body if present
   let body: unknown = undefined;
@@ -66,6 +79,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   res.end(JSON.stringify({ error: 'Not Found' }));
 }
 
+/**
+ * Initializes telemetry and returns the Node HTTP request listener for `target-app-demo`.
+ */
 export function createApp(): http.RequestListener {
   initTelemetry();
 

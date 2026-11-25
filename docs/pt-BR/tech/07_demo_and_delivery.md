@@ -19,7 +19,7 @@ Como visitantes anônimos na URL pública veem por padrão o modo `Replay` (para
 ## 2. Medição Honesta de TTD e TTPR vs. Baseline Manual Cronometrado
 O script `scripts/measure-mttr.sh` lê os timestamps de transição de `GET /api/incidents/:id` e calcula:
 1. **TTD (*Time to Deterministic Diagnosis*):** `timestamp(REMEDIATING) - timestamp(RECEIVED)` (meta: ≤ 15 s).
-2. **TTPR (*Time to Reviewable Pull Request*):** `timestamp(AWAITING_PR/NOTIFIED) - timestamp(RECEIVED)` (meta: ≤ 30 s).
+2. **TTPR (*Time to Reviewable Pull Request*):** `timestamp(AWAITING_PR/NOTIFIED) - timestamp(RECEIVED)` — onde `AWAITING_PR` é registrado estritamente **após** `createRemediationPr` concluir e o PR revisável existir no GitHub (meta: ≤ 30 s).
 3. **Tempo até Post-Mortem Entregue:** `timestamp(NOTIFIED) - timestamp(RECEIVED)` (meta: ≤ 45 s).
 
 Para comparação justa no README, cronometrar e registrar uma execução manual real dos mesmos 7 passos feitos por um engenheiro (1. ler alerta; 2. rodar PromQL; 3. abrir exemplar no Tempo; 4. filtrar Loki pelo `trace_id`; 5. rodar `git diff v2.14.7...v2.14.8 -- apps/target-app-demo`; 6. editar `payment.repository.ts` e rodar testes; 7. criar branch e abrir PR).

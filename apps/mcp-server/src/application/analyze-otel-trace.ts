@@ -1,5 +1,5 @@
-import type { TracesPort } from '../ports/index.js';
-import { SpanAnalyzer, type RawSpan } from '../domain/index.js';
+import type { TracesPort } from '../ports/traces.port.js';
+import { SpanAnalyzer, type RawSpan } from '../domain/span-analysis.js';
 
 export interface AnalyzeOtelTraceInput {
   trace_id: string;
@@ -15,9 +15,15 @@ export interface AnalyzeOtelTraceOutput {
   critical_span?: RawSpan;
 }
 
+/**
+ * MCP use case analyzing a trace's spans to identify blast radius, root span, errors, and slowest paths.
+ */
 export class AnalyzeOtelTrace {
   constructor(private readonly tracesPort: TracesPort) {}
 
+  /**
+   * Validates a 32-char trace ID, fetches spans, and returns root, error, and slowest span summaries.
+   */
   async execute(input: AnalyzeOtelTraceInput): Promise<AnalyzeOtelTraceOutput> {
     const traceId = input.trace_id.trim();
     if (!/^[0-9a-fA-F]{32}$/.test(traceId)) {

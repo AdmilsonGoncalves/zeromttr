@@ -3,11 +3,17 @@ import type {
   RemediationPort,
   RemediationPrRequest,
   RemediationPrReceipt
-} from '../ports/index.js';
+} from '../ports/remediation.port.js';
 
+/**
+ * MCP use case validating remediation inputs and delegating hotfix Pull Request creation.
+ */
 export class CreateRemediationPr {
   constructor(private readonly remediationPort: RemediationPort) {}
 
+  /**
+   * Validates remediation PR inputs and delegates branch/PR creation to the remediation port.
+   */
   async execute(input: RemediationPrRequest): Promise<RemediationPrReceipt> {
     if (
       !isNonEmptyString(input.incident_id) ||

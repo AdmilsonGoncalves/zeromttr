@@ -1,24 +1,22 @@
-import { toErrorMessage } from '@zeromttr/utils';
+import { isNonEmptyString, toErrorMessage } from '@zeromttr/utils';
 import {
   DecisionAction,
-  DecisionHmac,
   IncidentEventType,
-  IncidentState,
   NotificationStatus,
   OrchestratorDefault,
-  OrchestratorLogEvent,
   ReasoningProvider,
-  TransitionReason,
-  type ReasoningSource
-} from '../domain/index.js';
-import type {
-  IncidentRepository,
-  ToolsPort,
-  Clock,
-  EventBroadcasterPort,
-  LoggerPort,
-  SendPostMortemOutput
-} from '../ports/index.js';
+  TransitionReason
+} from '../domain/incident-enums.js';
+import { DecisionHmac } from '../domain/decision-hmac.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
+import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
+import type { ReasoningSource } from '../domain/rca-report.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { ToolsPort, SendPostMortemOutput } from '../ports/tools.port.js';
+import type { Clock } from '../ports/clock.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 
 export interface NotifyOnCallResult {
   emailId: string;
@@ -26,6 +24,9 @@ export interface NotifyOnCallResult {
   rejectUrl: string;
 }
 
+/**
+ * Use case signing email-only HMAC decision links and notifying on-call engineers via Resend.
+ */
 export class NotifyOnCall {
   public constructor(
     private readonly repository: IncidentRepository,
@@ -34,9 +35,13 @@ export class NotifyOnCall {
     private readonly broadcaster: EventBroadcasterPort,
     private readonly hmacSecret: string,
     private readonly dashboardUrl: string,
-    private readonly logger?: LoggerPort
+    private readonly logger?: LoggerPort,
+    private readonly recipientEmail?: string
   ) {}
 
+  /**
+   * Generates signed HMAC decision links, emails the on-call engineer via Resend, and transitions to `NOTIFIED`.
+   */
   public async execute(incidentId: string): Promise<NotifyOnCallResult> {
     const incident = await this.repository.findById(incidentId);
     if (!incident) {
@@ -61,6 +66,7 @@ export class NotifyOnCall {
     try {
       resendResult = await this.tools.sendPostMortemResend({
         incident_id: incident.id,
+        ...(isNonEmptyString(this.recipientEmail) ? { recipient_email: this.recipientEmail } : {}),
         title: `[Post-Mortem] Operational Incident ${incident.id} — ${incident.service}`,
         rca_summary: incident.rca?.summary || OrchestratorDefault.MITIGATION_FALLBACK,
         evidence_coverage: `${incident.rca?.signalsCollected ?? 4}/${incident.rca?.signalsTotal ?? 4} Signals (${incident.rca?.evidenceCoveragePercent ?? 100}%)`,
@@ -70,7 +76,7 @@ export class NotifyOnCall {
           incident.remediation?.suspectCommitSha ||
           incident.remediation?.commitSha ||
           OrchestratorDefault.UNKNOWN,
-        pull_request_url: incident.remediation?.pullRequestUrl || process.env.TARGET_REPO_URL || '',
+        pull_request_url: incident.remediation?.pullRequestUrl || resolveTargetRepoUrl(),
         approve_url: approveUrl,
         reject_url: rejectUrl,
         leaked_patterns_detected: incident.rca?.piiGuardAudit.leakedPatternsDetected ?? 0

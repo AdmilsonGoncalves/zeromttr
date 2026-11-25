@@ -1,4 +1,4 @@
-import type { LogsPort, LokiQueryInput, LogsQueryResult } from '../ports/index.js';
+import type { LogsPort, LokiQueryInput, LogsQueryResult } from '../ports/logs.port.js';
 import { isArray, isString, toErrorMessage } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 
@@ -6,9 +6,15 @@ export interface LokiAdapterConfig {
   baseUrl: string;
 }
 
+/**
+ * Grafana Loki HTTP adapter executing LogQL range queries and measuring raw fetched byte volume.
+ */
 export class LokiHttpAdapter implements LogsPort {
   constructor(private readonly config: LokiAdapterConfig) {}
 
+  /**
+   * Executes a LogQL range query against Loki and returns extracted log lines with raw byte size.
+   */
   async queryLogs(input: LokiQueryInput): Promise<LogsQueryResult> {
     const url = buildUrl(this.config.baseUrl, '/loki/api/v1/query_range', {
       query: input.logql,

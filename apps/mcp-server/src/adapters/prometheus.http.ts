@@ -1,5 +1,5 @@
-import type { MetricsPort, PromqlQueryInput, MetricsQueryResult } from '../ports/index.js';
-import type { RawPromSeries } from '../domain/index.js';
+import type { MetricsPort, PromqlQueryInput, MetricsQueryResult } from '../ports/metrics.port.js';
+import type { RawPromSeries } from '../domain/summarize-series.js';
 import { diffInSeconds, isArray, toErrorMessage } from '@zeromttr/utils';
 import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 
@@ -8,9 +8,15 @@ export interface PrometheusAdapterConfig {
   timeoutMs?: number;
 }
 
+/**
+ * Prometheus HTTP adapter executing bounded PromQL range queries with adaptive step sizing.
+ */
 export class PrometheusHttpAdapter implements MetricsPort {
   constructor(private readonly config: PrometheusAdapterConfig) {}
 
+  /**
+   * Executes a PromQL range query against Prometheus and returns parsed metric series with raw byte size.
+   */
   async queryRange(input: PromqlQueryInput): Promise<MetricsQueryResult> {
     const windowSec = Math.max(1, diffInSeconds(input.start, input.end));
     const defaultStep = `${Math.max(15, Math.ceil(windowSec / 250))}s`;

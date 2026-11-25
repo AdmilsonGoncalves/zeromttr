@@ -5,3 +5,4 @@ export * from './number.utils.js';
 export * from './date.utils.js';
 export * from './json.utils.js';
 export * from './error.utils.js';
+export * from './ip.utils.js';

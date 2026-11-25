@@ -1,4 +1,4 @@
-import type { ReasoningSource } from '../domain/index.js';
+import type { ReasoningSource } from '../domain/rca-report.js';
 
 export interface FinOpsData {
   rawBytesFetched: number;
@@ -69,6 +69,8 @@ export interface TraceAnalysisOutput {
 export interface TraceQlInput {
   query: string;
   limit?: number;
+  start?: string;
+  end?: string;
 }
 
 export interface TraceQlOutput {
@@ -95,6 +97,7 @@ export interface GitDeployDiffOutput {
   currentBlobSha: string;
   truncatedPatch: string;
   finops: FinOpsData;
+  suspectFileContent?: string;
 }
 
 export interface CreateRemediationPrInput {

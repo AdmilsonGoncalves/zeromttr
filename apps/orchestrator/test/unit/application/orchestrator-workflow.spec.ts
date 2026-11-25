@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  DispatchRemediation,
-  EnrichWithDeployDiff,
-  InvestigateIncident,
-  NotifyOnCall,
-  OrchestratorWorkflow
-} from '../../../src/application/index.js';
-import { IncidentState, Incident, type RcaReport } from '../../../src/domain/index.js';
+import { DispatchRemediation } from '../../../src/application/dispatch-remediation.js';
+import { EnrichWithDeployDiff } from '../../../src/application/enrich-with-deploy-diff.js';
+import { InvestigateIncident } from '../../../src/application/investigate-incident.js';
+import { NotifyOnCall } from '../../../src/application/notify-on-call.js';
+import { OrchestratorWorkflow } from '../../../src/application/orchestrator-workflow.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
+import type { RcaReport } from '../../../src/domain/rca-report.js';
 import {
   createMockBroadcaster,
   createMockClock,

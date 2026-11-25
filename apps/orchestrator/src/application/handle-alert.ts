@@ -4,15 +4,15 @@ import { diffInSeconds, isNonEmptyString } from '@zeromttr/utils';
 import {
   AlertSeverity,
   GrafanaAlertStatus,
-  Incident,
   IncidentEventType,
   IncidentExecutionMode,
-  IncidentState,
-  TransitionReason,
-  computeAlertFingerprint,
-  type IncidentMode
-} from '../domain/index.js';
-import type { IncidentRepository, EventBroadcasterPort } from '../ports/index.js';
+  TransitionReason
+} from '../domain/incident-enums.js';
+import { Incident, type IncidentMode } from '../domain/incident.js';
+import { IncidentState } from '../domain/incident-state.js';
+import { computeAlertFingerprint } from '../domain/fingerprint.js';
+import type { IncidentRepository } from '../ports/incident-repository.port.js';
+import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
 export const GrafanaAlertItemSchema = z
   .object({
@@ -24,7 +24,7 @@ export const GrafanaAlertItemSchema = z
         severity: z.string().optional().default(AlertSeverity.CRITICAL)
       })
       .passthrough(),
-    annotations: z.record(z.unknown()).optional(),
+    annotations: z.record(z.string(), z.unknown()).optional(),
     startsAt: z.string().optional(),
     endsAt: z.string().optional(),
     fingerprint: z.string().optional()
@@ -47,6 +47,19 @@ export interface HandleAlertResult {
   ignored?: boolean;
 }
 
+function normalizeAlertSeverity(rawSeverity?: string): AlertSeverity {
+  if (isNonEmptyString(rawSeverity)) {
+    const normalized = rawSeverity.trim().toLowerCase();
+    if (normalized === AlertSeverity.WARNING || normalized === 'warn') {
+      return AlertSeverity.WARNING;
+    }
+  }
+  return AlertSeverity.CRITICAL;
+}
+
+/**
+ * Use case ingesting Grafana alert webhooks with fingerprint deduplication and concurrency coalescing.
+ */
 export class HandleAlert {
   private readonly inFlightFingerprints = new Map<string, Promise<HandleAlertResult>>();
 
@@ -55,6 +68,9 @@ export class HandleAlert {
     private readonly broadcaster: EventBroadcasterPort
   ) {}
 
+  /**
+   * Parses Grafana webhook alerts, ignores resolved notices, deduplicates active fingerprints, and creates an incident.
+   */
   public async execute(rawPayload: unknown): Promise<HandleAlertResult> {
     const payload = GrafanaWebhookPayloadSchema.parse(rawPayload);
     const primaryAlert = payload.alerts[0];
@@ -121,9 +137,7 @@ export class HandleAlert {
     }
 
     const incidentId = `inc-${randomUUID().slice(0, 8)}`;
-    const severity = isNonEmptyString(primaryAlert.labels.severity)
-      ? primaryAlert.labels.severity
-      : AlertSeverity.CRITICAL;
+    const severity = normalizeAlertSeverity(primaryAlert.labels.severity);
     const mode: IncidentMode = IncidentExecutionMode.LIVE;
 
     const incident = new Incident({

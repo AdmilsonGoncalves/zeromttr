@@ -1,4 +1,4 @@
-import type { Incident } from '../domain/index.js';
+import type { Incident } from '../domain/incident.js';
 
 export interface IncidentRepository {
   findById(id: string): Promise<Incident | null>;

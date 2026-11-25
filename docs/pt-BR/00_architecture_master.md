@@ -120,7 +120,7 @@ Para evitar comparações distorcidas com processos que incluem deploy completo 
 | Infraestrutura | Docker, Docker Compose | Execução local (`docker-compose.yml`) e em produção na VPS (`docker-compose.prod.yml`) |
 | CI/CD | GitHub Actions | `ci.yml`, `hotfix-verify.yml` (verifica PRs `hotfix/zeromttr-*`) e `cd-release.yml` (deploy na VPS congelado apenas para tags `v*` ou disparo manual) |
 | Workload Demo | Express + Knex + PostgreSQL | Serviço `api-pagamentos-core` com falha reproduzível de saturação do pool de conexões |
-| Frontend | **Angular (última versão estável)**, **PrimeNG (preset Aura Dark)**, Tailwind CSS v4 + `tailwindcss-primeui` | War Room Dashboard enxuto (Single-Pane, 4 quadrantes) + rota `/decision/:id` |
+| Frontend | **Angular (última versão estável)**, **PrimeNG (preset Aura Dark)**, Tailwind CSS v4 + `tailwindcss-primeui` | War Room Dashboard enxuto (Single-Pane com barra horizontal interativa do Fluxo FSM no topo + painel de evidências OTel/PII/Diff + painel de PR/Resend) + rota `/decision/:id` |
 
 ---
 

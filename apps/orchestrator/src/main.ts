@@ -1,34 +1,32 @@
 import http from 'node:http';
 import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
-import {
-  ConsoleJsonLogger,
-  FileIncidentRepository,
-  HttpTargetStatusAdapter,
-  McpClientAdapter,
-  DeterministicFallbackReasoningAdapter,
-  GeminiReasoningAdapter,
-  TypeScriptPatchSyntaxValidator
-} from './adapters/index.js';
-import {
-  createInitialIncident,
-  HandleAlert,
-  InvestigateIncident,
-  EnrichWithDeployDiff,
-  DispatchRemediation,
-  NotifyOnCall,
-  RecordDecision,
-  OrchestratorWorkflow
-} from './application/index.js';
-import {
-  HttpDemoControlAdapter,
-  ReplayRunner,
-  SimulateDemoDecision,
-  createDemoRouterFactory
-} from './demo/index.js';
-import { OrchestratorLogEvent } from './domain/index.js';
-import { SystemClock } from './ports/index.js';
-import { createApp, SseEventBroadcaster } from './http/index.js';
+import { ConsoleJsonLogger } from './adapters/logger.console.js';
+import { FileIncidentRepository } from './adapters/repo.file.js';
+import { HttpTargetStatusAdapter } from './adapters/target-status.http.js';
+import { McpClientAdapter } from './adapters/mcp.client.js';
+import { DeterministicFallbackReasoningAdapter } from './adapters/llm.fallback.js';
+import { GeminiReasoningAdapter } from './adapters/llm.gemini.js';
+import { TypeScriptPatchSyntaxValidator } from './adapters/patch-syntax-validator.js';
+import { createInitialIncident } from './application/create-initial-incident.js';
+import { HandleAlert } from './application/handle-alert.js';
+import { InvestigateIncident } from './application/investigate-incident.js';
+import { EnrichWithDeployDiff } from './application/enrich-with-deploy-diff.js';
+import { DispatchRemediation } from './application/dispatch-remediation.js';
+import { NotifyOnCall } from './application/notify-on-call.js';
+import { RecordDecision } from './application/record-decision.js';
+import { OrchestratorWorkflow } from './application/orchestrator-workflow.js';
+import { HttpDemoControlAdapter } from './demo/demo-control.http.js';
+import { ReplayRunner } from './demo/replay-runner.js';
+import { SimulateDemoDecision } from './demo/simulate-demo-decision.js';
+import { createDemoRouterFactory } from './demo/demo.controller.js';
+import { OrchestratorLogEvent } from './domain/log-enums.js';
+import { SystemClock } from './ports/clock.port.js';
+import { createApp } from './http/app.js';
+import { SseEventBroadcaster } from './http/events.sse.js';
 
+/**
+ * Instantiates orchestrator adapters, use cases, Express app, and starts the HTTP server.
+ */
 export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
   const logger = new ConsoleJsonLogger();
   const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH, logger);
@@ -73,8 +71,11 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     fallbackAdapter,
     broadcaster,
     logger,
-    { syntaxValidator: patchSyntaxValidator }
+    {
+      syntaxValidator: patchSyntaxValidator
+    }
   );
+  const onCallEmail = process.env.ON_CALL_ENGINEER_EMAIL || process.env.ONCALL_TO_EMAIL;
   const notifyOnCall = new NotifyOnCall(
     repository,
     toolsPort,
@@ -82,7 +83,8 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     broadcaster,
     hmacSecret,
     dashboardUrl,
-    logger
+    logger,
+    onCallEmail
   );
   const recordDecision = new RecordDecision(
     repository,
@@ -104,8 +106,9 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
   );
 
   const initialIncident = createInitialIncident();
-  const demoCooldownMs = isNonEmptyString(process.env.DEMO_COOLDOWN_MS)
-    ? parseNumber(process.env.DEMO_COOLDOWN_MS, 120_000)
+  const rawCooldown = process.env.DEMO_COOLDOWN_MS ?? process.env.SIMULATION_COOLDOWN_MS;
+  const demoCooldownMs = isNonEmptyString(rawCooldown)
+    ? parseNumber(rawCooldown, 120_000)
     : undefined;
 
   const replayRunner = new ReplayRunner(repository, broadcaster, {}, logger);
@@ -118,6 +121,9 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
           simulateDemoDecision,
           replayRunner,
           liveDemoKey: process.env.LIVE_DEMO_KEY,
+          publicLiveDemo: process.env.PUBLIC_LIVE_DEMO === 'true',
+          turnstileSiteKey: process.env.TURNSTILE_SITE_KEY,
+          turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY,
           cooldownMs: demoCooldownMs
         });
 

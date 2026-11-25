@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { HandleAlert } from '../../../src/application/index.js';
-import { IncidentState, Incident } from '../../../src/domain/index.js';
-import type { IncidentRepository, EventBroadcasterPort } from '../../../src/ports/index.js';
+import { HandleAlert } from '../../../src/application/handle-alert.js';
+import { IncidentState } from '../../../src/domain/incident-state.js';
+import { Incident } from '../../../src/domain/incident.js';
+import type { IncidentRepository } from '../../../src/ports/incident-repository.port.js';
+import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 
 describe('HandleAlert Use Case', () => {
   const createMockRepo = (): IncidentRepository => {
