@@ -126,6 +126,15 @@ describe('string.utils', () => {
       expect(cleaned).toContain('href="blocked:"');
       expect(cleaned).toContain('https://example.com/&#x41;&#66;');
     });
+
+    it('should strip inline style attributes to prevent style injection and sanitizer warnings', () => {
+      const input =
+        '<div style="font-family: sans-serif; color: #0f172a;"><h3 style=\'color: red;\'>Alert</h3><p class="text-xs">Body</p></div>';
+      const cleaned = stripUnsafeHtml(input);
+      expect(cleaned).not.toMatch(/\sstyle\s*=/i);
+      expect(cleaned).toContain('<h3>Alert</h3>');
+      expect(cleaned).toContain('<p class="text-xs">Body</p>');
+    });
   });
 
   describe('isSafeRelativePath', () => {

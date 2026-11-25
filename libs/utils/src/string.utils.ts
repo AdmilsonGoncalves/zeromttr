@@ -78,9 +78,11 @@ export function stripUnsafeHtml(html: string): string {
     return '';
   }
   return html
+    .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<(script|iframe|object|embed|svg|math|style)\b[\s\S]*?<\/\1>/gi, '')
     .replace(/<(script|iframe|object|embed|svg|math|meta|base)\b[^>]*\/?>/gi, '')
     .replace(/([\s/]+)on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '$1')
+    .replace(/([\s/]+)style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(
       /(\b(?:href|src|action|formaction)\s*=\s*)(["'])([^"']*)\2/gi,
       (full, prefix, q, uri) => {
