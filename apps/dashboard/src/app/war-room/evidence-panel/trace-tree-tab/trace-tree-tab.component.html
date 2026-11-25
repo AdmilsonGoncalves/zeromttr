@@ -37,7 +37,11 @@
     <div
       class="flex justify-between items-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-1"
     >
-      <span>Span Hierarchy (Trace ID: {{ incidentSignal()?.rca?.traceId }})</span>
+      @if (incidentSignal()?.rca?.traceId; as traceId) {
+        <span>Span Hierarchy (Trace ID: {{ traceId }})</span>
+      } @else {
+        <span>Span Hierarchy</span>
+      }
       <span>Duration / Status</span>
     </div>
 
@@ -68,6 +72,10 @@
           >
             {{ span.durationMs }}ms
           </span>
+        </div>
+      } @empty {
+        <div class="py-3 text-center text-[11px] text-slate-400">
+          {{ incidentSignal() ? i18n.t('traceTreeAwaitingBody') : i18n.t('traceTreeIdleBody') }}
         </div>
       }
     </div>

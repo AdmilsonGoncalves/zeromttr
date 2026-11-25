@@ -98,9 +98,23 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
   piiLogWithheldMessage: '[WITHHELD DUE TO PII VIOLATION: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
+  gitDiffIdleBody:
+    'No regression diff under inspection — target service is healthy. Trigger a simulation to inspect the v2.14.7...v2.14.8 diff and FinOps reduction.',
   githubPrTitle: 'Pull Request Opened on GitHub',
   githubPrViewBtn: 'View PR on GitHub ↗',
+  githubPrIdleStatus: 'None',
+  githubPrOpenStatus: 'Open',
+  githubPrApprovedStatus: 'Approved',
+  githubPrRejectedStatus: 'Rejected',
+  githubPrClosedStatus: 'Closed',
+  githubPrIdleBody: 'No active Pull Request — awaiting remediation stage.',
+  traceTreeIdleBody: 'No active trace — trigger a simulation to inspect the Tempo span hierarchy.',
+  traceTreeAwaitingBody: 'Collecting distributed spans from Tempo...',
   awaitingAuditBadge: 'Awaiting audit...',
+  piiIdleBadge: 'No active incident — awaiting simulation',
+  piiIdlePreCollectorLog: 'No active failure event in the edge collector.',
+  piiIdlePostOttlLog:
+    'No masked log collected from Loki. Trigger a simulation to inspect OTTL redaction.',
 
   // === Resend Post-Mortem & Human Decision / HMAC ===
   resendPreviewTitle: 'Resend Post-Mortem (Sanitized Preview)',

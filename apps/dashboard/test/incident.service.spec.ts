@@ -35,7 +35,9 @@ describe('IncidentService', () => {
     expect(service.estimatedTokensSaved()).toBe(0);
     expect(service.evidenceCoveragePercent()).toBe(0);
     expect(service.signalsRatio()).toBe('0/4');
-    expect(service.timelineSteps()).toHaveLength(8);
+    const idleSteps = service.timelineSteps();
+    expect(idleSteps).toHaveLength(8);
+    expect(idleSteps.every((step) => step.status === 'pending')).toBe(true);
   });
 
   it('should calculate computed signals when incident detail is loaded', () => {
@@ -299,6 +301,58 @@ describe('IncidentService', () => {
     await pendingFetch;
 
     expect(service.currentIncident()).toBeNull();
+    fetchSpy.mockRestore();
+  });
+
+  it('should cancel in-flight syncIncidentFallback polling when resetChaos clears awaiting state', async () => {
+    const service = new IncidentService();
+    service.awaitingIncidentStart.set(true);
+
+    let resolveList!: (res: Response) => void;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/api/incidents')) {
+        return new Promise<Response>((resolve) => {
+          resolveList = resolve;
+        });
+      }
+      if (url.endsWith('/api/demo/reset')) {
+        return new Response(JSON.stringify({ status: 'reset_completed' }), {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.HEALTHY,
+          service: 'api-pagamentos-core',
+          version: 'v2.14.7',
+          previousHealthyVersion: 'v2.14.7'
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    service.startTargetStatusPolling('http://localhost:8080', 10);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    service.stopTargetStatusPolling();
+
+    await service.resetChaos('http://localhost:8080', true);
+    expect(service.awaitingIncidentStart()).toBe(false);
+
+    resolveList(
+      new Response(
+        JSON.stringify([{ id: MOCK_INCIDENT.id, startedAt: new Date().toISOString() }]),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(service.currentIncident()).toBeNull();
+    expect(service.awaitingIncidentStart()).toBe(false);
     fetchSpy.mockRestore();
   });
 

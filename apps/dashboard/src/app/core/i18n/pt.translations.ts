@@ -99,9 +99,24 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
     'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
   piiLogWithheldMessage: '[RETIDO POR VIOLAÇÃO PII: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
+  gitDiffIdleBody:
+    'Nenhum diff de regressão em análise — serviço saudável. Inicie uma simulação para inspecionar o diff v2.14.7...v2.14.8 e a redução FinOps.',
   githubPrTitle: 'Pull Request Aberto no GitHub',
   githubPrViewBtn: 'Ver PR no GitHub ↗',
+  githubPrIdleStatus: 'Nenhum',
+  githubPrOpenStatus: 'Open',
+  githubPrApprovedStatus: 'Aprovado',
+  githubPrRejectedStatus: 'Rejeitado',
+  githubPrClosedStatus: 'Fechado',
+  githubPrIdleBody: 'Nenhum Pull Request ativo — aguardando etapa de remediação.',
+  traceTreeIdleBody:
+    'Nenhum trace ativo — inicie uma simulação para inspecionar a árvore de spans do Tempo.',
+  traceTreeAwaitingBody: 'Coletando spans distribuídos no Tempo...',
   awaitingAuditBadge: 'Aguardando auditoria...',
+  piiIdleBadge: 'Nenhum incidente ativo — aguardando simulação',
+  piiIdlePreCollectorLog: 'Nenhum evento de falha ativo no coletor de borda.',
+  piiIdlePostOttlLog:
+    'Nenhum log mascarado coletado no Loki. Inicie uma simulação para inspecionar a redação OTTL.',
 
   // === Resend Post-Mortem & Human Decision / HMAC ===
   resendPreviewTitle: 'Post-Mortem Resend (Preview Sanitizado)',

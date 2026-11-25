@@ -1,9 +1,18 @@
 import '@angular/compiler';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
-import { NotificationStatus } from '../src/app/core/contract.js';
+import { IncidentState, NotificationStatus } from '../src/app/core/contract.js';
 import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
 import { RemediationPanelComponent } from '../src/app/war-room/remediation-panel/remediation-panel.component.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REMEDIATION_TEMPLATE_PATH = resolve(
+  HERE,
+  '../src/app/war-room/remediation-panel/remediation-panel.component.html'
+);
 
 describe('RemediationPanelComponent', () => {
   let i18n: I18nService;
@@ -106,5 +115,35 @@ describe('RemediationPanelComponent', () => {
     component.simulateDecision.subscribe(spy);
     component.simulateDecision.emit();
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should_update_pr_badge_across_idle_open_resolved_rejected_and_failed_states', () => {
+    expect(component.prBadge()).toEqual({ labelKey: 'githubPrIdleStatus', severity: 'secondary' });
+
+    const html = readFileSync(REMEDIATION_TEMPLATE_PATH, 'utf8');
+    expect(html).not.toContain('hotfix/zeromttr-pool-timeout');
+    expect(html).not.toContain('github.com/AdmilsonGoncalves/zeromttr/pull/42');
+    expect(html).toContain("i18n.t('githubPrIdleBody')");
+
+    const incident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+    component.incident = incident;
+    component.displayedFsmState = IncidentState.NOTIFIED;
+    expect(component.prBadge()).toEqual({ labelKey: 'githubPrOpenStatus', severity: 'success' });
+
+    component.displayedFsmState = IncidentState.RESOLVED;
+    expect(component.prBadge()).toEqual({
+      labelKey: 'githubPrApprovedStatus',
+      severity: 'success'
+    });
+
+    component.displayedFsmState = IncidentState.REJECTED;
+    expect(component.prBadge()).toEqual({ labelKey: 'githubPrRejectedStatus', severity: 'danger' });
+
+    component.displayedFsmState = IncidentState.FAILED;
+    expect(component.prBadge()).toEqual({ labelKey: 'githubPrClosedStatus', severity: 'danger' });
+
+    component.incident = null;
+    component.displayedFsmState = undefined;
+    expect(component.prBadge()).toEqual({ labelKey: 'githubPrIdleStatus', severity: 'secondary' });
   });
 });

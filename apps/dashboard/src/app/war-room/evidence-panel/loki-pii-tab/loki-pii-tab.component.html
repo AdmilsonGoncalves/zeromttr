@@ -1,13 +1,13 @@
 <div class="flex flex-col gap-2.5 pt-1.5">
   <div class="flex justify-center p-0.5">
-    @if (isPiiPassedSignal() === true) {
+    @if (incidentSignal() && isPiiPassedSignal() === true) {
       <div
         class="bg-emerald-950 border border-emerald-500 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
       >
         <i class="pi pi-check-circle text-emerald-400"></i>
         <span>{{ i18n.t('piiGuardVerifiedBadge') }}</span>
       </div>
-    } @else if (isPiiPassedSignal() === false) {
+    } @else if (incidentSignal() && isPiiPassedSignal() === false) {
       <div
         class="bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
       >
@@ -18,12 +18,19 @@
           }}
         </span>
       </div>
-    } @else {
+    } @else if (incidentSignal()) {
       <div
         class="bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 shadow"
       >
         <i class="pi pi-hourglass text-slate-400"></i>
         <span>{{ i18n.t('awaitingAuditBadge') }}</span>
+      </div>
+    } @else {
+      <div
+        class="bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 shadow"
+      >
+        <i class="pi pi-shield text-slate-400"></i>
+        <span>{{ i18n.t('piiIdleBadge') }}</span>
       </div>
     }
   </div>

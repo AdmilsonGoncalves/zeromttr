@@ -97,9 +97,21 @@ export interface TranslationDictionary {
   piiGuardBlockedBadge: string;
   piiLogWithheldMessage: string;
   gitDiffTitle: string;
+  gitDiffIdleBody: string;
   githubPrTitle: string;
   githubPrViewBtn: string;
+  githubPrIdleStatus: string;
+  githubPrOpenStatus: string;
+  githubPrApprovedStatus: string;
+  githubPrRejectedStatus: string;
+  githubPrClosedStatus: string;
+  githubPrIdleBody: string;
+  traceTreeIdleBody: string;
+  traceTreeAwaitingBody: string;
   awaitingAuditBadge: string;
+  piiIdleBadge: string;
+  piiIdlePreCollectorLog: string;
+  piiIdlePostOttlLog: string;
 
   // === Resend Post-Mortem & Human Decision / HMAC ===
   resendPreviewTitle: string;

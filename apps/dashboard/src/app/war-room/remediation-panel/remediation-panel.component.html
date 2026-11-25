@@ -8,30 +8,35 @@
         <i class="pi pi-github text-white"></i>
         {{ i18n.t('githubPrTitle') }}
       </span>
-      <p-tag value="Open" severity="success" styleClass="text-[10px] py-0" />
+      <p-tag
+        [value]="i18n.t(prBadge().labelKey)"
+        [severity]="prBadge().severity"
+        styleClass="text-[10px] py-0"
+      />
     </div>
 
-    <p class="text-[11px] text-slate-400 leading-snug">
-      Branch:
-      <code class="text-cyan-300 font-mono text-[10px]">{{
-        incidentSignal()?.remediation?.branchName ?? 'hotfix/zeromttr-pool-timeout'
-      }}</code>
-    </p>
+    @if (incidentSignal()?.remediation; as remediation) {
+      <p class="text-[11px] text-slate-400 leading-snug">
+        Branch:
+        <code class="text-cyan-300 font-mono text-[10px]">{{ remediation.branchName }}</code>
+      </p>
 
-    <a
-      [href]="
-        incidentSignal()?.remediation?.pullRequestUrl ??
-        'https://github.com/AdmilsonGoncalves/zeromttr/pull/42'
-      "
-      target="_blank"
-      rel="noopener noreferrer"
-      [pTooltip]="i18n.t('tooltipViewPr')"
-      tooltipPosition="left"
-      class="inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-1 px-2.5 rounded transition-colors"
-    >
-      <i class="pi pi-external-link text-xs"></i>
-      <span>{{ i18n.t('githubPrViewBtn') }}</span>
-    </a>
+      <a
+        [href]="remediation.pullRequestUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        [pTooltip]="i18n.t('tooltipViewPr')"
+        tooltipPosition="left"
+        class="inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-1 px-2.5 rounded transition-colors"
+      >
+        <i class="pi pi-external-link text-xs"></i>
+        <span>{{ i18n.t('githubPrViewBtn') }}</span>
+      </a>
+    } @else {
+      <p class="text-[11px] text-slate-400 leading-snug m-0">
+        {{ i18n.t('githubPrIdleBody') }}
+      </p>
+    }
   </div>
 
   <!-- Resend Email Preview -->

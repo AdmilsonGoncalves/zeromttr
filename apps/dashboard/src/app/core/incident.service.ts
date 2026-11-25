@@ -105,6 +105,7 @@ export class IncidentService {
   private visualStateQueue: IncidentState[] = [];
   private readonly dismissedIncidentIds = new Set<string>();
   private activeIncidentFetchToken = 0;
+  private syncFallbackGeneration = 0;
   private isSyncingFallback = false;
   private readonly incidentUpdateGeneration = new Map<string, number>();
   private chaosTriggeredAtMs = 0;
@@ -397,14 +398,14 @@ export class IncidentService {
 
   readonly timelineSteps = computed<TimelineStepItem[]>(() => {
     const incident = this.currentIncident();
-    const state: IncidentState = incident?.state ?? IncidentState.RECEIVED;
+    const state: IncidentState | null = incident?.state ?? null;
 
     const isDone = (targetStates: IncidentState[]): boolean => {
-      return targetStates.includes(state);
+      return state !== null && targetStates.includes(state);
     };
 
     const isCurrent = (targetState: IncidentState): boolean => {
-      return state === targetState;
+      return state !== null && state === targetState;
     };
 
     const rca = incident?.rca;
@@ -1237,10 +1238,17 @@ export class IncidentService {
     this.isSyncingFallback = true;
     try {
       if (this.awaitingIncidentStart()) {
+        const syncGen = this.syncFallbackGeneration;
         try {
           const res = await fetch(`${baseUrl}/api/incidents`);
+          if (syncGen !== this.syncFallbackGeneration || !this.awaitingIncidentStart()) {
+            return;
+          }
           if (res.ok) {
             const list = (await res.json()) as Array<{ id: string; startedAt?: string }>;
+            if (syncGen !== this.syncFallbackGeneration || !this.awaitingIncidentStart()) {
+              return;
+            }
             const minStartedAt = this.chaosTriggeredAtMs > 0 ? this.chaosTriggeredAtMs - 5000 : 0;
             const latest = Array.isArray(list)
               ? list.find((inc) => {
@@ -1256,9 +1264,9 @@ export class IncidentService {
                   return true;
                 })
               : undefined;
-            if (latest) {
+            if (latest && syncGen === this.syncFallbackGeneration && this.awaitingIncidentStart()) {
               const loaded = await this.fetchIncident(latest.id, baseUrl);
-              if (loaded) {
+              if (loaded && syncGen === this.syncFallbackGeneration) {
                 this.awaitingIncidentStart.set(false);
                 this.stopLiveWaitTimer();
               }
@@ -1390,8 +1398,8 @@ export class IncidentService {
         method: 'POST',
         headers: this.buildDemoHeaders(false, reservedToken)
       });
-      await this.fetchTargetStatus(baseUrl);
       if (!res.ok) {
+        await this.fetchTargetStatus(baseUrl);
         const errPayload = await this.readErrorPayload(res);
         return {
           ok: false,
@@ -1401,6 +1409,7 @@ export class IncidentService {
       }
 
       if (clearIncident) {
+        this.syncFallbackGeneration++;
         this.activeIncidentFetchToken++;
         const current = this.currentIncident();
         if (current) {
@@ -1416,6 +1425,8 @@ export class IncidentService {
           await this.fetchIncident(current.id, baseUrl);
         }
       }
+
+      await this.fetchTargetStatus(baseUrl);
       return { ok: true, status: res.status };
     } catch (err) {
       return { ok: false, error: toErrorMessage(err) };

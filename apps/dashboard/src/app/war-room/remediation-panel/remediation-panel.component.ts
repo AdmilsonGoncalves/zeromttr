@@ -15,7 +15,12 @@ import { Button } from 'primeng/button';
 import { Tag } from 'primeng/tag';
 import { Tooltip } from 'primeng/tooltip';
 import { IncidentState, NotificationStatus, type IncidentDetail } from '../../core/contract.js';
-import { I18nService } from '../../core/i18n/i18n.service.js';
+import { I18nService, type TranslationDictionary } from '../../core/i18n/i18n.service.js';
+
+export interface PrBadgeConfig {
+  labelKey: keyof TranslationDictionary;
+  severity: 'success' | 'info' | 'warn' | 'danger' | 'secondary';
+}
 
 /**
  * Right War Room quadrant displaying GitHub PR status, Resend post-mortem preview, and human decision controls.
@@ -50,6 +55,24 @@ export class RemediationPanelComponent {
   }
 
   @Output() readonly simulateDecision = new EventEmitter<void>();
+
+  readonly prBadge = computed<PrBadgeConfig>(() => {
+    const incident = this.incidentSignal();
+    if (!incident?.remediation) {
+      return { labelKey: 'githubPrIdleStatus', severity: 'secondary' };
+    }
+    const state = this.displayedFsmStateSignal() ?? incident.state;
+    if (state === IncidentState.RESOLVED) {
+      return { labelKey: 'githubPrApprovedStatus', severity: 'success' };
+    }
+    if (state === IncidentState.REJECTED) {
+      return { labelKey: 'githubPrRejectedStatus', severity: 'danger' };
+    }
+    if (state === IncidentState.FAILED) {
+      return { labelKey: 'githubPrClosedStatus', severity: 'danger' };
+    }
+    return { labelKey: 'githubPrOpenStatus', severity: 'success' };
+  });
 
   readonly safeResendPreview = computed<string>(() => {
     const cleanHtml = stripUnsafeHtml(this.buildPreviewHtml());

@@ -36,14 +36,23 @@ export class GitDiffFinopsTabComponent {
     this.estimatedTokensSavedSignal.set(value);
   }
 
+  readonly rawBytesFetched = computed<number>(() => {
+    return this.incidentSignal()?.finops?.rawBytesFetched ?? 0;
+  });
+
+  readonly compactedBytesSent = computed<number>(() => {
+    return this.incidentSignal()?.finops?.compactedBytesSent ?? 0;
+  });
+
   readonly finopsCompactedBarPercent = computed<number>(() => {
     const finops = this.incidentSignal()?.finops;
-    const raw = finops?.rawBytesFetched ?? 48200;
-    const compacted = finops?.compactedBytesSent ?? 7712;
-    if (raw <= 0) {
+    if (!finops || finops.rawBytesFetched <= 0) {
       return 0;
     }
-    return Math.min(100, Math.max(2, round((compacted / raw) * 100, 1)));
+    return Math.min(
+      100,
+      Math.max(2, round((finops.compactedBytesSent / finops.rawBytesFetched) * 100, 1))
+    );
   });
 
   constructor(...args: [I18nService?]) {

@@ -45,20 +45,30 @@ export class LokiPiiTabComponent {
   readonly maskedPostOttlLog = MASKED_POST_OTTL_LOG;
 
   readonly displayedPreCollectorLog = computed<string>(() => {
+    const incident = this.incidentSignal();
+    if (!incident) {
+      return this.i18n.t('piiIdlePreCollectorLog');
+    }
+
     return (
-      this.incidentSignal()?.rca?.rawEdgeLogPreCollector ??
+      incident.rca?.rawEdgeLogPreCollector ??
       this.targetStatusSignal()?.rawEdgeLogPreCollector ??
       this.rawPreCollectorLog
     );
   });
 
   readonly displayedPostOttlLog = computed<string>(() => {
+    const incident = this.incidentSignal();
+    if (!incident) {
+      return this.i18n.t('piiIdlePostOttlLog');
+    }
+
     if (this.isPiiPassedSignal() === false) {
-      const types = (this.incidentSignal()?.rca?.piiGuardAudit?.detectedTypes ?? []).join(', ');
+      const types = (incident.rca?.piiGuardAudit?.detectedTypes ?? []).join(', ');
       return this.i18n.t('piiLogWithheldMessage').replace('{TYPES}', types);
     }
 
-    const sample = this.incidentSignal()?.rca?.logSample;
+    const sample = incident.rca?.logSample;
     if (!isNonEmptyString(sample)) {
       return this.maskedPostOttlLog;
     }
