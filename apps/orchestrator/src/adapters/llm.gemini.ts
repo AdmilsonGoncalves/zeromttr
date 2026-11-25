@@ -115,7 +115,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
           config: {
             systemInstruction: this.systemInstruction,
             temperature: 0.1,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 8192,
             responseMimeType: 'application/json',
             responseSchema: RCA_SYNTHESIS_SCHEMA
           }
@@ -184,7 +184,7 @@ Strict instructions for patchedContent:
       );
     }
 
-    const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 15_000);
+    const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 25_000);
 
     const modelsToTry = [this.modelName];
     if (isNonEmptyString(this.fallbackModelName) && this.fallbackModelName !== this.modelName) {

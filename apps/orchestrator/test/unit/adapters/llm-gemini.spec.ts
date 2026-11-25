@@ -77,6 +77,7 @@ describe('GeminiReasoningAdapter', () => {
     const result = await adapter.synthesizeRcaAndPatch(sampleEvidence);
 
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    expect(mockGenerateContent.mock.calls[0]?.[0]?.config?.maxOutputTokens).toBe(8192);
     expect(result.reasoningSource).toBe('llm');
     expect(result.suspectFilePath).toBe('src/db.ts');
     expect(result.patchedContent).toBe('export const max = 10;');

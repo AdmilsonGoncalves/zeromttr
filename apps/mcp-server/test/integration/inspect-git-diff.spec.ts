@@ -95,4 +95,38 @@ describe('Tool: inspect_git_deploy_diff integration', () => {
     expect(res.result?.isError).toBe(true);
     expect(res.result?.content[0].text).toContain('GitHub compare failed: 404');
   });
+
+  it('should preserve full suspect file content above 8000 chars so LLM synthesis receives complete source', async () => {
+    const padding = '// baseline comment\n'.repeat(450);
+    const fullRepoContent = `export class PaymentRepository {\n${padding}  async getPaymentById(id: string) { return id; }\n}\n`;
+    expect(fullRepoContent.length).toBeGreaterThan(8000);
+    expect(fullRepoContent.length).toBeLessThan(24_000);
+
+    mockGithubCompare('AdmilsonGoncalves/zeromttr', 'v2.14.7', 'v2.14.8', {
+      authorLogin: 'admilson-dev',
+      commitMessage: 'perf(db): inline payment lock query on high concurrency'
+    });
+
+    mockGithubGetContents(
+      'AdmilsonGoncalves/zeromttr',
+      'apps/target-app-demo/src/repositories/payment.repository.ts',
+      'v2.14.8',
+      {
+        sha: 'sha-blob-full-repo',
+        content: fullRepoContent
+      }
+    );
+
+    const res = await callMcpTool(server, 'inspect_git_deploy_diff', {
+      base_ref: 'v2.14.7',
+      head_ref: 'v2.14.8',
+      service_path: 'apps/target-app-demo',
+      suspect_keyword: 'payment.repository.ts'
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.result?.isError).toBe(false);
+    expect(res.parsedContent.suspect_file.content).toBe(fullRepoContent);
+    expect(res.parsedContent.suspect_file.content).not.toContain('[TRUNCATED_DIFF]');
+  });
 });
