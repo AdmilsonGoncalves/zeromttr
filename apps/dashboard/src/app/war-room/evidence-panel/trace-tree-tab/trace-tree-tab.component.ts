@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angu
 import { CommonModule } from '@angular/common';
 import { ProgressBar } from 'primeng/progressbar';
 import type { IncidentDetail } from '../../../core/contract.js';
-import { I18nService } from '../../../core/i18n.service.js';
+import { I18nService } from '../../../core/i18n/i18n.service.js';
 
 /**
  * Displays OTel evidence coverage, blast radius, RCA summary, and hierarchical span tree.

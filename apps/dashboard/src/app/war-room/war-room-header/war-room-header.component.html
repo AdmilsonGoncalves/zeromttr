@@ -158,16 +158,7 @@
         styleClass="text-xs py-1"
       />
 
-      <p-selectbutton
-        [options]="langOptions"
-        [ngModel]="i18n.currentLang()"
-        (ngModelChange)="onLangSelect($event)"
-        optionLabel="label"
-        optionValue="value"
-        [pTooltip]="i18n.t('tooltipLanguageSelector')"
-        tooltipPosition="bottom"
-        styleClass="text-[10px]"
-      />
+      <app-locale-switcher [currentLang]="i18n.currentLang()" (langChange)="onLangSelect($event)" />
     </nav>
   </div>
 </header>

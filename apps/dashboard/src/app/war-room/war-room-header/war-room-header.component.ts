@@ -21,24 +21,20 @@ import {
   type IncidentMode,
   type TargetStatusResponse
 } from '../../core/contract.js';
-import { I18nService, type Language } from '../../core/i18n.service.js';
+import { I18nService, type Language } from '../../core/i18n/i18n.service.js';
+import { LocaleSwitcherComponent } from '../locale-switcher/locale-switcher.component.js';
 
 interface ModeOption {
   label: string;
   value: IncidentMode;
 }
 
-interface LangOption {
-  label: string;
-  value: Language;
-}
-
 /**
- * Pure top War Room header displaying project identity, target connection tags, command actions, and language selector.
+ * Pure top War Room header displaying project identity, target connection tags, command actions, and locale switcher.
  */
 @Component({
   selector: 'app-war-room-header',
-  imports: [NgClass, FormsModule, SelectButton, Tag, Button, Tooltip],
+  imports: [NgClass, FormsModule, SelectButton, Tag, Button, Tooltip, LocaleSwitcherComponent],
   templateUrl: './war-room-header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -128,11 +124,6 @@ export class WarRoomHeaderComponent {
   readonly modeOptions: ModeOption[] = [
     { label: '⚡ Live API Mode', value: IncidentExecutionMode.LIVE },
     { label: '🎬 Replay Mode', value: IncidentExecutionMode.REPLAY }
-  ];
-
-  readonly langOptions: LangOption[] = [
-    { label: '🇧🇷 PT', value: 'pt' },
-    { label: '🇺🇸 EN', value: 'en' }
   ];
 
   constructor(...args: [I18nService?]) {

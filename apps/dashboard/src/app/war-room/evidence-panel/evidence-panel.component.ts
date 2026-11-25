@@ -3,7 +3,7 @@ import { isFilled } from '@zeromttr/utils';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import type { IncidentDetail, TargetStatusResponse } from '../../core/contract.js';
 import type { TelemetryHistoryPoint } from '../../core/incident.service.js';
-import { I18nService } from '../../core/i18n.service.js';
+import { I18nService } from '../../core/i18n/i18n.service.js';
 import { GitDiffFinopsTabComponent } from './git-diff-finops-tab/git-diff-finops-tab.component.js';
 import { LiveMetricsTabComponent } from './live-metrics-tab/live-metrics-tab.component.js';
 import { LokiPiiTabComponent } from './loki-pii-tab/loki-pii-tab.component.js';

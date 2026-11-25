@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService } from '../src/app/core/i18n/i18n.service.js';
 import { TraceTreeTabComponent } from '../src/app/war-room/evidence-panel/trace-tree-tab/trace-tree-tab.component.js';
 
 describe('TraceTreeTabComponent', () => {

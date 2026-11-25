@@ -2,7 +2,7 @@ import '@angular/compiler';
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService } from '../src/app/core/i18n/i18n.service.js';
 import { EvidencePanelComponent } from '../src/app/war-room/evidence-panel/evidence-panel.component.js';
 
 const EVIDENCE_TEMPLATE_PATH = path.resolve(

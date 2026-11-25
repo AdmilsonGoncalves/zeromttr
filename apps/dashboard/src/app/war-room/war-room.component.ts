@@ -3,7 +3,7 @@ import { isNonEmptyString } from '@zeromttr/utils';
 import { MessageService } from 'primeng/api';
 import { Toast } from 'primeng/toast';
 import { DecisionAction, type IncidentMode } from '../core/contract.js';
-import { I18nService, type Language } from '../core/i18n.service.js';
+import { I18nService, type Language } from '../core/i18n/i18n.service.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
 import { EvidencePanelComponent } from './evidence-panel/evidence-panel.component.js';
 import { FsmTimelineComponent } from './fsm-timeline/fsm-timeline.component.js';

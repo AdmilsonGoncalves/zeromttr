@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } f
 import { isNonEmptyString, isObject, safeJsonParse } from '@zeromttr/utils';
 import { MASKED_POST_OTTL_LOG, RAW_PRE_COLLECTOR_LOG } from '../../../core/constants.js';
 import type { IncidentDetail, TargetStatusResponse } from '../../../core/contract.js';
-import { I18nService } from '../../../core/i18n.service.js';
+import { I18nService } from '../../../core/i18n/i18n.service.js';
 
 /**
  * Displays PII guard audit status and side-by-side Pre-Collector vs Post-OTTL masked Loki logs.

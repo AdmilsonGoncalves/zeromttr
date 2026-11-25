@@ -14,7 +14,7 @@ import {
 import { isNonEmptyString } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { IncidentExecutionMode, type IncidentMode } from '../../core/contract.js';
-import { I18nService } from '../../core/i18n.service.js';
+import { I18nService } from '../../core/i18n/i18n.service.js';
 
 interface TurnstileApi {
   render: (

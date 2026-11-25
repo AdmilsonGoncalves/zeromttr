@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentExecutionMode, TargetHealthStatus } from '../src/app/core/contract.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
 import { WarRoomHeaderComponent } from '../src/app/war-room/war-room-header/war-room-header.component.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -33,11 +33,11 @@ describe('WarRoomHeaderComponent', () => {
 
     component.onModeSelect(IncidentExecutionMode.LIVE);
     component.onLiveKeyInput({ target: { value: 'secret-key' } } as unknown as Event);
-    component.onLangSelect('en');
+    component.onLangSelect(Language.EN_US);
 
     expect(modeSpy).toHaveBeenCalledWith(IncidentExecutionMode.LIVE);
     expect(keySpy).toHaveBeenCalledWith('secret-key');
-    expect(langSpy).toHaveBeenCalledWith('en');
+    expect(langSpy).toHaveBeenCalledWith(Language.EN_US);
   });
 
   it('should ignore empty mode, language, or missing input target', () => {
@@ -51,7 +51,7 @@ describe('WarRoomHeaderComponent', () => {
 
     component.onModeSelect('' as unknown as typeof IncidentExecutionMode.LIVE);
     component.onLiveKeyInput({ target: null } as unknown as Event);
-    component.onLangSelect('' as unknown as 'pt');
+    component.onLangSelect('' as unknown as Language);
 
     expect(modeSpy).not.toHaveBeenCalled();
     expect(keySpy).not.toHaveBeenCalled();
@@ -100,5 +100,7 @@ describe('WarRoomHeaderComponent', () => {
     expect(html).not.toContain('turnstileContainer');
     expect(html).toContain('headerMenuBtn');
     expect(html).toContain('aria-controls="war-room-header-menu"');
+    expect(html).toContain('<app-locale-switcher');
+    expect(html).not.toContain('langOptions');
   });
 });

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService } from '../src/app/core/i18n/i18n.service.js';
 import { WarRoomKpisComponent } from '../src/app/war-room/war-room-kpis/war-room-kpis.component.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

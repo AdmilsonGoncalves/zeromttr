@@ -41,7 +41,7 @@ import {
   TimelineStepStatus,
   UiSeverity
 } from './constants.js';
-import type { TranslationDictionary } from './i18n.service.js';
+import type { TranslationDictionary } from './i18n/i18n.service.js';
 
 export interface TimelineStepItem {
   id: number;

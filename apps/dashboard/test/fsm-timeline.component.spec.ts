@@ -1,6 +1,6 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
 import { FsmTimelineComponent } from '../src/app/war-room/fsm-timeline/fsm-timeline.component.js';
 
 describe('FsmTimelineComponent', () => {
@@ -23,7 +23,7 @@ describe('FsmTimelineComponent', () => {
     component.liveWaitSeconds = 42;
     expect(component.formattedHint()).toContain('42');
 
-    i18n.setLang('en');
+    i18n.setLang(Language.EN_US);
     expect(component.formattedHint()).toContain('42');
 
     component.hintKey = 'fsmHintNotified';

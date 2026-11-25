@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WarRoomComponent } from '../src/app/war-room/war-room.component.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
 import { IncidentService } from '../src/app/core/incident.service.js';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
 
@@ -69,13 +69,13 @@ describe('WarRoomComponent', () => {
   });
 
   it('should switch languages between PT and EN', () => {
-    expect(i18n.currentLang()).toBe('pt');
-    component.onLangChange('en');
-    expect(i18n.currentLang()).toBe('en');
+    expect(i18n.currentLang()).toBe(Language.PT_BR);
+    component.onLangChange(Language.EN_US);
+    expect(i18n.currentLang()).toBe(Language.EN_US);
     expect(i18n.t('simulateIncident')).toBe('💥 Simulate Incident');
 
-    component.onLangChange('pt');
-    expect(i18n.currentLang()).toBe('pt');
+    component.onLangChange(Language.PT_BR);
+    expect(i18n.currentLang()).toBe(Language.PT_BR);
     expect(i18n.t('simulateIncident')).toBe('💥 Simular Incidente');
   });
 

@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentExecutionMode } from '../src/app/core/contract.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService } from '../src/app/core/i18n/i18n.service.js';
 import { WarRoomNoticesComponent } from '../src/app/war-room/war-room-notices/war-room-notices.component.js';
 
 describe('WarRoomNoticesComponent', () => {
