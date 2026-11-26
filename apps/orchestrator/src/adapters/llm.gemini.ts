@@ -30,6 +30,7 @@ export interface GeminiAdapterOptions {
   fallbackModelName?: string;
   maxRetries?: number;
   retryDelayMs?: number;
+  getModels?: () => { modelName: string; fallbackModelName: string };
 }
 
 // Structured Gemini response schema enforcing deterministic RCA and patch JSON fields
@@ -83,6 +84,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
   private readonly systemInstruction: string;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  private readonly getModels?: () => { modelName: string; fallbackModelName: string };
 
   public constructor(apiKey?: string, modelName?: string, options: GeminiAdapterOptions = {}) {
     this.apiKey = apiKey ?? (process.env.GEMINI_API_KEY || process.env.LLM_API_KEY || '');
@@ -93,6 +95,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
     this.systemInstruction = options.systemInstruction ?? GEMINI_SYSTEM_INSTRUCTION;
     this.maxRetries = options.maxRetries ?? 1;
     this.retryDelayMs = options.retryDelayMs ?? 1_000;
+    this.getModels = options.getModels;
   }
 
   private async invokeModelWithTimeout(
@@ -187,9 +190,13 @@ Strict instructions for patchedContent:
 
     const timeoutMs = parseNumber(process.env.GEMINI_TIMEOUT_MS, 25_000);
 
-    const modelsToTry = [this.modelName];
-    if (isNonEmptyString(this.fallbackModelName) && this.fallbackModelName !== this.modelName) {
-      modelsToTry.push(this.fallbackModelName);
+    const dynamicModels = this.getModels?.();
+    const primaryModel = dynamicModels?.modelName || this.modelName;
+    const secondaryModel = dynamicModels?.fallbackModelName || this.fallbackModelName;
+
+    const modelsToTry = [primaryModel];
+    if (isNonEmptyString(secondaryModel) && secondaryModel !== primaryModel) {
+      modelsToTry.push(secondaryModel);
     }
 
     let lastError: unknown;

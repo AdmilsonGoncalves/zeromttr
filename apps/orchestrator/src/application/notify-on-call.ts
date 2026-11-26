@@ -1,3 +1,4 @@
+import type { SystemSettings } from '@zeromttr/contracts';
 import { isNonEmptyString, toErrorMessage } from '@zeromttr/utils';
 import {
   DecisionAction,
@@ -36,7 +37,11 @@ export class NotifyOnCall {
     private readonly hmacSecret: string,
     private readonly dashboardUrl: string,
     private readonly logger?: LoggerPort,
-    private readonly recipientEmail?: string
+    private readonly recipientEmail?: string,
+    private readonly getNotificationSettings?: () => Pick<
+      SystemSettings,
+      'decisionTtlSeconds' | 'onCallEmail'
+    >
   ) {}
 
   /**
@@ -48,7 +53,13 @@ export class NotifyOnCall {
       throw new Error(`Incident '${incidentId}' not found`);
     }
 
-    const exp = Math.floor(this.clock.now() / 1000) + 900; // 15 min TTL
+    const dynamicSettings = this.getNotificationSettings?.();
+    const ttlSeconds = dynamicSettings?.decisionTtlSeconds ?? 900;
+    const resolvedRecipientEmail = isNonEmptyString(dynamicSettings?.onCallEmail)
+      ? dynamicSettings.onCallEmail
+      : this.recipientEmail;
+
+    const exp = Math.floor(this.clock.now() / 1000) + ttlSeconds;
 
     const approveAction = DecisionAction.APPROVE;
     const rejectAction = DecisionAction.REJECT;
@@ -66,7 +77,9 @@ export class NotifyOnCall {
     try {
       resendResult = await this.tools.sendPostMortemResend({
         incident_id: incident.id,
-        ...(isNonEmptyString(this.recipientEmail) ? { recipient_email: this.recipientEmail } : {}),
+        ...(isNonEmptyString(resolvedRecipientEmail)
+          ? { recipient_email: resolvedRecipientEmail }
+          : {}),
         title: `[Post-Mortem] Operational Incident ${incident.id} — ${incident.service}`,
         rca_summary: incident.rca?.summary || OrchestratorDefault.MITIGATION_FALLBACK,
         evidence_coverage: `${incident.rca?.signalsCollected ?? 4}/${incident.rca?.signalsTotal ?? 4} Signals (${incident.rca?.evidenceCoveragePercent ?? 100}%)`,

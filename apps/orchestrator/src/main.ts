@@ -1,7 +1,10 @@
 import http from 'node:http';
+import path from 'node:path';
+import { SettingsPersistenceEngine } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
 import { ConsoleJsonLogger } from './adapters/logger.console.js';
 import { FileIncidentRepository } from './adapters/repo.file.js';
+import { SqliteSettingsRepository } from './adapters/settings.sqlite.js';
 import { createTargetStatusPort } from './adapters/target-status.prometheus.js';
 import { McpClientAdapter } from './adapters/mcp.client.js';
 import { DeterministicFallbackReasoningAdapter } from './adapters/llm.fallback.js';
@@ -21,24 +24,44 @@ import { ReplayRunner } from './demo/replay-runner.js';
 import { SimulateDemoDecision } from './demo/simulate-demo-decision.js';
 import { createDemoRouterFactory, createDemoSessionLifecycle } from './demo/demo.controller.js';
 import { OrchestratorLogEvent } from './domain/log-enums.js';
+import { resolveDefaultSystemSettings } from './domain/system-settings.js';
+import { resolveTargetRepoUrl } from './domain/target-repo-url.js';
 import { SystemClock } from './ports/clock.port.js';
 import { createApp } from './http/app.js';
 import { SseEventBroadcaster } from './http/events.sse.js';
+import { createSettingsRouter } from './http/settings.controller.js';
 
 /**
  * Instantiates orchestrator adapters, use cases, Express app, and starts the HTTP server.
  */
 export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
-  const logger = new ConsoleJsonLogger();
+  const isTest = process.env.NODE_ENV === 'test';
+  const defaultSettings = resolveDefaultSystemSettings(process.env);
+  const settingsDbPath =
+    process.env.SETTINGS_DB_PATH ||
+    (isTest ? ':memory:' : path.resolve(process.cwd(), 'var/zeromttr-settings.sqlite'));
+  const settingsRepository = new SqliteSettingsRepository(settingsDbPath, defaultSettings);
+  const getSettings = () => settingsRepository.get();
+
+  const logger = new ConsoleJsonLogger(getSettings().logLevel);
   const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH, logger);
   const toolsPort = new McpClientAdapter();
-  const targetStatusPort = createTargetStatusPort(toolsPort);
+  const targetStatusPort = createTargetStatusPort(toolsPort, {
+    getErrorRateThreshold: () => getSettings().targetErrorRateThresholdPercent
+  });
   const fallbackAdapter = new DeterministicFallbackReasoningAdapter();
-  const llmAdapter = new GeminiReasoningAdapter();
+  const llmAdapter = new GeminiReasoningAdapter(undefined, undefined, {
+    getModels: () => {
+      const current = getSettings();
+      return {
+        modelName: current.llmModel,
+        fallbackModelName: current.llmFallbackModel
+      };
+    }
+  });
   const clock = new SystemClock();
   const broadcaster = new SseEventBroadcaster();
 
-  const isTest = process.env.NODE_ENV === 'test';
   if (!isTest) {
     if (!process.env.DECISION_HMAC_SECRET) {
       throw new Error('FATAL: DECISION_HMAC_SECRET must be configured.');
@@ -55,7 +78,7 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     process.env.DECISION_HMAC_SECRET || (isTest ? 'test-hmac-secret-zeromttr-2026' : '');
   const dashboardUrl = process.env.PUBLIC_DASHBOARD_URL || 'https://zeromttr.agjworks.com';
 
-  const handleAlert = new HandleAlert(repository, broadcaster);
+  const handleAlert = new HandleAlert(repository, broadcaster, () => getSettings());
   const investigateIncident = new InvestigateIncident(
     repository,
     toolsPort,
@@ -63,7 +86,13 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     broadcaster,
     logger
   );
-  const enrichWithDeployDiff = new EnrichWithDeployDiff(repository, toolsPort, broadcaster);
+  const enrichWithDeployDiff = new EnrichWithDeployDiff(
+    repository,
+    toolsPort,
+    broadcaster,
+    getSettings().targetServicePath,
+    () => getSettings()
+  );
   const patchSyntaxValidator = new TypeScriptPatchSyntaxValidator();
   const dispatchRemediation = new DispatchRemediation(
     repository,
@@ -85,7 +114,8 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     hmacSecret,
     dashboardUrl,
     logger,
-    onCallEmail
+    onCallEmail,
+    () => getSettings()
   );
   const demoConfig = resolveDemoConfig(process.env);
   const demoEnabled = demoConfig.demoModeEnabled;
@@ -105,7 +135,13 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     broadcaster,
     hmacSecret,
     logger,
-    demoLifecycle ? (incident) => demoLifecycle.handleLiveIncidentApproved(incident) : undefined
+    demoLifecycle
+      ? async (incident) => {
+          if (getSettings().autoRestoreOnApprove) {
+            await demoLifecycle.handleLiveIncidentApproved(incident);
+          }
+        }
+      : undefined
   );
   const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster, logger);
 
@@ -115,7 +151,8 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     enrichWithDeployDiff,
     dispatchRemediation,
     notifyOnCall,
-    broadcaster
+    broadcaster,
+    () => getSettings()
   );
 
   const initialIncident = createInitialIncident();
@@ -142,6 +179,42 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
         })
       : undefined;
 
+  const settingsReadonlyInfo = {
+    targetGithubRepo: resolveTargetRepoUrl(),
+    targetBaseBranch: process.env.TARGET_BASE_BRANCH || 'release/target-v2.14.8',
+    targetStatusProvider: (process.env.TARGET_STATUS_PROVIDER || 'manifest').trim().toLowerCase(),
+    grafanaRepeatInterval: process.env.GRAFANA_ALERT_REPEAT_INTERVAL || '1m',
+    persistenceEngine: SettingsPersistenceEngine.SQLITE
+  };
+  const settingsAdminToken = process.env.SETTINGS_ADMIN_TOKEN?.trim() || '';
+  const hasSettingsAdminToken = isNonEmptyString(settingsAdminToken);
+  // In demo mode without SETTINGS_ADMIN_TOKEN, settings stay strictly read-only for anonymous visitors.
+  // When SETTINGS_ADMIN_TOKEN is set, it is always required to save (regardless of demo key settings).
+  // In private deployments (ENABLE_DEMO_MODE=false) without a token, settings remain editable behind VPN/SSO.
+  const settingsEditable = hasSettingsAdminToken || !demoEnabled;
+  const settingsRequiresAuthKey = hasSettingsAdminToken;
+
+  const settingsRouter = {
+    create: ({
+      dashboardAuthMiddleware
+    }: {
+      dashboardAuthMiddleware: Parameters<
+        typeof createSettingsRouter
+      >[0]['dashboardAuthMiddleware'];
+    }) =>
+      createSettingsRouter({
+        settingsRepository,
+        dashboardAuthMiddleware,
+        readonlyInfo: settingsReadonlyInfo,
+        editable: settingsEditable,
+        requiresAuthKey: settingsRequiresAuthKey,
+        adminToken: settingsAdminToken,
+        onSettingsUpdated: (updated) => {
+          logger.setMinLevel(updated.logLevel);
+        }
+      })
+  };
+
   const app = createApp({
     repository,
     targetStatusPort,
@@ -151,7 +224,8 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     broadcaster,
     grafanaWebhookToken: process.env.GRAFANA_WEBHOOK_TOKEN,
     dashboardApiToken: process.env.DASHBOARD_API_TOKEN,
-    demoRouter
+    demoRouter,
+    settingsRouter
   });
 
   const server = http.createServer(app);

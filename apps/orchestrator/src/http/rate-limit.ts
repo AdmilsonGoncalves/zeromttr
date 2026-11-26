@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { Express, NextFunction, Request, Response } from 'express';
 import { isNonEmptyString, normalizeIp, parseForwardedIp } from '@zeromttr/utils';
 import { HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { SecurityErrorCode } from './http-constants.js';
@@ -126,4 +126,31 @@ export function createIpRateLimitMiddleware(options: IpRateLimitOptions) {
 
     next();
   };
+}
+
+/**
+ * Registers standard per-IP read (600/min) and strict write (30/min) rate limits on API endpoints.
+ */
+export function registerApiRateLimits(app: Express): void {
+  const strictActionLimiter = createIpRateLimitMiddleware({
+    windowMs: 60_000,
+    maxRequests: 30,
+    message: 'Rate limit exceeded for simulation/decision actions. Please wait a minute.'
+  });
+  const readApiLimiter = createIpRateLimitMiddleware({
+    windowMs: 60_000,
+    maxRequests: 600,
+    message: 'Rate limit exceeded for API read endpoints. Please slow down.'
+  });
+
+  app.use('/api/demo/chaos', strictActionLimiter);
+  app.use('/api/demo/reset', strictActionLimiter);
+  app.use('/api/demo/simulate-decision', strictActionLimiter);
+  app.use('/api/demo/healthy-traffic', strictActionLimiter);
+  app.use('/api/incidents/:id/decision', strictActionLimiter);
+  app.get('/api/incidents', readApiLimiter);
+  app.get('/api/incidents/:id', readApiLimiter);
+  app.get('/api/target/status', readApiLimiter);
+  app.get('/api/settings', readApiLimiter);
+  app.patch('/api/settings', strictActionLimiter);
 }

@@ -152,6 +152,8 @@ describe('http.utils', () => {
       expect(HTTP_HEADERS.CONTENT_TYPE).toBe('Content-Type');
       expect(HTTP_HEADERS.LIVE_DEMO_KEY).toBe('X-Live-Demo-Key');
       expect(HTTP_HEADERS.LIVE_DEMO_KEY_LOWER).toBe('x-live-demo-key');
+      expect(HTTP_HEADERS.SETTINGS_ADMIN_TOKEN).toBe('X-Settings-Admin-Token');
+      expect(HTTP_HEADERS.SETTINGS_ADMIN_TOKEN_LOWER).toBe('x-settings-admin-token');
       expect(HTTP_HEADERS.TURNSTILE_TOKEN).toBe('X-Turnstile-Token');
       expect(HTTP_HEADERS.TURNSTILE_TOKEN_LOWER).toBe('x-turnstile-token');
       expect(HTTP_HEADERS.CF_TURNSTILE_RESPONSE).toBe('CF-Turnstile-Response');

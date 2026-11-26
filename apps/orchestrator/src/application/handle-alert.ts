@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import type { SystemSettings } from '@zeromttr/contracts';
 import { diffInSeconds, isNonEmptyString } from '@zeromttr/utils';
 import {
   AlertSeverity,
@@ -41,11 +42,20 @@ export const GrafanaWebhookPayloadSchema = z
 
 export type GrafanaWebhookPayload = z.infer<typeof GrafanaWebhookPayloadSchema>;
 
+export type AlertSuppressionReason = 'rejection_cooldown' | 'repeat_suppression';
+
 export interface HandleAlertResult {
   incident: Incident | null;
   isDuplicate: boolean;
   ignored?: boolean;
+  suppressed?: boolean;
+  suppressionReason?: AlertSuppressionReason;
 }
+
+export type AlertPolicySettings = Pick<
+  SystemSettings,
+  'rejectionCooldownSeconds' | 'repeatSuppressionSeconds' | 'decisionTtlSeconds'
+>;
 
 const WARNING_SEVERITY_ALIASES: ReadonlySet<string> = new Set([AlertSeverity.WARNING, 'warn']);
 
@@ -67,7 +77,8 @@ export class HandleAlert {
 
   public constructor(
     private readonly repository: IncidentRepository,
-    private readonly broadcaster: EventBroadcasterPort
+    private readonly broadcaster: EventBroadcasterPort,
+    private readonly getAlertSettings?: () => AlertPolicySettings
   ) {}
 
   /**
@@ -109,12 +120,16 @@ export class HandleAlert {
     primaryAlert: GrafanaWebhookPayload['alerts'][number],
     fingerprint: string
   ): Promise<HandleAlertResult> {
+    const policy = this.getAlertSettings?.();
+    const ttlSeconds = policy?.decisionTtlSeconds ?? 15 * 60;
+    const rejectionCooldownSeconds = policy?.rejectionCooldownSeconds ?? 0;
+    const repeatSuppressionSeconds = policy?.repeatSuppressionSeconds ?? 0;
+
     const existing = await this.repository.findOpenByFingerprint(fingerprint);
     if (existing) {
       const lastTransition = existing.transitions[existing.transitions.length - 1];
       const lastReferenceAt = lastTransition ? lastTransition.at : existing.startedAt;
       const elapsedSeconds = diffInSeconds(lastReferenceAt, Date.now());
-      const ttlSeconds = 15 * 60;
 
       if (elapsedSeconds > ttlSeconds) {
         const reason =
@@ -135,6 +150,38 @@ export class HandleAlert {
           incident: existing,
           isDuplicate: true
         };
+      }
+    } else if (
+      (rejectionCooldownSeconds > 0 || repeatSuppressionSeconds > 0) &&
+      this.repository.findLatestByFingerprint
+    ) {
+      const latest = await this.repository.findLatestByFingerprint(fingerprint);
+      if (latest) {
+        const lastTransition = latest.transitions[latest.transitions.length - 1];
+        const lastReferenceAt = lastTransition ? lastTransition.at : latest.startedAt;
+        const elapsedSeconds = diffInSeconds(lastReferenceAt, Date.now());
+
+        if (
+          latest.state === IncidentState.REJECTED &&
+          rejectionCooldownSeconds > 0 &&
+          elapsedSeconds < rejectionCooldownSeconds
+        ) {
+          return {
+            incident: latest,
+            isDuplicate: true,
+            suppressed: true,
+            suppressionReason: 'rejection_cooldown'
+          };
+        }
+
+        if (repeatSuppressionSeconds > 0 && elapsedSeconds < repeatSuppressionSeconds) {
+          return {
+            incident: latest,
+            isDuplicate: true,
+            suppressed: true,
+            suppressionReason: 'repeat_suppression'
+          };
+        }
       }
     }
 

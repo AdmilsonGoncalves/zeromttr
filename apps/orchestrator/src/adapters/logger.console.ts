@@ -74,10 +74,17 @@ function redactValue(value: unknown, seen = new WeakSet<object>()): unknown {
  * Structured JSON console logger enforcing log-level filtering and automatic secret redaction.
  */
 export class ConsoleJsonLogger implements LoggerPort {
-  private readonly minLevel: LogLevel;
+  private minLevel: LogLevel;
 
   public constructor(minLevel?: LogLevel | string) {
     this.minLevel = resolveMinLevel(minLevel ?? process.env.LOG_LEVEL);
+  }
+
+  /**
+   * Updates the minimum emitted log level dynamically at runtime.
+   */
+  public setMinLevel(minLevel: LogLevel | string): void {
+    this.minLevel = resolveMinLevel(minLevel);
   }
 
   /**

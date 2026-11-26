@@ -12,6 +12,7 @@ export interface PrometheusTargetStatusConfig {
   targetRepo?: string;
   suspectFilePath?: string;
   errorRateThresholdPercent?: number;
+  getErrorRateThreshold?: () => number;
 }
 
 const DEFAULT_ERROR_RATE_THRESHOLD_PERCENT = 5;
@@ -57,6 +58,7 @@ export class PrometheusTargetStatusAdapter implements TargetStatusPort {
     const suspectFilePath =
       this.config.suspectFilePath ?? process.env.TARGET_SUSPECT_FILE_PATH ?? '';
     const errorThreshold =
+      this.config.getErrorRateThreshold?.() ??
       this.config.errorRateThresholdPercent ??
       parseNumber(
         process.env.TARGET_ERROR_RATE_THRESHOLD_PERCENT,
@@ -138,10 +140,13 @@ export class PrometheusTargetStatusAdapter implements TargetStatusPort {
 /**
  * Selects the configured `TargetStatusPort` provider (`manifest` or `prometheus`).
  */
-export function createTargetStatusPort(toolsPort: ToolsPort): TargetStatusPort {
+export function createTargetStatusPort(
+  toolsPort: ToolsPort,
+  config?: PrometheusTargetStatusConfig
+): TargetStatusPort {
   const provider = (process.env.TARGET_STATUS_PROVIDER || 'manifest').trim().toLowerCase();
   if (provider === 'prometheus') {
-    return new PrometheusTargetStatusAdapter(toolsPort);
+    return new PrometheusTargetStatusAdapter(toolsPort, config);
   }
   return new HttpTargetStatusAdapter();
 }
