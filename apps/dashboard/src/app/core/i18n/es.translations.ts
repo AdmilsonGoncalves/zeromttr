@@ -178,12 +178,8 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   // === Charts ===
   chartLatencyErrorTitle: 'Latencia p95 (ms) y Tasa de Error 5xx (%)',
   chartThroughputPoolTitle: 'Throughput (req/s) y Uso del Pool DB',
-  chartPoolGaugeLabel: 'Saturación del Pool',
-  chartFinopsGaugeLabel: 'Reducción FinOps',
   chartFinopsBarsTitle: 'Payload LLM (Bruto vs Compactado)',
-  chartMttrBarsTitle: 'MTTR Autónomo vs Manual (~30m)',
   chartAwaitingSamples: 'Esperando muestras en vivo del servicio objetivo (polling 2s)...',
-  chartSloThreshold: 'SLO 500ms',
 
   // === Turnstile & Tooltips ===
   turnstilePendingNotice:

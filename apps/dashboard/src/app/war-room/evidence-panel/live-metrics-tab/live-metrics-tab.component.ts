@@ -73,8 +73,42 @@ export class LiveMetricsTabComponent {
     )
   );
 
+  readonly latestLatencyMs = computed<number>(() => {
+    const pts = this.telemetryHistorySignal();
+    return pts[pts.length - 1]?.p95LatencyMs ?? 0;
+  });
+
+  readonly latestErrorPercent = computed<number>(() => {
+    const pts = this.telemetryHistorySignal();
+    return pts[pts.length - 1]?.errorRate5xxPercent ?? 0;
+  });
+
+  readonly latestRequestsPerSecond = computed<number>(() => {
+    const pts = this.telemetryHistorySignal();
+    return pts[pts.length - 1]?.requestsPerSecond ?? 0;
+  });
+
+  readonly latestPoolConnections = computed<number>(() => {
+    const pts = this.telemetryHistorySignal();
+    const latest = pts[pts.length - 1];
+    if (!latest) {
+      return 0;
+    }
+    return latest.poolActive + latest.poolWaiting;
+  });
+
   constructor(...args: [I18nService?]) {
     const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
+  }
+
+  /**
+   * Computes SVG text baseline Y so bottom axis labels render cleanly inside the 145px viewBox.
+   */
+  yTickLabelY(tickY: number): number {
+    if (tickY >= 130) {
+      return tickY - 3;
+    }
+    return tickY + 9;
   }
 }

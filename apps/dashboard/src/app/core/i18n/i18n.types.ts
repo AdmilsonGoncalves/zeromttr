@@ -160,12 +160,8 @@ export interface TranslationDictionary {
   // === Charts ===
   chartLatencyErrorTitle: string;
   chartThroughputPoolTitle: string;
-  chartPoolGaugeLabel: string;
-  chartFinopsGaugeLabel: string;
   chartFinopsBarsTitle: string;
-  chartMttrBarsTitle: string;
   chartAwaitingSamples: string;
-  chartSloThreshold: string;
 
   // === Turnstile & Tooltips ===
   turnstilePendingNotice: string;

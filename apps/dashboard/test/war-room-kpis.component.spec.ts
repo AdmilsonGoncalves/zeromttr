@@ -21,7 +21,7 @@ describe('WarRoomKpisComponent', () => {
     component = new WarRoomKpisComponent(i18n);
   });
 
-  it('should expose TTD, TTPR, evidence coverage, reasoning source, and FinOps signals', () => {
+  it('should_expose_ttd_ttpr_evidence_coverage_reasoning_source_and_finops_signals', () => {
     component.ttdDisplay = '2.4s';
     component.ttprDisplay = '8.1s';
     component.signalsRatio = '4/4';
@@ -39,7 +39,7 @@ describe('WarRoomKpisComponent', () => {
     expect(component.estimatedTokensSavedSignal()).toBe(5014);
   });
 
-  it('should render all 5 decoupled KPI cards including FinOps payload reduction', () => {
+  it('should_render_all_5_decoupled_kpi_cards_including_finops_payload_reduction', () => {
     const html = readFileSync(KPIS_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('kpiTtdLabel');
     expect(html).toContain('kpiTtprLabel');

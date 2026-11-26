@@ -828,4 +828,56 @@ describe('DispatchRemediation Use Case', () => {
       expect.anything()
     );
   });
+
+  it('should route to deterministic fallback without calling LLM when suspectFileContent is truncated', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-inc-trunc-001',
+        branchUrl:
+          'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-trunc-001',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/101',
+        commitSha: 'commit-trunc'
+      })),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 106, success: true }))
+    };
+    const llmAdapter: ReasoningPort = { synthesizeRcaAndPatch: vi.fn() };
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Fallback for truncated file',
+        rootCause: 'Oversized suspect file truncated at cap',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'Restored complete baseline'
+      }))
+    };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    const truncatedEvidence: CollectedEvidence = {
+      ...validEvidence,
+      gitDiff: {
+        ...validEvidence.gitDiff!,
+        suspectFileContent: `${validPatch}\n... [TRUNCATED_DIFF]`
+      }
+    };
+
+    const result = await useCase.execute(incident.id, truncatedEvidence, 'blob123');
+    expect(llmAdapter.synthesizeRcaAndPatch).not.toHaveBeenCalled();
+    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalledTimes(1);
+    expect(result.reasoningSource).toBe('fallback');
+  });
 });

@@ -63,7 +63,7 @@
       class="w-full md:w-auto flex-wrap items-center justify-start md:justify-end gap-1.5 min-w-0 pt-2 md:pt-0 border-t border-slate-800/80 md:border-t-0"
     >
       <p-selectbutton
-        [options]="modeOptions"
+        [options]="modeOptions()"
         [ngModel]="activeModeSignal()"
         (ngModelChange)="onModeSelect($event)"
         [disabled]="isWorkflowRunningSignal()"

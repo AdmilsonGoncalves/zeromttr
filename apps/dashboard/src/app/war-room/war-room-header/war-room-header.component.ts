@@ -121,10 +121,10 @@ export class WarRoomHeaderComponent {
   @Output() readonly triggerChaos = new EventEmitter<void>();
   @Output() readonly resetService = new EventEmitter<void>();
 
-  readonly modeOptions: ModeOption[] = [
-    { label: '⚡ Live API Mode', value: IncidentExecutionMode.LIVE },
-    { label: '🎬 Replay Mode', value: IncidentExecutionMode.REPLAY }
-  ];
+  readonly modeOptions = computed<ModeOption[]>(() => [
+    { label: this.i18n.t('liveMode'), value: IncidentExecutionMode.LIVE },
+    { label: this.i18n.t('replayMode'), value: IncidentExecutionMode.REPLAY }
+  ]);
 
   constructor(...args: [I18nService?]) {
     const [i18n] = args;

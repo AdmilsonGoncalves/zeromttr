@@ -13,7 +13,7 @@ describe('WarRoomNoticesComponent', () => {
     component = new WarRoomNoticesComponent(i18n);
   });
 
-  it('should reflect replay mode and turnstile lock inputs in reactive signals', () => {
+  it('should_reflect_replay_mode_and_turnstile_lock_inputs_in_reactive_signals', () => {
     expect(component.activeModeSignal()).toBe(IncidentExecutionMode.REPLAY);
     expect(component.turnstileSiteKeySignal()).toBeNull();
     expect(component.simulationLockedByTurnstileSignal()).toBe(false);
@@ -27,15 +27,16 @@ describe('WarRoomNoticesComponent', () => {
     expect(component.simulationLockedByTurnstileSignal()).toBe(true);
   });
 
-  it('should safely ignore retryTurnstileLoad when host element or site key is missing', () => {
+  it('should_safely_ignore_retryTurnstileLoad_when_host_element_or_site_key_is_missing', () => {
     component.turnstileLoadErrorSignal.set(true);
     component.retryTurnstileLoad();
     expect(component.turnstileLoadErrorSignal()).toBe(true);
   });
 
-  it('should emit turnstileTokenChange reset cleanly when ngOnDestroy runs without global turnstile', () => {
+  it('should_emit_null_on_turnstileTokenChange_and_prevent_post_destroy_script_mounts_during_ngOnDestroy', () => {
     const spy = vi.fn();
     component.turnstileTokenChange.subscribe(spy);
-    expect(() => component.ngOnDestroy()).not.toThrow();
+    component.ngOnDestroy();
+    expect(spy).toHaveBeenCalledWith(null);
   });
 });

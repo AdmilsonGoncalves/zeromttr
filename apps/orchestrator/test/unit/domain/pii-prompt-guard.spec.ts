@@ -95,6 +95,20 @@ describe('PiiPromptGuard (Fail-Closed)', () => {
     const auditGit = PiiPromptGuard.inspectAndEnforceFailClosed(gitSsh);
     expect(auditGit.detectedTypes).not.toContain('email');
 
+    const gitSshNoExt = 'Fetching git@gitlab.com:platform-team/api-pagamentos-core';
+    const auditGitNoExt = PiiPromptGuard.inspectAndEnforceFailClosed(gitSshNoExt);
+    expect(auditGitNoExt.detectedTypes).not.toContain('email');
+
+    const emailFollowedByColon = 'Error from git@empresa.com.br: connection timeout';
+    const auditEmailColon = PiiPromptGuard.inspectAndEnforceFailClosed(emailFollowedByColon);
+    expect(auditEmailColon.passed).toBe(false);
+    expect(auditEmailColon.detectedTypes).toContain('email');
+
+    const emailWithColonWord = 'Contact git@empresa.com.br:urgente';
+    const auditEmailColonWord = PiiPromptGuard.inspectAndEnforceFailClosed(emailWithColonWord);
+    expect(auditEmailColonWord.passed).toBe(false);
+    expect(auditEmailColonWord.detectedTypes).toContain('email');
+
     const gitHubNoReply = 'Committed by 12345+admilson@users.noreply.github.com';
     const auditNoReply = PiiPromptGuard.inspectAndEnforceFailClosed(gitHubNoReply);
     expect(auditNoReply.detectedTypes).not.toContain('email');

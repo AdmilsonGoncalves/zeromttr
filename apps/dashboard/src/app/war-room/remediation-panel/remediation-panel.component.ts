@@ -135,7 +135,7 @@ export class RemediationPanelComponent {
     }
 
     if (isNonEmptyString(raw)) {
-      return stripUnsafeHtml(raw);
+      return raw;
     }
 
     return `

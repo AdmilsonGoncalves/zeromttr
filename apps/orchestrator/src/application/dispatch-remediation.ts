@@ -49,6 +49,10 @@ function isTruncatedLlmSnippet(content: string): boolean {
   return TRUNCATED_PATCH_PLACEHOLDER_PATTERN.test(content);
 }
 
+function isTruncatedSuspectFile(suspectFileContent?: string): boolean {
+  return isNonEmptyString(suspectFileContent) && suspectFileContent.includes('[TRUNCATED_DIFF]');
+}
+
 function extractRequiredExportPatterns(suspectFileContent?: string): RegExp[] {
   if (!isNonEmptyString(suspectFileContent)) {
     return [];
@@ -353,7 +357,25 @@ export class DispatchRemediation {
     let synthesis: RcaAndPatchSynthesis;
     let reasoningSource: ReasoningSource;
 
-    if (piiAudit.passed) {
+    if (!piiAudit.passed) {
+      // Fail-closed! Route directly to fallback
+      this.logger?.warn({
+        event: OrchestratorLogEvent.PII_PROMPT_GUARD_BLOCKED,
+        incidentId,
+        message: `Fail-closed PII guard blocked LLM dispatch (${piiAudit.detectedTypes.join(', ')})`
+      });
+      synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+      reasoningSource = ReasoningProvider.FALLBACK;
+    } else if (isTruncatedSuspectFile(suspectFileContent)) {
+      this.logger?.warn({
+        event: OrchestratorLogEvent.LLM_PATCH_REJECTED,
+        incidentId,
+        message:
+          'Suspect file content was truncated at policy cap; routing to deterministic fallback'
+      });
+      synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+      reasoningSource = ReasoningProvider.FALLBACK;
+    } else {
       try {
         const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
         if (
@@ -387,15 +409,6 @@ export class DispatchRemediation {
         synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
         reasoningSource = ReasoningProvider.FALLBACK;
       }
-    } else {
-      // Fail-closed! Route directly to fallback
-      this.logger?.warn({
-        event: OrchestratorLogEvent.PII_PROMPT_GUARD_BLOCKED,
-        incidentId,
-        message: `Fail-closed PII guard blocked LLM dispatch (${piiAudit.detectedTypes.join(', ')})`
-      });
-      synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-      reasoningSource = ReasoningProvider.FALLBACK;
     }
 
     if (

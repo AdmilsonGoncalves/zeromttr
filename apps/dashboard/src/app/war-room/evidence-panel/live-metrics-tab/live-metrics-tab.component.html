@@ -13,8 +13,7 @@
         <figcaption class="flex items-center justify-between text-xs">
           <span class="font-bold text-slate-200">{{ i18n.t('chartLatencyErrorTitle') }}</span>
           <span class="font-mono text-[11px] text-amber-300">
-            {{ latencyTimeSeries().max }}ms ·
-            {{ errorTimeSeries().points[errorTimeSeries().points.length - 1]?.value ?? 0 }}%
+            {{ latestLatencyMs() }}ms · {{ latestErrorPercent() }}%
           </span>
         </figcaption>
         <svg
@@ -32,7 +31,17 @@
               stroke="#1e293b"
               stroke-width="1"
             />
-            <text x="10" [attr.y]="tick.y + 9" class="fill-slate-500 text-[9px] font-mono">
+            <text x="10" [attr.y]="yTickLabelY(tick.y)" class="fill-slate-400 text-[9px] font-mono">
+              {{ tick.label }}
+            </text>
+          }
+          @for (tick of errorTimeSeries().yTicks; track tick.y) {
+            <text
+              x="410"
+              [attr.y]="yTickLabelY(tick.y)"
+              text-anchor="end"
+              class="fill-rose-400/80 text-[9px] font-mono"
+            >
               {{ tick.label }}
             </text>
           }
@@ -76,10 +85,7 @@
         <figcaption class="flex items-center justify-between text-xs">
           <span class="font-bold text-slate-200">{{ i18n.t('chartThroughputPoolTitle') }}</span>
           <span class="font-mono text-[11px] text-cyan-300">
-            {{
-              throughputTimeSeries().points[throughputTimeSeries().points.length - 1]?.value ?? 0
-            }}
-            rps
+            {{ latestRequestsPerSecond() }} rps · {{ latestPoolConnections() }} conn
           </span>
         </figcaption>
         <svg
@@ -97,7 +103,17 @@
               stroke="#1e293b"
               stroke-width="1"
             />
-            <text x="10" [attr.y]="tick.y + 9" class="fill-slate-500 text-[9px] font-mono">
+            <text x="10" [attr.y]="yTickLabelY(tick.y)" class="fill-slate-400 text-[9px] font-mono">
+              {{ tick.label }}
+            </text>
+          }
+          @for (tick of poolTimeSeries().yTicks; track tick.y) {
+            <text
+              x="410"
+              [attr.y]="yTickLabelY(tick.y)"
+              text-anchor="end"
+              class="fill-emerald-400/80 text-[9px] font-mono"
+            >
               {{ tick.label }}
             </text>
           }

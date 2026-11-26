@@ -51,20 +51,60 @@ describe('LiveMetricsTabComponent', () => {
     expect(component.errorTimeSeries().points).toHaveLength(2);
     expect(component.throughputTimeSeries().points).toHaveLength(2);
     expect(component.poolTimeSeries().points).toHaveLength(2);
+    expect(component.latestLatencyMs()).toBe(1500);
+    expect(component.latestErrorPercent()).toBe(100);
+    expect(component.latestRequestsPerSecond()).toBe(4.2);
+    expect(component.latestPoolConnections()).toBe(5);
   });
 
-  it('should_return_empty_series_when_no_history_is_loaded', () => {
+  it('should_return_empty_series_and_zero_latest_metrics_when_no_history_is_loaded', () => {
     expect(component.latencyTimeSeries().points).toEqual([]);
     expect(component.throughputTimeSeries().points).toEqual([]);
+    expect(component.latestLatencyMs()).toBe(0);
+    expect(component.latestErrorPercent()).toBe(0);
+    expect(component.latestRequestsPerSecond()).toBe(0);
+    expect(component.latestPoolConnections()).toBe(0);
   });
 
-  it('should_render_only_dedicated_time_series_without_duplicate_gauges_or_finops_mttr_cards', () => {
+  it('should_render_only_dedicated_time_series_with_secondary_axis_labels_and_no_duplicate_gauges', () => {
     const html = readFileSync(LIVE_METRICS_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('chartLatencyErrorTitle');
     expect(html).toContain('chartThroughputPoolTitle');
+    expect(html).toContain('latestLatencyMs()');
+    expect(html).toContain('latestPoolConnections()');
+    expect(html).toContain('errorTimeSeries().yTicks');
+    expect(html).toContain('poolTimeSeries().yTicks');
     expect(html).not.toContain('chartPoolGaugeLabel');
     expect(html).not.toContain('chartFinopsGaugeLabel');
     expect(html).not.toContain('chartMttrBarsTitle');
     expect(html).not.toContain('chartFinopsBarsTitle');
+    expect(html).not.toContain('tick.y + 9');
+    expect(html).toContain('yTickLabelY(tick.y)');
+  });
+
+  it('should_keep_all_svg_y_tick_labels_inside_the_145px_viewbox_bounds', () => {
+    const labelYFn = (component as unknown as { yTickLabelY?: (tickY: number) => number })
+      .yTickLabelY;
+    expect(typeof labelYFn).toBe('function');
+
+    component.telemetryHistory = [
+      {
+        timestampMs: 1000,
+        label: '11:00:00',
+        requestsPerSecond: 1.4,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 18,
+        poolActive: 1,
+        poolWaiting: 0,
+        poolMax: 10,
+        healthyTrafficActive: true
+      }
+    ];
+
+    for (const tick of component.latencyTimeSeries().yTicks) {
+      const y = labelYFn!(tick.y);
+      expect(y).toBeGreaterThanOrEqual(9);
+      expect(y).toBeLessThanOrEqual(142);
+    }
   });
 });

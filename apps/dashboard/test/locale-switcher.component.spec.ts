@@ -12,7 +12,7 @@ describe('LocaleSwitcherComponent', () => {
     component = new LocaleSwitcherComponent(i18n);
   });
 
-  it('should expose PT_BR, EN_US, and ES_ES locale options and resolve active flag', () => {
+  it('should_expose_pt_br_en_us_and_es_es_locale_options_and_resolve_active_flag', () => {
     expect(component.localeOptions.map((o) => o.code)).toEqual([
       Language.PT_BR,
       Language.EN_US,
@@ -25,7 +25,7 @@ describe('LocaleSwitcherComponent', () => {
     expect(component.activeLocale().flag).toBe('🇪🇸');
   });
 
-  it('should toggle dropdown state, emit selected locale, and close menu', () => {
+  it('should_toggle_dropdown_state_emit_selected_locale_and_close_menu', () => {
     const spy = vi.fn();
     component.langChange.subscribe(spy);
 
@@ -38,7 +38,7 @@ describe('LocaleSwitcherComponent', () => {
     expect(component.isOpenSignal()).toBe(false);
   });
 
-  it('should close dropdown on Escape or Tab keyboard events', () => {
+  it('should_close_dropdown_on_escape_or_tab_keyboard_events', () => {
     component.toggleMenu();
     expect(component.isOpenSignal()).toBe(true);
 

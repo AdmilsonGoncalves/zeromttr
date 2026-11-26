@@ -51,4 +51,21 @@ describe('I18nService', () => {
       expect(esDict[key]).toBeTruthy();
     }
   });
+
+  it('should_exclude_removed_chart_gauge_and_bar_keys_from_dictionaries', () => {
+    const service = new I18nService();
+    const removedKeys = [
+      'chartPoolGaugeLabel',
+      'chartFinopsGaugeLabel',
+      'chartMttrBarsTitle',
+      'chartSloThreshold'
+    ];
+    for (const lang of [Language.PT_BR, Language.EN_US, Language.ES_ES]) {
+      service.setLang(lang);
+      const keys = Object.keys(service.dict());
+      for (const removed of removedKeys) {
+        expect(keys).not.toContain(removed);
+      }
+    }
+  });
 });

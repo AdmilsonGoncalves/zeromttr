@@ -63,6 +63,7 @@ export class WarRoomNoticesComponent implements OnDestroy {
   private readonly turnstileHostSignal = signal<HTMLElement | null>(null);
   private turnstileWidgetId: string | null = null;
   private lastResetTrigger = 0;
+  private isDestroyed = false;
 
   @ViewChild('turnstileContainer')
   set turnstileContainer(ref: ElementRef<HTMLElement> | undefined) {
@@ -119,10 +120,12 @@ export class WarRoomNoticesComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.isDestroyed = true;
     if (this.turnstileWidgetId && globalThis.window?.turnstile) {
       globalThis.window.turnstile.remove(this.turnstileWidgetId);
       this.turnstileWidgetId = null;
     }
+    this.turnstileTokenChange.emit(null);
   }
 
   /**
@@ -140,7 +143,7 @@ export class WarRoomNoticesComponent implements OnDestroy {
 
   private mountTurnstileWidget(host: HTMLElement, siteKey: string): void {
     const renderWidget = (): void => {
-      if (!globalThis.window?.turnstile || this.turnstileWidgetId) {
+      if (this.isDestroyed || !globalThis.window?.turnstile || this.turnstileWidgetId) {
         return;
       }
       this.turnstileLoadErrorSignal.set(false);
@@ -161,6 +164,9 @@ export class WarRoomNoticesComponent implements OnDestroy {
     };
 
     const handleScriptError = (scriptEl: HTMLScriptElement): void => {
+      if (this.isDestroyed) {
+        return;
+      }
       this.turnstileLoadErrorSignal.set(true);
       this.turnstileTokenChange.emit(null);
       scriptEl.remove();
