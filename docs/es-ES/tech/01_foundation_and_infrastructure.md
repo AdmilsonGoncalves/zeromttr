@@ -122,7 +122,10 @@ GRAFANA_WEBHOOK_TOKEN=change-me-grafana-webhook-token
 DASHBOARD_API_TOKEN=change-me-dashboard-api-token
 # Exclusively signs Approve/Reject links sent via email
 DECISION_HMAC_SECRET=change-me-hmac-secret
-# true = shows app-main-menu (Replay/Live/Simulate/Restore); false = real/production mode
+# Protects PATCH /api/settings (empty + ENABLE_DEMO_MODE=true => read-only)
+SETTINGS_ADMIN_TOKEN=
+SETTINGS_DB_PATH=/app/var/zeromttr-settings.sqlite
+# true = shows app-demo-settings (Replay/Live/Simulate/Restore); false = real/production mode
 ENABLE_DEMO_MODE=true
 # When ENABLE_DEMO_MODE=true: requires LIVE_DEMO_KEY for real Live API execution
 REQUIRE_DEMO_KEY=true

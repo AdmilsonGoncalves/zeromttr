@@ -13,3 +13,5 @@ Este directorio documenta las decisiones arquitectónicas fundacionales de la pl
 | [ADR-007](./007-json-incident-persistence-and-replay-snapshot.md) | Persistencia de incidentes en memoria + archivo JSON atómico y snapshot para el modo Replay | Aceptado |
 | [ADR-008](./008-mcp-server-adapter-ownership.md) | Consolidación de las 8 herramientas y adaptadores HTTP externos exclusivamente en `apps/mcp-server` | Aceptado |
 | [ADR-009](./009-otel-collector-ottl-transform-pii-masking.md) | Enmascaramiento de PII en el borde mediante el procesador `transform` (OTTL) en el OTel Collector | Aceptado |
+| [ADR-010](./010-target-decoupling-neutral-ops-status-and-capabilities.md) | Desacoplamiento del servicio objetivo mediante manifiesto neutro `/ops/status`, `TargetCapabilities` y proveedor Prometheus | Aceptado |
+| [ADR-011](./011-sqlite-runtime-settings-audit-log-and-admin-token.md) | Configuración operativa en runtime mediante SQLite (Node 24), auditoría y `SETTINGS_ADMIN_TOKEN` dedicado | Aceptado |

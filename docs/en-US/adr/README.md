@@ -13,3 +13,5 @@ This directory documents the foundational architectural decisions of the **ZeroM
 | [ADR-007](./007-json-incident-persistence-and-replay-snapshot.md) | In-memory + atomic JSON file incident persistence and Replay mode snapshot | Accepted |
 | [ADR-008](./008-mcp-server-adapter-ownership.md) | Consolidation of all 8 tools and external HTTP adapters exclusively in `apps/mcp-server` | Accepted |
 | [ADR-009](./009-otel-collector-ottl-transform-pii-masking.md) | Edge PII masking via `transform` processor (OTTL) in the OTel Collector | Accepted |
+| [ADR-010](./010-target-decoupling-neutral-ops-status-and-capabilities.md) | Target workload decoupling via neutral `/ops/status` manifest, `TargetCapabilities`, and Prometheus provider | Accepted |
+| [ADR-011](./011-sqlite-runtime-settings-audit-log-and-admin-token.md) | Runtime system settings via Node 24 SQLite, audit log, and dedicated `SETTINGS_ADMIN_TOKEN` | Accepted |

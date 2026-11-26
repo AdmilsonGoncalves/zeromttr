@@ -21,6 +21,8 @@ Welcome to the English (`en-US`) technical documentation for **ZeroMTTR** — an
   - [ADR 007 — JSON Incident Persistence & Replay Snapshot](./adr/007-json-incident-persistence-and-replay-snapshot.md)
   - [ADR 008 — MCP Server Adapter Ownership](./adr/008-mcp-server-adapter-ownership.md)
   - [ADR 009 — OTel Collector OTTL Transform PII Masking](./adr/009-otel-collector-ottl-transform-pii-masking.md)
+  - [ADR 010 — Target Workload Decoupling via Neutral `/ops/status` & Prometheus Provider](./adr/010-target-decoupling-neutral-ops-status-and-capabilities.md)
+  - [ADR 011 — Runtime System Settings via Node 24 SQLite, Audit Log & Admin Token](./adr/011-sqlite-runtime-settings-audit-log-and-admin-token.md)
 
 ## Technical Specifications (`tech/`)
 

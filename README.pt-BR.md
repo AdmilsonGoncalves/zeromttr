@@ -12,7 +12,7 @@
 
 Em sistemas distribuídos de missão crítica — como liquidação de pagamentos instantâneos (PIX), separação e expedição logística, checkout ou faturamento — o tempo entre o disparo de um alerta e um hotfix revisável ainda é dominado por trabalho manual fragmentado entre métricas, traces, logs e diffs no Git.
 
-O **ZeroMTTR** é uma plataforma autônoma de AIOps e remediação de incidentes inscrita na trilha **Logística & Automação** (automação de fluxos de trabalho operacionais e integração entre sistemas críticos). Seu núcleo adota **Clean Architecture / Arquitetura Hexagonal** e é **100% agnóstico ao domínio**: qualquer serviço que emita telemetria OpenTelemetry (OTLP) e possua um repositório hospedado no **GitHub** (outros provedores Git como GitLab podem ser suportados implementando um adapter para `RepoInspectorPort` / `RemediationPort`) pode ser diagnosticado e remediado sem alterar uma única linha em `apps/orchestrator` ou `apps/mcp-server`. A inspeção de status do alvo também é desacoplada por `TargetStatusPort`: serviços cooperativos expõem o manifesto neutro `GET /ops/status` (`capabilities` + `saturation` genérico), enquanto serviços externos/legados podem ser monitorados passivamente via `TARGET_STATUS_PROVIDER=prometheus` (MCP) sem endpoints customizados.
+O **ZeroMTTR** é uma plataforma autônoma de AIOps e remediação de incidentes inscrita na trilha **Logística & Automação** (automação de fluxos de trabalho operacionais e integração entre sistemas críticos). Seu núcleo adota **Clean Architecture / Arquitetura Hexagonal** e é **100% agnóstico ao domínio**: qualquer serviço que emita telemetria OpenTelemetry (OTLP) e possua um repositório hospedado no **GitHub** (outros provedores Git como GitLab podem ser suportados implementando um adapter para `RepoInspectorPort` / `RemediationPort`) pode ser diagnosticado e remediado sem alterar uma única linha em `apps/orchestrator` ou `apps/mcp-server`. A inspeção de status do alvo é desacoplada por `TargetStatusPort`: serviços cooperativos expõem o manifesto neutro `GET /ops/status` (`capabilities` + `saturation` genérico), enquanto serviços externos/legados podem ser monitorados passivamente via `TARGET_STATUS_PROVIDER=prometheus` (MCP) sem endpoints customizados. Políticas operacionais (cooldown pós-rejeição _Human Takeover_, supressão de repetição, TTL de decisão, refs de diff do alvo, modelos LLM e nível de log do orquestrador) podem ser ajustadas em tempo real em armazenamento **SQLite nativo do Node 24** com trilha de auditoria (`GET`/`PATCH /api/settings`) protegido por `SETTINGS_ADMIN_TOKEN` dedicado.
 
 ### Tabela Comparativa Qualificada (referência: novembro/2026)
 
@@ -26,7 +26,7 @@ O **ZeroMTTR** é uma plataforma autônoma de AIOps e remediação de incidentes
 
 ### Como o Sistema Demo Funciona
 
-Ao clicar em **"Simular Incidente"** no War Room (`POST /api/demo/chaos`), o `demo.controller.ts` do Orchestrator opera em um de dois modos sobre o serviço alvo **`api-pagamentos-core`** (`apps/target-app-demo`):
+Ao abrir o painel lateral **Demonstração** (`app-demo-settings`) no War Room e clicar em **"Simular Incidente"** (`POST /api/demo/chaos`), o roteador modular de demonstração do Orchestrator (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) opera em um de dois modos sobre o serviço alvo **`api-pagamentos-core`** (`apps/target-app-demo`). De forma independente, o painel lateral **Configurações** (`app-system-settings`, ícone de engrenagem sempre visível em demo e produção) permite consultar ou ajustar em tempo real cooldowns de alerta, configurações do alvo/diff, modelos LLM, nível de log e histórico de auditoria (`GET`/`PATCH /api/settings`, `GET /api/settings/audit`) sem reiniciar os contêineres:
 
 1. **Modo `Replay` (padrão público):**
    - Reproduz em tempo real via SSE a linha do tempo de uma execução real gravada (`data/last-recorded-incident.json`), usando o `ReplayRunner`.
@@ -193,7 +193,7 @@ Endpoints locais:
 
 - [Documento Mestre de Arquitetura](./docs/pt-BR/00_architecture_master.md)
 - [Diagramas Comportamentais e de Rede](./docs/pt-BR/01_system_diagrams.md)
-- [Architecture Decision Records — ADRs 001–009](./docs/pt-BR/adr/README.md)
+- [Architecture Decision Records — ADRs 001–011](./docs/pt-BR/adr/README.md)
 - [Especificações Técnicas (`docs/pt-BR/tech/`)](./docs/pt-BR/tech/)
 - [English Documentation (`docs/en-US/`)](./docs/en-US/README.md)
 - [Documentación en Español (`docs/es-ES/`)](./docs/es-ES/README.md)

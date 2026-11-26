@@ -13,3 +13,5 @@ Este diretório documenta as decisões arquiteturais estruturantes da plataforma
 | [ADR-007](./007-json-incident-persistence-and-replay-snapshot.md) | Persistência de incidentes em memória + arquivo JSON atômico e snapshot de modo Replay | Aceito |
 | [ADR-008](./008-mcp-server-adapter-ownership.md) | Concentração das 8 ferramentas e adapters HTTP externos exclusivamente em `apps/mcp-server` | Aceito |
 | [ADR-009](./009-otel-collector-ottl-transform-pii-masking.md) | Mascaramento de PII na borda via processor `transform` (OTTL) no OTel Collector | Aceito |
+| [ADR-010](./010-target-decoupling-neutral-ops-status-and-capabilities.md) | Desacoplamento do serviço-alvo via manifesto neutro `/ops/status`, `TargetCapabilities` e provider Prometheus | Aceito |
+| [ADR-011](./011-sqlite-runtime-settings-audit-log-and-admin-token.md) | Configurações operacionais em runtime via SQLite (Node 24), trilha de auditoria e `SETTINGS_ADMIN_TOKEN` dedicado | Aceito |

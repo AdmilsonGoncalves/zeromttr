@@ -27,6 +27,7 @@ flowchart TD
             UC_MON(["Monitor Pipeline, FinOps, and Evidence via SSE"])
             UC_PII(["Audit PII Masking (OTTL Transform + PiiPromptGuard)"])
             UC_DEC(["Approve or Reject Hotfix (Via Email-Exclusive HMAC Link)"])
+            UC_CFG(["Tune Runtime Policies & Review Audit Log (SQLite + SETTINGS_ADMIN_TOKEN)"])
             UC_EXT(["Explore the 8 AIOps Tools via Open MCP Contract (.mcp.json)"])
         end
 
@@ -55,6 +56,7 @@ flowchart TD
     SRE --> UC_MON
     SRE --> UC_PII
     SRE --> UC_DEC
+    SRE --> UC_CFG
     EXT_MCP --> UC_EXT
 
     %% Grafana Trigger
@@ -246,8 +248,16 @@ classDiagram
         <<interface>>
         +findById(id: string) Promise~Incident~
         +findOpenByFingerprint(fp: string) Promise~Incident~
+        +findLatestByFingerprint(fp: string) Promise~Incident~
         +findAll() Promise~Incident[]~
         +save(incident: Incident) Promise~void~
+    }
+
+    class SettingsRepositoryPort {
+        <<interface>>
+        +getSettings() SystemSettings
+        +updateSettings(patch: SystemSettingsPatch, actor: string) SystemSettings
+        +listAuditEntries(limit?: number) SettingsAuditEntry[]
     }
 
     class ToolsPort {
@@ -315,8 +325,12 @@ classDiagram
     class TargetStatusPort {
         <<interface>>
     }
+    class SettingsRepositoryPort {
+        <<interface>>
+    }
 
     class FileIncidentRepository
+    class SqliteSettingsRepository
     class McpClientAdapter
     class GeminiReasoningAdapter
     class DeterministicFallbackReasoningAdapter
@@ -324,20 +338,24 @@ classDiagram
     class PrometheusTargetStatusAdapter
 
     HandleAlert --> IncidentRepository
+    HandleAlert --> SettingsRepositoryPort
     InvestigateIncident --> ToolsPort
     InvestigateIncident --> TargetStatusPort
     InvestigateIncident --> IncidentRepository
     EnrichWithDeployDiff --> ToolsPort
+    EnrichWithDeployDiff --> SettingsRepositoryPort
     EnrichWithDeployDiff --> IncidentRepository
     DispatchRemediation --> ReasoningPort
     DispatchRemediation --> ToolsPort
     DispatchRemediation --> IncidentRepository
     NotifyOnCall --> ToolsPort
+    NotifyOnCall --> SettingsRepositoryPort
     NotifyOnCall --> IncidentRepository
     RecordDecision --> IncidentRepository
     RecordDecision --> ToolsPort
 
     FileIncidentRepository ..|> IncidentRepository
+    SqliteSettingsRepository ..|> SettingsRepositoryPort
     McpClientAdapter ..|> ToolsPort
     GeminiReasoningAdapter ..|> ReasoningPort
     DeterministicFallbackReasoningAdapter ..|> ReasoningPort
@@ -474,7 +492,7 @@ flowchart TD
         end
 
         subgraph Internal_Network["2B. Isolated Docker Network: aiops-net (expose: only)"]
-            ORCH["zeromttr-orchestrator (:8080)"]
+            ORCH["zeromttr-orchestrator (:8080 + SQLite /app/var)"]
             MCP["zeromttr-mcp-server (:8000)"]
             DEMO["zeromttr-target-demo (:3001 — api-pagamentos-core)"]
             PG[("zeromttr-postgres (:5432)")]

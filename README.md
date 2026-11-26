@@ -12,7 +12,7 @@
 
 In mission-critical distributed systems — such as instant payment settlement (PIX), logistics fulfillment, e-commerce checkout, or billing — the mean time from alert to reviewable fix is dominated by manual context switching across siloed metrics, traces, logs, and Git diffs.
 
-**ZeroMTTR** is an autonomous AIOps and incident remediation platform built for the **Logistics & Automation** track (automating operational workflows and integrating mission-critical systems). Its core follows **Clean / Hexagonal Architecture** and is **100% domain-agnostic**: any service emitting OpenTelemetry (OTLP) telemetry and backed by a **GitHub** repository (with other Git hosts like GitLab supported by adding an adapter for `RepoInspectorPort` / `RemediationPort`) can be diagnosed and remediated without changing a single line in `apps/orchestrator` or `apps/mcp-server`. Target status inspection is also decoupled behind `TargetStatusPort`: cooperative workloads expose a neutral `GET /ops/status` manifest (`capabilities` + generic `saturation`), while external/legacy workloads can be monitored passively via `TARGET_STATUS_PROVIDER=prometheus` (MCP) with zero target-side endpoints.
+**ZeroMTTR** is an autonomous AIOps and incident remediation platform built for the **Logistics & Automation** track (automating operational workflows and integrating mission-critical systems). Its core follows **Clean / Hexagonal Architecture** and is **100% domain-agnostic**: any service emitting OpenTelemetry (OTLP) telemetry and backed by a **GitHub** repository (with other Git hosts like GitLab supported by adding an adapter for `RepoInspectorPort` / `RemediationPort`) can be diagnosed and remediated without changing a single line in `apps/orchestrator` or `apps/mcp-server`. Target status inspection is decoupled behind `TargetStatusPort`: cooperative workloads expose a neutral `GET /ops/status` manifest (`capabilities` + generic `saturation`), while external/legacy workloads can be monitored passively via `TARGET_STATUS_PROVIDER=prometheus` (MCP) with zero target-side endpoints. Operational policies (post-rejection Human Takeover cooldown, repeat suppression, decision TTL, target diff refs, LLM models, and orchestrator log level) are editable at runtime via an audited **Node 24 SQLite** settings store (`GET`/`PATCH /api/settings`) protected by a dedicated `SETTINGS_ADMIN_TOKEN`.
 
 ### Comparative Positioning (as of November 2026)
 
@@ -26,7 +26,7 @@ In mission-critical distributed systems — such as instant payment settlement (
 
 ### How the Interactive Demo Works
 
-When you click **"Simulate Incident"** in the War Room (`POST /api/demo/chaos`), the Orchestrator's `demo.controller.ts` operates in one of two modes targeting the **`api-pagamentos-core`** workload (`apps/target-app-demo`):
+When you open the **Demo** slide-over drawer (`app-demo-settings`) in the War Room and click **"Simulate Incident"** (`POST /api/demo/chaos`), the Orchestrator's modular demo router (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) operates in one of two modes targeting the **`api-pagamentos-core`** workload (`apps/target-app-demo`). Separately, the always-available **Settings** drawer (`app-system-settings`, gear icon) lets operators inspect or update runtime alert cooldowns, target diff settings, LLM models, log levels, and the change audit log (`GET`/`PATCH /api/settings`, `GET /api/settings/audit`) without restarting containers:
 
 1. **Replay Mode (public default):**
    - Streams a real-time SSE timeline of a recorded real execution (`data/last-recorded-incident.json`) via `ReplayRunner`.
@@ -194,7 +194,7 @@ Local endpoints:
 - [English Documentation Index (`docs/en-US/README.md`)](./docs/en-US/README.md)
 - [Architecture Master Document (en-US)](./docs/en-US/00_architecture_master.md)
 - [System Diagrams & Flows (en-US)](./docs/en-US/01_system_diagrams.md)
-- [Architecture Decision Records — ADRs 001–009 (en-US)](./docs/en-US/adr/README.md)
+- [Architecture Decision Records — ADRs 001–011 (en-US)](./docs/en-US/adr/README.md)
 - [Technical Specifications (`docs/en-US/tech/`)](./docs/en-US/tech/)
 - [Portuguese Documentation (`docs/pt-BR/`)](./docs/pt-BR/00_architecture_master.md)
 - [Spanish Documentation (`docs/es-ES/`)](./docs/es-ES/README.md)
