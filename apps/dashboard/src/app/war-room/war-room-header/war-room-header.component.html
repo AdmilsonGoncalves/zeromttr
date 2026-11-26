@@ -42,37 +42,9 @@
       </div>
     </div>
 
-    <!-- Mobile Menu Toggle + Always-Available Language Switcher -->
-    <div class="flex items-center gap-1.5 shrink-0 md:order-3">
+    <!-- Demo Drawer Trigger + Always-Available Language Switcher -->
+    <div class="flex items-center gap-2 shrink-0">
       @if (demoModeEnabledSignal()) {
-        <button
-          type="button"
-          class="md:hidden inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-slate-700 bg-slate-950 text-xs font-medium text-slate-200 hover:border-cyan-500/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 cursor-pointer shrink-0 transition-colors"
-          [attr.aria-expanded]="isMobileMenuOpenSignal()"
-          aria-controls="war-room-header-menu"
-          [attr.aria-label]="i18n.t('headerMenuAriaLabel')"
-          (click)="toggleMobileMenu()"
-        >
-          <i
-            class="pi text-xs"
-            [ngClass]="isMobileMenuOpenSignal() ? 'pi-times' : 'pi-bars'"
-            aria-hidden="true"
-          ></i>
-          <span>{{ i18n.t('headerMenuBtn') }}</span>
-        </button>
-      }
-
-      <app-locale-switcher [currentLang]="i18n.currentLang()" (langChange)="onLangSelect($event)" />
-    </div>
-
-    <!-- Modular Main Menu (Collapsible on narrow screens, hidden when ENABLE_DEMO_MODE=false) -->
-    @if (demoModeEnabledSignal()) {
-      <nav
-        id="war-room-header-menu"
-        [attr.aria-label]="i18n.t('headerMenuAriaLabel')"
-        [ngClass]="isMobileMenuOpenSignal() ? 'flex' : 'hidden md:flex'"
-        class="w-full md:w-auto md:order-2 flex-wrap items-center justify-start md:justify-end min-w-0 pt-2 md:pt-0 border-t border-slate-800/80 md:border-t-0"
-      >
         <app-main-menu
           [demoModeEnabled]="demoModeEnabledSignal()"
           [targetStatus]="targetStatusSignal()"
@@ -91,7 +63,9 @@
           (triggerChaos)="triggerChaos.emit()"
           (resetService)="resetService.emit()"
         />
-      </nav>
-    }
+      }
+
+      <app-locale-switcher [currentLang]="i18n.currentLang()" (langChange)="onLangSelect($event)" />
+    </div>
   </div>
 </header>

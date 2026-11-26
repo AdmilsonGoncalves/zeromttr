@@ -22,33 +22,68 @@ describe('MainMenuComponent', () => {
     component = new MainMenuComponent(i18n);
   });
 
-  it('should emit modeChange liveKeyChange and action events for valid inputs', () => {
+  it('should open and close drawer and close automatically on triggerChaos and resetService', () => {
+    const chaosSpy = vi.fn();
+    const resetSpy = vi.fn();
+    component.triggerChaos.subscribe(chaosSpy);
+    component.resetService.subscribe(resetSpy);
+
+    expect(component.isDrawerOpenSignal()).toBe(false);
+    component.openDrawer();
+    expect(component.isDrawerOpenSignal()).toBe(true);
+
+    component.onTriggerChaos();
+    expect(chaosSpy).toHaveBeenCalledTimes(1);
+    expect(component.isDrawerOpenSignal()).toBe(false);
+
+    component.onDrawerVisibilityChange(true);
+    expect(component.isDrawerOpenSignal()).toBe(true);
+
+    component.onResetService();
+    expect(resetSpy).toHaveBeenCalledTimes(1);
+    expect(component.isDrawerOpenSignal()).toBe(false);
+  });
+
+  it('should emit modeChange liveKeyChange and healthy traffic toggle events for valid inputs', () => {
     const modeSpy = vi.fn();
     const keySpy = vi.fn();
     const trafficSpy = vi.fn();
-    const chaosSpy = vi.fn();
-    const resetSpy = vi.fn();
 
     component.modeChange.subscribe(modeSpy);
     component.liveKeyChange.subscribe(keySpy);
     component.toggleHealthyTraffic.subscribe(trafficSpy);
-    component.triggerChaos.subscribe(chaosSpy);
-    component.resetService.subscribe(resetSpy);
 
-    component.onModeSelect(IncidentExecutionMode.LIVE);
-    component.onLiveKeyInput({ target: { value: 'secret-key' } } as unknown as Event);
-    component.toggleHealthyTraffic.emit();
-    component.triggerChaos.emit();
-    component.resetService.emit();
-
+    component.onLiveModeToggle(true);
     expect(modeSpy).toHaveBeenCalledWith(IncidentExecutionMode.LIVE);
+
+    component.onLiveModeToggle(false);
+    expect(modeSpy).toHaveBeenLastCalledWith(IncidentExecutionMode.REPLAY);
+
+    component.onLiveKeyInput({ target: { value: 'secret-key' } } as unknown as Event);
     expect(keySpy).toHaveBeenCalledWith('secret-key');
+
+    component.activeMode = IncidentExecutionMode.LIVE;
+    component.targetStatus = {
+      status: TargetHealthStatus.HEALTHY,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.7',
+      previousHealthyVersion: 'v2.14.7',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: true
+      }
+    };
+
+    component.onHealthyTrafficToggle(true);
     expect(trafficSpy).toHaveBeenCalledTimes(1);
-    expect(chaosSpy).toHaveBeenCalledTimes(1);
-    expect(resetSpy).toHaveBeenCalledTimes(1);
+
+    // Repeating same boolean state should not re-emit
+    component.healthyTrafficActive = true;
+    component.onHealthyTrafficToggle(true);
+    expect(trafficSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('should ignore empty mode or missing input target', () => {
+  it('should ignore empty mode, missing input target, or mode toggle while workflow is running', () => {
     const modeSpy = vi.fn();
     const keySpy = vi.fn();
 
@@ -57,14 +92,34 @@ describe('MainMenuComponent', () => {
 
     component.onModeSelect('' as unknown as typeof IncidentExecutionMode.LIVE);
     component.onLiveKeyInput({ target: null } as unknown as Event);
+    component.isWorkflowRunning = true;
+    component.onLiveModeToggle(true);
 
     expect(modeSpy).not.toHaveBeenCalled();
     expect(keySpy).not.toHaveBeenCalled();
   });
 
+  it('should disable and hide live key value when requireDemoKey is false and restore it when required', () => {
+    component.liveDemoKey = 'persisted-local-storage-key';
+    component.activeMode = IncidentExecutionMode.LIVE;
+
+    component.requireDemoKey = false;
+    expect(component.isLiveKeyInputDisabled()).toBe(true);
+    expect(component.displayedLiveDemoKey()).toBe('');
+
+    component.requireDemoKey = true;
+    expect(component.isLiveKeyInputDisabled()).toBe(false);
+    expect(component.displayedLiveDemoKey()).toBe('persisted-local-storage-key');
+
+    component.activeMode = IncidentExecutionMode.REPLAY;
+    expect(component.isLiveKeyInputDisabled()).toBe(true);
+    expect(component.displayedLiveDemoKey()).toBe('persisted-local-storage-key');
+  });
+
   it('should block starting healthy traffic while target is degraded unless already active', () => {
     expect(component.isHealthyTrafficStartBlockedSignal()).toBe(false);
 
+    component.activeMode = IncidentExecutionMode.LIVE;
     component.targetStatus = {
       status: TargetHealthStatus.DEGRADED,
       service: 'api-pagamentos-core',
@@ -77,9 +132,11 @@ describe('MainMenuComponent', () => {
       rawEdgeLogPreCollector: 'raw'
     };
     expect(component.isHealthyTrafficStartBlockedSignal()).toBe(true);
+    expect(component.isHealthyTrafficToggleDisabled()).toBe(true);
 
     component.healthyTrafficActive = true;
     expect(component.isHealthyTrafficStartBlockedSignal()).toBe(false);
+    expect(component.isHealthyTrafficToggleDisabled()).toBe(false);
 
     component.healthyTrafficActive = false;
     component.targetStatus = {
@@ -94,22 +151,20 @@ describe('MainMenuComponent', () => {
       rawEdgeLogPreCollector: 'raw'
     };
     expect(component.isHealthyTrafficStartBlockedSignal()).toBe(false);
+    expect(component.isHealthyTrafficToggleDisabled()).toBe(false);
   });
 
-  it('should compute reactive modeOptions labels from active i18n language', () => {
-    expect(component.modeOptions().map((o) => o.label)).toEqual([
-      i18n.t('liveMode'),
-      i18n.t('replayMode')
-    ]);
+  it('should compute reactive hints from active i18n language', () => {
+    component.requireDemoKey = false;
+    expect(component.liveKeyHint()).toBe(i18n.t('demoMenuKeyNotRequiredHint'));
 
     i18n.setLang(Language.ES_ES);
-    expect(component.modeOptions().map((o) => o.label)).toEqual([
-      '⚡ Modo Live API',
-      '🎬 Modo Replay (Grabado)'
-    ]);
+    expect(component.liveKeyHint()).toBe(
+      'Deshabilitada — el servidor está configurado para Modo Live público (.env).'
+    );
   });
 
-  it('should hide chaos and traffic controls in live mode when capabilities are false', () => {
+  it('should hide chaos and traffic controls when capabilities are explicitly false', () => {
     component.activeMode = IncidentExecutionMode.LIVE;
     component.demoModeEnabled = true;
     component.targetStatus = {
@@ -125,41 +180,48 @@ describe('MainMenuComponent', () => {
 
     expect(component.canSimulateChaos()).toBe(false);
     expect(component.canToggleHealthyTraffic()).toBe(false);
+    expect(component.showHealthyTrafficControl()).toBe(false);
 
     const html = readFileSync(MAIN_MENU_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('@if (canSimulateChaos())');
-    expect(html).toContain('@if (canToggleHealthyTraffic())');
+    expect(html).toContain('@if (showHealthyTrafficControl())');
   });
 
-  it('should show controls in replay mode even without live chaos capabilities', () => {
+  it('should show controls in replay mode with healthy traffic toggle disabled', () => {
     component.activeMode = IncidentExecutionMode.REPLAY;
     component.demoModeEnabled = true;
     component.targetStatus = {
       status: TargetHealthStatus.HEALTHY,
-      service: 'external-orders-api',
-      version: 'v3.1.0',
-      previousHealthyVersion: 'v3.0.9',
+      service: 'api-pagamentos-core',
+      version: 'v2.14.7',
+      previousHealthyVersion: 'v2.14.7',
       capabilities: {
-        chaosSimulation: false,
-        healthyTrafficToggle: false
+        chaosSimulation: true,
+        healthyTrafficToggle: true
       }
     };
 
     expect(component.canSimulateChaos()).toBe(true);
     expect(component.canToggleHealthyTraffic()).toBe(false);
+    expect(component.showHealthyTrafficControl()).toBe(true);
+    expect(component.isHealthyTrafficToggleDisabled()).toBe(true);
 
     component.demoModeEnabled = false;
     expect(component.canSimulateChaos()).toBe(false);
+    expect(component.showHealthyTrafficControl()).toBe(false);
   });
 
-  it('should gate demo menu markup on demoModeEnabled and requireDemoKey', () => {
+  it('should render demo drawer trigger, toggles, live key input, and action buttons gated on demoModeEnabled', () => {
     const html = readFileSync(MAIN_MENU_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('@if (demoModeEnabledSignal())');
-    expect(html).toContain('activeModeSignal() === executionMode.LIVE && requireDemoKeySignal()');
-    expect(html).toContain('liveKeyPlaceholder');
+    expect(html).toContain('demoMenuBtn');
+    expect(html).toContain('<p-drawer');
+    expect(html).toContain('<p-toggleswitch');
+    expect(html).toContain('demo-live-mode-toggle');
+    expect(html).toContain('demo-live-key-input');
+    expect(html).toContain('demo-healthy-traffic-toggle');
     expect(html).toContain('simulateIncident');
     expect(html).toContain('restoreService');
-    expect(html).toContain('healthyTrafficStartBtn');
     expect(html).not.toContain('<app-locale-switcher');
   });
 });

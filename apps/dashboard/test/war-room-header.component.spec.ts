@@ -43,25 +43,16 @@ describe('WarRoomHeaderComponent', () => {
     expect(component.requireDemoKeySignal()).toBe(false);
   });
 
-  it('should toggle responsive mobile command menu state', () => {
-    expect(component.isMobileMenuOpenSignal()).toBe(false);
-    component.toggleMobileMenu();
-    expect(component.isMobileMenuOpenSignal()).toBe(true);
-    component.toggleMobileMenu();
-    expect(component.isMobileMenuOpenSignal()).toBe(false);
-  });
-
-  it('should delegate command controls to app-main-menu and keep header pure', () => {
+  it('should delegate demo drawer controls to app-main-menu and keep header pure', () => {
     const html = readFileSync(HEADER_TEMPLATE_PATH, 'utf8');
     expect(html).not.toContain('<ng-content');
     expect(html).not.toContain('finopsPayloadReduction');
     expect(html).not.toContain('kpiTtdLabel');
     expect(html).not.toContain('turnstileContainer');
-    expect(html).toContain('headerMenuBtn');
-    expect(html).toContain('aria-controls="war-room-header-menu"');
     expect(html).toContain('<app-main-menu');
     expect(html).toContain('<app-locale-switcher');
     expect(html).not.toContain('<p-selectbutton');
+    expect(html).not.toContain('<p-drawer');
     expect(html).not.toContain('liveKeyPlaceholder');
     expect(html).not.toContain('langOptions');
   });

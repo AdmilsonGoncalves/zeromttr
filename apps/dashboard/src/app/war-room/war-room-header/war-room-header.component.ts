@@ -1,4 +1,3 @@
-import { NgClass } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -21,11 +20,11 @@ import { LocaleSwitcherComponent } from '../locale-switcher/locale-switcher.comp
 import { MainMenuComponent } from '../main-menu/main-menu.component.js';
 
 /**
- * Pure top War Room header displaying project identity, target connection tags, modular main menu, and locale switcher.
+ * Pure top War Room header displaying project identity, target connection tags, demo drawer trigger, and locale switcher.
  */
 @Component({
   selector: 'app-war-room-header',
-  imports: [NgClass, Tag, MainMenuComponent, LocaleSwitcherComponent],
+  imports: [Tag, MainMenuComponent, LocaleSwitcherComponent],
   templateUrl: './war-room-header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -45,7 +44,6 @@ export class WarRoomHeaderComponent {
   readonly isTogglingTrafficSignal = signal<boolean>(false);
   readonly isResettingSignal = signal<boolean>(false);
   readonly isSimulatingSignal = signal<boolean>(false);
-  readonly isMobileMenuOpenSignal = signal<boolean>(false);
 
   @Input()
   set demoModeEnabled(value: boolean) {
@@ -117,13 +115,6 @@ export class WarRoomHeaderComponent {
   constructor(...args: [I18nService?]) {
     const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
-  }
-
-  /**
-   * Toggles the collapsible header command menu on narrow screens.
-   */
-  toggleMobileMenu(): void {
-    this.isMobileMenuOpenSignal.update((open) => !open);
   }
 
   /**

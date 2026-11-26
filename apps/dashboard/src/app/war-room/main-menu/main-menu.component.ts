@@ -11,7 +11,8 @@ import {
 import { FormsModule } from '@angular/forms';
 import { isNonEmptyString, isString } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
-import { SelectButton } from 'primeng/selectbutton';
+import { Drawer } from 'primeng/drawer';
+import { ToggleSwitch } from 'primeng/toggleswitch';
 import { Tooltip } from 'primeng/tooltip';
 import {
   IncidentExecutionMode,
@@ -21,18 +22,14 @@ import {
 } from '../../core/contract.js';
 import { I18nService } from '../../core/i18n/i18n.service.js';
 
-interface ModeOption {
-  label: string;
-  value: IncidentMode;
-}
-
 /**
- * Modular command menu isolating interactive demo controls (mode switch, live key, traffic, chaos, reset).
- * Hidden automatically when `demoModeEnabled` is false for production/real-use deployments.
+ * Modular demo menu trigger and slide-over Drawer isolating interactive simulation controls
+ * (Live/Replay toggle, Live API key, healthy traffic toggle, chaos trigger, and service reset).
+ * Hidden automatically when `demoModeEnabled` is false for production deployments.
  */
 @Component({
   selector: 'app-main-menu',
-  imports: [FormsModule, SelectButton, Button, Tooltip],
+  imports: [FormsModule, Drawer, ToggleSwitch, Button, Tooltip],
   templateUrl: './main-menu.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -40,6 +37,7 @@ export class MainMenuComponent {
   readonly i18n: I18nService;
   readonly executionMode = IncidentExecutionMode;
 
+  readonly isDrawerOpenSignal = signal<boolean>(false);
   readonly demoModeEnabledSignal = signal<boolean>(true);
   readonly targetStatusSignal = signal<TargetStatusResponse | null>(null);
   readonly activeModeSignal = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
@@ -52,11 +50,24 @@ export class MainMenuComponent {
   readonly isResettingSignal = signal<boolean>(false);
   readonly isSimulatingSignal = signal<boolean>(false);
 
+  readonly isLiveMode = computed<boolean>(
+    () => this.activeModeSignal() === IncidentExecutionMode.LIVE
+  );
+
+  readonly isLiveKeyInputDisabled = computed<boolean>(
+    () => !this.requireDemoKeySignal() || !this.isLiveMode() || this.isWorkflowRunningSignal()
+  );
+
+  readonly displayedLiveDemoKey = computed<string>(() =>
+    this.requireDemoKeySignal() ? this.liveDemoKeySignal() : ''
+  );
+
   readonly isHealthyTrafficStartBlockedSignal = computed<boolean>(
     () =>
       !this.healthyTrafficActiveSignal() &&
       this.targetStatusSignal()?.status === TargetHealthStatus.DEGRADED
   );
+
   readonly canSimulateChaos = computed<boolean>(() => {
     if (!this.demoModeEnabledSignal()) {
       return false;
@@ -66,11 +77,52 @@ export class MainMenuComponent {
     }
     return this.targetStatusSignal()?.capabilities?.chaosSimulation ?? false;
   });
+
   readonly canToggleHealthyTraffic = computed<boolean>(() => {
     if (!this.demoModeEnabledSignal() || this.activeModeSignal() !== IncidentExecutionMode.LIVE) {
       return false;
     }
     return this.targetStatusSignal()?.capabilities?.healthyTrafficToggle ?? false;
+  });
+
+  readonly showHealthyTrafficControl = computed<boolean>(() => {
+    if (!this.demoModeEnabledSignal()) {
+      return false;
+    }
+    return this.targetStatusSignal()?.capabilities?.healthyTrafficToggle !== false;
+  });
+
+  readonly isHealthyTrafficToggleDisabled = computed<boolean>(
+    () =>
+      !this.canToggleHealthyTraffic() ||
+      this.isTogglingTrafficSignal() ||
+      this.simulationLockedByTurnstileSignal() ||
+      this.isHealthyTrafficStartBlockedSignal()
+  );
+
+  readonly healthyTrafficHint = computed<string>(() => {
+    if (this.simulationLockedByTurnstileSignal()) {
+      return this.i18n.t('tooltipTurnstilePending');
+    }
+    if (!this.isLiveMode()) {
+      return this.i18n.t('demoMenuTrafficReplayHint');
+    }
+    if (this.isHealthyTrafficStartBlockedSignal()) {
+      return this.i18n.t('tooltipHealthyTrafficRequiresRestore');
+    }
+    return this.i18n.t('tooltipHealthyTraffic', {
+      service: this.targetStatusSignal()?.service || this.i18n.t('serviceStatusLabel')
+    });
+  });
+
+  readonly liveKeyHint = computed<string>(() => {
+    if (!this.requireDemoKeySignal()) {
+      return this.i18n.t('demoMenuKeyNotRequiredHint');
+    }
+    if (!this.isLiveMode()) {
+      return this.i18n.t('demoMenuKeyReplayHint');
+    }
+    return this.i18n.t('demoMenuKeySavedHint');
   });
 
   @Input()
@@ -134,14 +186,30 @@ export class MainMenuComponent {
   @Output() readonly triggerChaos = new EventEmitter<void>();
   @Output() readonly resetService = new EventEmitter<void>();
 
-  readonly modeOptions = computed<ModeOption[]>(() => [
-    { label: this.i18n.t('liveMode'), value: IncidentExecutionMode.LIVE },
-    { label: this.i18n.t('replayMode'), value: IncidentExecutionMode.REPLAY }
-  ]);
-
   constructor(...args: [I18nService?]) {
     const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
+  }
+
+  /**
+   * Opens the demo controls drawer.
+   */
+  openDrawer(): void {
+    this.isDrawerOpenSignal.set(true);
+  }
+
+  /**
+   * Closes the demo controls drawer.
+   */
+  closeDrawer(): void {
+    this.isDrawerOpenSignal.set(false);
+  }
+
+  /**
+   * Synchronizes the drawer open signal with PrimeNG Drawer two-way visibility events.
+   */
+  onDrawerVisibilityChange(visible: boolean): void {
+    this.isDrawerOpenSignal.set(visible);
   }
 
   /**
@@ -154,12 +222,48 @@ export class MainMenuComponent {
   }
 
   /**
-   * Emits the updated live demo key from the password input.
+   * Translates the boolean Live toggle state into `LIVE` or `REPLAY` mode emissions.
+   */
+  onLiveModeToggle(enabled: boolean): void {
+    if (this.isWorkflowRunningSignal()) {
+      return;
+    }
+    this.onModeSelect(enabled ? IncidentExecutionMode.LIVE : IncidentExecutionMode.REPLAY);
+  }
+
+  /**
+   * Emits the updated live demo key from the password input when required by server config.
    */
   onLiveKeyInput(event: Event): void {
     const target = event.target as HTMLInputElement;
     if (target && isString(target.value)) {
       this.liveKeyChange.emit(target.value);
     }
+  }
+
+  /**
+   * Emits a healthy traffic toggle request only when the switch is enabled and state changes.
+   */
+  onHealthyTrafficToggle(enabled: boolean): void {
+    if (this.isHealthyTrafficToggleDisabled() || enabled === this.healthyTrafficActiveSignal()) {
+      return;
+    }
+    this.toggleHealthyTraffic.emit();
+  }
+
+  /**
+   * Triggers chaos simulation and closes the drawer so the operator sees live War Room updates.
+   */
+  onTriggerChaos(): void {
+    this.triggerChaos.emit();
+    this.closeDrawer();
+  }
+
+  /**
+   * Resets target service health and closes the drawer.
+   */
+  onResetService(): void {
+    this.resetService.emit();
+    this.closeDrawer();
   }
 }
