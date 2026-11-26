@@ -1,6 +1,6 @@
 # ⚡ ZeroMTTR — Autonomous AIOps & Incident Remediation
 
-> **Read in Portuguese:** [README.pt-BR.md](./README.pt-BR.md)  
+> **Read in Portuguese:** [README.pt-BR.md](./README.pt-BR.md) | **Leer en Español:** [README.es-ES.md](./README.es-ES.md)  
 > **Track:** Logistics & Automation (_Operational workflow automation & mission-critical system integrations_)  
 > **Organization:** AGJ Works ([https://agjworks.com](https://agjworks.com))  
 > **Repository:** [https://github.com/AdmilsonGoncalves/zeromttr](https://github.com/AdmilsonGoncalves/zeromttr)  
@@ -141,7 +141,7 @@ To reproduce real Pull Requests deterministically without ever breaking `master`
 
 ## 6. Measured Baseline (TTD / TTPR & LGTM Stability)
 
-Full measurement methodology and raw results are documented in [docs/pt-BR/phase-5-baseline.md](./docs/pt-BR/phase-5-baseline.md).
+Measurement protocol and verification scripts are documented in [07_demo_and_delivery.md](./docs/en-US/tech/07_demo_and_delivery.md).
 
 Against the 7-step manual baseline (1. alert triage → 2. PromQL query → 3. Tempo exemplar/trace inspection → 4. Loki log correlation → 5. `git diff v2.14.7...v2.14.8` → 6. edit & test fix → 7. open PR & write post-mortem):
 
@@ -195,9 +195,9 @@ Local endpoints:
 - [Architecture Master Document (en-US)](./docs/en-US/00_architecture_master.md)
 - [System Diagrams & Flows (en-US)](./docs/en-US/01_system_diagrams.md)
 - [Architecture Decision Records — ADRs 001–009 (en-US)](./docs/en-US/adr/README.md)
-- [Phase 5 Baseline & Load Measurements (en-US)](./docs/en-US/phase-5-baseline.md)
 - [Technical Specifications (`docs/en-US/tech/`)](./docs/en-US/tech/)
 - [Portuguese Documentation (`docs/pt-BR/`)](./docs/pt-BR/00_architecture_master.md)
+- [Spanish Documentation (`docs/es-ES/`)](./docs/es-ES/README.md)
 - [Contributing Guide](./CONTRIBUTING.md)
 - [Security Policy](./SECURITY.md)
 - [Coding Agent Guidelines](./AGENTS.md)

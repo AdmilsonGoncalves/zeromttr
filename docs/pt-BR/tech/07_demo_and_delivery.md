@@ -11,9 +11,9 @@ Como visitantes anônimos na URL pública veem por padrão o modo `Replay` (para
 | **0:00 – 0:25** | Problema Operacional & Arquitetura Aberta | Contextualização na trilha **Logística & Automação** (automação de fluxos de trabalho e integração entre sistemas): diferencial de PII mascarada na borda + FinOps de tokens + contrato MCP aberto e agnóstico ao serviço monitorado. |
 | **0:25 – 0:45** | Contrato MCP Aberto (Cliente Externo) | **MCP Inspector** (ou Cursor/Claude Desktop via `.mcp.json`) conectado diretamente ao `zeromttr-mcp-server`, listando as 8 tools (`tools/list`) e invocando `execute_promql_range`. |
 | **0:45 – 1:10** | Disparo do Incidente Real (`⚡ Live API Mode`) | Clique em "Simular Incidente" no War Room; `api-pagamentos-core` entra em `degraded` (`v2.14.8`); Grafana dispara alerta para o Orchestrator. |
-| **1:10 – 1:40** | Mascaramento OTTL na Borda & Coleta OTel (`TTD ≤ 15s`) | Aba 1 mostra `Evidence Coverage: 4/4 Signals (100%)` + `reasoningSource: 'llm'` + `Blast Radius` + span `pg.pool.acquire` em erro; Aba 2 mostra o log reportado na aplicação (pré-Collector) vs. log mascarado pelo `transform` OTTL (`[REDACTED_CPF]`, `[REDACTED_CNPJ]`, `Bearer [REDACTED_TOKEN]`) e a auditoria fail-closed do `PiiPromptGuard` (`leakedPatternsDetected: 0`). |
-| **1:40 – 2:10** | Diff Real `v2.14.7...v2.14.8` & PR Autônomo (`TTPR ≤ 30s`) | Aba 3 mostra o diff extraído de `apps/target-app-demo/src/repositories/payment.repository.ts` e a redução FinOps calculada dinamicamente (`bytes reduced / estimated tokens saved`). Clique no link abre no GitHub o **Pull Request real recém-criado** (contra `release/target-v2.14.8`) com `reasoningSource: llm` e o comentário `✅ ZeroMTTR Autonomous CI Gate: PASSED` postado pelo `hotfix-verify.yml`. |
-| **2:10 – 2:40** | Post-Mortem no Resend & Aprovação Humana via HMAC (`#fragment`) | Exibição do e-mail real recebido via **Resend** (`sre@send.zeromttr.agjworks.com`); clique no botão **Aprovar Hotfix** do e-mail abre `/decision/:id#action=approve&sig=...`, confirma via `POST` com assinatura HMAC e muda o estado para `RESOLVED` + anotação no gráfico do Grafana. |
+| **1:10 – 1:40** | Mascaramento OTTL na Borda & Coleta OTel (`TTD ≤ 15s`) | Aba 1 (`Live Metrics`) exibe os gráficos temporais SVG de latência, 5xx, vazão e pool; Aba 2 (`Trace Tree`) mostra `Evidence Coverage: 4/4 Signals (100%)` + `reasoningSource: 'llm'` + `Blast Radius` + span `pg.pool.acquire` em erro; Aba 3 (`Loki Logs & PII`) mostra o log reportado na aplicação (pré-Collector) vs. log mascarado pelo `transform` OTTL (`[REDACTED_CPF]`, `[REDACTED_CNPJ]`, `Bearer [REDACTED_TOKEN]`) e a auditoria fail-closed do `PiiPromptGuard` (`leakedPatternsDetected: 0`). |
+| **1:40 – 2:10** | Diff Real `v2.14.7...v2.14.8` & PR Autônomo (`TTPR ≤ 30s`) | Aba 4 (`Git Diff & FinOps`) mostra o diff extraído de `apps/target-app-demo/src/repositories/payment.repository.ts` e a redução FinOps calculada dinamicamente (`bytes reduced / estimated tokens saved`). Clique no link abre no GitHub o **Pull Request real recém-criado** (contra `release/target-v2.14.8`) com `reasoningSource: llm` e o comentário `✅ ZeroMTTR Autonomous CI Gate: PASSED` postado pelo `hotfix-verify.yml`. |
+| **2:10 – 2:40** | Post-Mortem no Resend & Aprovação Humana via HMAC (`#fragment`) | Exibição do e-mail real recebido via **Resend** (`sre@zeromttr.agjworks.com`); clique no botão **Aprovar Hotfix** do e-mail abre `/decision/:id#action=approve&sig=...`, confirma via `POST` com assinatura HMAC e muda o estado para `RESOLVED` + anotação no gráfico do Grafana. |
 | **2:40 – 3:00** | Fechamento com Métricas Cronometradas | Comparação entre o baseline manual cronometrado (7 passos) e o TTD/TTPR medido pelo `scripts/measure-mttr.sh`. |
 
 ## 2. Medição Honesta de TTD e TTPR vs. Baseline Manual Cronometrado
@@ -23,6 +23,18 @@ O script `scripts/measure-mttr.sh` lê os timestamps de transição de `GET /api
 3. **Tempo até Post-Mortem Entregue:** `timestamp(NOTIFIED) - timestamp(RECEIVED)` (meta: ≤ 45 s).
 
 Para comparação justa no README, cronometrar e registrar uma execução manual real dos mesmos 7 passos feitos por um engenheiro (1. ler alerta; 2. rodar PromQL; 3. abrir exemplar no Tempo; 4. filtrar Loki pelo `trace_id`; 5. rodar `git diff v2.14.7...v2.14.8 -- apps/target-app-demo`; 6. editar `payment.repository.ts` e rodar testes; 7. criar branch e abrir PR).
+
+### Scripts de Verificação, Carga LGTM e Replay
+
+Os scripts abaixo automatizam a validação de PII na borda, estabilidade de memória do stack LGTM (`GOMEMLIMIT=200MiB` no `otel-collector`, teto agregado `<= 2200 MiB` sem `OOMKill`), medição de TTD/TTPR e gravação do snapshot de replay:
+
+```bash
+./scripts/smoke-phase1.sh
+./scripts/load-test-lgtm.sh
+INCIDENT_ID="inc-001" # defina com o ID real do incidente
+./scripts/measure-mttr.sh "$INCIDENT_ID"
+./scripts/record-replay.sh "$INCIDENT_ID"
+```
 
 ## 3. Documentação Obrigatória no Repositório Público
 - `README.md` (en-US) e `README.pt-BR.md`:

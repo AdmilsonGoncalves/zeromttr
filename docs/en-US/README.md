@@ -1,6 +1,6 @@
 # ZeroMTTR Documentation (`en-US`)
 
-> **Leia em Português:** [`docs/pt-BR/`](../pt-BR/00_architecture_master.md)
+> **Leia em Português:** [`docs/pt-BR/`](../pt-BR/00_architecture_master.md) | **Leer en Español:** [`docs/es-ES/`](../es-ES/README.md)
 
 Welcome to the English (`en-US`) technical documentation for **ZeroMTTR** — an autonomous AIOps and incident remediation platform built on **Clean / Hexagonal Architecture** and an open **Model Context Protocol (MCP)** Streamable HTTP contract.
 
@@ -8,7 +8,6 @@ Welcome to the English (`en-US`) technical documentation for **ZeroMTTR** — an
 
 - [Architecture Master Document (`00_architecture_master.md`)](./00_architecture_master.md) — Overview, comparative positioning, domain isolation, KPIs, and project phases
 - [System Diagrams & Flows (`01_system_diagrams.md`)](./01_system_diagrams.md) — Use cases, E2E sequence diagrams, hexagonal class boundaries, and network topology
-- [Phase 5 Baseline & Load Measurements (`phase-5-baseline.md`)](./phase-5-baseline.md) — Timed TTD/TTPR measurements vs. manual baseline and LGTM memory stability
 
 ## Architecture Decision Records (ADRs)
 

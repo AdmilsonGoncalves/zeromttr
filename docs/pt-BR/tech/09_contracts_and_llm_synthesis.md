@@ -228,14 +228,15 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 ### 2.4 Parâmetros de Execução do LLM
 - **Modelo:** `${LLM_MODEL}` (padrão: `gemini-3.5-flash`, com fallback operacional para `gemini-3.5-flash-lite`).
 - **Temperature:** `0.1` (baixa variabilidade para garantir previsibilidade e patches determinísticos).
-- **MaxOutputTokens:** `4096`.
-- **Timeout:** 15.000 ms (15 s), com no máximo 1 retentativa automática com backoff exponencial de 1 s.
+- **MaxOutputTokens:** `8192`.
+- **Timeout:** 25.000 ms (25 s), com no máximo 1 retentativa automática com backoff exponencial de 1 s.
+- **Teto do Arquivo Suspeito:** até `24.000` caracteres retornados por `inspect_git_deploy_diff` (`MAX_SUSPECT_FILE_CHARS`).
 
 ### 2.5 Validação Defensiva do Patch Pré-PR
 Antes de acionar a tool `create_remediation_pr`, o Orchestrator executa a validação do patch sintetizado:
 1. **Allowlist de Arquivo:** `suspectFilePath === 'apps/target-app-demo/src/repositories/payment.repository.ts'`.
 2. **Parsing Sintático:** O TypeScript Compiler API (`ts.createSourceFile`) valida se o `patchedContent` é sintaticamente válido.
-3. **Asserção de Resolução Operacional:** O código corrigido **deve conter** `client.release()` e `pool` configurado (`max: 10`).
+3. **Asserção de Resolução Operacional e Integridade:** Se `evidence.gitDiff.suspectFileContent` chegar truncado (`[TRUNCATED_DIFF]`), o Orchestrator **não** envia ao LLM e desvia imediatamente para o fallback determinístico (que lê o arquivo completo da base saudável). Quando completo, o código corrigido **deve conter** `client.release()` e `pool` configurado (`max: 10`).
 4. **Desvio para Fallback:** Se o JSON for malformado ou qualquer uma das validações falhar, o Orchestrator aborta o uso da síntese do LLM e direciona imediatamente para o `DeterministicFallbackReasoningAdapter` (`reasoningSource: 'fallback'`).
 
 ---
@@ -298,12 +299,12 @@ Para garantir reprodutibilidade idêntica entre máquinas e agentes de IA, todas
 | :--- | :--- |
 | **Node.js** | `24.x LTS` (Engine: `>=24.0.0`) |
 | **pnpm** | `10.x` |
-| **Nx** | `20.3.3` |
+| **Nx** | `23.3.1` |
 | **TypeScript** | `5.7.3` (`ES2024`, `NodeNext`) |
 | **@modelcontextprotocol/sdk** | `1.6.0` |
 | **@google/genai** | `0.1.2` |
-| **Angular** | `19.1.5` |
-| **PrimeNG** | `19.0.6` |
+| **Angular** | `22.2.5` |
+| **PrimeNG** | `22.1.4` |
 | **Tailwind CSS** | `4.0.6` |
 | **Express** | `4.21.2` |
 | **Knex** | `3.1.0` |

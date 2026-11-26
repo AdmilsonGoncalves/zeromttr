@@ -157,7 +157,7 @@ sequenceDiagram
     Note over ORCH,SRE: Phase 6 — Post-Mortem (Resend) with Exclusive HMAC in Email URI Fragment (#)
     ORCH->>ORCH: Generates approveSig, rejectSig, and exp via HMAC-SHA256 (NOT persisted in public API or SSE)
     ORCH->>MCP: CallTool: send_post_mortem_resend (escaped HTML + /decision/:id#action=...&sig=...&exp=... links)
-    MCP->>EXT: Resend API: POST /emails (From: sre@send.zeromttr.agjworks.com)
+    MCP->>EXT: Resend API: POST /emails (From: sre@zeromttr.agjworks.com)
     EXT-->>SRE: Delivers Post-Mortem email with signed Approve / Reject buttons
     ORCH-->>UI: SSE event: incident.transition (NOTIFIED) & incident.notified (only emailId and sanitized htmlPreview, NO sig)
 

@@ -95,7 +95,7 @@ Create `docker-compose.prod.yml`, `infra/otel-collector-config.prod.yaml`, and `
 - **Secrets outside the repository** (e.g., `/path/to/secrets/.env` with `600` permissions), referenced via `${ENV_FILE_PATH}`.
 - **Zero published host ports (`expose:` only):** all telemetry and backend services remain isolated on the `aiops-net` network.
 - **Token segregation in Nginx:** the `dashboard` (Nginx) container injects `Authorization: Bearer ${DASHBOARD_API_TOKEN}` into the Dashboard's `/api/*` routes. The `GRAFANA_WEBHOOK_TOKEN` token never passes through Nginx.
-- **RAM limits sized with headroom against OOMKill under load (~2.1 GB total):** `prometheus: 512M`, `loki: 512M`, `tempo: 384M`, `otel-collector: 256M` (`limit_mib: 200`), `grafana: 256M`, `orchestrator: 256M`, `mcp-server: 192M`, `target-app-demo: 192M`, `postgres: 192M`, `dashboard: 128M`.
+- **Container RAM limits sized for coexistence on the ~2.2 GB host budget (combined hard caps sum to `2880M`; measured concurrent load across all 10 containers stays `<= 1.0 GiB`):** `prometheus: 512M`, `loki: 512M`, `tempo: 384M`, `otel-collector: 256M` (`limit_mib: 200`), `grafana: 256M`, `orchestrator: 256M`, `mcp-server: 192M`, `target-app-demo: 192M`, `postgres: 192M`, `dashboard: 128M`.
 
 ---
 
@@ -139,7 +139,7 @@ TARGET_GITHUB_REPO=https://github.com/AdmilsonGoncalves/zeromttr
 TARGET_BASE_BRANCH=release/target-v2.14.8
 TARGET_SERVICE_PATH=apps/target-app-demo
 RESEND_API_KEY=
-RESEND_FROM="ZeroMTTR - AGJ Works <sre@send.zeromttr.agjworks.com>"
+RESEND_FROM="ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>"
 ON_CALL_ENGINEER_EMAIL=oncall-sre@example.com
 
 # LLM (Orchestrator ReasoningPort — Configurable Model)
@@ -384,7 +384,7 @@ jobs:
 ---
 
 ### 3.2 OTel Collector Specification with `transform` Processor (OTTL PII Masking in `log.body`)
-In `infra/otel-collector-config.yaml` and `infra/otel-collector-config.prod.yaml`, the `logs` pipeline applies `transform/pii_logs` to guarantee deterministic masking in the `body` and attributes of all logs prior to persistence in Loki:
+In `infra/otel-collector-config.yaml` and `infra/otel-collector-config.prod.yaml`, the `logs` pipeline applies `transform/pii_logs` to perform deterministic OTTL `replace_pattern` masking on string-valued `body` and string attributes prior to persistence in Loki (see [ADR-009](../adr/009-otel-collector-ottl-transform-pii-masking.md) for the known limitation regarding non-string/map-valued log bodies):
 
 ```yaml
 processors:

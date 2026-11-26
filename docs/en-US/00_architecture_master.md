@@ -114,11 +114,11 @@ To avoid skewed comparisons with processes that include full production deployme
 | Agent Protocol | **MCP** (`@modelcontextprotocol/sdk`) | Standardized open interface of 8 AIOps tools |
 | Agent LLM | Google Gemini API (`ReasoningPort`, model configurable via `LLM_MODEL`, default `gemini-3.5-flash`) | RCA synthesis and surgical patch generation (with explicit `reasoningSource: 'llm' \| 'fallback'`) |
 | **Deploy Inspection & Auto-Remediation** | **GitHub REST API (Octokit)** on `apps/target-app-demo` in the `zeromttr` repository | Real comparison between tags `v2.14.7...v2.14.8`, code reading, `hotfix/zeromttr-*` branch creation, and Pull Request creation targeting `release/target-v2.14.8` |
-| **Notification & Governance** | **Resend** | HTML Post-Mortem delivery (`sre@send.zeromttr.agjworks.com`) exclusively containing HMAC-signed decision links |
+| **Notification & Governance** | **Resend** | HTML Post-Mortem delivery (`sre@zeromttr.agjworks.com`) exclusively containing HMAC-signed decision links |
 | Testing | Vitest, Supertest, `nock`/MSW + **Test Helpers (`test/helpers/`)** | **Testing Trophy (Integration & E2E priority)** exercising HTTP routes, MCP, and `PiiPromptGuard` end-to-end (Happy & Unhappy Paths); unit tests restricted to pure helper functions |
 | Quality | ESLint, Prettier, Husky + lint-staged, Commitlint | Code standards and hexagonal boundary enforcement |
 | Infrastructure | Docker, Docker Compose | Local execution (`docker-compose.yml`) and VPS production (`docker-compose.prod.yml`) |
-| CI/CD | GitHub Actions | `ci.yml`, `hotfix-verify.yml` (verifies `hotfix/zeromttr-*` PRs), and `cd-release.yml` (VPS deploy frozen only for `v*` tags or manual dispatch) |
+| CI/CD | GitHub Actions | `ci.yml`, `hotfix-verify.yml` (verifies `hotfix/zeromttr-*` PRs), and `cd-release.yml` (VPS deploy frozen only for `v1.*.*` tags or manual dispatch) |
 | Demo Workload | Express + Knex + PostgreSQL | `api-pagamentos-core` service with reproducible connection pool saturation fault |
 | Frontend | **Angular (latest stable)**, **PrimeNG (Aura Dark preset)**, Tailwind CSS v4 + `tailwindcss-primeui` | Lean War Room Dashboard (Single-Pane with interactive horizontal FSM Flow bar at top + OTel/PII/Diff evidence panel + PR/Resend panel) + `/decision/:id` route |
 
@@ -335,11 +335,12 @@ zeromttr/
 ├── scripts/                      # demo.sh, chaos.sh, reset.sh, measure-mttr.sh, smoke-integrations.sh
 └── docs/
     ├── pt-BR/
-    │   ├── 00_architecture_master.md
-    │   ├── 01_system_diagrams.md # Use Cases, E2E Sequence, Hexagonal Classes, and Network Topology
-    │   ├── tech/                 # implementation documents by slice (01 to 08)
-    │   └── adr/
+    ├── es-ES/
     └── en-US/
+        ├── 00_architecture_master.md
+        ├── 01_system_diagrams.md # Use Cases, E2E Sequence, Hexagonal Classes, and Network Topology
+        ├── tech/                 # implementation documents by slice (01 to 09)
+        └── adr/
 ```
 
 ---

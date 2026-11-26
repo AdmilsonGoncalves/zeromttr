@@ -232,14 +232,15 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 ### 2.4 LLM Execution Parameters
 - **Model:** `${LLM_MODEL}` (default: `gemini-3.5-flash`, with operational fallback to `gemini-3.5-flash-lite`).
 - **Temperature:** `0.1` (low variability to ensure predictability and deterministic patches).
-- **MaxOutputTokens:** `4096`.
-- **Timeout:** 15,000 ms (15 s), with at most 1 automatic retry using 1 s exponential backoff.
+- **MaxOutputTokens:** `8192`.
+- **Timeout:** 25,000 ms (25 s), with at most 1 automatic retry using 1 s exponential backoff.
+- **Suspect File Diff Cap:** up to `24,000` chars returned by `inspect_git_deploy_diff` (`MAX_SUSPECT_FILE_CHARS`).
 
 ### 2.5 Defensive Pre-PR Patch Validation
 Before invoking the `create_remediation_pr` tool, the Orchestrator runs domain-agnostic validation on the synthesized patch:
 1. **Target Path Consistency:** `synthesis.suspectFilePath === evidence.gitDiff.suspectFilePath` (must match the authoritative suspect file path from the deploy diff).
 2. **Syntactic Parsing:** The TypeScript Compiler API (`ts.createSourceFile`) validates that `patchedContent` is syntactically valid.
-3. **Dynamic Export Completeness:** When `evidence.gitDiff.suspectFileContent` is available, the Orchestrator dynamically extracts all exported declarations (`class`, `const`, `let`, `function`, `interface`, `type`, `enum`) and rejects any truncated or stubbed LLM output that omits them.
+3. **Dynamic Export & Input Completeness:** If `evidence.gitDiff.suspectFileContent` was truncated at the policy cap (`[TRUNCATED_DIFF]`), the Orchestrator skips LLM synthesis and routes directly to `DeterministicFallbackReasoningAdapter` so a partial file never produces an incomplete PR. Otherwise, it dynamically extracts all exported declarations (`class`, `const`, `let`, `function`, `interface`, `type`, `enum`) and rejects any truncated or stubbed LLM output that omits them.
 4. **Fallback Routing:** If the JSON is malformed or any validation fails, the Orchestrator aborts using the LLM synthesis and immediately routes to `DeterministicFallbackReasoningAdapter` (`reasoningSource: 'fallback'`).
 
 ---
@@ -312,7 +313,7 @@ To ensure identical reproducibility across machines and AI agents, all versions 
 | :--- | :--- |
 | **Node.js** | `24.x LTS` (Engine: `>=24.0.0`) |
 | **pnpm** | `10.x` |
-| **Nx** | `20.3.3` |
+| **Nx** | `23.3.1` |
 | **TypeScript** | `5.7.3` (`ES2024`, `NodeNext`) |
 | **@modelcontextprotocol/sdk** | `1.6.0` |
 | **@google/genai** | `0.1.2` |
