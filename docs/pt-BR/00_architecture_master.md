@@ -114,11 +114,11 @@ Para evitar comparações distorcidas com processos que incluem deploy completo 
 | Protocolo de Agente | **MCP** (`@modelcontextprotocol/sdk`) | Interface aberta padronizada de 8 tools de AIOps |
 | LLM do Agente | Google Gemini API (`ReasoningPort`, modelo configurável via `LLM_MODEL`, padrão `gemini-3.5-flash`) | Síntese de RCA e geração de patch cirúrgico (com `reasoningSource: 'llm' \| 'fallback'` explícito) |
 | **Inspeção de Deploy & Auto-Remediação** | **GitHub REST API (Octokit)** sobre `apps/target-app-demo` no repositório `zeromttr` | Comparação real entre as tags `v2.14.7...v2.14.8`, leitura de código, criação de branch `hotfix/zeromttr-*` e abertura de Pull Request mirando `release/target-v2.14.8` |
-| **Notificação e Governança** | **Resend** | Entrega do Post-Mortem em HTML (`sre@send.zeromttr.agjworks.com`) contendo com exclusividade os links de decisão assinados via HMAC |
+| **Notificação e Governança** | **Resend** | Entrega do Post-Mortem em HTML (`sre@zeromttr.agjworks.com`) contendo com exclusividade os links de decisão assinados via HMAC |
 | Testes | Vitest, Supertest, `nock`/MSW + **Test Helpers (`test/helpers/`)** | **Testing Trophy (Integração & E2E como prioridade)** exercitando rotas HTTP, MCP e `PiiPromptGuard` de ponta a ponta (Happy & Unhappy Paths); testes unitários restritos às funções puras de apoio |
 | Qualidade | ESLint, Prettier, Husky + lint-staged, Commitlint | Padrões de código e imposição de fronteiras hexagonais |
 | Infraestrutura | Docker, Docker Compose | Execução local (`docker-compose.yml`) e em produção na VPS (`docker-compose.prod.yml`) |
-| CI/CD | GitHub Actions | `ci.yml`, `hotfix-verify.yml` (verifica PRs `hotfix/zeromttr-*`) e `cd-release.yml` (deploy na VPS congelado apenas para tags `v*` ou disparo manual) |
+| CI/CD | GitHub Actions | `ci.yml`, `hotfix-verify.yml` (verifica PRs `hotfix/zeromttr-*`) e `cd-release.yml` (deploy na VPS congelado apenas para tags `v1.*.*` ou disparo manual) |
 | Workload Demo | Express + Knex + PostgreSQL | Serviço `api-pagamentos-core` com falha reproduzível de saturação do pool de conexões |
 | Frontend | **Angular (última versão estável)**, **PrimeNG (preset Aura Dark)**, Tailwind CSS v4 + `tailwindcss-primeui` | War Room Dashboard enxuto (Single-Pane com barra horizontal interativa do Fluxo FSM no topo + painel de evidências OTel/PII/Diff + painel de PR/Resend) + rota `/decision/:id` |
 
@@ -337,9 +337,10 @@ zeromttr/
     ├── pt-BR/
     │   ├── 00_architecture_master.md
     │   ├── 01_system_diagrams.md # Casos de Uso, Sequência E2E, Classes Hexagonais e Topologia de Rede
-    │   ├── tech/                 # documentos de implementação por fatia (01 a 08)
+    │   ├── tech/                 # documentos de implementação por fatia (01 a 09)
     │   └── adr/
-    └── en-US/
+    ├── en-US/
+    └── es-ES/
 ```
 
 ---
