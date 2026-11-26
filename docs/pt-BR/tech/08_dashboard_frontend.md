@@ -35,9 +35,8 @@ A rota principal `/` (`WarRoomComponent`) exibe os 4 quadrantes alimentados via 
 | `GET /api/incidents` | `Incident[]` (resumo, mais recente primeiro) |
 | `GET /api/incidents/:id` | `IncidentDetail` (**nunca** inclui `decisionToken` / `sig`) |
 | `GET /api/demo/config` | `{ "demoModeEnabled": boolean, "requireDemoKey": boolean, "publicLiveDemo": boolean, "turnstileSiteKey": string \| null, "turnstileRequired": boolean }` — controla a exibição do `app-demo-settings` (`ENABLE_DEMO_MODE`) e o campo de chave (`REQUIRE_DEMO_KEY`) |
-| `GET /api/settings` | `{ "settings": SystemSettings, "editable": boolean, "adminTokenRequired": boolean, "readonlyMeta": ... }` — alimenta o drawer `app-system-settings` (`onCallEmail` sempre mascarado) |
-| `PATCH /api/settings` | corpo `SystemSettingsPatch` (cabeçalho opcional `X-Settings-Admin-Token` quando exigido) → `200` com configurações atualizadas |
-| `GET /api/settings/audit` | `{ "entries": SettingsAuditEntry[] }` — histórico de alterações de configuração exibido na aba Auditoria |
+| `GET /api/settings` | `{ "settings": SystemSettingsDisplay, "readonlyInfo": SystemSettingsReadonlyInfo, "editable": boolean, "requiresAuthKey": boolean, "auditLog": SettingsAuditEntry[] }` — alimenta o drawer `app-system-settings` (`onCallEmail` sempre mascarado) e a aba Auditoria |
+| `PATCH /api/settings` | corpo `SystemSettingsPatch` (cabeçalho opcional `X-Settings-Admin-Token` quando exigido) → `200` com `SystemSettingsResponse` atualizado (`settings`, `readonlyInfo`, `editable`, `requiresAuthKey`, `auditLog`) |
 | `POST /api/demo/chaos` | corpo `{ "mode": "live" \| "replay" }` (cabeçalho opcional `X-Live-Demo-Key`) → `202` |
 | `POST /api/demo/reset` | `202` — restaura o serviço-alvo e fecha PRs de demo no repositório-alvo |
 | `GET /api/target/status` | `{ "status": "healthy" \| "degraded" \| "unreachable", "service": string, "version": string, "previousHealthyVersion": string, "capabilities": { "chaosSimulation": boolean, "healthyTrafficToggle": boolean }, "rawEdgeLogPreCollector"?: string, "metrics"?: { "requestsPerSecond": number, "errorRate5xxPercent": number, "p95LatencyMs": number, "healthyTrafficActive": boolean, "saturation"?: { "resourceLabel": string, "active": number, "waiting": number, "max": number } } }` |

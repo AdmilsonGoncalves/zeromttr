@@ -19,6 +19,12 @@ export interface DemoSessionLifecycle {
 
   clearPendingTargetResets(): void;
 
+  markPendingLiveReset(): void;
+
+  hasPendingLiveReset(): boolean;
+
+  clearPendingLiveReset(): void;
+
   completeApprovalReset(incidentId: string): Promise<void>;
 
   handleLiveIncidentApproved(incident: Incident): Promise<void>;
@@ -34,6 +40,8 @@ export function createDemoSessionLifecycle(
 ): DemoSessionLifecycle {
   let lastChaosTimestamp = 0;
   let lastChaosMode: IncidentMode = IncidentExecutionMode.REPLAY;
+  let chaosSessionGeneration = 0;
+  let pendingLiveReset = false;
   const pendingTargetResetIncidentIds = new Set<string>();
   let lifecycleQueue: Promise<void> = Promise.resolve();
 
@@ -52,6 +60,7 @@ export function createDemoSessionLifecycle(
     await demoControlPort.reset();
     lastChaosTimestamp = 0;
     lastChaosMode = IncidentExecutionMode.REPLAY;
+    pendingLiveReset = false;
     pendingTargetResetIncidentIds.delete(incidentId);
   };
 
@@ -62,6 +71,7 @@ export function createDemoSessionLifecycle(
     setLastChaos: (timestamp: number, mode: IncidentMode) => {
       lastChaosTimestamp = timestamp;
       lastChaosMode = mode;
+      chaosSessionGeneration += 1;
     },
     clearLastChaos: () => {
       lastChaosTimestamp = 0;
@@ -71,11 +81,21 @@ export function createDemoSessionLifecycle(
     clearPendingTargetResets: () => {
       pendingTargetResetIncidentIds.clear();
     },
+    markPendingLiveReset: () => {
+      pendingLiveReset = true;
+    },
+    hasPendingLiveReset: () => pendingLiveReset,
+    clearPendingLiveReset: () => {
+      pendingLiveReset = false;
+    },
     completeApprovalReset,
     handleLiveIncidentApproved: async (incident: Incident): Promise<void> => {
       if (incident.mode !== IncidentExecutionMode.LIVE) {
         return;
       }
+      const observedGeneration = chaosSessionGeneration;
+      const incidentStartedAtMs = Date.parse(incident.startedAt);
+
       if (targetStatusPort) {
         const targetStatus = await targetStatusPort.getStatus();
         if (
@@ -85,7 +105,20 @@ export function createDemoSessionLifecycle(
           return;
         }
       }
-      await runSerialized(() => completeApprovalReset(incident.id));
+
+      await runSerialized(async () => {
+        const newerChaosStartedDuringLookup = chaosSessionGeneration !== observedGeneration;
+        const newerLiveSessionOwnsTarget =
+          lastChaosTimestamp > 0 &&
+          lastChaosMode === IncidentExecutionMode.LIVE &&
+          Number.isFinite(incidentStartedAtMs) &&
+          lastChaosTimestamp > incidentStartedAtMs;
+        if (newerChaosStartedDuringLookup || newerLiveSessionOwnsTarget) {
+          return;
+        }
+        pendingLiveReset = true;
+        await completeApprovalReset(incident.id);
+      });
     }
   };
 }

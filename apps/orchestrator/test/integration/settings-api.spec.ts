@@ -1,7 +1,11 @@
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
-import { SettingsPersistenceEngine, SystemLogLevel } from '@zeromttr/contracts';
+import {
+  SettingsPersistenceEngine,
+  SystemLogLevel,
+  SystemSettingsResponseSchema
+} from '@zeromttr/contracts';
 import { HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { SqliteSettingsRepository } from '../../src/adapters/settings.sqlite.js';
 import { resolveDefaultSystemSettings } from '../../src/domain/system-settings.js';
@@ -46,7 +50,7 @@ function createTestServer(options: { editable?: boolean; requiresAuthKey?: boole
 }
 
 describe('System Settings REST API (/api/settings)', () => {
-  it('should always mask onCallEmail on GET /api/settings and return readonly info', async () => {
+  it('should_always_mask_onCallEmail_on_GET_settings_and_match_response_schema', async () => {
     const { app, settingsRepository } = createTestServer();
 
     const res = await request(app)
@@ -54,14 +58,15 @@ describe('System Settings REST API (/api/settings)', () => {
       .set(HTTP_HEADERS.AUTHORIZATION, `Bearer ${DASHBOARD_TOKEN}`);
 
     expect(res.status).toBe(HTTP_STATUS.OK);
-    expect(res.body.settings.rejectionCooldownSeconds).toBe(900);
-    expect(res.body.settings.onCallEmail).toBe('on***@example.com');
-    expect(res.body.readonlyInfo.persistenceEngine).toBe(SettingsPersistenceEngine.SQLITE);
-    expect(res.body.auditLog).toEqual([]);
+    const parsed = SystemSettingsResponseSchema.parse(res.body);
+    expect(parsed.settings.rejectionCooldownSeconds).toBe(900);
+    expect(parsed.settings.onCallEmail).toBe('on***@example.com');
+    expect(parsed.readonlyInfo.persistenceEngine).toBe(SettingsPersistenceEngine.SQLITE);
+    expect(parsed.auditLog).toEqual([]);
     settingsRepository.close();
   });
 
-  it('should persist valid PATCH updates to SQLite, invoke hook, and append audit log', async () => {
+  it('should_persist_valid_PATCH_updates_to_SQLite_invoke_hook_and_append_audit_log', async () => {
     const { app, settingsRepository, onSettingsUpdated } = createTestServer();
 
     const res = await request(app)
@@ -75,16 +80,17 @@ describe('System Settings REST API (/api/settings)', () => {
       });
 
     expect(res.status).toBe(HTTP_STATUS.OK);
-    expect(res.body.settings.rejectionCooldownSeconds).toBe(1800);
-    expect(res.body.settings.repeatSuppressionSeconds).toBe(120);
-    expect(res.body.settings.targetServicePath).toBe('services/checkout-api');
-    expect(res.body.settings.logLevel).toBe(SystemLogLevel.WARN);
-    expect(res.body.auditLog).toHaveLength(4);
+    const parsed = SystemSettingsResponseSchema.parse(res.body);
+    expect(parsed.settings.rejectionCooldownSeconds).toBe(1800);
+    expect(parsed.settings.repeatSuppressionSeconds).toBe(120);
+    expect(parsed.settings.targetServicePath).toBe('services/checkout-api');
+    expect(parsed.settings.logLevel).toBe(SystemLogLevel.WARN);
+    expect(parsed.auditLog).toHaveLength(4);
     expect(onSettingsUpdated).toHaveBeenCalledTimes(1);
     settingsRepository.close();
   });
 
-  it('should return 400 Bad Request for invalid path traversal or out-of-range fields', async () => {
+  it('should_return_400_Bad_Request_for_invalid_path_traversal_or_out_of_range_fields', async () => {
     const { app, settingsRepository } = createTestServer();
 
     const res = await request(app)
@@ -100,7 +106,7 @@ describe('System Settings REST API (/api/settings)', () => {
     settingsRepository.close();
   });
 
-  it('should enforce X-Settings-Admin-Token on PATCH when requiresAuthKey is true', async () => {
+  it('should_enforce_X_Settings_Admin_Token_on_PATCH_when_requiresAuthKey_is_true', async () => {
     const { app, settingsRepository } = createTestServer({ requiresAuthKey: true });
 
     const deniedMissing = await request(app)
@@ -126,7 +132,7 @@ describe('System Settings REST API (/api/settings)', () => {
     settingsRepository.close();
   });
 
-  it('should reject PATCH with 403 Forbidden when settings are read-only', async () => {
+  it('should_reject_PATCH_with_403_Forbidden_when_settings_are_read_only', async () => {
     const { app, settingsRepository } = createTestServer({ editable: false });
 
     const res = await request(app)

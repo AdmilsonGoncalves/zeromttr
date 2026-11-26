@@ -35,9 +35,8 @@ The main route `/` (`WarRoomComponent`) displays the 4 quadrants powered by real
 | `GET /api/incidents` | `Incident[]` (summary, newest first) |
 | `GET /api/incidents/:id` | `IncidentDetail` (**never** includes `decisionToken` / `sig`) |
 | `GET /api/demo/config` | `{ "demoModeEnabled": boolean, "requireDemoKey": boolean, "publicLiveDemo": boolean, "turnstileSiteKey": string \| null, "turnstileRequired": boolean }` — drives `app-demo-settings` visibility (`ENABLE_DEMO_MODE`) and key input (`REQUIRE_DEMO_KEY`) |
-| `GET /api/settings` | `{ "settings": SystemSettings, "editable": boolean, "adminTokenRequired": boolean, "readonlyMeta": ... }` — powers the `app-system-settings` drawer (`onCallEmail` always masked) |
-| `PATCH /api/settings` | body `SystemSettingsPatch` (optional header `X-Settings-Admin-Token` when required) → `200` with updated settings |
-| `GET /api/settings/audit` | `{ "entries": SettingsAuditEntry[] }` — settings change history displayed in the Audit tab |
+| `GET /api/settings` | `{ "settings": SystemSettingsDisplay, "readonlyInfo": SystemSettingsReadonlyInfo, "editable": boolean, "requiresAuthKey": boolean, "auditLog": SettingsAuditEntry[] }` — powers the `app-system-settings` drawer (`onCallEmail` always masked) and Audit tab |
+| `PATCH /api/settings` | body `SystemSettingsPatch` (optional header `X-Settings-Admin-Token` when required) → `200` with updated `SystemSettingsResponse` (`settings`, `readonlyInfo`, `editable`, `requiresAuthKey`, `auditLog`) |
 | `POST /api/demo/chaos` | body `{ "mode": "live" \| "replay" }` (optional header `X-Live-Demo-Key`) → `202` |
 | `POST /api/demo/reset` | `202` — restores target service and closes demo PRs on target repository |
 | `GET /api/target/status` | `{ "status": "healthy" \| "degraded" \| "unreachable", "service": string, "version": string, "previousHealthyVersion": string, "capabilities": { "chaosSimulation": boolean, "healthyTrafficToggle": boolean }, "rawEdgeLogPreCollector"?: string, "metrics"?: { "requestsPerSecond": number, "errorRate5xxPercent": number, "p95LatencyMs": number, "healthyTrafficActive": boolean, "saturation"?: { "resourceLabel": string, "active": number, "waiting": number, "max": number } } }` |

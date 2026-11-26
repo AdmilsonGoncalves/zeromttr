@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { SystemLogLevel, SystemSettingsSchema, type SystemSettings } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
 import { OrchestratorDefault } from './incident-enums.js';
@@ -34,68 +35,105 @@ function resolveLogLevel(raw?: string): SystemLogLevel {
   return SystemLogLevel.INFO;
 }
 
+function resolveSchemaField<T>(schema: z.ZodType<T>, candidate: unknown, fallback: T): T {
+  const parsed = schema.safeParse(candidate);
+  if (parsed.success) {
+    return parsed.data;
+  }
+  return fallback;
+}
+
 /**
  * Resolves initial system settings from environment variables with validated production-safe defaults.
+ * Each field is validated independently so one invalid environment value never discards other valid overrides.
  */
 export function resolveDefaultSystemSettings(
   env: Record<string, string | undefined> = {}
 ): SystemSettings {
   const demoEnabled = parseOptionalBoolean(env.ENABLE_DEMO_MODE, true);
   const rawEmail = (env.ON_CALL_ENGINEER_EMAIL || env.ONCALL_TO_EMAIL || '').trim();
+  const shape = SystemSettingsSchema.shape;
 
   const candidate: SystemSettings = {
-    rejectionCooldownSeconds: Math.max(
-      0,
-      Math.min(
-        86_400,
-        Math.trunc(parseNumber(env.REJECTION_COOLDOWN_SECONDS, DEFAULT_REJECTION_COOLDOWN_SECONDS))
-      )
+    rejectionCooldownSeconds: resolveSchemaField(
+      shape.rejectionCooldownSeconds,
+      Math.max(
+        0,
+        Math.min(
+          86_400,
+          Math.trunc(
+            parseNumber(env.REJECTION_COOLDOWN_SECONDS, DEFAULT_REJECTION_COOLDOWN_SECONDS)
+          )
+        )
+      ),
+      DEFAULT_REJECTION_COOLDOWN_SECONDS
     ),
-    repeatSuppressionSeconds: Math.max(
-      0,
-      Math.min(
-        86_400,
-        Math.trunc(parseNumber(env.REPEAT_SUPPRESSION_SECONDS, DEFAULT_REPEAT_SUPPRESSION_SECONDS))
-      )
+    repeatSuppressionSeconds: resolveSchemaField(
+      shape.repeatSuppressionSeconds,
+      Math.max(
+        0,
+        Math.min(
+          86_400,
+          Math.trunc(
+            parseNumber(env.REPEAT_SUPPRESSION_SECONDS, DEFAULT_REPEAT_SUPPRESSION_SECONDS)
+          )
+        )
+      ),
+      DEFAULT_REPEAT_SUPPRESSION_SECONDS
     ),
-    decisionTtlSeconds: Math.max(
-      60,
-      Math.min(
-        86_400,
-        Math.trunc(parseNumber(env.DECISION_TTL_SECONDS, DEFAULT_DECISION_TTL_SECONDS))
-      )
+    decisionTtlSeconds: resolveSchemaField(
+      shape.decisionTtlSeconds,
+      Math.max(
+        60,
+        Math.min(
+          86_400,
+          Math.trunc(parseNumber(env.DECISION_TTL_SECONDS, DEFAULT_DECISION_TTL_SECONDS))
+        )
+      ),
+      DEFAULT_DECISION_TTL_SECONDS
     ),
     autoRestoreOnApprove: parseOptionalBoolean(env.AUTO_RESTORE_ON_APPROVE, demoEnabled),
-    targetServicePath: (env.TARGET_SERVICE_PATH || DEFAULT_SERVICE_PATH).trim(),
-    targetBaseRef: (env.TARGET_BASE_REF || OrchestratorDefault.DEFAULT_BASE_REF).trim(),
-    targetHeadRef: (env.TARGET_HEAD_REF || OrchestratorDefault.DEFAULT_HEAD_REF).trim(),
-    targetErrorRateThresholdPercent: Math.max(
-      0.1,
-      Math.min(
-        100,
-        parseNumber(env.TARGET_ERROR_RATE_THRESHOLD_PERCENT, DEFAULT_ERROR_RATE_THRESHOLD_PERCENT)
-      )
+    targetServicePath: resolveSchemaField(
+      shape.targetServicePath,
+      (env.TARGET_SERVICE_PATH || DEFAULT_SERVICE_PATH).trim(),
+      DEFAULT_SERVICE_PATH
     ),
-    llmModel: (env.LLM_MODEL || DEFAULT_LLM_MODEL).trim(),
-    llmFallbackModel: (env.LLM_FALLBACK_MODEL || DEFAULT_LLM_FALLBACK_MODEL).trim(),
-    onCallEmail: rawEmail,
+    targetBaseRef: resolveSchemaField(
+      shape.targetBaseRef,
+      (env.TARGET_BASE_REF || OrchestratorDefault.DEFAULT_BASE_REF).trim(),
+      OrchestratorDefault.DEFAULT_BASE_REF
+    ),
+    targetHeadRef: resolveSchemaField(
+      shape.targetHeadRef,
+      (env.TARGET_HEAD_REF || OrchestratorDefault.DEFAULT_HEAD_REF).trim(),
+      OrchestratorDefault.DEFAULT_HEAD_REF
+    ),
+    targetErrorRateThresholdPercent: resolveSchemaField(
+      shape.targetErrorRateThresholdPercent,
+      Math.max(
+        0.1,
+        Math.min(
+          100,
+          parseNumber(env.TARGET_ERROR_RATE_THRESHOLD_PERCENT, DEFAULT_ERROR_RATE_THRESHOLD_PERCENT)
+        )
+      ),
+      DEFAULT_ERROR_RATE_THRESHOLD_PERCENT
+    ),
+    llmModel: resolveSchemaField(
+      shape.llmModel,
+      (env.LLM_MODEL || DEFAULT_LLM_MODEL).trim(),
+      DEFAULT_LLM_MODEL
+    ),
+    llmFallbackModel: resolveSchemaField(
+      shape.llmFallbackModel,
+      (env.LLM_FALLBACK_MODEL || DEFAULT_LLM_FALLBACK_MODEL).trim(),
+      DEFAULT_LLM_FALLBACK_MODEL
+    ),
+    onCallEmail: resolveSchemaField(shape.onCallEmail, rawEmail, ''),
     logLevel: resolveLogLevel(env.LOG_LEVEL)
   };
 
-  const parsed = SystemSettingsSchema.safeParse(candidate);
-  if (parsed.success) {
-    return parsed.data;
-  }
-
-  return SystemSettingsSchema.parse({
-    ...candidate,
-    targetServicePath: DEFAULT_SERVICE_PATH,
-    targetBaseRef: OrchestratorDefault.DEFAULT_BASE_REF,
-    targetHeadRef: OrchestratorDefault.DEFAULT_HEAD_REF,
-    llmModel: DEFAULT_LLM_MODEL,
-    llmFallbackModel: DEFAULT_LLM_FALLBACK_MODEL,
-    onCallEmail: ''
-  });
+  return SystemSettingsSchema.parse(candidate);
 }
 
 /**

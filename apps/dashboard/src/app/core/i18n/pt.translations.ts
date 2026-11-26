@@ -259,6 +259,8 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   settingsDrawerSubtitle:
     'Ajuste políticas de alertas, serviço alvo, modelo LLM e consulte o histórico de alterações.',
   settingsLoading: 'Carregando configurações...',
+  settingsLoadError:
+    'Não foi possível carregar as configurações. Clique em Recarregar para tentar novamente.',
   settingsReadonlyNotice:
     'Modo somente leitura — configure SETTINGS_ADMIN_TOKEN no servidor para habilitar alterações.',
   settingsAdminTokenLabel: 'Token administrativo (X-Settings-Admin-Token)',
@@ -290,7 +292,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   settingsLlmFallbackLabel: 'Modelo LLM Secundário (Fallback)',
   settingsOnCallEmailLabel: 'E-mail do Plantonista (Resend)',
   settingsOnCallEmailHint:
-    'Destinatário do post-mortem e links HMAC. Mascarado automaticamente para proteção de privacidade.',
+    'Destinatário do post-mortem e links HMAC (mascarado para privacidade). Deixar vazio usa o ON_CALL_ENGINEER_EMAIL padrão do servidor (.env).',
   settingsLogLevelLabel: 'Nível de Log do Orquestrador',
   settingsAuditEmpty: 'Nenhuma alteração de configuração registrada ainda.',
   settingsReloadBtn: 'Recarregar',

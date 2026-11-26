@@ -13,6 +13,7 @@ export interface PrometheusTargetStatusConfig {
   suspectFilePath?: string;
   errorRateThresholdPercent?: number;
   getErrorRateThreshold?: () => number;
+  getDiffRefs?: () => { targetBaseRef: string; targetHeadRef: string };
 }
 
 const DEFAULT_ERROR_RATE_THRESHOLD_PERCENT = 5;
@@ -40,6 +41,7 @@ export class PrometheusTargetStatusAdapter implements TargetStatusPort {
    * Queries Prometheus via `ToolsPort` for throughput, 5xx ratio, and p95 latency without requiring target API endpoints.
    */
   public async getStatus(): Promise<TargetStatus> {
+    const dynamicRefs = this.config.getDiffRefs?.();
     const service =
       this.config.serviceName ||
       process.env.TARGET_SERVICE_NAME ||
@@ -47,12 +49,12 @@ export class PrometheusTargetStatusAdapter implements TargetStatusPort {
     const version =
       this.config.version ||
       process.env.TARGET_VERSION ||
-      process.env.TARGET_HEAD_REF ||
+      dynamicRefs?.targetHeadRef ||
       OrchestratorDefault.UNKNOWN;
     const previousHealthyVersion =
       this.config.previousHealthyVersion ||
       process.env.TARGET_PREVIOUS_VERSION ||
-      process.env.TARGET_BASE_REF ||
+      dynamicRefs?.targetBaseRef ||
       OrchestratorDefault.UNKNOWN;
     const targetRepo = this.config.targetRepo || resolveTargetRepoUrl();
     const suspectFilePath =
@@ -69,8 +71,11 @@ export class PrometheusTargetStatusAdapter implements TargetStatusPort {
     const startIso = new Date(endMs - PROMQL_WINDOW_MS).toISOString();
     const endIso = new Date(endMs).toISOString();
 
-    const rpsQuery = `sum(rate(http_server_duration_milliseconds_count{service_name="${service}"}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}"}[1m]))`;
-    const errorRatioQuery = `100 * (sum(rate(http_server_duration_milliseconds_count{service_name="${service}",http_status_code=~"5.."}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}",status=~"5.."}[1m])) or vector(0)) / clamp_min(sum(rate(http_server_duration_milliseconds_count{service_name="${service}"}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}"}[1m])), 1)`;
+    const totalRateExpr = `(sum(rate(http_server_duration_milliseconds_count{service_name="${service}"}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}"}[1m])))`;
+    const errorRateExpr = `(sum(rate(http_server_duration_milliseconds_count{service_name="${service}",http_status_code=~"5.."}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}",status=~"5.."}[1m])) or vector(0))`;
+
+    const rpsQuery = totalRateExpr;
+    const errorRatioQuery = `((100 * ${errorRateExpr}) / (${totalRateExpr} > 0)) or vector(0)`;
     const p95Query = `(histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name="${service}"}[1m])) by (le))) or (1000 * histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="${service}"}[1m])) by (le)))`;
 
     try {
@@ -94,6 +99,24 @@ export class PrometheusTargetStatusAdapter implements TargetStatusPort {
           step: '30s'
         })
       ]);
+
+      const hasObservedTelemetry =
+        rpsOut.summarizedSeries.length > 0 || p95Out.summarizedSeries.length > 0;
+      if (!hasObservedTelemetry) {
+        return {
+          status: TargetHealthStatus.UNREACHABLE,
+          service,
+          version,
+          previousHealthyVersion,
+          targetRepo,
+          suspectFilePath,
+          capabilities: {
+            chaosSimulation: false,
+            healthyTrafficToggle: false
+          },
+          rawEdgeLogPreCollector: ''
+        };
+      }
 
       const requestsPerSecond = round(extractMetricSample(rpsOut), 2);
       const errorRate5xxPercent = Math.min(100, round(extractMetricSample(errorOut), 2));

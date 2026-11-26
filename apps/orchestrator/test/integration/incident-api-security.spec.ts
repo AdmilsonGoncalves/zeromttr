@@ -5,7 +5,10 @@ import type { Express } from 'express';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { createApp } from '../../src/http/app.js';
 import { SseEventBroadcaster } from '../../src/http/events.sse.js';
-import { createDemoRouterFactory } from '../../src/demo/demo.controller.js';
+import {
+  createDemoRouterFactory,
+  createDemoSessionLifecycle
+} from '../../src/demo/demo.controller.js';
 import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
 import type { DemoControlPort } from '../../src/demo/demo-control.port.js';
 import {
@@ -731,5 +734,179 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     expect(trafficRes.status).toBe(HTTP_STATUS.BAD_REQUEST);
     expect(trafficRes.body.code).toBe('CAPABILITY_NOT_SUPPORTED');
     expect(toggleHealthyTraffic).not.toHaveBeenCalled();
+  });
+
+  it('should_preserve_live_reset_authorization_when_demo_reset_fails_transiently', async () => {
+    const liveIncident = new Incident({
+      id: 'inc-live-reset-retry-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:live-reset-retry',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.LIVE
+    });
+    const storedIncidents = [liveIncident];
+    const localRepo: IncidentRepository = {
+      findById: vi.fn(async (id: string) => storedIncidents.find((i) => i.id === id) ?? null),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => storedIncidents),
+      save: vi.fn(async () => {})
+    };
+    const resetMock = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('target unreachable'))
+      .mockResolvedValueOnce(undefined);
+
+    const retryApp = createApp({
+      repository: localRepo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(localRepo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: localRepo,
+        demoControlPort: { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+        simulateDemoDecision: new SimulateDemoDecision(localRepo, toolsPort, broadcaster),
+        liveDemoKey: 'secret-retry-key'
+      })
+    });
+
+    // Authorized first reset fails transiently during demoControlPort.reset()
+    const failedFirst = await request(retryApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'secret-retry-key');
+    expect(failedFirst.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+
+    // Retry WITHOUT X-Live-Demo-Key MUST STILL be forbidden even though incident is now FAILED
+    const unauthorizedRetry = await request(retryApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(unauthorizedRetry.status).toBe(HTTP_STATUS.FORBIDDEN);
+    expect(resetMock).toHaveBeenCalledTimes(1);
+
+    // Authorized retry completes reset and clears pending live reset marker
+    const authorizedRetry = await request(retryApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .set('X-Live-Demo-Key', 'secret-retry-key');
+    expect(authorizedRetry.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(resetMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('should_reject_live_demo_when_auth_middleware_calls_next_with_error_and_forward_async_rejections', async () => {
+    const triggerChaos = vi.fn(async () => {});
+    const errorAuthApp = createApp({
+      repository: repo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: repo,
+        targetStatusPort,
+        demoControlPort: { triggerChaos, toggleHealthyTraffic: vi.fn(), reset: vi.fn() },
+        simulateDemoDecision,
+        liveDemoMiddleware: (_req, _res, next) => {
+          next(new Error('auth middleware failure'));
+        }
+      })
+    });
+
+    const authErrorRes = await request(errorAuthApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(authErrorRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(triggerChaos).not.toHaveBeenCalled();
+
+    const rejectingTargetPort: TargetStatusPort = {
+      getStatus: vi.fn(async () => {
+        throw new Error('target status probe failed');
+      })
+    };
+    const asyncRejectApp = createApp({
+      repository: repo,
+      targetStatusPort: rejectingTargetPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: repo,
+        targetStatusPort: rejectingTargetPort,
+        demoControlPort: { triggerChaos, toggleHealthyTraffic: vi.fn(), reset: vi.fn() },
+        simulateDemoDecision,
+        publicLiveDemo: true
+      })
+    });
+
+    const asyncRejectRes = await request(asyncRejectApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(asyncRejectRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(triggerChaos).not.toHaveBeenCalled();
+  });
+
+  it('should_discard_stale_approval_reset_when_newer_live_chaos_session_started', async () => {
+    let resolveStatusProbe!: (value: Awaited<ReturnType<TargetStatusPort['getStatus']>>) => void;
+    const deferredStatusPort: TargetStatusPort = {
+      getStatus: vi.fn(
+        () =>
+          new Promise<Awaited<ReturnType<TargetStatusPort['getStatus']>>>((resolve) => {
+            resolveStatusProbe = resolve;
+          })
+      )
+    };
+    const resetMock = vi.fn(async () => {});
+    const lifecycle = createDemoSessionLifecycle(
+      { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      undefined,
+      deferredStatusPort
+    );
+
+    const olderTimestamp = Date.now() - 10_000;
+    lifecycle.setLastChaos(olderTimestamp, IncidentExecutionMode.LIVE);
+
+    const olderIncident = new Incident({
+      id: 'inc-live-older-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:older',
+      state: IncidentState.RESOLVED,
+      mode: IncidentExecutionMode.LIVE,
+      startedAt: new Date(olderTimestamp + 500).toISOString()
+    });
+
+    const approvalPromise = lifecycle.handleLiveIncidentApproved(olderIncident);
+
+    // While olderIncident's getStatus() is still in flight, a newer live chaos session starts
+    const newerTimestamp = Date.now();
+    lifecycle.setLastChaos(newerTimestamp, IncidentExecutionMode.LIVE);
+
+    resolveStatusProbe({
+      status: TargetHealthStatus.DEGRADED,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.8',
+      previousHealthyVersion: 'v2.14.7',
+      targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+      suspectFilePath: '',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: true
+      },
+      rawEdgeLogPreCollector: ''
+    });
+
+    await approvalPromise;
+
+    expect(resetMock).not.toHaveBeenCalled();
+    expect(lifecycle.getLastChaosTimestamp()).toBe(newerTimestamp);
   });
 });

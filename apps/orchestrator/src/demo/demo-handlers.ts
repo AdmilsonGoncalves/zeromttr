@@ -259,6 +259,7 @@ export function createDemoResetHandler(
       const hasLiveSessionOrIncident =
         (deps.lifecycle.getLastChaosTimestamp() > 0 &&
           deps.lifecycle.getLastChaosMode() === IncidentExecutionMode.LIVE) ||
+        deps.lifecycle.hasPendingLiveReset() ||
         openIncidents.some((inc) => inc.mode === IncidentExecutionMode.LIVE);
 
       if (hasLiveSessionOrIncident) {
@@ -266,6 +267,7 @@ export function createDemoResetHandler(
         if (!allowed) {
           return;
         }
+        deps.lifecycle.markPendingLiveReset();
       }
 
       try {
@@ -273,6 +275,7 @@ export function createDemoResetHandler(
 
         deps.replayRunner?.stop();
         await deps.demoControlPort.reset();
+        deps.lifecycle.clearPendingLiveReset();
         deps.lifecycle.clearPendingTargetResets();
         deps.lifecycle.clearLastChaos();
 
@@ -339,6 +342,9 @@ export function createDemoSimulateDecisionHandler(
 
         const incident = await deps.simulateDemoDecision.execute(incidentId, action);
         if (action === DecisionAction.APPROVE) {
+          if (requiresLiveAuth) {
+            deps.lifecycle.markPendingLiveReset();
+          }
           await deps.lifecycle.completeApprovalReset(incidentId);
         }
         sendSimulatedDecisionResponse(res, incident);

@@ -35,9 +35,8 @@ La ruta principal `/` (`WarRoomComponent`) muestra los 4 cuadrantes alimentados 
 | `GET /api/incidents` | `Incident[]` (resumen, más reciente primero) |
 | `GET /api/incidents/:id` | `IncidentDetail` (**nunca** incluye `decisionToken` / `sig`) |
 | `GET /api/demo/config` | `{ "demoModeEnabled": boolean, "requireDemoKey": boolean, "publicLiveDemo": boolean, "turnstileSiteKey": string \| null, "turnstileRequired": boolean }` — controla la visibilidad de `app-demo-settings` (`ENABLE_DEMO_MODE`) y el campo de clave (`REQUIRE_DEMO_KEY`) |
-| `GET /api/settings` | `{ "settings": SystemSettings, "editable": boolean, "adminTokenRequired": boolean, "readonlyMeta": ... }` — alimenta el drawer `app-system-settings` (`onCallEmail` siempre enmascarado) |
-| `PATCH /api/settings` | cuerpo `SystemSettingsPatch` (cabecera opcional `X-Settings-Admin-Token` cuando se exige) → `200` con la configuración actualizada |
-| `GET /api/settings/audit` | `{ "entries": SettingsAuditEntry[] }` — historial de cambios de configuración mostrado en la pestaña Auditoría |
+| `GET /api/settings` | `{ "settings": SystemSettingsDisplay, "readonlyInfo": SystemSettingsReadonlyInfo, "editable": boolean, "requiresAuthKey": boolean, "auditLog": SettingsAuditEntry[] }` — alimenta el drawer `app-system-settings` (`onCallEmail` siempre enmascarado) y la pestaña Auditoría |
+| `PATCH /api/settings` | cuerpo `SystemSettingsPatch` (cabecera opcional `X-Settings-Admin-Token` cuando se exige) → `200` con `SystemSettingsResponse` actualizado (`settings`, `readonlyInfo`, `editable`, `requiresAuthKey`, `auditLog`) |
 | `POST /api/demo/chaos` | cuerpo `{ "mode": "live" \| "replay" }` (cabecera opcional `X-Live-Demo-Key`) → `202` |
 | `POST /api/demo/reset` | `202` — restaura el servicio objetivo y cierra los PRs de demostración en el repositorio objetivo |
 | `GET /api/target/status` | `{ "status": "healthy" \| "degraded" \| "unreachable", "service": string, "version": string, "previousHealthyVersion": string, "capabilities": { "chaosSimulation": boolean, "healthyTrafficToggle": boolean }, "rawEdgeLogPreCollector"?: string, "metrics"?: { "requestsPerSecond": number, "errorRate5xxPercent": number, "p95LatencyMs": number, "healthyTrafficActive": boolean, "saturation"?: { "resourceLabel": string, "active": number, "waiting": number, "max": number } } }` |

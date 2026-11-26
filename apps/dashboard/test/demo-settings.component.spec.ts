@@ -22,7 +22,7 @@ describe('DemoSettingsComponent', () => {
     component = new DemoSettingsComponent(i18n);
   });
 
-  it('should open and close drawer and close automatically on triggerChaos and resetService', () => {
+  it('should_open_and_close_drawer_and_close_automatically_on_triggerChaos_and_resetService', () => {
     const chaosSpy = vi.fn();
     const resetSpy = vi.fn();
     component.triggerChaos.subscribe(chaosSpy);
@@ -44,7 +44,7 @@ describe('DemoSettingsComponent', () => {
     expect(component.isDrawerOpenSignal()).toBe(false);
   });
 
-  it('should emit modeChange liveKeyChange and healthy traffic toggle events for valid inputs', () => {
+  it('should_emit_modeChange_liveKeyChange_and_healthy_traffic_toggle_events_for_valid_inputs', () => {
     const modeSpy = vi.fn();
     const keySpy = vi.fn();
     const trafficSpy = vi.fn();
@@ -83,7 +83,7 @@ describe('DemoSettingsComponent', () => {
     expect(trafficSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('should ignore empty mode, missing input target, or mode toggle while workflow is running', () => {
+  it('should_ignore_empty_mode_missing_input_target_or_mode_toggle_while_workflow_is_running', () => {
     const modeSpy = vi.fn();
     const keySpy = vi.fn();
 
@@ -99,7 +99,7 @@ describe('DemoSettingsComponent', () => {
     expect(keySpy).not.toHaveBeenCalled();
   });
 
-  it('should disable and hide live key value when requireDemoKey is false and restore it when required', () => {
+  it('should_disable_and_hide_live_key_value_when_requireDemoKey_is_false_and_restore_when_required', () => {
     component.liveDemoKey = 'persisted-local-storage-key';
     component.activeMode = IncidentExecutionMode.LIVE;
 
@@ -116,7 +116,7 @@ describe('DemoSettingsComponent', () => {
     expect(component.displayedLiveDemoKey()).toBe('persisted-local-storage-key');
   });
 
-  it('should block starting healthy traffic while target is degraded unless already active', () => {
+  it('should_block_starting_healthy_traffic_while_target_is_degraded_unless_already_active', () => {
     expect(component.isHealthyTrafficStartBlockedSignal()).toBe(false);
 
     component.activeMode = IncidentExecutionMode.LIVE;
@@ -154,7 +154,7 @@ describe('DemoSettingsComponent', () => {
     expect(component.isHealthyTrafficToggleDisabled()).toBe(false);
   });
 
-  it('should compute reactive hints from active i18n language', () => {
+  it('should_compute_reactive_hints_from_active_i18n_language', () => {
     expect(i18n.t('demoMenuBtn')).toBe('Demonstração');
     expect(i18n.t('demoMenuTitle')).toBe('Demonstração');
 
@@ -167,7 +167,7 @@ describe('DemoSettingsComponent', () => {
     );
   });
 
-  it('should hide chaos and traffic controls when capabilities are explicitly false', () => {
+  it('should_hide_chaos_and_traffic_controls_when_capabilities_are_explicitly_false', () => {
     component.activeMode = IncidentExecutionMode.LIVE;
     component.demoModeEnabled = true;
     component.targetStatus = {
@@ -190,7 +190,7 @@ describe('DemoSettingsComponent', () => {
     expect(html).toContain('@if (showHealthyTrafficControl())');
   });
 
-  it('should show controls in replay mode with healthy traffic toggle disabled', () => {
+  it('should_show_controls_in_replay_mode_with_healthy_traffic_toggle_disabled', () => {
     component.activeMode = IncidentExecutionMode.REPLAY;
     component.demoModeEnabled = true;
     component.targetStatus = {
@@ -214,7 +214,7 @@ describe('DemoSettingsComponent', () => {
     expect(component.showHealthyTrafficControl()).toBe(false);
   });
 
-  it('should render demo drawer trigger, toggles, live key input, and action buttons gated on demoModeEnabled', () => {
+  it('should_render_demo_drawer_trigger_toggles_live_key_input_and_action_buttons_gated_on_demoModeEnabled', () => {
     const html = readFileSync(DEMO_SETTINGS_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('@if (demoModeEnabledSignal())');
     expect(html).toContain('demoMenuBtn');

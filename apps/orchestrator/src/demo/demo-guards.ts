@@ -42,12 +42,20 @@ export interface DemoAccessGuards {
   ): Promise<boolean>;
 }
 
+/**
+ * Executes an Express authorization middleware programmatically inside an async handler,
+ * enabling conditional auth checks (e.g., requiring `X-Live-Demo-Key` only for live sessions).
+ *
+ * - Resolves `true` when the middleware calls `next()` without arguments (request authorized).
+ * - Resolves `false` when the middleware ends or writes the response (e.g., 401/403 denial).
+ * - Rejects with `err` when the middleware calls `next(err)` or throws synchronously.
+ */
 function runExpressMiddleware(
   middleware: RequestHandler,
   req: Request,
   res: Response
 ): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (allowed: boolean): void => {
       if (!settled) {
@@ -55,9 +63,26 @@ function runExpressMiddleware(
         resolve(allowed);
       }
     };
+    const fail = (err: unknown): void => {
+      if (!settled) {
+        settled = true;
+        reject(err);
+      }
+    };
 
     res.once('finish', () => finish(false));
-    middleware(req, res, () => finish(true));
+    try {
+      middleware(req, res, (err?: unknown) => {
+        if (err !== undefined) {
+          fail(err);
+          return;
+        }
+        finish(true);
+      });
+    } catch (err) {
+      fail(err);
+      return;
+    }
 
     if (res.writableEnded || res.headersSent) {
       finish(false);
@@ -66,13 +91,13 @@ function runExpressMiddleware(
 }
 
 /**
- * Wraps an async Express route handler so ESLint `@typescript-eslint/no-misused-promises` stays clean.
+ * Wraps an async Express route handler so rejected promises reach Express error handling.
  */
 export function asAsyncHandler(
   handler: (req: Request, res: Response) => Promise<void>
 ): RequestHandler {
-  return (req: Request, res: Response): void => {
-    void handler(req, res);
+  return (req: Request, res: Response, next: NextFunction): void => {
+    void handler(req, res).catch(next);
   };
 }
 

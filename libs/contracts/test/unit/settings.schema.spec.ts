@@ -23,11 +23,14 @@ const VALID_SETTINGS = {
 };
 
 describe('SystemSettingsSchema', () => {
-  it('should accept valid full settings and response payloads', () => {
+  it('should_accept_valid_full_settings_and_masked_email_response_payloads', () => {
     expect(SystemSettingsSchema.parse(VALID_SETTINGS)).toEqual(VALID_SETTINGS);
 
     const response = SystemSettingsResponseSchema.parse({
-      settings: VALID_SETTINGS,
+      settings: {
+        ...VALID_SETTINGS,
+        onCallEmail: 'on***@example.com'
+      },
       readonlyInfo: {
         targetGithubRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
         targetBaseBranch: 'release/target-v2.14.8',
@@ -49,9 +52,10 @@ describe('SystemSettingsSchema', () => {
       ]
     });
     expect(response.readonlyInfo.persistenceEngine).toBe(SettingsPersistenceEngine.SQLITE);
+    expect(response.settings.onCallEmail).toBe('on***@example.com');
   });
 
-  it('should allow empty string for onCallEmail and partial patch payloads', () => {
+  it('should_allow_empty_string_for_onCallEmail_and_partial_patch_payloads', () => {
     const parsed = SystemSettingsPatchSchema.parse({
       onCallEmail: '',
       rejectionCooldownSeconds: 0
@@ -66,12 +70,23 @@ describe('SystemSettingsSchema', () => {
     ['apps\\windows\\path'],
     ['apps/../secret'],
     ['   ']
-  ])('should reject unsafe targetServicePath %s', (unsafePath) => {
+  ])('should_reject_unsafe_targetServicePath_%s', (unsafePath) => {
     const result = SystemSettingsPatchSchema.safeParse({ targetServicePath: unsafePath });
     expect(result.success).toBe(false);
   });
 
-  it('should reject unknown keys and out-of-range cooldown or threshold values', () => {
+  it.each([
+    ['--no-patch'],
+    ['-v2.14.7'],
+    ['v2.14.7..v2.14.8'],
+    ['release/'],
+    ['refs/heads/main.lock']
+  ])('should_reject_unsafe_git_ref_%s', (unsafeRef) => {
+    expect(SystemSettingsPatchSchema.safeParse({ targetBaseRef: unsafeRef }).success).toBe(false);
+    expect(SystemSettingsPatchSchema.safeParse({ targetHeadRef: unsafeRef }).success).toBe(false);
+  });
+
+  it('should_reject_unknown_keys_and_out_of_range_cooldown_or_threshold_values', () => {
     expect(SystemSettingsPatchSchema.safeParse({ unknownField: true }).success).toBe(false);
     expect(SystemSettingsPatchSchema.safeParse({ decisionTtlSeconds: 10 }).success).toBe(false);
     expect(SystemSettingsPatchSchema.safeParse({ rejectionCooldownSeconds: -1 }).success).toBe(

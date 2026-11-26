@@ -235,6 +235,7 @@ export interface TranslationDictionary {
   settingsDrawerTitle: string;
   settingsDrawerSubtitle: string;
   settingsLoading: string;
+  settingsLoadError: string;
   settingsReadonlyNotice: string;
   settingsAdminTokenLabel: string;
   settingsAdminTokenPlaceholder: string;

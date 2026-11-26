@@ -41,7 +41,7 @@ describe('createApp composition and rate-limit wiring', () => {
     }
   });
 
-  it('should register read (600/min) and strict write (30/min) rate limits on API routes including settings', async () => {
+  it('should_register_read_and_strict_write_rate_limits_on_API_routes_including_settings', async () => {
     const app = express();
     registerApiRateLimits(app);
     app.get('/api/settings', (_req, res) => {
@@ -60,7 +60,7 @@ describe('createApp composition and rate-limit wiring', () => {
     expect(patchRes.headers['ratelimit-limit']).toBe('30');
   });
 
-  it('should return 400 JSON when receiving a malformed JSON request body', async () => {
+  it('should_return_400_JSON_when_receiving_a_malformed_JSON_request_body', async () => {
     const app = createApp(createMinimalAppDependencies());
 
     const res = await request(app)
@@ -72,7 +72,7 @@ describe('createApp composition and rate-limit wiring', () => {
     expect(res.body).toEqual({ error: 'Malformed JSON request body' });
   });
 
-  it('should mount both Router instances and PluggableRouterFactory objects cleanly', async () => {
+  it('should_mount_both_Router_instances_and_PluggableRouterFactory_objects_cleanly', async () => {
     const directDemoRouter = Router();
     directDemoRouter.get('/demo/ping', (_req, res) => {
       res.status(HTTP_STATUS.OK).json({ source: 'direct-router' });
@@ -108,7 +108,7 @@ describe('createApp composition and rate-limit wiring', () => {
     expect(settingsRes.body).toEqual({ source: 'factory-router' });
   });
 
-  it('should fail closed outside test environment when auth tokens are missing', () => {
+  it('should_fail_closed_outside_test_environment_when_auth_tokens_are_missing', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.GRAFANA_WEBHOOK_TOKEN;
     delete process.env.DASHBOARD_API_TOKEN;

@@ -19,7 +19,7 @@ const FIRING_ALERT_PAYLOAD = {
 };
 
 describe('HandleAlert rejection cooldown and repeat suppression', () => {
-  it('should suppress new incidents during rejectionCooldownSeconds after a REJECTED incident', async () => {
+  it('should_suppress_new_incidents_during_rejectionCooldownSeconds_after_a_REJECTED_incident', async () => {
     const repository = new FileIncidentRepository();
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
     let rejectionCooldownSeconds = 900;
@@ -59,7 +59,7 @@ describe('HandleAlert rejection cooldown and repeat suppression', () => {
     expect(reopened.incident?.id).not.toBe(inc.id);
   });
 
-  it('should suppress reopening after RESOLVED during repeatSuppressionSeconds window', async () => {
+  it('should_suppress_reopening_after_RESOLVED_during_repeatSuppressionSeconds_window', async () => {
     const repository = new FileIncidentRepository();
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
 

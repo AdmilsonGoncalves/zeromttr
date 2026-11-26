@@ -95,9 +95,8 @@ export const PII_PATTERNS = {
 | `POST /webhook/grafana-alert` | Receives Grafana Alerting webhooks | Bearer `GRAFANA_WEBHOOK_TOKEN` (exclusive) |
 | `GET /api/incidents` / `GET /api/incidents/:id` | State and timeline (without `decisionToken`) | Bearer `DASHBOARD_API_TOKEN` (injected by Nginx) |
 | `POST /api/incidents/:id/decision` | Executes real decision from the email link | Valid HMAC signature (`sig` + unexpired `exp`) |
-| `GET /api/settings` | Reads live operational settings (masked `onCallEmail`) + `editable` / `adminTokenRequired` flags | Bearer `DASHBOARD_API_TOKEN` |
-| `PATCH /api/settings` | Updates runtime settings and appends SQLite audit entry | Bearer `DASHBOARD_API_TOKEN` + `X-Settings-Admin-Token` (when `SETTINGS_ADMIN_TOKEN` is set; `403` read-only in demo mode without token) |
-| `GET /api/settings/audit` | Lists settings change history (zero PII) | Bearer `DASHBOARD_API_TOKEN` |
+| `GET /api/settings` | Reads live operational settings (masked `onCallEmail`), `readonlyInfo`, `editable` / `requiresAuthKey` flags, and `auditLog` (zero PII) | Bearer `DASHBOARD_API_TOKEN` |
+| `PATCH /api/settings` | Updates runtime settings, appends SQLite audit entries, and returns the updated snapshot (`settings`, `readonlyInfo`, `editable`, `requiresAuthKey`, `auditLog`) | Bearer `DASHBOARD_API_TOKEN` + `X-Settings-Admin-Token` (when `SETTINGS_ADMIN_TOKEN` is set; `403` read-only in demo mode without token) |
 | `POST /api/demo/simulate-decision` | Simulates decision in the War Room (labeled as simulation) | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` if incident is `live` on VPS) |
 | `GET /api/events` | SSE stream (see [08 §3.2](./08_dashboard_frontend.md)) | Bearer `DASHBOARD_API_TOKEN` (injected by Nginx) |
 | `GET /api/target/status` | Target workload state & capabilities | Bearer `DASHBOARD_API_TOKEN` |

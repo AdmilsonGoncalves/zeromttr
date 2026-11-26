@@ -47,7 +47,14 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
   const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH, logger);
   const toolsPort = new McpClientAdapter();
   const targetStatusPort = createTargetStatusPort(toolsPort, {
-    getErrorRateThreshold: () => getSettings().targetErrorRateThresholdPercent
+    getErrorRateThreshold: () => getSettings().targetErrorRateThresholdPercent,
+    getDiffRefs: () => {
+      const current = getSettings();
+      return {
+        targetBaseRef: current.targetBaseRef,
+        targetHeadRef: current.targetHeadRef
+      };
+    }
   });
   const fallbackAdapter = new DeterministicFallbackReasoningAdapter();
   const llmAdapter = new GeminiReasoningAdapter(undefined, undefined, {
@@ -229,6 +236,11 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
   });
 
   const server = http.createServer(app);
+
+  server.once('close', () => {
+    broadcaster.close();
+    settingsRepository.close();
+  });
 
   server.listen(port, () => {
     logger.info({
