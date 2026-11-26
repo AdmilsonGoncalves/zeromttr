@@ -28,7 +28,7 @@ export class PaymentRepository {
   private waitingWaiters = 0;
   private pendingCleanups = new Set<() => void>();
 
-  // Pool Configuration (Restored to baseline v2.14.7: max 10)
+  // Pool Configuration (Restored Baseline v2.14.7: max 10)
   private healthyMaxConnections = 10;
   private degradedMaxConnections = 2;
   private acquireTimeoutMs = parseNumber(process.env.DB_ACQUIRE_TIMEOUT_MS, 150);
