@@ -47,10 +47,12 @@ export interface HandleAlertResult {
   ignored?: boolean;
 }
 
+const WARNING_SEVERITY_ALIASES: ReadonlySet<string> = new Set([AlertSeverity.WARNING, 'warn']);
+
 function normalizeAlertSeverity(rawSeverity?: string): AlertSeverity {
   if (isNonEmptyString(rawSeverity)) {
     const normalized = rawSeverity.trim().toLowerCase();
-    if (normalized === AlertSeverity.WARNING || normalized === 'warn') {
+    if (WARNING_SEVERITY_ALIASES.has(normalized)) {
       return AlertSeverity.WARNING;
     }
   }

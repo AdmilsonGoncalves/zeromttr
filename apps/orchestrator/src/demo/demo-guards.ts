@@ -1,5 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { z } from 'zod';
+import type { TargetCapabilities } from '@zeromttr/contracts';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { TargetHealthStatus } from '../domain/incident-enums.js';
 import { createLiveDemoKeyMiddleware } from '../http/auth.js';
@@ -7,7 +8,7 @@ import { createTurnstileMiddleware, validateTurnstileConfigPair } from '../http/
 import { DemoErrorCode } from '../http/http-constants.js';
 import type { TargetStatusPort } from '../ports/target-status.port.js';
 
-export type TargetCapabilityKey = 'chaosSimulation' | 'healthyTrafficToggle';
+export type TargetCapabilityKey = keyof TargetCapabilities;
 
 export interface DemoRuntimeConfig {
   demoModeEnabled: boolean;

@@ -756,7 +756,7 @@ export class IncidentService {
       }
     };
 
-    es.addEventListener('heartbeat', (_evt: MessageEvent) => {
+    es.addEventListener(IncidentEventType.HEARTBEAT, (_evt: MessageEvent) => {
       this.sseConnected.set(true);
     });
   }
@@ -1338,7 +1338,7 @@ export class IncidentService {
                   }
                   if (minStartedAt > 0 && isNonEmptyString(inc.startedAt)) {
                     const startedMs = new Date(inc.startedAt).getTime();
-                    if (!Number.isNaN(startedMs) && startedMs < minStartedAt) {
+                    if (isNumber(startedMs) && startedMs < minStartedAt) {
                       return false;
                     }
                   }

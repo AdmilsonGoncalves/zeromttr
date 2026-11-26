@@ -29,13 +29,13 @@
   <div class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-col">
     <span class="text-[11px] text-slate-400 truncate">{{ i18n.t('reasoningSourceLabel') }}</span>
     <div class="mt-0.5">
-      @if (reasoningSourceSignal() === 'llm') {
+      @if (reasoningSourceSignal() === reasoningProvider.LLM) {
         <span
           class="bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
         >
           {{ i18n.t('reasoningSourceLlm') }}
         </span>
-      } @else if (reasoningSourceSignal() === 'fallback') {
+      } @else if (reasoningSourceSignal() === reasoningProvider.FALLBACK) {
         <span
           class="bg-amber-950 border border-amber-500 text-amber-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
         >

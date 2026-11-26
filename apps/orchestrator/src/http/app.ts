@@ -7,7 +7,7 @@ import express, {
   type Router
 } from 'express';
 import { isEmpty } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_STATUS } from '@zeromttr/utils/http';
 import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { TargetStatusPort } from '../ports/target-status.port.js';
 import type { HandleAlert } from '../application/handle-alert.js';
@@ -114,7 +114,7 @@ export function createApp(dependencies: AppDependencies): Express {
 
   // Root endpoint (public)
   app.get('/', (_req, res) => {
-    res.status(HTTP_STATUS.OK).type('text/plain').send('ZeroMTTR Orchestrator Running');
+    res.status(HTTP_STATUS.OK).type(CONTENT_TYPE.TEXT_PLAIN).send('ZeroMTTR Orchestrator Running');
   });
 
   // Webhook Router

@@ -5,16 +5,23 @@ import {
   isNonEmptyString,
   isNumber,
   isObject,
+  nowIso,
   safeJsonParse,
   toErrorMessage
 } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
-import type {
-  DecisionPayload,
-  Incident,
-  IncidentDetail,
-  SimulateDecisionPayload,
-  TargetStatusResponse
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
+import {
+  DecisionAction,
+  DecisionSource,
+  IncidentEventType,
+  IncidentExecutionMode,
+  IncidentState,
+  type DecisionPayload,
+  type Incident,
+  type IncidentDetail,
+  type IncidentMode,
+  type SimulateDecisionPayload,
+  type TargetStatusResponse
 } from '../src/app/core/contract.js';
 import { HEALTHY_TARGET_STATUS, INITIAL_TARGET_STATUS, MOCK_INCIDENT } from './mock-data.js';
 
@@ -36,11 +43,16 @@ class ClientError extends Error {
 export class MockServer {
   private server: http.Server | null = null;
   private sseClients = new Set<ServerResponse>();
-  private currentIncident: IncidentDetail = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+  private currentIncident: IncidentDetail = structuredClone(MOCK_INCIDENT);
   private targetStatus: TargetStatusResponse = { ...INITIAL_TARGET_STATUS };
   private heartbeatTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly options: MockServerOptions = {}) {}
+
+  private sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
+    res.writeHead(statusCode, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
+    res.end(JSON.stringify(body));
+  }
 
   /**
    * Returns the current in-memory incident detail state.
@@ -75,10 +87,11 @@ export class MockServer {
           if (!res.headersSent) {
             const isClient =
               err instanceof ClientError || (err instanceof Error && err.name === 'ClientError');
-            res.writeHead(isClient ? HTTP_STATUS.BAD_REQUEST : HTTP_STATUS.INTERNAL_SERVER_ERROR, {
-              'Content-Type': 'application/json'
-            });
-            res.end(JSON.stringify({ error: toErrorMessage(err) }));
+            this.sendJson(
+              res,
+              isClient ? HTTP_STATUS.BAD_REQUEST : HTTP_STATUS.INTERNAL_SERVER_ERROR,
+              { error: toErrorMessage(err) }
+            );
           } else {
             res.end();
           }
@@ -131,7 +144,7 @@ export class MockServer {
     }
     const interval = this.options.heartbeatIntervalMs ?? 15000;
     this.heartbeatTimer = setInterval(() => {
-      this.broadcastSse('heartbeat', { at: new Date().toISOString() });
+      this.broadcastSse(IncidentEventType.HEARTBEAT, { at: nowIso() });
     }, interval);
   }
 
@@ -148,7 +161,10 @@ export class MockServer {
   private setCorsHeaders(res: ServerResponse): void {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Live-Demo-Key');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      `${HTTP_HEADERS.CONTENT_TYPE}, ${HTTP_HEADERS.AUTHORIZATION}, ${HTTP_HEADERS.LIVE_DEMO_KEY}`
+    );
   }
 
   private async parseBody<T>(req: IncomingMessage): Promise<T> {
@@ -190,10 +206,10 @@ export class MockServer {
     // GET /api/events (SSE)
     if (req.method === 'GET' && pathname === '/api/events') {
       res.writeHead(HTTP_STATUS.OK, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
-        'X-Accel-Buffering': 'no'
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.EVENT_STREAM,
+        [HTTP_HEADERS.CACHE_CONTROL]: 'no-cache, no-transform',
+        [HTTP_HEADERS.CONNECTION]: 'keep-alive',
+        [HTTP_HEADERS.X_ACCEL_BUFFERING]: 'no'
       });
       res.flushHeaders?.();
 
@@ -203,9 +219,11 @@ export class MockServer {
       });
 
       // Send initial events
-      res.write(`event: heartbeat\ndata: ${JSON.stringify({ at: new Date().toISOString() })}\n\n`);
       res.write(
-        `event: incident.created\ndata: ${JSON.stringify({
+        `event: ${IncidentEventType.HEARTBEAT}\ndata: ${JSON.stringify({ at: nowIso() })}\n\n`
+      );
+      res.write(
+        `event: ${IncidentEventType.CREATED}\ndata: ${JSON.stringify({
           incidentId: this.currentIncident.id,
           service: this.currentIncident.service,
           severity: this.currentIncident.severity,
@@ -215,7 +233,7 @@ export class MockServer {
       );
       if (this.currentIncident.rca) {
         res.write(
-          `event: incident.rca\ndata: ${JSON.stringify({
+          `event: ${IncidentEventType.RCA}\ndata: ${JSON.stringify({
             incidentId: this.currentIncident.id,
             ...this.currentIncident.rca
           })}\n\n`
@@ -223,7 +241,7 @@ export class MockServer {
       }
       if (this.currentIncident.finops) {
         res.write(
-          `event: incident.finops\ndata: ${JSON.stringify({
+          `event: ${IncidentEventType.FINOPS}\ndata: ${JSON.stringify({
             incidentId: this.currentIncident.id,
             ...this.currentIncident.finops
           })}\n\n`
@@ -231,7 +249,7 @@ export class MockServer {
       }
       if (this.currentIncident.remediation) {
         res.write(
-          `event: incident.remediation\ndata: ${JSON.stringify({
+          `event: ${IncidentEventType.REMEDIATION}\ndata: ${JSON.stringify({
             incidentId: this.currentIncident.id,
             ...this.currentIncident.remediation
           })}\n\n`
@@ -239,7 +257,7 @@ export class MockServer {
       }
       if (this.currentIncident.notification) {
         res.write(
-          `event: incident.notified\ndata: ${JSON.stringify({
+          `event: ${IncidentEventType.NOTIFIED}\ndata: ${JSON.stringify({
             incidentId: this.currentIncident.id,
             emailId: this.currentIncident.notification.emailId,
             htmlPreview: this.currentIncident.notification.htmlPreview
@@ -259,8 +277,7 @@ export class MockServer {
         mode: this.currentIncident.mode,
         startedAt: this.currentIncident.startedAt
       };
-      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify([summary]));
+      this.sendJson(res, HTTP_STATUS.OK, [summary]);
       return;
     }
 
@@ -268,86 +285,82 @@ export class MockServer {
     if (req.method === 'GET' && pathname.startsWith('/api/incidents/')) {
       const id = pathname.replace('/api/incidents/', '');
       if (id !== this.currentIncident.id) {
-        res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Incident ${id} not found` }));
+        this.sendJson(res, HTTP_STATUS.NOT_FOUND, { error: `Incident ${id} not found` });
         return;
       }
-      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(this.currentIncident));
+      this.sendJson(res, HTTP_STATUS.OK, this.currentIncident);
       return;
     }
 
     // GET /api/target/status
     if (req.method === 'GET' && pathname === '/api/target/status') {
-      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(this.targetStatus));
+      this.sendJson(res, HTTP_STATUS.OK, this.targetStatus);
       return;
     }
 
     // GET /api/demo/config
     if (req.method === 'GET' && pathname === '/api/demo/config') {
-      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          demoModeEnabled: true,
-          requireDemoKey: false,
-          publicLiveDemo: true,
-          turnstileSiteKey: null,
-          turnstileRequired: false
-        })
-      );
+      this.sendJson(res, HTTP_STATUS.OK, {
+        demoModeEnabled: true,
+        requireDemoKey: false,
+        publicLiveDemo: true,
+        turnstileSiteKey: null,
+        turnstileRequired: false
+      });
       return;
     }
 
     // POST /api/demo/chaos
     if (req.method === 'POST' && pathname === '/api/demo/chaos') {
-      const body = await this.parseBody<{ mode?: 'live' | 'replay' }>(req);
-      const mode = isNonEmptyString(body.mode) && body.mode === 'live' ? 'live' : 'replay';
+      const body = await this.parseBody<{ mode?: IncidentMode }>(req);
+      const mode: IncidentMode =
+        isNonEmptyString(body.mode) && body.mode === IncidentExecutionMode.LIVE
+          ? IncidentExecutionMode.LIVE
+          : IncidentExecutionMode.REPLAY;
 
       this.targetStatus = { ...INITIAL_TARGET_STATUS };
-      this.currentIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
+      this.currentIncident = structuredClone(MOCK_INCIDENT);
       this.currentIncident.mode = mode;
-      this.currentIncident.state = 'INVESTIGATING';
+      this.currentIncident.state = IncidentState.INVESTIGATING;
 
-      this.broadcastSse('incident.created', {
+      this.broadcastSse(IncidentEventType.CREATED, {
         incidentId: this.currentIncident.id,
         service: this.currentIncident.service,
         severity: this.currentIncident.severity,
         mode,
-        at: new Date().toISOString()
+        at: nowIso()
       });
 
-      this.broadcastSse('incident.transition', {
+      this.broadcastSse(IncidentEventType.TRANSITION, {
         incidentId: this.currentIncident.id,
-        from: 'RECEIVED',
-        to: 'INVESTIGATING',
-        at: new Date().toISOString(),
+        from: IncidentState.RECEIVED,
+        to: IncidentState.INVESTIGATING,
+        at: nowIso(),
         reason: 'Chaos simulation triggered'
       });
 
       if (this.currentIncident.rca) {
-        this.broadcastSse('incident.rca', {
+        this.broadcastSse(IncidentEventType.RCA, {
           incidentId: this.currentIncident.id,
           ...this.currentIncident.rca
         });
       }
 
       if (this.currentIncident.finops) {
-        this.broadcastSse('incident.finops', {
+        this.broadcastSse(IncidentEventType.FINOPS, {
           incidentId: this.currentIncident.id,
           ...this.currentIncident.finops
         });
       }
 
       if (this.currentIncident.remediation) {
-        this.broadcastSse('incident.remediation', {
+        this.broadcastSse(IncidentEventType.REMEDIATION, {
           incidentId: this.currentIncident.id,
           ...this.currentIncident.remediation
         });
       }
 
-      res.writeHead(HTTP_STATUS.ACCEPTED, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'chaos_injected', mode }));
+      this.sendJson(res, HTTP_STATUS.ACCEPTED, { status: 'chaos_injected', mode });
       return;
     }
 
@@ -355,18 +368,17 @@ export class MockServer {
     if (req.method === 'POST' && pathname === '/api/demo/reset') {
       const previousState = this.currentIncident.state;
       this.targetStatus = { ...HEALTHY_TARGET_STATUS };
-      this.currentIncident.state = 'RESOLVED';
+      this.currentIncident.state = IncidentState.RESOLVED;
 
-      this.broadcastSse('incident.transition', {
+      this.broadcastSse(IncidentEventType.TRANSITION, {
         incidentId: this.currentIncident.id,
         from: previousState,
-        to: 'RESOLVED',
-        at: new Date().toISOString(),
+        to: IncidentState.RESOLVED,
+        at: nowIso(),
         reason: 'Target service restored and chaos reset'
       });
 
-      res.writeHead(HTTP_STATUS.ACCEPTED, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'reset_completed' }));
+      this.sendJson(res, HTTP_STATUS.ACCEPTED, { status: 'reset_completed' });
       return;
     }
 
@@ -374,57 +386,54 @@ export class MockServer {
     if (req.method === 'POST' && pathname.includes('/decision') && !pathname.includes('simulate')) {
       const match = pathname.match(/^\/api\/incidents\/([^/]+)\/decision$/);
       if (!match) {
-        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid decision URL pattern' }));
+        this.sendJson(res, HTTP_STATUS.BAD_REQUEST, { error: 'Invalid decision URL pattern' });
         return;
       }
       const incidentId = match[1];
       if (incidentId !== this.currentIncident.id) {
-        res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Incident not found: ${incidentId}` }));
+        this.sendJson(res, HTTP_STATUS.NOT_FOUND, { error: `Incident not found: ${incidentId}` });
         return;
       }
 
       const body = await this.parseBody<DecisionPayload>(req);
 
       if (!isNonEmptyString(body.action) || !isNonEmptyString(body.sig) || !isNumber(body.exp)) {
-        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Missing decision parameters (action, sig, exp)' }));
+        this.sendJson(res, HTTP_STATUS.BAD_REQUEST, {
+          error: 'Missing decision parameters (action, sig, exp)'
+        });
         return;
       }
 
-      if (body.action !== 'approve' && body.action !== 'reject') {
-        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid decision action: must be approve or reject' }));
+      if (body.action !== DecisionAction.APPROVE && body.action !== DecisionAction.REJECT) {
+        this.sendJson(res, HTTP_STATUS.BAD_REQUEST, {
+          error: 'Invalid decision action: must be approve or reject'
+        });
         return;
       }
 
       const nowSeconds = Math.floor(Date.now() / 1000);
       if (body.exp < nowSeconds) {
-        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Decision link has expired' }));
+        this.sendJson(res, HTTP_STATUS.BAD_REQUEST, { error: 'Decision link has expired' });
         return;
       }
 
       this.currentIncident.decision = body.action;
-      this.currentIncident.decisionSource = 'email_hmac';
-      this.currentIncident.state = body.action === 'approve' ? 'RESOLVED' : 'REJECTED';
+      this.currentIncident.decisionSource = DecisionSource.EMAIL_HMAC;
+      this.currentIncident.state =
+        body.action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED;
 
-      this.broadcastSse('incident.decision', {
+      this.broadcastSse(IncidentEventType.DECISION, {
         incidentId,
         action: body.action,
-        source: 'email_hmac'
+        source: DecisionSource.EMAIL_HMAC
       });
 
-      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          status: 'recorded',
-          incidentId,
-          action: body.action,
-          source: 'email_hmac'
-        })
-      );
+      this.sendJson(res, HTTP_STATUS.OK, {
+        status: 'recorded',
+        incidentId,
+        action: body.action,
+        source: DecisionSource.EMAIL_HMAC
+      });
       return;
     }
 
@@ -433,47 +442,45 @@ export class MockServer {
       const body = await this.parseBody<SimulateDecisionPayload>(req);
 
       if (!isNonEmptyString(body.incidentId) || !isNonEmptyString(body.action)) {
-        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Missing incidentId or action' }));
+        this.sendJson(res, HTTP_STATUS.BAD_REQUEST, { error: 'Missing incidentId or action' });
         return;
       }
 
       if (body.incidentId !== this.currentIncident.id) {
-        res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Incident not found: ${body.incidentId}` }));
+        this.sendJson(res, HTTP_STATUS.NOT_FOUND, {
+          error: `Incident not found: ${body.incidentId}`
+        });
         return;
       }
 
-      if (body.action !== 'approve' && body.action !== 'reject') {
-        res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid decision action: must be approve or reject' }));
+      if (body.action !== DecisionAction.APPROVE && body.action !== DecisionAction.REJECT) {
+        this.sendJson(res, HTTP_STATUS.BAD_REQUEST, {
+          error: 'Invalid decision action: must be approve or reject'
+        });
         return;
       }
 
       this.currentIncident.decision = body.action;
-      this.currentIncident.decisionSource = 'demo_simulation';
-      this.currentIncident.state = body.action === 'approve' ? 'RESOLVED' : 'REJECTED';
+      this.currentIncident.decisionSource = DecisionSource.DEMO_SIMULATION;
+      this.currentIncident.state =
+        body.action === DecisionAction.APPROVE ? IncidentState.RESOLVED : IncidentState.REJECTED;
 
-      this.broadcastSse('incident.decision', {
+      this.broadcastSse(IncidentEventType.DECISION, {
         incidentId: body.incidentId,
         action: body.action,
-        source: 'demo_simulation'
+        source: DecisionSource.DEMO_SIMULATION
       });
 
-      res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          status: 'simulated',
-          incidentId: body.incidentId,
-          action: body.action,
-          source: 'demo_simulation'
-        })
-      );
+      this.sendJson(res, HTTP_STATUS.OK, {
+        status: 'simulated',
+        incidentId: body.incidentId,
+        action: body.action,
+        source: DecisionSource.DEMO_SIMULATION
+      });
       return;
     }
 
-    res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: `Not found: ${req.method} ${pathname}` }));
+    this.sendJson(res, HTTP_STATUS.NOT_FOUND, { error: `Not found: ${req.method} ${pathname}` });
   }
 }
 

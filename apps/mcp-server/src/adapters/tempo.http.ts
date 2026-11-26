@@ -4,6 +4,7 @@ import {
   isNumber,
   isObject,
   isString,
+  parseIsoDate,
   round,
   safeJsonParse
 } from '@zeromttr/utils';
@@ -134,14 +135,11 @@ export class TempoHttpAdapter implements TracesPort {
   }
 
   private toEpochSeconds(iso?: string): number | undefined {
-    if (!iso) {
+    const parsed = parseIsoDate(iso);
+    if (!parsed) {
       return undefined;
     }
-    const ms = Date.parse(iso);
-    if (!isNumber(ms)) {
-      return undefined;
-    }
-    return Math.floor(ms / 1000);
+    return Math.floor(parsed.getTime() / 1000);
   }
 
   /**

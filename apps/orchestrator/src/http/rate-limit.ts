@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { isNonEmptyString, normalizeIp, parseForwardedIp } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { SecurityErrorCode } from './http-constants.js';
 
 export interface IpRateLimitOptions {
@@ -51,18 +51,18 @@ export function extractClientIp(
 
   if (peerIp !== 'unknown' && isTrustedProxyIp(peerIp)) {
     if (trustCloudflare) {
-      const cfIp = parseForwardedIp(req.headers['cf-connecting-ip']);
+      const cfIp = parseForwardedIp(req.headers[HTTP_HEADERS.CF_CONNECTING_IP_LOWER]);
       if (cfIp) {
         return cfIp;
       }
     }
 
-    const forwardedIp = parseForwardedIp(req.headers['x-forwarded-for']);
+    const forwardedIp = parseForwardedIp(req.headers[HTTP_HEADERS.X_FORWARDED_FOR_LOWER]);
     if (forwardedIp) {
       return forwardedIp;
     }
 
-    const realIp = parseForwardedIp(req.headers['x-real-ip']);
+    const realIp = parseForwardedIp(req.headers[HTTP_HEADERS.X_REAL_IP_LOWER]);
     if (realIp) {
       return realIp;
     }

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angular/core';
-import { type ReasoningSource } from '../../core/contract.js';
+import { ReasoningProvider, type ReasoningSource } from '../../core/contract.js';
 import { I18nService } from '../../core/i18n/i18n.service.js';
 
 /**
@@ -13,6 +13,7 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
 })
 export class WarRoomKpisComponent {
   readonly i18n: I18nService;
+  readonly reasoningProvider = ReasoningProvider;
 
   readonly ttdDisplaySignal = signal<string>('--');
   readonly ttprDisplaySignal = signal<string>('--');

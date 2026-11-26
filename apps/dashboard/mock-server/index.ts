@@ -1,6 +1,7 @@
+import { parseNumber } from '@zeromttr/utils';
 import { createMockServer } from './server.js';
 
-const port = Number(process.env['PORT'] ?? 8080);
+const port = parseNumber(process.env['PORT'], 8080);
 const server = createMockServer({ port });
 
 server

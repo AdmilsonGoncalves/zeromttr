@@ -1,7 +1,15 @@
-import type { IncidentDetail, TargetStatusResponse } from '../src/app/core/contract.js';
+import {
+  AlertSeverity,
+  IncidentExecutionMode,
+  IncidentState,
+  ReasoningProvider,
+  TargetHealthStatus,
+  type IncidentDetail,
+  type TargetStatusResponse
+} from '../src/app/core/contract.js';
 
 export const INITIAL_TARGET_STATUS: TargetStatusResponse = {
-  status: 'degraded',
+  status: TargetHealthStatus.DEGRADED,
   service: 'api-pagamentos-core',
   version: 'v2.14.8',
   previousHealthyVersion: 'v2.14.7',
@@ -29,7 +37,7 @@ export const INITIAL_TARGET_STATUS: TargetStatusResponse = {
 };
 
 export const HEALTHY_TARGET_STATUS: TargetStatusResponse = {
-  status: 'healthy',
+  status: TargetHealthStatus.HEALTHY,
   service: 'api-pagamentos-core',
   version: 'v2.14.7',
   previousHealthyVersion: 'v2.14.7',
@@ -57,44 +65,44 @@ export const HEALTHY_TARGET_STATUS: TargetStatusResponse = {
 export const MOCK_INCIDENT: IncidentDetail = {
   id: 'inc-20261110-001',
   service: 'api-pagamentos-core',
-  severity: 'critical',
-  state: 'NOTIFIED',
-  mode: 'live',
+  severity: AlertSeverity.CRITICAL,
+  state: IncidentState.NOTIFIED,
+  mode: IncidentExecutionMode.LIVE,
   startedAt: '2026-11-10T16:20:00Z',
   transitions: [
     {
       from: null,
-      to: 'RECEIVED',
+      to: IncidentState.RECEIVED,
       at: '2026-11-10T16:20:00.100Z',
       reason: 'Grafana latency p99 webhook'
     },
     {
-      from: 'RECEIVED',
-      to: 'INVESTIGATING',
+      from: IncidentState.RECEIVED,
+      to: IncidentState.INVESTIGATING,
       at: '2026-11-10T16:20:02.300Z',
       reason: 'PromQL range + Exemplar query'
     },
     {
-      from: 'INVESTIGATING',
-      to: 'ENRICHING',
+      from: IncidentState.INVESTIGATING,
+      to: IncidentState.ENRICHING,
       at: '2026-11-10T16:20:04.700Z',
       reason: 'Tempo trace + Loki logs + GitHub diff'
     },
     {
-      from: 'ENRICHING',
-      to: 'REMEDIATING',
+      from: IncidentState.ENRICHING,
+      to: IncidentState.REMEDIATING,
       at: '2026-11-10T16:20:05.100Z',
       reason: 'PiiPromptGuard verified (0 leaked)'
     },
     {
-      from: 'REMEDIATING',
-      to: 'AWAITING_PR',
+      from: IncidentState.REMEDIATING,
+      to: IncidentState.AWAITING_PR,
       at: '2026-11-10T16:20:12.400Z',
       reason: 'Gemini synthesis & hotfix PR creation'
     },
     {
-      from: 'AWAITING_PR',
-      to: 'NOTIFIED',
+      from: IncidentState.AWAITING_PR,
+      to: IncidentState.NOTIFIED,
       at: '2026-11-10T16:20:18.200Z',
       reason: 'Resend post-mortem dispatched'
     }
@@ -102,7 +110,7 @@ export const MOCK_INCIDENT: IncidentDetail = {
   rca: {
     summary:
       'Connection pool exhaustion detected in api-pagamentos-core due to acquireTimeoutMs reduction from 5000ms to 100ms in commit 7a8b9c (v2.14.8). Under concurrent traffic, pg.pool.acquire exceeds 100ms causing 500 errors.',
-    reasoningSource: 'llm',
+    reasoningSource: ReasoningProvider.LLM,
     evidenceCoveragePercent: 100,
     signalsCollected: 4,
     signalsTotal: 4,

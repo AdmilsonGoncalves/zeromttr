@@ -146,6 +146,9 @@ describe('http.utils', () => {
     it('should expose standard HTTP header and MIME constants', () => {
       expect(HTTP_HEADERS.ACCEPT).toBe('Accept');
       expect(HTTP_HEADERS.AUTHORIZATION).toBe('Authorization');
+      expect(HTTP_HEADERS.AUTHORIZATION_LOWER).toBe('authorization');
+      expect(HTTP_HEADERS.CACHE_CONTROL).toBe('Cache-Control');
+      expect(HTTP_HEADERS.CONNECTION).toBe('Connection');
       expect(HTTP_HEADERS.CONTENT_TYPE).toBe('Content-Type');
       expect(HTTP_HEADERS.LIVE_DEMO_KEY).toBe('X-Live-Demo-Key');
       expect(HTTP_HEADERS.LIVE_DEMO_KEY_LOWER).toBe('x-live-demo-key');
@@ -153,6 +156,10 @@ describe('http.utils', () => {
       expect(HTTP_HEADERS.TURNSTILE_TOKEN_LOWER).toBe('x-turnstile-token');
       expect(HTTP_HEADERS.CF_TURNSTILE_RESPONSE).toBe('CF-Turnstile-Response');
       expect(HTTP_HEADERS.CF_TURNSTILE_RESPONSE_LOWER).toBe('cf-turnstile-response');
+      expect(HTTP_HEADERS.CF_CONNECTING_IP_LOWER).toBe('cf-connecting-ip');
+      expect(HTTP_HEADERS.X_ACCEL_BUFFERING).toBe('X-Accel-Buffering');
+      expect(HTTP_HEADERS.X_FORWARDED_FOR_LOWER).toBe('x-forwarded-for');
+      expect(HTTP_HEADERS.X_REAL_IP_LOWER).toBe('x-real-ip');
       expect(CONTENT_TYPE.JSON).toBe('application/json');
       expect(CONTENT_TYPE.TEXT_PLAIN).toBe('text/plain');
       expect(CONTENT_TYPE.EVENT_STREAM).toBe('text/event-stream');

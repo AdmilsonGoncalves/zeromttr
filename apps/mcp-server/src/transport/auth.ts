@@ -11,7 +11,7 @@ export function verifyAuthToken(req: http.IncomingMessage, expectedToken: string
     return false;
   } // fail-closed if no token configured
 
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers[HTTP_HEADERS.AUTHORIZATION_LOWER];
   if (!authHeader) {
     return false;
   }

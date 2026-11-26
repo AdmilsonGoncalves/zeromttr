@@ -6,6 +6,7 @@ import {
   ExecutePromqlRangeInputSchema,
   InspectGitDeployDiffInputSchema,
   QueryLokiLogsInputSchema,
+  ReasoningProvider,
   SearchTracesByTraceqlInputSchema,
   SendPostMortemResendInputSchema
 } from '@zeromttr/contracts';
@@ -179,7 +180,7 @@ export class ToolRegistry {
           rca_markdown: { type: 'string', description: 'RCA summary in markdown' },
           reasoning_source: {
             type: 'string',
-            enum: ['llm', 'fallback'],
+            enum: Object.values(ReasoningProvider),
             description: 'Reasoning source'
           }
         },
@@ -209,7 +210,7 @@ export class ToolRegistry {
           title: { type: 'string' },
           rca_summary: { type: 'string' },
           evidence_coverage: { type: 'string' },
-          reasoning_source: { type: 'string', enum: ['llm', 'fallback'] },
+          reasoning_source: { type: 'string', enum: Object.values(ReasoningProvider) },
           blast_radius: { type: 'array', items: { type: 'string' } },
           regression_commit: { type: 'string' },
           pull_request_url: { type: 'string' },

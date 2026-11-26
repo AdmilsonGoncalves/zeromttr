@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   isArray,
+  isFilled,
   isNonEmptyString,
   isNumber,
   isObject,
@@ -14,15 +15,9 @@ import {
   HTTP_STATUS,
   buildUrl,
   isHttpSuccess,
-  sanitizeHeaderValue
+  sanitizeHeaderValue,
+  trimTrailingSlash
 } from '@zeromttr/utils/http';
-
-const OTEL_SPAN_STATUS_ERROR = 2;
-const OTEL_ERROR_STATUS_CODES = new Set<string | number>([
-  OTEL_SPAN_STATUS_ERROR,
-  'ERROR',
-  'STATUS_CODE_ERROR'
-]);
 import { OrchestratorDefault } from '../domain/incident-enums.js';
 import type {
   ToolsPort,
@@ -97,6 +92,13 @@ function firstNonEmptyString(...candidates: unknown[]): string {
   return '';
 }
 
+const OTEL_SPAN_STATUS_ERROR = 2;
+const OTEL_ERROR_STATUS_CODES = new Set<string | number>([
+  OTEL_SPAN_STATUS_ERROR,
+  'ERROR',
+  'STATUS_CODE_ERROR'
+]);
+
 function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: boolean): boolean {
   if (typeof span.hasError === 'boolean') {
     return span.hasError;
@@ -105,7 +107,7 @@ function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: bool
     return span.has_error;
   }
   if (
-    (typeof span.statusCode === 'number' || typeof span.statusCode === 'string') &&
+    (isNumber(span.statusCode) || isString(span.statusCode)) &&
     OTEL_ERROR_STATUS_CODES.has(span.statusCode)
   ) {
     return true;
@@ -133,7 +135,7 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
     spanId: String(span.spanId ?? span.span_id ?? ''),
     parentSpanId: isNonEmptyString(parentSpanRaw)
       ? parentSpanRaw
-      : parentSpanRaw !== undefined && parentSpanRaw !== null
+      : isFilled(parentSpanRaw)
         ? String(parentSpanRaw)
         : undefined,
     serviceName: String(span.serviceName ?? span.service_name ?? ''),
@@ -142,7 +144,7 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
     hasError: inferSpanHasError(span, defaultHasError),
     errorMessage: isNonEmptyString(errorMessageRaw)
       ? errorMessageRaw
-      : errorMessageRaw !== undefined && errorMessageRaw !== null
+      : isFilled(errorMessageRaw)
         ? String(errorMessageRaw)
         : undefined
   };
@@ -151,7 +153,7 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
 function normalizeMcpUrl(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
-    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    const cleanPath = trimTrailingSlash(parsed.pathname);
     if (cleanPath.endsWith('/mcp')) {
       parsed.pathname = cleanPath;
       return parsed.toString();

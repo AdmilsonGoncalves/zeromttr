@@ -135,13 +135,20 @@ export function sanitizeHeaderValue(value: string): string {
 export const HTTP_HEADERS = {
   ACCEPT: 'Accept',
   AUTHORIZATION: 'Authorization',
+  AUTHORIZATION_LOWER: 'authorization',
+  CACHE_CONTROL: 'Cache-Control',
+  CONNECTION: 'Connection',
   CONTENT_TYPE: 'Content-Type',
   LIVE_DEMO_KEY: 'X-Live-Demo-Key',
   LIVE_DEMO_KEY_LOWER: 'x-live-demo-key',
   TURNSTILE_TOKEN: 'X-Turnstile-Token',
   TURNSTILE_TOKEN_LOWER: 'x-turnstile-token',
   CF_TURNSTILE_RESPONSE: 'CF-Turnstile-Response',
-  CF_TURNSTILE_RESPONSE_LOWER: 'cf-turnstile-response'
+  CF_TURNSTILE_RESPONSE_LOWER: 'cf-turnstile-response',
+  CF_CONNECTING_IP_LOWER: 'cf-connecting-ip',
+  X_ACCEL_BUFFERING: 'X-Accel-Buffering',
+  X_FORWARDED_FOR_LOWER: 'x-forwarded-for',
+  X_REAL_IP_LOWER: 'x-real-ip'
 } as const;
 
 export type HttpHeaderName = (typeof HTTP_HEADERS)[keyof typeof HTTP_HEADERS];
