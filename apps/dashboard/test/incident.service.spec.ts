@@ -35,7 +35,9 @@ describe('IncidentService', () => {
     expect(service.estimatedTokensSaved()).toBe(0);
     expect(service.evidenceCoveragePercent()).toBe(0);
     expect(service.signalsRatio()).toBe('0/4');
-    expect(service.timelineSteps()).toHaveLength(8);
+    const idleSteps = service.timelineSteps();
+    expect(idleSteps).toHaveLength(8);
+    expect(idleSteps.every((step) => step.status === 'pending')).toBe(true);
   });
 
   it('should calculate computed signals when incident detail is loaded', () => {
@@ -302,6 +304,58 @@ describe('IncidentService', () => {
     fetchSpy.mockRestore();
   });
 
+  it('should cancel in-flight syncIncidentFallback polling when resetChaos clears awaiting state', async () => {
+    const service = new IncidentService();
+    service.awaitingIncidentStart.set(true);
+
+    let resolveList!: (res: Response) => void;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.endsWith('/api/incidents')) {
+        return new Promise<Response>((resolve) => {
+          resolveList = resolve;
+        });
+      }
+      if (url.endsWith('/api/demo/reset')) {
+        return new Response(JSON.stringify({ status: 'reset_completed' }), {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.HEALTHY,
+          service: 'api-pagamentos-core',
+          version: 'v2.14.7',
+          previousHealthyVersion: 'v2.14.7'
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    service.startTargetStatusPolling('http://localhost:8080', 10);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    service.stopTargetStatusPolling();
+
+    await service.resetChaos('http://localhost:8080', true);
+    expect(service.awaitingIncidentStart()).toBe(false);
+
+    resolveList(
+      new Response(
+        JSON.stringify([{ id: MOCK_INCIDENT.id, startedAt: new Date().toISOString() }]),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(service.currentIncident()).toBeNull();
+    expect(service.awaitingIncidentStart()).toBe(false);
+    fetchSpy.mockRestore();
+  });
+
   it('should_toggle_healthy_traffic_and_expose_target_metrics', async () => {
     const service = new IncidentService();
     service.setLiveDemoKey('secret-key');
@@ -535,6 +589,45 @@ describe('IncidentService', () => {
     expect(result).toEqual({ ok: true, status: 202 });
     expect(service.turnstileToken()).toBe('token-2');
     expect(service.turnstileResetCounter()).toBe(0);
+
+    fetchSpy.mockRestore();
+  });
+
+  it('should_buffer_bounded_telemetryHistory_across_fetchTargetStatus_polls_and_retain_recovery_curve', async () => {
+    const service = new IncidentService();
+    let sampleIdx = 0;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      sampleIdx += 1;
+      const isDegraded = sampleIdx <= 25;
+      return new Response(
+        JSON.stringify({
+          status: isDegraded ? TargetHealthStatus.DEGRADED : TargetHealthStatus.HEALTHY,
+          service: 'api-pagamentos-core',
+          version: isDegraded ? 'v2.14.8' : 'v2.14.7',
+          previousHealthyVersion: 'v2.14.7',
+          metrics: {
+            requestsPerSecond: Number((1.2 + sampleIdx * 0.1).toFixed(1)),
+            errorRate5xxPercent: isDegraded ? 100 : 0,
+            p95LatencyMs: isDegraded ? 1200 : 22,
+            poolActive: isDegraded ? 2 : 1,
+            poolWaiting: isDegraded ? 3 : 0,
+            poolMax: isDegraded ? 2 : 10,
+            healthyTrafficActive: true
+          }
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    for (let i = 0; i < 50; i++) {
+      await service.fetchTargetStatus('http://localhost:8080');
+    }
+
+    const history = service.telemetryHistory();
+    expect(history).toHaveLength(45);
+    expect(history[0]?.errorRate5xxPercent).toBe(100);
+    expect(history[history.length - 1]?.errorRate5xxPercent).toBe(0);
+    expect(history[history.length - 1]?.p95LatencyMs).toBe(22);
 
     fetchSpy.mockRestore();
   });

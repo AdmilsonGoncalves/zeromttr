@@ -3,24 +3,28 @@ import { isNonEmptyString } from '@zeromttr/utils';
 import { MessageService } from 'primeng/api';
 import { Toast } from 'primeng/toast';
 import { DecisionAction, type IncidentMode } from '../core/contract.js';
-import { I18nService, type Language } from '../core/i18n.service.js';
+import { I18nService, type Language } from '../core/i18n/i18n.service.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
 import { EvidencePanelComponent } from './evidence-panel/evidence-panel.component.js';
 import { FsmTimelineComponent } from './fsm-timeline/fsm-timeline.component.js';
 import { RemediationPanelComponent } from './remediation-panel/remediation-panel.component.js';
 import { TargetTelemetryComponent } from './target-telemetry/target-telemetry.component.js';
 import { WarRoomHeaderComponent } from './war-room-header/war-room-header.component.js';
+import { WarRoomKpisComponent } from './war-room-kpis/war-room-kpis.component.js';
+import { WarRoomNoticesComponent } from './war-room-notices/war-room-notices.component.js';
 
 /**
- * Single-pane War Room mission control orchestrator composing quadrant child components via signals.
+ * Single-pane War Room mission control orchestrator composing decoupled header, notices, telemetry, and quadrant panels.
  */
 @Component({
   selector: 'app-war-room',
   imports: [
     Toast,
     WarRoomHeaderComponent,
+    WarRoomNoticesComponent,
     FsmTimelineComponent,
     TargetTelemetryComponent,
+    WarRoomKpisComponent,
     EvidencePanelComponent,
     RemediationPanelComponent
   ],

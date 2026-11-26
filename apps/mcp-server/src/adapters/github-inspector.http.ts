@@ -20,6 +20,9 @@ export interface GithubInspectorConfig {
   apiBaseUrl?: string;
 }
 
+const MAX_DIFF_PATCH_CHARS = 1500;
+const MAX_SUSPECT_FILE_CHARS = 24_000;
+
 /**
  * GitHub REST adapter for comparing deploy refs with PII sanitization and bounded diff pruning.
  */
@@ -109,7 +112,7 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
       status: f.status,
       additions: f.additions,
       deletions: f.deletions,
-      patch: f.patch ? truncateDiff(f.patch, 1500) : undefined
+      patch: f.patch ? truncateDiff(f.patch, MAX_DIFF_PATCH_CHARS) : undefined
     }));
 
     // Find suspect file
@@ -141,7 +144,7 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
           const decoded = contentsData.content
             ? Buffer.from(contentsData.content, 'base64').toString('utf-8')
             : '';
-          const cappedContent = truncateDiff(decoded, 8000);
+          const cappedContent = truncateDiff(decoded, MAX_SUSPECT_FILE_CHARS);
           suspectFileResult = {
             path: suspectFileItem.filename,
             blob_sha: contentsData.sha || '',

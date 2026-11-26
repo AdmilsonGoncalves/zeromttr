@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } f
 import { CommonModule } from '@angular/common';
 import { Timeline } from 'primeng/timeline';
 import { Tooltip } from 'primeng/tooltip';
-import { I18nService, type TranslationDictionary } from '../../core/i18n.service.js';
+import { I18nService, type TranslationDictionary } from '../../core/i18n/i18n.service.js';
 import type { FsmStageItem } from '../../core/incident.service.js';
 
 /**

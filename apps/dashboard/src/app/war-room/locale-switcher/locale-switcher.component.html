@@ -1,0 +1,51 @@
+<div #rootRef class="relative inline-block shrink-0" (keydown)="onMenuKeydown($event)">
+  <button
+    #triggerBtn
+    type="button"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="isOpenSignal()"
+    aria-controls="locale-switcher-menu"
+    [attr.aria-label]="i18n.t('tooltipLanguageSelector')"
+    [pTooltip]="i18n.t('tooltipLanguageSelector')"
+    tooltipPosition="bottom"
+    (click)="toggleMenu()"
+    class="h-8 px-2 rounded-md border border-slate-700 bg-slate-950 hover:border-cyan-500/70 text-xs text-slate-100 inline-flex items-center gap-1.5 cursor-pointer transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+  >
+    <span class="text-sm leading-none">{{ activeLocale().flag }}</span>
+    <i
+      class="pi pi-chevron-down text-[10px] text-slate-400 transition-transform"
+      [ngClass]="isOpenSignal() ? 'rotate-180' : ''"
+      aria-hidden="true"
+    ></i>
+  </button>
+
+  @if (isOpenSignal()) {
+    <div
+      id="locale-switcher-menu"
+      role="menu"
+      [attr.aria-label]="i18n.t('tooltipLanguageSelector')"
+      class="absolute right-0 top-full mt-1.5 w-40 rounded-lg border border-slate-700 bg-slate-900 shadow-2xl py-1 z-50"
+    >
+      @for (option of localeOptions; track option.code) {
+        <button
+          type="button"
+          role="menuitemradio"
+          [attr.aria-checked]="option.code === currentLangSignal()"
+          (click)="selectLocale(option.code)"
+          class="w-full px-3 py-2 text-left text-xs flex items-center gap-2.5 cursor-pointer transition-colors"
+          [ngClass]="
+            option.code === currentLangSignal()
+              ? 'border-l-2 border-cyan-400 bg-slate-800/80 text-white font-semibold'
+              : 'border-l-2 border-transparent text-slate-300 hover:bg-slate-800/50 hover:text-white'
+          "
+        >
+          <span class="text-sm leading-none">{{ option.flag }}</span>
+          <span class="flex-1">{{ option.label }}</span>
+          @if (option.code === currentLangSignal()) {
+            <i class="pi pi-check text-cyan-400 text-[11px]" aria-hidden="true"></i>
+          }
+        </button>
+      }
+    </div>
+  }
+</div>

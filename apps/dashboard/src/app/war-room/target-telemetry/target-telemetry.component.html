@@ -1,5 +1,5 @@
 @if (metricsSignal(); as m) {
-  <div class="bg-slate-950/70 border border-slate-800/90 rounded-lg p-2 flex flex-col gap-2">
+  <div class="bg-slate-950/70 border border-slate-800/90 rounded-lg p-2 flex flex-col gap-1.5">
     <div class="flex items-center justify-between gap-2">
       <span
         class="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5"
@@ -21,7 +21,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
       <!-- Card 1: Throughput Req/s -->
       <div
-        class="bg-slate-900/95 border rounded-md px-3 py-2 flex flex-col justify-between gap-1.5 shadow-sm"
+        class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex flex-col justify-between gap-1 shadow-sm"
         [ngClass]="throughputLevel() === 'warn' ? 'border-amber-500/70' : 'border-slate-800'"
       >
         <div class="flex items-center justify-between">
@@ -35,7 +35,7 @@
         </div>
         <div class="flex items-baseline gap-1.5">
           <span
-            class="text-xl font-mono font-bold"
+            class="text-lg font-mono font-bold"
             [ngClass]="throughputLevel() === 'warn' ? 'text-amber-300' : 'text-cyan-300'"
           >
             {{ m.requestsPerSecond }}
@@ -54,19 +54,19 @@
 
       <!-- Card 2: 5xx Error Rate with PrimeNG Knob -->
       <div
-        class="bg-slate-900/95 border rounded-md px-3 py-2 flex items-center justify-between gap-2 shadow-sm"
+        class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex items-center justify-between gap-2 shadow-sm"
         [ngClass]="{
           'border-rose-500/70': error5xxLevel() === 'critical',
           'border-amber-500/70': error5xxLevel() === 'warn',
           'border-slate-800': error5xxLevel() === 'healthy'
         }"
       >
-        <div class="flex flex-col justify-between gap-1">
+        <div class="flex flex-col justify-between gap-0.5">
           <span class="text-[11px] text-slate-400 font-medium">
             {{ i18n.t('targetError5xxLabel') }}
           </span>
           <span
-            class="text-xl font-mono font-bold"
+            class="text-lg font-mono font-bold"
             [ngClass]="{
               'text-rose-400': error5xxLevel() === 'critical',
               'text-amber-300': error5xxLevel() === 'warn',
@@ -93,7 +93,7 @@
         <p-knob
           [ngModel]="m.errorRate5xxPercent"
           [readonly]="true"
-          [size]="52"
+          [size]="46"
           [strokeWidth]="10"
           valueTemplate="{value}%"
           [valueColor]="error5xxColor()"
@@ -104,7 +104,7 @@
 
       <!-- Card 3: p95 Latency -->
       <div
-        class="bg-slate-900/95 border rounded-md px-3 py-2 flex flex-col justify-between gap-1.5 shadow-sm"
+        class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex flex-col justify-between gap-1 shadow-sm"
         [ngClass]="{
           'border-rose-500/70': latencyLevel() === 'critical',
           'border-amber-500/70': latencyLevel() === 'warn',
@@ -121,7 +121,7 @@
         </div>
         <div class="flex items-baseline gap-1">
           <span
-            class="text-xl font-mono font-bold"
+            class="text-lg font-mono font-bold"
             [ngClass]="{
               'text-rose-400': latencyLevel() === 'critical',
               'text-amber-300': latencyLevel() === 'warn',
@@ -141,7 +141,7 @@
 
       <!-- Card 4: DB Pool with PrimeNG MeterGroup -->
       <div
-        class="bg-slate-900/95 border rounded-md px-3 py-2 flex flex-col justify-between gap-1.5 shadow-sm"
+        class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex flex-col justify-between gap-1 shadow-sm"
         [ngClass]="{
           'border-rose-500/70': poolLevel() === 'critical',
           'border-amber-500/70': poolLevel() === 'warn',

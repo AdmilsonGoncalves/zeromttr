@@ -1,8 +1,17 @@
 import '@angular/compiler';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TelemetryHealthLevel } from '../src/app/core/constants.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService } from '../src/app/core/i18n/i18n.service.js';
 import { TargetTelemetryComponent } from '../src/app/war-room/target-telemetry/target-telemetry.component.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const TELEMETRY_TEMPLATE_PATH = resolve(
+  HERE,
+  '../src/app/war-room/target-telemetry/target-telemetry.component.html'
+);
 
 describe('TargetTelemetryComponent', () => {
   let i18n: I18nService;
@@ -60,5 +69,16 @@ describe('TargetTelemetryComponent', () => {
     expect(component.latencyLevel()).toBe(TelemetryHealthLevel.WARN);
     expect(component.poolLevel()).toBe(TelemetryHealthLevel.WARN);
     expect(component.poolMeters()).toHaveLength(1);
+  });
+
+  it('should_render_compact_instantaneous_cards_without_duplicate_card_sparklines', () => {
+    const html = readFileSync(TELEMETRY_TEMPLATE_PATH, 'utf8');
+    expect(html).not.toContain('rpsSparkline');
+    expect(html).not.toContain('error5xxSparkline');
+    expect(html).not.toContain('latencySparkline');
+    expect(html).not.toContain('poolSparkline');
+    expect(html).toContain('<p-progressbar');
+    expect(html).toContain('<p-knob');
+    expect(html).toContain('<p-metergroup');
   });
 });

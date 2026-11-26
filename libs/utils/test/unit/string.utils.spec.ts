@@ -126,6 +126,48 @@ describe('string.utils', () => {
       expect(cleaned).toContain('href="blocked:"');
       expect(cleaned).toContain('https://example.com/&#x41;&#66;');
     });
+
+    it('should strip inline style attributes to prevent style injection and sanitizer warnings', () => {
+      const input =
+        '<div style="font-family: sans-serif; color: #0f172a;"><h3 style=\'color: red;\'>Alert</h3><p class="text-xs">Body</p></div>';
+      const cleaned = stripUnsafeHtml(input);
+      expect(cleaned).not.toMatch(/\sstyle\s*=/i);
+      expect(cleaned).toContain('<h3>Alert</h3>');
+      expect(cleaned).toContain('<p class="text-xs">Body</p>');
+    });
+
+    it('should preserve attribute separators when stripping style so adjacent tokens never merge into executable handlers', () => {
+      const splitHandler = '<img o style="x"nerror="alert(1)" src=x>';
+      const adjacentHandler = '<div class="a" style="x"onmouseover=alert(1)>hi</div>';
+      const adjacentClass = '<div style="color:red"class="x">hi</div>';
+
+      const cleanedSplit = stripUnsafeHtml(splitHandler);
+      const cleanedAdjacent = stripUnsafeHtml(adjacentHandler);
+      const cleanedClass = stripUnsafeHtml(adjacentClass);
+
+      expect(cleanedSplit).not.toMatch(/\bonerror\s*=/i);
+      expect(cleanedSplit).not.toMatch(/\bstyle\s*=/i);
+      expect(cleanedAdjacent).not.toMatch(/\bonmouseover\s*=/i);
+      expect(cleanedAdjacent).not.toMatch(/\bstyle\s*=/i);
+      expect(cleanedClass).toBe('<div class="x">hi</div>');
+    });
+
+    it('should preserve text and legitimate attribute values containing style= or on*= while still blocking unquoted entity URIs', () => {
+      const textAndAttr =
+        '<a title="btn style=x onclick=noop" onclick="alert(1)">Use style=compact and onclick=1</a>';
+      const cleanedTextAndAttr = stripUnsafeHtml(textAndAttr);
+      expect(cleanedTextAndAttr).toBe(
+        '<a title="btn style=x onclick=noop">Use style=compact and onclick=1</a>'
+      );
+
+      const unquotedEntityUri =
+        '<a href=&#106;avascript:alert(1)>Bad</a><img src=&#x6a;avascript:alert(2)>';
+      const cleanedUnquoted = stripUnsafeHtml(unquotedEntityUri);
+      expect(cleanedUnquoted).not.toContain('&#106;avascript:');
+      expect(cleanedUnquoted).not.toContain('&#x6a;avascript:');
+      expect(cleanedUnquoted).toContain('href="blocked:"');
+      expect(cleanedUnquoted).toContain('src="blocked:"');
+    });
   });
 
   describe('isSafeRelativePath', () => {

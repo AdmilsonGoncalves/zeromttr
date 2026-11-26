@@ -7,10 +7,10 @@ import { ProgressBar } from 'primeng/progressbar';
 import { Tag } from 'primeng/tag';
 import { TARGET_TELEMETRY_THRESHOLDS, TelemetryHealthLevel } from '../../core/constants.js';
 import type { TargetLiveMetrics } from '../../core/contract.js';
-import { I18nService } from '../../core/i18n.service.js';
+import { I18nService } from '../../core/i18n/i18n.service.js';
 
 /**
- * Displays live target workload telemetry cards (throughput, 5xx rate, p95 latency, and DB pool usage).
+ * Displays compact instantaneous target workload telemetry cards (throughput, 5xx rate, p95 latency, and DB pool usage).
  */
 @Component({
   selector: 'app-target-telemetry',

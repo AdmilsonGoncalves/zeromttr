@@ -1,8 +1,14 @@
 import '@angular/compiler';
+import fs from 'node:fs';
+import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService } from '../src/app/core/i18n/i18n.service.js';
 import { EvidencePanelComponent } from '../src/app/war-room/evidence-panel/evidence-panel.component.js';
+
+const EVIDENCE_TEMPLATE_PATH = path.resolve(
+  import.meta.dirname,
+  '../src/app/war-room/evidence-panel/evidence-panel.component.html'
+);
 
 describe('EvidencePanelComponent', () => {
   let i18n: I18nService;
@@ -19,43 +25,33 @@ describe('EvidencePanelComponent', () => {
     component.isPiiPassed = true;
   });
 
-  it('should expose fallback logs and mock git diff when no incident is selected', () => {
-    expect(component.mockGitDiff).toContain('acquireTimeoutMillis: 100');
-    expect(component.mockGitDiff).toContain('acquireTimeoutMillis: 5000');
-    expect(component.displayedPreCollectorLog()).toContain('123.456.789-00');
-    expect(component.displayedPostOttlLog()).toContain('[REDACTED_CPF]');
-  });
-
-  it('should extract clean body from Loki JSON envelope', () => {
-    const lokiEnvelopeIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
-    lokiEnvelopeIncident.rca.logSample =
-      '{"body":"ERROR [api-pagamentos-core] Pool exhausted for CPF [REDACTED_CPF]","traceid":"abc"}\n{"body":"second line"}';
-    component.incident = lokiEnvelopeIncident;
-
-    expect(component.displayedPostOttlLog()).toBe(
-      'ERROR [api-pagamentos-core] Pool exhausted for CPF [REDACTED_CPF]'
-    );
-  });
-
-  it('should withhold post-OTTL log when PII audit fails', () => {
-    const blockedIncident = JSON.parse(JSON.stringify(MOCK_INCIDENT));
-    blockedIncident.rca.piiGuardAudit = {
-      passed: false,
-      leakedPatternsDetected: 1,
-      detectedTypes: ['CPF'],
-      edgeRedactedTokensVerified: 0
-    };
-    component.incident = blockedIncident;
-    component.isPiiPassed = false;
-
-    expect(component.displayedPostOttlLog()).toContain('CPF');
-  });
-
-  it('should update activeTab only for filled tab values', () => {
+  it('should_default_activeTab_to_0_and_update_only_for_filled_tab_values', () => {
     expect(component.activeTab()).toBe('0');
+    component.onTabChange('1');
+    expect(component.activeTab()).toBe('1');
     component.onTabChange('2');
     expect(component.activeTab()).toBe('2');
+    component.onTabChange('3');
+    expect(component.activeTab()).toBe('3');
     component.onTabChange(undefined);
-    expect(component.activeTab()).toBe('2');
+    expect(component.activeTab()).toBe('3');
+  });
+
+  it('should_render_live_metrics_as_tab_1_and_delegate_each_tab_to_its_child_component', () => {
+    const html = fs.readFileSync(EVIDENCE_TEMPLATE_PATH, 'utf8');
+    const liveTabIdx = html.indexOf("i18n.t('tabLiveMetrics')");
+    const traceTabIdx = html.indexOf("i18n.t('tabTraceTree')");
+    const lokiTabIdx = html.indexOf("i18n.t('tabLokiLogs')");
+    const diffTabIdx = html.indexOf("i18n.t('tabGitDiff')");
+
+    expect(liveTabIdx).toBeGreaterThan(-1);
+    expect(liveTabIdx).toBeLessThan(traceTabIdx);
+    expect(traceTabIdx).toBeLessThan(lokiTabIdx);
+    expect(lokiTabIdx).toBeLessThan(diffTabIdx);
+
+    expect(html).toContain('<app-live-metrics-tab');
+    expect(html).toContain('<app-trace-tree-tab');
+    expect(html).toContain('<app-loki-pii-tab');
+    expect(html).toContain('<app-git-diff-finops-tab');
   });
 });

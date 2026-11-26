@@ -9,7 +9,7 @@ export const PII_PATTERNS = {
   jwt: /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\b/,
   bearer: /\bBearer\s+(?!\[REDACTED)[A-Za-z0-9\-._~+/]{8,}=*/i,
   email:
-    /(?<![A-Za-z0-9._%+-])(?!git@[A-Za-z0-9.-]+:)[A-Za-z0-9._%+-]+@(?!users\.noreply\.github\.com)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b/,
+    /(?<![A-Za-z0-9._%+-])(?!git@[A-Za-z0-9.-]+:(?:[A-Za-z0-9._~-]+\/[A-Za-z0-9._~/-]+|[A-Za-z0-9._~/-]+\.git(?![A-Za-z0-9._~/-])))[A-Za-z0-9._%+-]+@(?!users\.noreply\.github\.com)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b/,
   phone: new RegExp(
     String.raw`(?:\+55\s?${DDD}\s?(?:9\d{8}|[2-5]\d{7})\b|(?:\+?55\s?)?\(${DDD}\)\s?(?:9\d{4}|[2-5]\d{3})-?\d{4}\b|(?:\+?55\s?)?\b${DDD}\s?(?:9\d{4}|[2-5]\d{3})-\d{4}\b|\b(?:pix|tel|cel|fone|phone|whatsapp)\b["':=\s]+(?:\+?55)?${DDD}(?:9\d{8}|[2-5]\d{7})\b)`,
     'i'

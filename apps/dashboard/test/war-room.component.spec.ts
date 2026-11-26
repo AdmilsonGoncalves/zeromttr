@@ -1,9 +1,15 @@
 import '@angular/compiler';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WarRoomComponent } from '../src/app/war-room/war-room.component.js';
-import { I18nService } from '../src/app/core/i18n.service.js';
+import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
 import { IncidentService } from '../src/app/core/incident.service.js';
 import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const WAR_ROOM_TEMPLATE_PATH = resolve(HERE, '../src/app/war-room/war-room.component.html');
 
 describe('WarRoomComponent', () => {
   let component: WarRoomComponent;
@@ -63,13 +69,13 @@ describe('WarRoomComponent', () => {
   });
 
   it('should switch languages between PT and EN', () => {
-    expect(i18n.currentLang()).toBe('pt');
-    component.onLangChange('en');
-    expect(i18n.currentLang()).toBe('en');
+    expect(i18n.currentLang()).toBe(Language.PT_BR);
+    component.onLangChange(Language.EN_US);
+    expect(i18n.currentLang()).toBe(Language.EN_US);
     expect(i18n.t('simulateIncident')).toBe('💥 Simulate Incident');
 
-    component.onLangChange('pt');
-    expect(i18n.currentLang()).toBe('pt');
+    component.onLangChange(Language.PT_BR);
+    expect(i18n.currentLang()).toBe(Language.PT_BR);
     expect(i18n.t('simulateIncident')).toBe('💥 Simular Incidente');
   });
 
@@ -180,5 +186,13 @@ describe('WarRoomComponent', () => {
     expect(incidentService.reasoningSource()).toBe('llm');
     expect(incidentService.isPiiPassed()).toBe(true);
     expect(incidentService.timelineSteps()).toHaveLength(8);
+  });
+
+  it('should compose pure header, notices, timeline, telemetry, and KPIs as decoupled siblings', () => {
+    const html = readFileSync(WAR_ROOM_TEMPLATE_PATH, 'utf8');
+    expect(html).toContain('<app-war-room-header');
+    expect(html).toContain('<app-war-room-notices');
+    expect(html).toContain('<app-war-room-kpis');
+    expect(html).not.toContain('</app-war-room-header>');
   });
 });

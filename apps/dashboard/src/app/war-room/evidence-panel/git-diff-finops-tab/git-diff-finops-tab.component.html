@@ -1,0 +1,67 @@
+<div class="flex flex-col gap-2.5 pt-1.5">
+  @if (incidentSignal()) {
+    <div class="flex justify-between items-center text-xs text-slate-300">
+      <span class="font-bold font-mono text-cyan-300">
+        {{ i18n.t('gitDiffTitle') }}
+      </span>
+      <span class="font-mono text-slate-400 text-[11px]">
+        apps/target-app-demo/src/repositories/payment.repository.ts
+      </span>
+    </div>
+
+    <pre
+      class="bg-slate-950 border border-slate-800 rounded p-2.5 font-mono text-[11px] text-slate-200 overflow-x-auto leading-relaxed max-h-56 overflow-y-auto"
+      >{{ mockGitDiff }}</pre>
+  } @else {
+    <div
+      class="bg-slate-950 border border-slate-800 rounded p-3 text-xs text-slate-400 font-mono leading-relaxed"
+    >
+      {{ i18n.t('gitDiffIdleBody') }}
+    </div>
+  }
+
+  <div
+    class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-950 border border-slate-800 rounded p-2"
+  >
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsBytesFetched') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-slate-200">{{ rawBytesFetched() }} B</div>
+    </div>
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsBytesSent') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-slate-200">{{ compactedBytesSent() }} B</div>
+    </div>
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsPayloadReduction') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-emerald-400">{{ finopsReductionSignal() }}%</div>
+    </div>
+    <div>
+      <div class="text-[9px] text-slate-400 uppercase">
+        {{ i18n.t('finopsTokensSaved') }}
+      </div>
+      <div class="text-xs font-mono font-bold text-cyan-400">
+        ~{{ estimatedTokensSavedSignal() }}
+      </div>
+    </div>
+    <div class="col-span-2 md:col-span-4 pt-1.5 border-t border-slate-800/80 flex flex-col gap-1">
+      <div class="flex justify-between text-[10px] font-mono text-slate-400">
+        <span>{{ i18n.t('chartFinopsBarsTitle') }}</span>
+        <span class="text-cyan-300">
+          {{ compactedBytesSent() }} B / {{ rawBytesFetched() }} B
+        </span>
+      </div>
+      <div class="w-full h-2 bg-slate-800 rounded overflow-hidden">
+        <div
+          class="h-full bg-cyan-400 transition-all"
+          [style.width.%]="finopsCompactedBarPercent()"
+        ></div>
+      </div>
+    </div>
+  </div>
+</div>

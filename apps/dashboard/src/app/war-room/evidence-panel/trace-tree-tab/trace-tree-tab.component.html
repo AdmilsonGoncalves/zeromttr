@@ -1,0 +1,83 @@
+<div class="flex flex-col gap-2.5 pt-1.5">
+  <div class="bg-slate-950 border border-slate-800 rounded p-2">
+    <div class="flex justify-between items-center mb-1 text-xs">
+      <span class="font-bold text-slate-300">
+        {{ i18n.t('evidenceCoverageLabel') }}: {{ signalsRatioSignal() }} Signals ({{
+          evidenceCoveragePercentSignal()
+        }}%)
+      </span>
+      <span class="font-mono text-cyan-400"> {{ evidenceCoveragePercentSignal() }}% </span>
+    </div>
+    <p-progressbar [value]="evidenceCoveragePercentSignal()" [showValue]="false" />
+  </div>
+
+  <div class="flex items-center gap-1.5 flex-wrap">
+    <span class="text-xs font-semibold text-slate-400"> {{ i18n.t('blastRadiusLabel') }}: </span>
+    @for (svc of incidentSignal()?.rca?.blastRadius ?? []; track svc) {
+      <span
+        class="bg-rose-950/70 border border-rose-700/80 text-rose-300 text-xs px-2 py-0.5 rounded font-mono font-semibold"
+      >
+        {{ svc }}
+      </span>
+    }
+  </div>
+
+  @if (incidentSignal()?.rca?.summary; as summary) {
+    <div class="bg-slate-950 border border-slate-800 rounded p-2">
+      <div class="text-[11px] font-bold text-slate-400 uppercase mb-0.5">
+        Root Cause Analysis (RCA)
+      </div>
+      <p class="text-xs font-mono text-slate-200 leading-relaxed">
+        {{ summary }}
+      </p>
+    </div>
+  }
+
+  <div class="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1">
+    <div
+      class="flex justify-between items-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-1"
+    >
+      @if (incidentSignal()?.rca?.traceId; as traceId) {
+        <span>Span Hierarchy (Trace ID: {{ traceId }})</span>
+      } @else {
+        <span>Span Hierarchy</span>
+      }
+      <span>Duration / Status</span>
+    </div>
+
+    <div class="flex flex-col gap-1 font-mono text-xs max-h-56 overflow-y-auto pr-0.5">
+      @for (span of incidentSignal()?.rca?.spans ?? []; track span.spanId) {
+        <div
+          class="p-1.5 rounded border transition-colors flex justify-between items-center"
+          [ngClass]="{
+            'bg-rose-950/40 border-rose-800/80 text-rose-200': span.hasError,
+            'bg-slate-900/40 border-slate-800/60 text-slate-300': !span.hasError,
+            'ml-5 border-l-2 border-l-cyan-500/40': !!span.parentSpanId
+          }"
+        >
+          <div class="flex items-center gap-1.5">
+            <i
+              [class]="
+                span.hasError
+                  ? 'pi pi-times-circle text-rose-400 text-xs'
+                  : 'pi pi-check-circle text-emerald-400 text-xs'
+              "
+            ></i>
+            <span class="font-bold text-xs">{{ span.operationName }}</span>
+            <span class="text-[10px] text-slate-400">({{ span.serviceName }})</span>
+          </div>
+          <span
+            class="font-mono text-xs font-bold"
+            [ngClass]="span.hasError ? 'text-rose-400' : 'text-slate-400'"
+          >
+            {{ span.durationMs }}ms
+          </span>
+        </div>
+      } @empty {
+        <div class="py-3 text-center text-[11px] text-slate-400">
+          {{ incidentSignal() ? i18n.t('traceTreeAwaitingBody') : i18n.t('traceTreeIdleBody') }}
+        </div>
+      }
+    </div>
+  </div>
+</div>

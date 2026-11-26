@@ -15,7 +15,12 @@ import { Button } from 'primeng/button';
 import { Tag } from 'primeng/tag';
 import { Tooltip } from 'primeng/tooltip';
 import { IncidentState, NotificationStatus, type IncidentDetail } from '../../core/contract.js';
-import { I18nService } from '../../core/i18n.service.js';
+import { I18nService, type TranslationDictionary } from '../../core/i18n/i18n.service.js';
+
+export interface PrBadgeConfig {
+  labelKey: keyof TranslationDictionary;
+  severity: 'success' | 'info' | 'warn' | 'danger' | 'secondary';
+}
 
 /**
  * Right War Room quadrant displaying GitHub PR status, Resend post-mortem preview, and human decision controls.
@@ -51,12 +56,30 @@ export class RemediationPanelComponent {
 
   @Output() readonly simulateDecision = new EventEmitter<void>();
 
-  readonly safeResendPreview = computed<string>(() => {
-    const html = this.buildPreviewHtml();
-    if (this.sanitizer) {
-      return this.sanitizer.sanitize(SecurityContext.HTML, html) ?? '';
+  readonly prBadge = computed<PrBadgeConfig>(() => {
+    const incident = this.incidentSignal();
+    if (!incident?.remediation) {
+      return { labelKey: 'githubPrIdleStatus', severity: 'secondary' };
     }
-    return stripUnsafeHtml(html);
+    const state = this.displayedFsmStateSignal() ?? incident.state;
+    if (state === IncidentState.RESOLVED) {
+      return { labelKey: 'githubPrApprovedStatus', severity: 'success' };
+    }
+    if (state === IncidentState.REJECTED) {
+      return { labelKey: 'githubPrRejectedStatus', severity: 'danger' };
+    }
+    if (state === IncidentState.FAILED) {
+      return { labelKey: 'githubPrClosedStatus', severity: 'danger' };
+    }
+    return { labelKey: 'githubPrOpenStatus', severity: 'success' };
+  });
+
+  readonly safeResendPreview = computed<string>(() => {
+    const cleanHtml = stripUnsafeHtml(this.buildPreviewHtml());
+    if (this.sanitizer) {
+      return this.sanitizer.sanitize(SecurityContext.HTML, cleanHtml) ?? '';
+    }
+    return cleanHtml;
   });
 
   constructor(...args: [I18nService?, DomSanitizer?]) {
@@ -74,7 +97,16 @@ export class RemediationPanelComponent {
   }
 
   private buildPreviewHtml(): string {
-    const notification = this.incidentSignal()?.notification;
+    const incident = this.incidentSignal();
+    if (!incident) {
+      return `
+      <div class="font-sans text-slate-400">
+        <p class="text-[11px] m-0">${this.i18n.t('resendIdleBody')}</p>
+      </div>
+    `;
+    }
+
+    const notification = incident.notification;
     const raw = notification?.htmlPreview;
 
     if (
@@ -82,9 +114,9 @@ export class RemediationPanelComponent {
       (isNonEmptyString(raw) && raw.startsWith('Warning: Resend delivery failed'))
     ) {
       return `
-      <div style="font-family: sans-serif; color: #fde68a;">
-        <h3 style="color: #fbbf24; margin-top: 0; font-size: 12px;">${this.i18n.t('resendDegradedTitle')}</h3>
-        <p style="font-size: 11px; color: #cbd5e1; margin-bottom: 6px;">${this.i18n.t('resendDegradedBody')}</p>
+      <div class="font-sans text-amber-200">
+        <h3 class="text-amber-400 mt-0 mb-1 text-xs font-semibold">${this.i18n.t('resendDegradedTitle')}</h3>
+        <p class="text-[11px] text-slate-300 mb-1.5">${this.i18n.t('resendDegradedBody')}</p>
       </div>
     `;
     }
@@ -94,22 +126,22 @@ export class RemediationPanelComponent {
       (!isNonEmptyString(raw) || !raw.trim().startsWith('<'))
     ) {
       return `
-      <div style="font-family: sans-serif; color: #cbd5e1;">
-        <h3 style="color: #34d399; margin-top: 0; font-size: 12px;">✅ ${this.i18n.t('resendDispatchedBadge')}</h3>
-        <p style="font-size: 11px; margin-bottom: 4px;">${this.i18n.t('resendDispatchedBody')}</p>
-        <p style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${escapeHtml(notification.emailId ?? '')}</p>
+      <div class="font-sans text-slate-300">
+        <h3 class="text-emerald-400 mt-0 mb-1 text-xs font-semibold">✅ ${this.i18n.t('resendDispatchedBadge')}</h3>
+        <p class="text-[11px] mb-1">${this.i18n.t('resendDispatchedBody')}</p>
+        <p class="text-[10px] text-slate-400 font-mono">ID: ${escapeHtml(notification.emailId ?? '')}</p>
       </div>
     `;
     }
 
     if (isNonEmptyString(raw)) {
-      return stripUnsafeHtml(raw);
+      return raw;
     }
 
     return `
-    <div style="font-family: sans-serif; color: #cbd5e1;">
-      <h3 style="color: #ef4444; margin-top: 0;">🚨 ZeroMTTR Incident Post-Mortem</h3>
-      <p style="font-size: 11px;">${this.i18n.t('resendDefaultBody')}</p>
+    <div class="font-sans text-slate-300">
+      <h3 class="text-rose-500 mt-0 mb-1 font-semibold">🚨 ZeroMTTR Incident Post-Mortem</h3>
+      <p class="text-[11px]">${this.i18n.t('resendDefaultBody')}</p>
     </div>
   `;
   }

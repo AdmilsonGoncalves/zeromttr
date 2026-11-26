@@ -1,0 +1,62 @@
+<section
+  class="shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"
+  aria-label="War Room KPIs"
+>
+  <div class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-col">
+    <span class="text-[11px] text-slate-400 truncate">{{ i18n.t('kpiTtdLabel') }}</span>
+    <span class="text-base font-mono font-bold text-emerald-400">
+      {{ ttdDisplaySignal() }}
+    </span>
+    <span class="text-[9px] text-slate-400 truncate">{{ i18n.t('kpiTtdTarget') }}</span>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-col">
+    <span class="text-[11px] text-slate-400 truncate">{{ i18n.t('kpiTtprLabel') }}</span>
+    <span class="text-base font-mono font-bold text-emerald-400">
+      {{ ttprDisplaySignal() }}
+    </span>
+    <span class="text-[9px] text-slate-400 truncate">{{ i18n.t('kpiTtprTarget') }}</span>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-col">
+    <span class="text-[11px] text-slate-400 truncate">{{ i18n.t('evidenceCoverageLabel') }}</span>
+    <span class="text-base font-mono font-bold text-cyan-400">
+      {{ signalsRatioSignal() }} ({{ evidenceCoveragePercentSignal() }}%)
+    </span>
+    <span class="text-[9px] text-slate-400 truncate">PromQL + Exemplar + Tempo + Diff</span>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 flex flex-col">
+    <span class="text-[11px] text-slate-400 truncate">{{ i18n.t('reasoningSourceLabel') }}</span>
+    <div class="mt-0.5">
+      @if (reasoningSourceSignal() === 'llm') {
+        <span
+          class="bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
+        >
+          {{ i18n.t('reasoningSourceLlm') }}
+        </span>
+      } @else if (reasoningSourceSignal() === 'fallback') {
+        <span
+          class="bg-amber-950 border border-amber-500 text-amber-300 font-mono text-[11px] px-1.5 py-0.5 rounded font-bold"
+        >
+          {{ i18n.t('reasoningSourceFallback') }}
+        </span>
+      } @else {
+        <span class="text-slate-500 font-mono text-[11px]">--</span>
+      }
+    </div>
+    <span class="text-[9px] text-slate-400 mt-0.5 truncate">rca.reasoningSource</span>
+  </div>
+
+  <div
+    class="bg-slate-900 border border-cyan-500/40 rounded-lg px-2.5 py-1.5 flex flex-col col-span-2 sm:col-span-1"
+  >
+    <span class="text-[11px] text-slate-400 truncate">{{ i18n.t('finopsPayloadReduction') }}</span>
+    <span class="text-base font-mono font-bold text-cyan-300">
+      {{ finopsReductionSignal() }}%
+    </span>
+    <span class="text-[9px] text-slate-400 truncate">
+      Est. ~{{ estimatedTokensSavedSignal() }} {{ i18n.t('finopsTokensSaved') }}
+    </span>
+  </div>
+</section>
