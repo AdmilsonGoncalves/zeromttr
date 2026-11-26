@@ -11,7 +11,7 @@
             {{ i18n.t('appTitle') }}
           </h1>
           <p-tag
-            [value]="sseConnectedSignal() ? 'SSE Connected' : 'SSE Offline'"
+            [value]="sseConnectedSignal() ? i18n.t('sseConnected') : i18n.t('sseOffline')"
             [severity]="sseConnectedSignal() ? 'success' : 'danger'"
             styleClass="text-[10px] py-0 shrink-0"
           />
@@ -29,7 +29,11 @@
               styleClass="text-[10px] py-0 shrink-0"
             />
           } @else {
-            <p-tag value="Target: --" severity="secondary" styleClass="text-[10px] py-0 shrink-0" />
+            <p-tag
+              [value]="i18n.t('targetStatusUnknown')"
+              severity="secondary"
+              styleClass="text-[10px] py-0 shrink-0"
+            />
           }
         </div>
         <p class="hidden sm:block text-[11px] text-slate-400 truncate">

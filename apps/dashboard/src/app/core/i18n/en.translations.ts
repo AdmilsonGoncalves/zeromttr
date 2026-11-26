@@ -6,10 +6,14 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   appSubtitle: 'Autonomous Incident Remediation & Human-in-the-Loop Governance',
   headerMenuBtn: 'Menu',
   headerMenuAriaLabel: 'Toggle command menu',
+  sseConnected: 'SSE Connected',
+  sseOffline: 'SSE Offline',
+  targetStatusUnknown: 'Target: --',
+  demoMenuBadge: 'DEMO',
+  tooltipDemoMenuBadge:
+    'Demonstration and simulation environment controls (hidden in production when ENABLE_DEMO_MODE=false).',
   liveMode: '⚡ Live API Mode',
   replayMode: '🎬 Replay Mode (Recorded)',
-  replayNotice:
-    'Notice: Public Replay Mode active reproducing a recorded real run to preserve API quotas.',
   liveKeyPlaceholder: 'X-Live-Demo-Key token...',
   simulateIncident: '💥 Simulate Incident',
   restoreService: '🔄 Restore Service',
@@ -94,9 +98,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   blastRadiusLabel: 'Blast Radius (Affected Services)',
   preCollectorLogLabel: '🔴 Application Log (Pre-Collector with Raw PII)',
   postOttlLogLabel: '🟢 Loki / MCP Agent Log (Post-OTTL transform Masked)',
-  piiGuardVerifiedBadge: 'PII Masked at Edge — Fail-Closed Guard Verified (0 Leaked Patterns)',
-  piiGuardBlockedBadge:
-    'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
+  piiGuardVerifiedBadge: 'PII Masked at Edge — Fail-Closed Guard OK (0 leaked)',
+  piiGuardBlockedBadge: 'Fail-Closed Guard Triggered ({N} leaked blocked — Local Fallback)',
   piiLogWithheldMessage: '[WITHHELD DUE TO PII VIOLATION: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
   gitDiffIdleBody: 'No regression diff under inspection — target service is healthy.',
@@ -119,6 +122,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   resendPreviewTitle: 'Resend Post-Mortem (Sanitized Preview)',
   resendIdleBody:
     'No active incident right now — the sanitized Post-Mortem will appear here once dispatched.',
+  resendDefaultTitle: '🚨 ZeroMTTR Incident Post-Mortem',
   resendDefaultBody: 'Awaiting on-call approval via exclusive signed link.',
   resendDispatchedBadge: 'Post-Mortem email dispatched to on-call engineer via Resend',
   resendDispatchedBody:
@@ -127,7 +131,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   resendDegradedBody:
     'The Resend API rejected the configured sender domain (HTTP 403/delivery error). The incident remains active for simulated decision in the dashboard.',
   awaitingDecisionBadge: 'Awaiting on-call decision via HMAC link dispatched by email',
-  simulateDecisionBtn: '[Simulation Mode] Simulate On-Call Approval',
+  simulateDecisionBtn: 'Approve Hotfix (On-Call)',
   decisionPageTitle: 'Remediation Decision Confirmation',
   decisionIncidentIdLabel: 'Incident ID:',
   decisionRequestedActionLabel: 'Requested Action:',
@@ -195,7 +199,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   tooltipLanguageSelector: 'Switch UI language between Portuguese, English, and Spanish.',
   tooltipViewPr: 'Open the autonomously generated hotfix Pull Request on GitHub.',
   tooltipSimulateDecision:
-    'Simulates on-call approval in demo mode (production requires the email HMAC link).',
+    'Records on-call approval directly from the dashboard (in production, confirmation requires the HMAC link sent by email).',
 
   // === Toasts & Notifications ===
   toastLiveKeyRequiredSummary: 'Live key invalid or not provided',

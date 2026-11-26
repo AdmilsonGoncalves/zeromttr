@@ -25,7 +25,7 @@ describe('RemediationPanelComponent', () => {
 
   it('should_render_idle_preview_when_no_incident_is_active', () => {
     expect(component.safeResendPreview()).toContain(i18n.t('resendIdleBody'));
-    expect(component.safeResendPreview()).not.toContain('🚨 ZeroMTTR Incident Post-Mortem');
+    expect(component.safeResendPreview()).not.toContain(i18n.t('resendDefaultTitle'));
     expect(component.safeResendPreview()).not.toContain(i18n.t('resendDefaultBody'));
   });
 
@@ -34,7 +34,7 @@ describe('RemediationPanelComponent', () => {
     delete activeIncident.notification;
     component.incident = activeIncident;
 
-    expect(component.safeResendPreview()).toContain('🚨 ZeroMTTR Incident Post-Mortem');
+    expect(component.safeResendPreview()).toContain(i18n.t('resendDefaultTitle'));
     expect(component.safeResendPreview()).toContain(i18n.t('resendDefaultBody'));
   });
 

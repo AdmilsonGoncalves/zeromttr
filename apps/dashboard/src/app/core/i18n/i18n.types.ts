@@ -13,9 +13,13 @@ export interface TranslationDictionary {
   appSubtitle: string;
   headerMenuBtn: string;
   headerMenuAriaLabel: string;
+  sseConnected: string;
+  sseOffline: string;
+  targetStatusUnknown: string;
+  demoMenuBadge: string;
+  tooltipDemoMenuBadge: string;
   liveMode: string;
   replayMode: string;
-  replayNotice: string;
   liveKeyPlaceholder: string;
   simulateIncident: string;
   restoreService: string;
@@ -116,6 +120,7 @@ export interface TranslationDictionary {
   // === Resend Post-Mortem & Human Decision / HMAC ===
   resendPreviewTitle: string;
   resendIdleBody: string;
+  resendDefaultTitle: string;
   resendDefaultBody: string;
   resendDispatchedBadge: string;
   resendDispatchedBody: string;

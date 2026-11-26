@@ -148,7 +148,7 @@ export class RemediationPanelComponent {
 
     return `
     <div class="font-sans text-slate-300">
-      <h3 class="text-rose-500 mt-0 mb-1 font-semibold">🚨 ZeroMTTR Incident Post-Mortem</h3>
+      <h3 class="text-rose-500 mt-0 mb-1 font-semibold">${this.i18n.t('resendDefaultTitle')}</h3>
       <p class="text-[11px]">${this.i18n.t('resendDefaultBody')}</p>
     </div>
   `;

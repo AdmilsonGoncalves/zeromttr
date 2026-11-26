@@ -6,10 +6,14 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   appSubtitle: 'Remediación Autónoma de Incidentes y Gobernanza con Humano en el Circuito',
   headerMenuBtn: 'Menú',
   headerMenuAriaLabel: 'Alternar menú de controles',
+  sseConnected: 'SSE Conectado',
+  sseOffline: 'SSE Desconectado',
+  targetStatusUnknown: 'Objetivo: --',
+  demoMenuBadge: 'DEMO',
+  tooltipDemoMenuBadge:
+    'Controles del entorno de demostración y simulación (ocultos en producción cuando ENABLE_DEMO_MODE=false).',
   liveMode: '⚡ Modo Live API',
   replayMode: '🎬 Modo Replay (Grabado)',
-  replayNotice:
-    'Aviso: Modo Replay público activo reproduciendo una ejecución real grabada para preservar cuotas de API.',
   liveKeyPlaceholder: 'Clave X-Live-Demo-Key...',
   simulateIncident: '💥 Simular Incidente',
   restoreService: '🔄 Restaurar Servicio',
@@ -22,7 +26,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   kpiTtprLabel: 'TTPR (PR Listo)',
   kpiTtdTarget: 'Meta: ≤ 15s (Manual: ~15min)',
   kpiTtprTarget: 'Meta: ≤ 30s (Manual: ~30min)',
-  finopsPayloadReduction: '💰 Payload Reduction',
+  finopsPayloadReduction: '💰 Reducción de Payload',
   finopsTokensSaved: 'Tokens ahorrados',
   finopsBytesFetched: 'Bytes Brutos Recolectados',
   finopsBytesSent: 'Bytes Compactados Enviados',
@@ -97,16 +101,16 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   blastRadiusLabel: 'Blast Radius (Servicios Afectados)',
   preCollectorLogLabel: '🔴 Log en la Aplicación (Pre-Collector con PII sin procesar)',
   postOttlLogLabel: '🟢 Log en Loki / Agente MCP (Post-OTTL transform Enmascarado)',
-  piiGuardVerifiedBadge: 'PII Masked at Edge — Fail-Closed Guard Verified (0 Leaked Patterns)',
+  piiGuardVerifiedBadge: 'PII Enmascarada en Borde — Guardia Fail-Closed OK (0 filtraciones)',
   piiGuardBlockedBadge:
-    'Fail-Closed Triggered ({N} Patrones Filtrados Bloqueados — Enviado a Fallback Local)',
+    'Guardia Fail-Closed Activada ({N} filtraciones bloqueadas — Fallback Local)',
   piiLogWithheldMessage: '[RETENIDO POR VIOLACIÓN DE PII: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
   gitDiffIdleBody: 'Ningún diff de regresión en análisis — servicio saludable.',
   githubPrTitle: 'Pull Request Abierto en GitHub',
   githubPrViewBtn: 'Ver PR en GitHub ↗',
   githubPrIdleStatus: 'Ninguno',
-  githubPrOpenStatus: 'Open',
+  githubPrOpenStatus: 'Abierto',
   githubPrApprovedStatus: 'Aprobado',
   githubPrRejectedStatus: 'Rechazado',
   githubPrClosedStatus: 'Cerrado',
@@ -122,6 +126,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   resendPreviewTitle: 'Post-Mortem Resend (Vista Sanitizada)',
   resendIdleBody:
     'No hay ningún incidente activo en este momento — el Post-Mortem sanitizado aparecerá aquí tras el envío.',
+  resendDefaultTitle: '🚨 Post-Mortem del Incidente ZeroMTTR',
   resendDefaultBody:
     'Esperando aprobación del ingeniero de guardia mediante enlace seguro exclusivo.',
   resendDispatchedBadge: 'Correo Post-Mortem enviado al ingeniero de guardia vía Resend',
@@ -131,7 +136,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   resendDegradedBody:
     'La API de Resend rechazó el dominio remitente configurado (HTTP 403/error de entrega). El incidente sigue activo para decisión simulada en el panel.',
   awaitingDecisionBadge: 'Esperando decisión humana vía enlace HMAC enviado por correo al guardia',
-  simulateDecisionBtn: '[Modo Simulación] Simular Aprobación del Guardia',
+  simulateDecisionBtn: 'Aprobar Hotfix (Guardia)',
   decisionPageTitle: 'Confirmación de Decisión de Remediación',
   decisionIncidentIdLabel: 'ID del Incidente:',
   decisionRequestedActionLabel: 'Acción Solicitada:',
@@ -178,8 +183,8 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
 
   // === Charts ===
   chartLatencyErrorTitle: 'Latencia p95 (ms) y Tasa de Error 5xx (%)',
-  chartThroughputTitle: 'Throughput (req/s)',
-  chartThroughputPoolTitle: 'Throughput (req/s) y {{resource}}',
+  chartThroughputTitle: 'Rendimiento (req/s)',
+  chartThroughputPoolTitle: 'Rendimiento (req/s) y {{resource}}',
   chartFinopsBarsTitle: 'Payload LLM (Bruto vs Compactado)',
   chartAwaitingSamples: 'Esperando muestras en vivo del servicio objetivo (polling 2s)...',
 
@@ -201,7 +206,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   tooltipLanguageSelector: 'Cambia el idioma de la interfaz (Portugués, Inglés o Español).',
   tooltipViewPr: 'Abre en GitHub el Pull Request de hotfix generado automáticamente.',
   tooltipSimulateDecision:
-    'Simula la aprobación del guardia en entorno demo (en producción requiere el enlace HMAC del correo).',
+    'Registra la aprobación del ingeniero de guardia desde el panel (en producción, la confirmación requiere el enlace HMAC enviado por correo).',
 
   // === Toasts & Notifications ===
   toastLiveKeyRequiredSummary: 'Clave Live inválida o no informada',

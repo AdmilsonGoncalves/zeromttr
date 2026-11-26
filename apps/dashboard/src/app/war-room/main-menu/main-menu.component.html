@@ -2,6 +2,16 @@
   <div
     class="flex flex-wrap items-center gap-2 bg-slate-950/80 border border-slate-800/90 rounded-lg p-1 shadow-inner"
   >
+    <!-- Demo Context Indicator -->
+    <span
+      [pTooltip]="i18n.t('tooltipDemoMenuBadge')"
+      tooltipPosition="bottom"
+      class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/70 border border-amber-500/40 text-[10px] font-mono font-bold tracking-wider text-amber-300 uppercase select-none shrink-0"
+    >
+      <i class="pi pi-sliders-h text-[10px]" aria-hidden="true"></i>
+      <span>{{ i18n.t('demoMenuBadge') }}</span>
+    </span>
+
     <!-- Mode Selector & Optional Live Key Pill -->
     <div class="flex flex-wrap items-center gap-1.5">
       <p-selectbutton

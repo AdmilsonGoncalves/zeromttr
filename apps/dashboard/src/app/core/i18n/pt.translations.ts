@@ -6,10 +6,14 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   appSubtitle: 'Remediação Autônoma de Incidentes & Governança com Humano no Circuito',
   headerMenuBtn: 'Menu',
   headerMenuAriaLabel: 'Alternar menu de controles',
+  sseConnected: 'SSE Conectado',
+  sseOffline: 'SSE Desconectado',
+  targetStatusUnknown: 'Alvo: --',
+  demoMenuBadge: 'DEMO',
+  tooltipDemoMenuBadge:
+    'Controles do ambiente de demonstração e simulação (ocultos em produção quando ENABLE_DEMO_MODE=false).',
   liveMode: '⚡ Live API Mode',
   replayMode: '🎬 Replay Mode (Gravado)',
-  replayNotice:
-    'Aviso: Modo Replay público ativo reproduzindo execução real gravada para preservar cotas de API.',
   liveKeyPlaceholder: 'Chave X-Live-Demo-Key...',
   simulateIncident: '💥 Simular Incidente',
   restoreService: '🔄 Restaurar Serviço',
@@ -22,7 +26,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   kpiTtprLabel: 'TTPR (PR Pronto)',
   kpiTtdTarget: 'Meta: ≤ 15s (Manual: ~15min)',
   kpiTtprTarget: 'Meta: ≤ 30s (Manual: ~30min)',
-  finopsPayloadReduction: '💰 Payload Reduction',
+  finopsPayloadReduction: '💰 Redução de Payload',
   finopsTokensSaved: 'Tokens poupados',
   finopsBytesFetched: 'Bytes Brutos Coletados',
   finopsBytesSent: 'Bytes Compactados Enviados',
@@ -87,23 +91,22 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   tabLokiLogs: 'Logs Loki & Mascaramento PII',
   tabGitDiff: 'Git Deploy Diff & FinOps',
   tabLiveMetrics: 'Telemetria ao Vivo',
-  evidenceCoverageLabel: 'Evidence Coverage',
-  reasoningSourceLabel: 'Reasoning Source',
+  evidenceCoverageLabel: 'Cobertura de Evidências',
+  reasoningSourceLabel: 'Fonte do Diagnóstico',
   reasoningSourceLlm: 'Gemini LLM',
-  reasoningSourceFallback: 'Deterministic Fallback',
+  reasoningSourceFallback: 'Fallback Determinístico',
   blastRadiusLabel: 'Blast Radius (Serviços Afetados)',
   preCollectorLogLabel: '🔴 Log Reportado na Aplicação (Pré-Collector c/ PII Bruta)',
   postOttlLogLabel: '🟢 Log no Loki / Agente MCP (Pós-OTTL transform Mascarado)',
-  piiGuardVerifiedBadge: 'PII Masked at Edge — Fail-Closed Guard Verified (0 Leaked Patterns)',
-  piiGuardBlockedBadge:
-    'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
+  piiGuardVerifiedBadge: 'PII Mascarada na Borda — Guarda Fail-Closed OK (0 vazamentos)',
+  piiGuardBlockedBadge: 'Guarda Fail-Closed Acionada ({N} vazamentos bloqueados — Fallback Local)',
   piiLogWithheldMessage: '[RETIDO POR VIOLAÇÃO PII: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
   gitDiffIdleBody: 'Nenhum diff de regressão em análise — serviço saudável.',
   githubPrTitle: 'Pull Request Aberto no GitHub',
   githubPrViewBtn: 'Ver PR no GitHub ↗',
   githubPrIdleStatus: 'Nenhum',
-  githubPrOpenStatus: 'Open',
+  githubPrOpenStatus: 'Aberto',
   githubPrApprovedStatus: 'Aprovado',
   githubPrRejectedStatus: 'Rejeitado',
   githubPrClosedStatus: 'Fechado',
@@ -119,6 +122,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   resendPreviewTitle: 'Post-Mortem Resend (Preview Sanitizado)',
   resendIdleBody:
     'Nenhum incidente ativo no momento — o Post-Mortem sanitizado será exibido aqui após a notificação.',
+  resendDefaultTitle: '🚨 Post-Mortem do Incidente ZeroMTTR',
   resendDefaultBody: 'Aguardando aprovação do plantonista via link seguro exclusivo.',
   resendDispatchedBadge: 'E-mail Post-Mortem enviado ao plantonista via Resend',
   resendDispatchedBody:
@@ -127,7 +131,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   resendDegradedBody:
     'A API do Resend recusou o domínio remetente configurado (HTTP 403/erro de entrega). O incidente permanece ativo para decisão simulada no painel.',
   awaitingDecisionBadge: 'Aguardando decisão via link HMAC enviado por e-mail ao plantonista',
-  simulateDecisionBtn: '[Modo Simulação] Simular Aprovação do Plantonista',
+  simulateDecisionBtn: 'Aprovar Hotfix (Plantonista)',
   decisionPageTitle: 'Confirmação de Decisão de Remediação',
   decisionIncidentIdLabel: 'ID do Incidente:',
   decisionRequestedActionLabel: 'Ação Solicitada:',
@@ -174,8 +178,8 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
 
   // === Charts ===
   chartLatencyErrorTitle: 'Latência p95 (ms) & Taxa de Erro 5xx (%)',
-  chartThroughputTitle: 'Throughput (req/s)',
-  chartThroughputPoolTitle: 'Throughput (req/s) & {{resource}}',
+  chartThroughputTitle: 'Vazão (req/s)',
+  chartThroughputPoolTitle: 'Vazão (req/s) & {{resource}}',
   chartFinopsBarsTitle: 'Payload LLM (Bruto vs Compactado)',
   chartAwaitingSamples: 'Aguardando amostras ao vivo do serviço alvo (polling 2s)...',
 
@@ -197,7 +201,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   tooltipLanguageSelector: 'Seleciona o idioma da interface (Português, Inglês ou Espanhol).',
   tooltipViewPr: 'Abre o Pull Request de hotfix gerado automaticamente no GitHub.',
   tooltipSimulateDecision:
-    'Simula a aprovação do plantonista no ambiente de demonstração (em produção exige link HMAC do e-mail).',
+    'Registra a aprovação do plantonista diretamente pelo painel (em produção, a confirmação exige o link HMAC enviado por e-mail).',
 
   // === Toasts & Notifications ===
   toastLiveKeyRequiredSummary: 'Chave Live inválida ou não informada',

@@ -102,7 +102,7 @@ describe('LiveMetricsTabComponent', () => {
 
     expect(component.hasSaturationSeries()).toBe(false);
     expect(component.saturationResourceLabel()).toBeNull();
-    expect(component.throughputChartTitle()).toBe('Throughput (req/s)');
+    expect(component.throughputChartTitle()).toBe('Vazão (req/s)');
   });
 
   it('should render custom saturation resource label on throughput chart from telemetry history', () => {
@@ -123,7 +123,7 @@ describe('LiveMetricsTabComponent', () => {
 
     expect(component.hasSaturationSeries()).toBe(true);
     expect(component.saturationResourceLabel()).toBe('Worker Queue');
-    expect(component.throughputChartTitle()).toBe('Throughput (req/s) & Worker Queue');
+    expect(component.throughputChartTitle()).toBe('Vazão (req/s) & Worker Queue');
   });
 
   it('should_keep_all_svg_y_tick_labels_inside_the_145px_viewbox_bounds', () => {
