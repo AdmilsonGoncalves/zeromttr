@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { nowIso } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
 /**
@@ -22,7 +22,7 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
    */
   public handleConnection(req: Request, res: Response): void {
     res.writeHead(HTTP_STATUS.OK, {
-      'Content-Type': 'text/event-stream',
+      [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.EVENT_STREAM,
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no'

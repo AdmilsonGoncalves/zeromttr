@@ -1,7 +1,7 @@
 /**
- * Checks if a value is an Array.
+ * Checks if a value is an Array (preserving narrowing for both mutable and readonly arrays).
  */
-export function isArray(value: unknown): value is unknown[] {
+export function isArray(value: unknown): value is readonly unknown[] {
   return Array.isArray(value);
 }
 

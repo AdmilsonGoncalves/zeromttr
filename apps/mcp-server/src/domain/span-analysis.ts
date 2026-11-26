@@ -1,5 +1,13 @@
 import { isArray, isNonEmptyArray, isNonEmptyString, isObject } from '@zeromttr/utils';
 
+export const OTEL_SPAN_STATUS_ERROR = 2;
+const OTEL_ERROR_STATUS_CODES = new Set<string | number>([
+  OTEL_SPAN_STATUS_ERROR,
+  'ERROR',
+  'STATUS_CODE_ERROR'
+]);
+const HTTP_ERROR_STATUS_THRESHOLD = 400;
+
 export interface RawSpan {
   spanId: string;
   traceId: string;
@@ -51,11 +59,7 @@ export function extractOtelAttributeValue(val: unknown): unknown {
  * Determines whether a normalized span represents an error or HTTP 4xx/5xx failure.
  */
 export function isErrorSpan(span: RawSpan): boolean {
-  if (
-    span.statusCode === 2 ||
-    span.statusCode === 'ERROR' ||
-    span.statusCode === 'STATUS_CODE_ERROR'
-  ) {
+  if (span.statusCode !== undefined && OTEL_ERROR_STATUS_CODES.has(span.statusCode)) {
     return true;
   }
   if (span.attributes) {
@@ -65,7 +69,7 @@ export function isErrorSpan(span: RawSpan): boolean {
     const httpStatus = Number(
       span.attributes['http.status_code'] || span.attributes['http.response.status_code']
     );
-    if (httpStatus >= 400) {
+    if (httpStatus >= HTTP_ERROR_STATUS_THRESHOLD) {
       return true;
     }
   }

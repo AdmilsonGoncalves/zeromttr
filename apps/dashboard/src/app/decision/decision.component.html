@@ -18,19 +18,19 @@
       class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 font-mono text-xs"
     >
       <div class="flex justify-between items-center">
-        <span class="text-slate-400">Incident ID:</span>
+        <span class="text-slate-400">{{ i18n.t('decisionIncidentIdLabel') }}</span>
         <span class="font-bold text-cyan-300">{{ incidentId() }}</span>
       </div>
       <div class="flex justify-between items-center">
-        <span class="text-slate-400">Requested Action:</span>
+        <span class="text-slate-400">{{ i18n.t('decisionRequestedActionLabel') }}</span>
         <p-tag
-          [value]="action() ? action()!.toUpperCase() : 'UNKNOWN'"
-          [severity]="action() === 'approve' ? 'success' : 'danger'"
+          [value]="actionLabel()"
+          [severity]="action() === decisionAction.APPROVE ? severity.SUCCESS : severity.DANGER"
           styleClass="text-xs"
         />
       </div>
       <div class="flex justify-between items-center">
-        <span class="text-slate-400">Expiration:</span>
+        <span class="text-slate-400">{{ i18n.t('decisionExpirationLabel') }}</span>
         <span [class]="isExpired() ? 'text-rose-400 font-bold' : 'text-slate-300'">
           {{ expirationFormatted() }}
         </span>
@@ -68,7 +68,7 @@
     }
 
     <!-- Feedback Messages -->
-    @if (status() === 'success') {
+    @if (status() === decisionUiStatus.SUCCESS) {
       <div
         class="bg-emerald-950/70 border border-emerald-500 rounded p-3 text-emerald-200 text-xs flex items-center gap-2"
       >
@@ -77,7 +77,7 @@
       </div>
     }
 
-    @if (status() === 'error' || (!isValid() && errorMessage())) {
+    @if (status() === decisionUiStatus.ERROR || (!isValid() && errorMessage())) {
       <div
         class="bg-rose-950/70 border border-rose-500 rounded p-3 text-rose-200 text-xs flex items-center gap-2"
       >
@@ -88,12 +88,14 @@
 
     <!-- Actions -->
     <div class="flex flex-col gap-2 pt-2 border-t border-slate-800">
-      @if (status() !== 'success') {
+      @if (status() !== decisionUiStatus.SUCCESS) {
         <p-button
           [label]="
-            action() === 'reject' ? i18n.t('decisionRejectBtn') : i18n.t('decisionApproveBtn')
+            action() === decisionAction.REJECT
+              ? i18n.t('decisionRejectBtn')
+              : i18n.t('decisionApproveBtn')
           "
-          [severity]="action() === 'reject' ? 'danger' : 'success'"
+          [severity]="action() === decisionAction.REJECT ? severity.DANGER : severity.SUCCESS"
           [disabled]="isExpired() || !isValid() || isSubmitting() || incidentClosed()"
           (onClick)="executeDecision()"
           styleClass="w-full font-bold"

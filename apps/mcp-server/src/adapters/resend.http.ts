@@ -5,6 +5,8 @@ import type {
 } from '../ports/notifier.port.js';
 import { escapeHtml, isEmpty } from '@zeromttr/utils';
 import {
+  CONTENT_TYPE,
+  HTTP_HEADERS,
   buildUrl,
   isHttpSuccess,
   safeHttpUrl,
@@ -116,8 +118,8 @@ export class ResendHttpAdapter implements NotifierPort {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${sanitizeHeaderValue(this.config.apiKey)}`,
-        'Content-Type': 'application/json',
+        [HTTP_HEADERS.AUTHORIZATION]: `Bearer ${sanitizeHeaderValue(this.config.apiKey)}`,
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
         'Idempotency-Key': `post-mortem-${req.incident_id}`
       },
       body: JSON.stringify({

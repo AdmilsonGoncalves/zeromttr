@@ -30,19 +30,19 @@
           class="w-7 h-7 rounded-full flex items-center justify-center border-2 cursor-help transition-all"
           [ngClass]="{
             'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.35)]':
-              stage.status === 'completed',
+              stage.status === stageStatus.COMPLETED,
             'bg-cyan-500/25 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.5)]':
-              stage.status === 'active',
+              stage.status === stageStatus.ACTIVE,
             'bg-rose-500/25 border-rose-400 text-rose-200 shadow-[0_0_8px_rgba(244,63,94,0.4)]':
-              stage.status === 'failed',
-            'bg-slate-900 border-slate-700 text-slate-500': stage.status === 'pending'
+              stage.status === stageStatus.FAILED,
+            'bg-slate-900 border-slate-700 text-slate-500': stage.status === stageStatus.PENDING
           }"
         >
-          @if (stage.status === 'completed') {
+          @if (stage.status === stageStatus.COMPLETED) {
             <i class="pi pi-check text-xs font-bold"></i>
-          } @else if (stage.status === 'active') {
+          } @else if (stage.status === stageStatus.ACTIVE) {
             <i class="pi pi-spin pi-spinner text-xs"></i>
-          } @else if (stage.status === 'failed') {
+          } @else if (stage.status === stageStatus.FAILED) {
             <i class="pi pi-times text-xs font-bold"></i>
           } @else {
             <i class="pi pi-circle text-[9px]"></i>
@@ -55,10 +55,10 @@
           tooltipPosition="bottom"
           class="mt-1 text-[11px] font-mono leading-tight cursor-help whitespace-nowrap"
           [ngClass]="{
-            'text-emerald-300 font-semibold': stage.status === 'completed',
-            'text-cyan-200 font-bold': stage.status === 'active',
-            'text-rose-300 font-bold': stage.status === 'failed',
-            'text-slate-500': stage.status === 'pending'
+            'text-emerald-300 font-semibold': stage.status === stageStatus.COMPLETED,
+            'text-cyan-200 font-bold': stage.status === stageStatus.ACTIVE,
+            'text-rose-300 font-bold': stage.status === stageStatus.FAILED,
+            'text-slate-500': stage.status === stageStatus.PENDING
           }"
         >
           {{ i18n.t(stage.labelKey) }}

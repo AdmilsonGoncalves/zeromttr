@@ -9,8 +9,10 @@ import {
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { isEmpty, isNonEmptyString, parseNumber, toErrorMessage } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { Button } from 'primeng/button';
 import { Tag } from 'primeng/tag';
+import { DecisionUiStatus, UiSeverity } from '../core/constants.js';
 import {
   DecisionAction,
   IncidentState,
@@ -34,6 +36,9 @@ export class DecisionComponent implements OnInit {
   readonly route: ActivatedRoute;
   readonly i18n: I18nService;
   readonly incidentService: IncidentService;
+  readonly decisionAction = DecisionAction;
+  readonly decisionUiStatus = DecisionUiStatus;
+  readonly severity = UiSeverity;
 
   readonly incidentId = signal<string>('');
   readonly action = signal<IncidentDecisionAction | null>(null);
@@ -44,8 +49,12 @@ export class DecisionComponent implements OnInit {
   readonly isSubmitting = signal<boolean>(false);
   readonly incidentClosed = signal<boolean>(false);
   readonly incidentClosedState = signal<string>('');
-  readonly status = signal<'idle' | 'success' | 'error'>('idle');
+  readonly status = signal<DecisionUiStatus>(DecisionUiStatus.IDLE);
   readonly errorMessage = signal<string>('');
+
+  readonly actionLabel = computed<string>(
+    () => this.action()?.toUpperCase() ?? this.i18n.t('decisionUnknownAction')
+  );
 
   readonly expirationFormatted = computed<string>(() => {
     const expiration = this.exp();
@@ -152,7 +161,7 @@ export class DecisionComponent implements OnInit {
     }
 
     this.isSubmitting.set(true);
-    this.status.set('idle');
+    this.status.set(DecisionUiStatus.IDLE);
 
     try {
       const payload: DecisionPayload = {
@@ -165,10 +174,10 @@ export class DecisionComponent implements OnInit {
       this.isSubmitting.set(false);
 
       if (success) {
-        this.status.set('success');
+        this.status.set(DecisionUiStatus.SUCCESS);
       } else {
         const statusCode = this.incidentService.decisionStatusCode();
-        if (statusCode === 409) {
+        if (statusCode === HTTP_STATUS.CONFLICT) {
           this.incidentClosed.set(true);
           this.errorMessage.set(this.i18n.t('decisionAlreadyResolvedError'));
         } else {
@@ -176,12 +185,12 @@ export class DecisionComponent implements OnInit {
             this.incidentService.decisionError() || this.i18n.t('decisionErrorMsg')
           );
         }
-        this.status.set('error');
+        this.status.set(DecisionUiStatus.ERROR);
       }
     } catch (err: unknown) {
       this.isSubmitting.set(false);
       this.errorMessage.set(toErrorMessage(err));
-      this.status.set('error');
+      this.status.set(DecisionUiStatus.ERROR);
     }
   }
 }

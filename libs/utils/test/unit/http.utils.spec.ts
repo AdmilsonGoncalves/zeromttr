@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CONTENT_TYPE,
+  HTTP_HEADERS,
   HTTP_STATUS,
   buildQueryParams,
   buildUrl,
@@ -137,6 +139,24 @@ describe('http.utils', () => {
       expect(HTTP_STATUS.TOO_MANY_REQUESTS).toBe(429);
       expect(HTTP_STATUS.INTERNAL_SERVER_ERROR).toBe(500);
       expect(HTTP_STATUS.SERVICE_UNAVAILABLE).toBe(503);
+    });
+  });
+
+  describe('HTTP_HEADERS and CONTENT_TYPE', () => {
+    it('should expose standard HTTP header and MIME constants', () => {
+      expect(HTTP_HEADERS.ACCEPT).toBe('Accept');
+      expect(HTTP_HEADERS.AUTHORIZATION).toBe('Authorization');
+      expect(HTTP_HEADERS.CONTENT_TYPE).toBe('Content-Type');
+      expect(HTTP_HEADERS.LIVE_DEMO_KEY).toBe('X-Live-Demo-Key');
+      expect(HTTP_HEADERS.LIVE_DEMO_KEY_LOWER).toBe('x-live-demo-key');
+      expect(HTTP_HEADERS.TURNSTILE_TOKEN).toBe('X-Turnstile-Token');
+      expect(HTTP_HEADERS.TURNSTILE_TOKEN_LOWER).toBe('x-turnstile-token');
+      expect(HTTP_HEADERS.CF_TURNSTILE_RESPONSE).toBe('CF-Turnstile-Response');
+      expect(HTTP_HEADERS.CF_TURNSTILE_RESPONSE_LOWER).toBe('cf-turnstile-response');
+      expect(CONTENT_TYPE.JSON).toBe('application/json');
+      expect(CONTENT_TYPE.TEXT_PLAIN).toBe('text/plain');
+      expect(CONTENT_TYPE.EVENT_STREAM).toBe('text/event-stream');
+      expect(CONTENT_TYPE.FORM_URLENCODED).toBe('application/x-www-form-urlencoded');
     });
   });
 });

@@ -3,12 +3,18 @@ import { randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { isNonEmptyString, isObject } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { isNonEmptyString, isObject, safeJsonParse } from '@zeromttr/utils';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { ToolRegistry } from './tool-registry.js';
 import { handleAuthMiddleware } from './auth.js';
 import { logger } from './logger.js';
 import { checkMcpApplicationHealth } from '../application/check-mcp-health.js';
+
+enum McpHealthResponseStatus {
+  OK = 'ok'
+}
+
+const JSON_PARSE_FAILED = Symbol('json-parse-failed');
 
 export interface McpServerOptions {
   authToken: string;
@@ -43,14 +49,14 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
       // Health check
       if (pathname === '/health' && req.method === 'GET') {
         const health = checkMcpApplicationHealth();
-        res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', health }));
+        res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
+        res.end(JSON.stringify({ status: McpHealthResponseStatus.OK, health }));
         return;
       }
 
       // Root check
       if (pathname === '/' && req.method === 'GET') {
-        res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'text/plain' });
+        res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.TEXT_PLAIN });
         res.end('ZeroMTTR MCP Server Running');
         return;
       }
@@ -124,7 +130,7 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
           logger.error({ requestId, err }, 'Failed to initialize MCP SSE connection');
           if (!res.headersSent) {
             res.writeHead(HTTP_STATUS.INTERNAL_SERVER_ERROR, {
-              'Content-Type': 'application/json'
+              [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
             });
             res.end(JSON.stringify({ error: 'Failed to initialize SSE connection' }));
           }
@@ -136,7 +142,7 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
       if (req.method === 'POST' && pathname === '/mcp/messages') {
         const sessionId = reqUrl.searchParams.get('sessionId');
         if (!isNonEmptyString(sessionId) || !sessions.has(sessionId)) {
-          res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
+          res.writeHead(HTTP_STATUS.NOT_FOUND, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
           res.end(JSON.stringify({ error: 'Session not found or expired' }));
           return;
         }
@@ -163,7 +169,9 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
           if (bodyBytes > MAX_BODY_BYTES) {
             isTooLarge = true;
             req.pause();
-            res.writeHead(HTTP_STATUS.PAYLOAD_TOO_LARGE, { 'Content-Type': 'application/json' });
+            res.writeHead(HTTP_STATUS.PAYLOAD_TOO_LARGE, {
+              [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
+            });
             res.end(
               JSON.stringify({
                 error: 'Payload too large',
@@ -183,11 +191,11 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
 
           void (async () => {
             const bodyText = Buffer.concat(chunks).toString('utf-8');
-            let parsed: unknown;
-            try {
-              parsed = JSON.parse(bodyText);
-            } catch {
-              res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
+            const parsed = safeJsonParse<unknown>(bodyText, JSON_PARSE_FAILED);
+            if (parsed === JSON_PARSE_FAILED) {
+              res.writeHead(HTTP_STATUS.BAD_REQUEST, {
+                [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
+              });
               res.end(
                 JSON.stringify({
                   jsonrpc: '2.0',
@@ -199,7 +207,9 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
             }
 
             if (!isObject(parsed)) {
-              res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
+              res.writeHead(HTTP_STATUS.BAD_REQUEST, {
+                [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
+              });
               res.end(
                 JSON.stringify({
                   jsonrpc: '2.0',
@@ -222,7 +232,7 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
             const id = body.id ?? null;
 
             if (body.method === 'tools/list') {
-              res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+              res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
               res.end(
                 JSON.stringify({
                   jsonrpc: '2.0',
@@ -237,7 +247,9 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
               const toolName = body.params?.name;
               const toolArgs = body.params?.arguments;
               if (!isNonEmptyString(toolName)) {
-                res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
+                res.writeHead(HTTP_STATUS.BAD_REQUEST, {
+                  [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
+                });
                 res.end(
                   JSON.stringify({
                     jsonrpc: '2.0',
@@ -249,7 +261,7 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
               }
               const result = await toolRegistry.callTool(toolName, toolArgs);
 
-              res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+              res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
               res.end(
                 JSON.stringify({
                   jsonrpc: '2.0',
@@ -261,7 +273,7 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
             }
 
             if (body.method === 'initialize') {
-              res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+              res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
               res.end(
                 JSON.stringify({
                   jsonrpc: '2.0',
@@ -277,12 +289,12 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
             }
 
             if (body.method === 'ping') {
-              res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+              res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
               res.end(JSON.stringify({ jsonrpc: '2.0', id, result: {} }));
               return;
             }
 
-            res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+            res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
             res.end(
               JSON.stringify({
                 jsonrpc: '2.0',
@@ -294,7 +306,7 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
             logger.error({ err }, 'Error handling /mcp request');
             if (!res.headersSent) {
               res.writeHead(HTTP_STATUS.INTERNAL_SERVER_ERROR, {
-                'Content-Type': 'application/json'
+                [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
               });
               res.end(
                 JSON.stringify({
@@ -309,12 +321,14 @@ export function createMcpHttpServer(options: McpServerOptions): http.Server {
         return;
       }
 
-      res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.NOT_FOUND, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
       res.end(JSON.stringify({ error: 'Not Found' }));
     })().catch((err: unknown) => {
       logger.error({ err }, 'Unhandled request error');
       if (!res.headersSent) {
-        res.writeHead(HTTP_STATUS.INTERNAL_SERVER_ERROR, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.INTERNAL_SERVER_ERROR, {
+          [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
+        });
         res.end(JSON.stringify({ error: 'Internal Server Error' }));
       }
     });

@@ -8,7 +8,21 @@ import {
   parseNumber,
   safeJsonParse
 } from '@zeromttr/utils';
-import { buildUrl, isHttpSuccess, sanitizeHeaderValue } from '@zeromttr/utils/http';
+import {
+  CONTENT_TYPE,
+  HTTP_HEADERS,
+  HTTP_STATUS,
+  buildUrl,
+  isHttpSuccess,
+  sanitizeHeaderValue
+} from '@zeromttr/utils/http';
+
+const OTEL_SPAN_STATUS_ERROR = 2;
+const OTEL_ERROR_STATUS_CODES = new Set<string | number>([
+  OTEL_SPAN_STATUS_ERROR,
+  'ERROR',
+  'STATUS_CODE_ERROR'
+]);
 import { OrchestratorDefault } from '../domain/incident-enums.js';
 import type {
   ToolsPort,
@@ -91,9 +105,8 @@ function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: bool
     return span.has_error;
   }
   if (
-    span.statusCode === 2 ||
-    span.statusCode === 'ERROR' ||
-    span.statusCode === 'STATUS_CODE_ERROR'
+    (typeof span.statusCode === 'number' || typeof span.statusCode === 'string') &&
+    OTEL_ERROR_STATUS_CODES.has(span.statusCode)
   ) {
     return true;
   }
@@ -103,7 +116,7 @@ function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: bool
       return true;
     }
     const httpStatus = Number(attrs['http.status_code'] ?? attrs['http.response.status_code']);
-    if (isNumber(httpStatus) && httpStatus >= 500) {
+    if (isNumber(httpStatus) && httpStatus >= HTTP_STATUS.INTERNAL_SERVER_ERROR) {
       return true;
     }
   }
@@ -202,8 +215,8 @@ export class McpClientAdapter implements ToolsPort {
     const response = await fetch(this.baseUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.authToken}`
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+        [HTTP_HEADERS.AUTHORIZATION]: `Bearer ${this.authToken}`
       },
       body: JSON.stringify({
         jsonrpc: '2.0',

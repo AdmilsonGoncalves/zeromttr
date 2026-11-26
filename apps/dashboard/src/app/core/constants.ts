@@ -39,6 +39,19 @@ export const UiSeverity = {
 } as const;
 export type UiSeverity = (typeof UiSeverity)[keyof typeof UiSeverity];
 
+export const ToastSeverity = {
+  SUCCESS: 'success',
+  INFO: 'info',
+  WARN: 'warn',
+  ERROR: 'error'
+} as const;
+export type ToastSeverity = (typeof ToastSeverity)[keyof typeof ToastSeverity];
+
+export const DashboardApiErrorCode = {
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  TURNSTILE_PREFIX: 'TURNSTILE_'
+} as const;
+
 export const FsmStageStatus = {
   COMPLETED: 'completed',
   ACTIVE: 'active',

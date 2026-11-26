@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isFilled } from '@zeromttr/utils';
-import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
+import { HTTP_STATUS, buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import { OrchestratorDefault, TargetHealthStatus } from '../domain/incident-enums.js';
 import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
 import type {
@@ -138,7 +138,10 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
         return primary.data;
       }
 
-      if (primary.status === 404 && this.statusPath !== LEGACY_CHAOS_STATUS_PATH) {
+      if (
+        primary.status === HTTP_STATUS.NOT_FOUND &&
+        this.statusPath !== LEGACY_CHAOS_STATUS_PATH
+      ) {
         const legacy = await this.fetchAndParse(LEGACY_CHAOS_STATUS_PATH);
         if (legacy.data) {
           return legacy.data;

@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { RcaAndPatchSynthesisSchema } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber, safeJsonParse } from '@zeromttr/utils';
+import { CONTENT_TYPE } from '@zeromttr/utils/http';
 import { ReasoningProvider } from '../domain/incident-enums.js';
 import { PiiPromptGuard } from '../domain/pii-prompt-guard.js';
 import type {
@@ -116,7 +117,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
             systemInstruction: this.systemInstruction,
             temperature: 0.1,
             maxOutputTokens: 8192,
-            responseMimeType: 'application/json',
+            responseMimeType: CONTENT_TYPE.JSON,
             responseSchema: RCA_SYNTHESIS_SCHEMA
           }
         }),

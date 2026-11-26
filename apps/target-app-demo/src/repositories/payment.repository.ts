@@ -1,6 +1,10 @@
 import crypto from 'node:crypto';
 import { chaosManager } from '../chaos/chaos.manager.js';
-import type { CreatePaymentInput, Payment } from '../models/payment.model.js';
+import {
+  PaymentStatusValue,
+  type CreatePaymentInput,
+  type Payment
+} from '../models/payment.model.js';
 import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
 import { nowIso, parseNumber, toErrorMessage } from '@zeromttr/utils';
 
@@ -258,7 +262,7 @@ export class PaymentRepository {
       txId,
       amount: input.amount,
       currency: input.currency || 'BRL',
-      status: 'completed',
+      status: PaymentStatusValue.COMPLETED,
       payerCpf: input.payerCpf,
       merchantCnpj: input.merchantCnpj,
       pixKey: input.pixKey,

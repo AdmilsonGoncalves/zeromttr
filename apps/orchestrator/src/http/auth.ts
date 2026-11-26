@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { isEmpty, isNonEmptyString, isString } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 
 /**
  * Performs a constant-time SHA-256 comparison between two secret token strings.
@@ -116,7 +116,7 @@ export function createLiveDemoKeyMiddleware(
       return;
     }
 
-    const rawHeader = req.headers['x-live-demo-key'];
+    const rawHeader = req.headers[HTTP_HEADERS.LIVE_DEMO_KEY_LOWER];
     const liveKeyHeader = isString(rawHeader) ? rawHeader : undefined;
     if (!liveKeyHeader || !safeTokenCompare(liveKeyHeader, configuredKey)) {
       res.status(HTTP_STATUS.FORBIDDEN).json({

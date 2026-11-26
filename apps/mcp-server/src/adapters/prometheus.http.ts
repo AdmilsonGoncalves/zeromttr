@@ -1,7 +1,7 @@
 import type { MetricsPort, PromqlQueryInput, MetricsQueryResult } from '../ports/metrics.port.js';
 import type { RawPromSeries } from '../domain/summarize-series.js';
-import { diffInSeconds, isArray, toErrorMessage } from '@zeromttr/utils';
-import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
+import { diffInSeconds, isArray, safeJsonParse } from '@zeromttr/utils';
+import { CONTENT_TYPE, HTTP_HEADERS, buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 
 export interface PrometheusAdapterConfig {
   baseUrl: string;
@@ -28,7 +28,7 @@ export class PrometheusHttpAdapter implements MetricsPort {
       step: input.step || defaultStep
     });
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: { [HTTP_HEADERS.ACCEPT]: CONTENT_TYPE.JSON },
       signal: AbortSignal.timeout(this.config.timeoutMs || 10_000)
     });
 
@@ -39,14 +39,12 @@ export class PrometheusHttpAdapter implements MetricsPort {
     const text = await response.text();
     const rawBytes = Buffer.byteLength(text, 'utf-8');
 
-    let data: {
+    const data = safeJsonParse<{
       status?: string;
       data?: { result?: Array<{ metric: Record<string, string>; values: [number, string][] }> };
-    };
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      throw new Error(`Failed to parse Prometheus JSON response: ${toErrorMessage(err)}`);
+    }>(text);
+    if (!data) {
+      throw new Error('Failed to parse Prometheus JSON response');
     }
 
     if (data.status !== 'success' || !data.data || !isArray(data.data.result)) {

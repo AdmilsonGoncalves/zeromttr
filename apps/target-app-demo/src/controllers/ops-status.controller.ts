@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import type { TargetOpsStatus } from '../chaos/target-metadata-enums.js';
 import { paymentService } from '../services/payment.service.js';
@@ -90,7 +90,7 @@ export class OpsStatusController {
    * Responds with the neutral operational status JSON manifest.
    */
   public getStatus(_req: http.IncomingMessage, res: http.ServerResponse): void {
-    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+    res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
     res.end(JSON.stringify(buildTargetStatusManifest(this.isHealthyTrafficActive())));
   }
 }

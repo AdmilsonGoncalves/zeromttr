@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { isNonEmptyString, normalizeIp, parseForwardedIp } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { SecurityErrorCode } from './http-constants.js';
 
 export interface IpRateLimitOptions {
   windowMs: number;
@@ -116,7 +117,7 @@ export function createIpRateLimitMiddleware(options: IpRateLimitOptions) {
       const retryAfterSeconds = Math.max(1, Math.ceil((existing.resetAtMs - now) / 1000));
       res.setHeader('Retry-After', String(retryAfterSeconds));
       res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
-        code: 'RATE_LIMIT_EXCEEDED',
+        code: SecurityErrorCode.RATE_LIMIT_EXCEEDED,
         error: errorMessage,
         retryAfterSeconds
       });

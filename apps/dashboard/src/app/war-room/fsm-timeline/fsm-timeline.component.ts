@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } f
 import { CommonModule } from '@angular/common';
 import { Timeline } from 'primeng/timeline';
 import { Tooltip } from 'primeng/tooltip';
+import { FsmStageStatus } from '../../core/constants.js';
 import { I18nService, type TranslationDictionary } from '../../core/i18n/i18n.service.js';
 import type { FsmStageItem } from '../../core/incident.service.js';
 
@@ -17,6 +18,7 @@ import type { FsmStageItem } from '../../core/incident.service.js';
 })
 export class FsmTimelineComponent {
   readonly i18n: I18nService;
+  readonly stageStatus = FsmStageStatus;
 
   readonly stagesSignal = signal<FsmStageItem[]>([]);
   readonly hintKeySignal = signal<keyof TranslationDictionary>('fsmHintAwaitingAlert');

@@ -10,6 +10,12 @@ describe('array.utils', () => {
       expect(isArray(null)).toBe(false);
       expect(isArray({})).toBe(false);
     });
+
+    it('should preserve element type when narrowing unions with readonly arrays', () => {
+      const value: { id: number } | readonly { id: number }[] = [{ id: 1 }, { id: 2 }];
+      const entries = isArray(value) ? value : [value];
+      expect(entries.map((entry) => entry.id)).toEqual([1, 2]);
+    });
   });
 
   describe('isNonEmptyArray', () => {

@@ -1,7 +1,7 @@
 import type http from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { isEmpty } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 
 /**
  * Validates the HTTP Bearer authorization header using constant-time SHA-256 comparison.
@@ -42,7 +42,7 @@ export function handleAuthMiddleware(
   const authorized = verifyAuthToken(req, expectedToken);
   if (!authorized) {
     res.writeHead(HTTP_STATUS.UNAUTHORIZED, {
-      'Content-Type': 'application/json',
+      [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
       'WWW-Authenticate': 'Bearer error="invalid_token"'
     });
     res.end(

@@ -124,6 +124,10 @@ export interface TranslationDictionary {
   awaitingDecisionBadge: string;
   simulateDecisionBtn: string;
   decisionPageTitle: string;
+  decisionIncidentIdLabel: string;
+  decisionRequestedActionLabel: string;
+  decisionExpirationLabel: string;
+  decisionUnknownAction: string;
   decisionApproveBtn: string;
   decisionRejectBtn: string;
   decisionSuccessMsg: string;
