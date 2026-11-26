@@ -7,6 +7,8 @@ export {
   IncidentState,
   NotificationStatus,
   ReasoningProvider,
+  SettingsPersistenceEngine,
+  SystemLogLevel,
   TargetHealthStatus
 } from '@zeromttr/contracts';
 
@@ -35,8 +37,13 @@ export type {
   IncidentTransitionEvent,
   PiiGuardAudit,
   ReasoningSource,
+  SettingsAuditEntry,
   SimulateDecisionPayload,
   SpanNode,
+  SystemSettings,
+  SystemSettingsPatch,
+  SystemSettingsReadonlyInfo,
+  SystemSettingsResponse,
   TargetCapabilities,
   TargetLiveMetrics,
   TargetSaturation,

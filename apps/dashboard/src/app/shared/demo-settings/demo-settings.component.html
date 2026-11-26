@@ -4,16 +4,16 @@
     type="button"
     (click)="openDrawer()"
     [attr.aria-expanded]="isDrawerOpenSignal()"
-    aria-controls="war-room-demo-drawer"
+    aria-controls="demo-settings-drawer"
     [attr.aria-label]="i18n.t('headerMenuAriaLabel')"
     [pTooltip]="i18n.t('tooltipDemoMenuBadge')"
     tooltipPosition="bottom"
-    class="inline-flex items-center gap-2 h-8 px-2.5 rounded-md bg-amber-950/60 hover:bg-amber-900/70 border border-amber-500/50 hover:border-amber-400/80 text-xs font-semibold text-amber-200 cursor-pointer shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+    class="inline-flex items-center justify-center w-8 lg:w-auto gap-0 lg:gap-2 h-8 px-0 lg:px-2.5 rounded-md bg-amber-950/60 hover:bg-amber-900/70 border border-amber-500/50 hover:border-amber-400/80 text-xs font-semibold text-amber-200 cursor-pointer shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
   >
-    <i class="pi pi-sliders-h text-xs text-amber-300" aria-hidden="true"></i>
-    <span class="whitespace-nowrap">{{ i18n.t('demoMenuBtn') }}</span>
+    <i class="pi pi-sliders-h text-sm lg:text-xs text-amber-300" aria-hidden="true"></i>
+    <span class="hidden lg:inline whitespace-nowrap">{{ i18n.t('demoMenuBtn') }}</span>
     <span
-      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-950/70 border border-amber-500/30 text-[10px] font-mono uppercase tracking-wide text-amber-300"
+      class="hidden lg:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-950/70 border border-amber-500/30 text-[10px] font-mono uppercase tracking-wide text-amber-300"
     >
       @if (healthyTrafficActiveSignal()) {
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
@@ -24,7 +24,7 @@
 
   <!-- Full Demo Controls Sidebar (Drawer) -->
   <p-drawer
-    id="war-room-demo-drawer"
+    id="demo-settings-drawer"
     [visible]="isDrawerOpenSignal()"
     (visibleChange)="onDrawerVisibilityChange($event)"
     position="right"

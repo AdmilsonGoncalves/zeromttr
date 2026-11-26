@@ -228,4 +228,45 @@ export interface TranslationDictionary {
   toastHealthyTrafficStartedDetail: string;
   toastHealthyTrafficStoppedSummary: string;
   toastHealthyTrafficStoppedDetail: string;
+
+  // === System Settings Drawer (SQLite) ===
+  settingsBtnAriaLabel: string;
+  tooltipSystemSettings: string;
+  settingsDrawerTitle: string;
+  settingsDrawerSubtitle: string;
+  settingsLoading: string;
+  settingsReadonlyNotice: string;
+  settingsAdminTokenLabel: string;
+  settingsAdminTokenPlaceholder: string;
+  settingsTabAlerts: string;
+  settingsTabTarget: string;
+  settingsTabLlm: string;
+  settingsTabAudit: string;
+  settingsRejectionCooldownLabel: string;
+  settingsRejectionCooldownHint: string;
+  settingsRepeatSuppressionLabel: string;
+  settingsRepeatSuppressionHint: string;
+  settingsDecisionTtlLabel: string;
+  settingsDecisionTtlHint: string;
+  settingsAutoRestoreLabel: string;
+  settingsAutoRestoreHint: string;
+  settingsTargetServicePathLabel: string;
+  settingsTargetBaseRefLabel: string;
+  settingsTargetHeadRefLabel: string;
+  settingsErrorThresholdLabel: string;
+  settingsErrorThresholdHint: string;
+  settingsReadonlySectionTitle: string;
+  settingsLlmModelLabel: string;
+  settingsLlmFallbackLabel: string;
+  settingsOnCallEmailLabel: string;
+  settingsOnCallEmailHint: string;
+  settingsLogLevelLabel: string;
+  settingsAuditEmpty: string;
+  settingsReloadBtn: string;
+  settingsSaveBtn: string;
+  settingsSavedSuccess: string;
+  settingsSaveError: string;
+  settingsInvalidAdminTokenError: string;
+  settingsValidationError: string;
+  settingsDisabledValue: string;
 }

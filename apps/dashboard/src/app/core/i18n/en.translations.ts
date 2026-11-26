@@ -5,12 +5,12 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   appTitle: 'ZeroMTTR — War Room Mission Control',
   appSubtitle: 'Autonomous Incident Remediation & Human-in-the-Loop Governance',
   headerMenuBtn: 'Menu',
-  headerMenuAriaLabel: 'Open demo menu',
+  headerMenuAriaLabel: 'Open demo',
   sseConnected: 'SSE Connected',
   sseOffline: 'SSE Offline',
   targetStatusUnknown: 'Target: --',
-  demoMenuBtn: 'Demo Menu',
-  demoMenuTitle: 'Demo Menu',
+  demoMenuBtn: 'Demo',
+  demoMenuTitle: 'Demo',
   demoMenuSubtitle: 'Configure execution mode, synthetic traffic, and incident simulation.',
   demoMenuModeSection: 'Execution Mode',
   demoMenuLiveToggleLabel: 'Live Mode (Real APIs)',
@@ -19,7 +19,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   demoMenuLiveKeyLabel: 'Live Mode Key',
   demoMenuKeyRequiredBadge: 'Required',
   demoMenuKeyOptionalBadge: 'Not required',
-  demoMenuKeyNotRequiredHint: 'Disabled — server is configured for public Live Mode (.env).',
+  demoMenuKeyNotRequiredHint: 'Disabled — server is configured for public Live Mode.',
   demoMenuKeyReplayHint: 'Enable Live Mode above to edit the authorization key.',
   demoMenuKeySavedHint: 'Saved in browser storage and sent via the X-Live-Demo-Key header.',
   demoMenuTrafficSection: 'Synthetic Traffic',
@@ -245,5 +245,55 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   toastHealthyTrafficStartedSummary: 'Healthy traffic started',
   toastHealthyTrafficStartedDetail: 'Continuous healthy requests streaming to {{service}}.',
   toastHealthyTrafficStoppedSummary: 'Healthy traffic stopped',
-  toastHealthyTrafficStoppedDetail: 'Continuous request stream stopped.'
+  toastHealthyTrafficStoppedDetail: 'Continuous request stream stopped.',
+
+  // === System Settings Drawer ===
+  settingsBtnAriaLabel: 'Open settings',
+  tooltipSystemSettings: 'Settings',
+  settingsDrawerTitle: 'Settings',
+  settingsDrawerSubtitle:
+    'Configure alert policies, target service, LLM model, and review change history.',
+  settingsLoading: 'Loading settings...',
+  settingsReadonlyNotice:
+    'Read-only mode — configure SETTINGS_ADMIN_TOKEN on the server to enable edits.',
+  settingsAdminTokenLabel: 'Admin token (X-Settings-Admin-Token)',
+  settingsAdminTokenPlaceholder: 'Enter SETTINGS_ADMIN_TOKEN...',
+  settingsTabAlerts: 'Alerts',
+  settingsTabTarget: 'Target & Diff',
+  settingsTabLlm: 'LLM & Ops',
+  settingsTabAudit: 'Audit',
+  settingsRejectionCooldownLabel: 'Post-rejection cooldown (seconds)',
+  settingsRejectionCooldownHint:
+    'After rejecting a hotfix (Human Takeover), suppresses new incidents for the same fingerprint for this window (0 disables).',
+  settingsRepeatSuppressionLabel: 'Repeat suppression window (seconds)',
+  settingsRepeatSuppressionHint:
+    'Minimum interval before reopening an incident for the same fingerprint after closure.',
+  settingsDecisionTtlLabel: 'Decision / open incident TTL (seconds)',
+  settingsDecisionTtlHint:
+    'Expiration window for emailed HMAC decision links and stale open incidents.',
+  settingsAutoRestoreLabel: 'Auto-restore target on approval',
+  settingsAutoRestoreHint:
+    'Runs the post-approval restore hook on the demo target. Turn off for real production.',
+  settingsTargetServicePathLabel: 'Repository service path (TARGET_SERVICE_PATH)',
+  settingsTargetBaseRefLabel: 'Base Ref (healthy)',
+  settingsTargetHeadRefLabel: 'Head Ref (current)',
+  settingsErrorThresholdLabel: '5xx error threshold for degraded status (%)',
+  settingsErrorThresholdHint:
+    'Used by the Prometheus status provider to classify the target service as degraded.',
+  settingsReadonlySectionTitle: 'Infrastructure (Read-Only from .env)',
+  settingsLlmModelLabel: 'Primary LLM Model',
+  settingsLlmFallbackLabel: 'Secondary LLM Model (Fallback)',
+  settingsOnCallEmailLabel: 'On-Call Engineer Email (Resend)',
+  settingsOnCallEmailHint:
+    'Recipient for post-mortems and HMAC links. Automatically masked for privacy.',
+  settingsLogLevelLabel: 'Orchestrator Log Level',
+  settingsAuditEmpty: 'No configuration changes recorded yet.',
+  settingsReloadBtn: 'Reload',
+  settingsSaveBtn: 'Save Settings',
+  settingsSavedSuccess: 'Settings saved and applied in real time!',
+  settingsSaveError: 'Failed to save settings.',
+  settingsInvalidAdminTokenError:
+    'Invalid or missing admin token. Check the SETTINGS_ADMIN_TOKEN provided.',
+  settingsValidationError: 'One or more values are invalid. Review the fields and try again.',
+  settingsDisabledValue: 'Disabled'
 };

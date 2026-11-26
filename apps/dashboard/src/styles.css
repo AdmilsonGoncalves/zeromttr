@@ -1,5 +1,6 @@
 @import 'primeicons/primeicons.css';
 @import 'tailwindcss';
+@import './styles/breakpoints.css';
 
 @layer base {
   body {
@@ -69,4 +70,18 @@
   font-size: 11px !important;
   line-height: 1.35 !important;
   padding: 0.35rem 0.55rem !important;
+}
+
+/* Compact tab headers inside Settings Drawer so all 4 tabs fit without scrolling */
+.settings-drawer-tabs .p-tab {
+  font-size: 0.72rem !important;
+  padding: 0.5rem 0.55rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.3rem !important;
+  white-space: nowrap !important;
+}
+
+.settings-drawer-tabs .p-tab .pi {
+  font-size: 0.7rem !important;
 }

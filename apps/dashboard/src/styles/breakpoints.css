@@ -1,0 +1,8 @@
+/* Standard responsive viewport breakpoints (Tailwind CSS v4 @theme) */
+@theme {
+  --breakpoint-sm: 40rem; /* 640px  — Mobile landscape / small tablets */
+  --breakpoint-md: 48rem; /* 768px  — Tablets */
+  --breakpoint-lg: 64rem; /* 1024px — Compact desktop / split-screen */
+  --breakpoint-xl: 80rem; /* 1280px — Standard desktop */
+  --breakpoint-2xl: 96rem; /* 1536px — Wide desktop */
+}

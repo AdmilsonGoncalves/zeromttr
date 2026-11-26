@@ -16,11 +16,16 @@ import {
   IncidentEventType,
   IncidentExecutionMode,
   IncidentState,
+  SettingsPersistenceEngine,
+  SystemLogLevel,
   type DecisionPayload,
   type Incident,
   type IncidentDetail,
   type IncidentMode,
+  type SettingsAuditEntry,
   type SimulateDecisionPayload,
+  type SystemSettings,
+  type SystemSettingsPatch,
   type TargetStatusResponse
 } from '../src/app/core/contract.js';
 import { HEALTHY_TARGET_STATUS, INITIAL_TARGET_STATUS, MOCK_INCIDENT } from './mock-data.js';
@@ -45,6 +50,21 @@ export class MockServer {
   private sseClients = new Set<ServerResponse>();
   private currentIncident: IncidentDetail = structuredClone(MOCK_INCIDENT);
   private targetStatus: TargetStatusResponse = { ...INITIAL_TARGET_STATUS };
+  private systemSettings: SystemSettings = {
+    rejectionCooldownSeconds: 900,
+    repeatSuppressionSeconds: 60,
+    decisionTtlSeconds: 900,
+    autoRestoreOnApprove: true,
+    targetServicePath: 'apps/target-app-demo',
+    targetBaseRef: 'v2.14.7',
+    targetHeadRef: 'v2.14.8',
+    targetErrorRateThresholdPercent: 5,
+    llmModel: 'gemini-3.5-flash',
+    llmFallbackModel: 'gemini-3.5-flash-lite',
+    onCallEmail: 'oncall-sre@example.com',
+    logLevel: SystemLogLevel.INFO
+  };
+  private settingsAuditLog: SettingsAuditEntry[] = [];
   private heartbeatTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly options: MockServerOptions = {}) {}
@@ -160,10 +180,10 @@ export class MockServer {
 
   private setCorsHeaders(res: ServerResponse): void {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      `${HTTP_HEADERS.CONTENT_TYPE}, ${HTTP_HEADERS.AUTHORIZATION}, ${HTTP_HEADERS.LIVE_DEMO_KEY}`
+      `${HTTP_HEADERS.CONTENT_TYPE}, ${HTTP_HEADERS.AUTHORIZATION}, ${HTTP_HEADERS.LIVE_DEMO_KEY}, ${HTTP_HEADERS.SETTINGS_ADMIN_TOKEN}`
     );
   }
 
@@ -306,6 +326,59 @@ export class MockServer {
         publicLiveDemo: true,
         turnstileSiteKey: null,
         turnstileRequired: false
+      });
+      return;
+    }
+
+    // GET /api/settings
+    if (req.method === 'GET' && pathname === '/api/settings') {
+      this.sendJson(res, HTTP_STATUS.OK, {
+        settings: this.systemSettings,
+        readonlyInfo: {
+          targetGithubRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+          targetBaseBranch: 'release/target-v2.14.8',
+          targetStatusProvider: 'manifest',
+          grafanaRepeatInterval: '1m',
+          persistenceEngine: SettingsPersistenceEngine.SQLITE
+        },
+        editable: true,
+        requiresAuthKey: false,
+        auditLog: this.settingsAuditLog.slice(0, 25)
+      });
+      return;
+    }
+
+    // PATCH /api/settings
+    if (req.method === 'PATCH' && pathname === '/api/settings') {
+      const patch = await this.parseBody<SystemSettingsPatch>(req);
+      const changedAt = nowIso();
+      for (const key of Object.keys(patch) as Array<keyof SystemSettings>) {
+        const nextVal = patch[key];
+        if (nextVal !== undefined && this.systemSettings[key] !== nextVal) {
+          const oldVal = this.systemSettings[key];
+          (this.systemSettings as Record<string, unknown>)[key] = nextVal;
+          this.settingsAuditLog.unshift({
+            id: this.settingsAuditLog.length + 1,
+            settingKey: key,
+            oldValue: String(oldVal),
+            newValue: String(nextVal),
+            actor: 'dashboard_operator',
+            changedAt
+          });
+        }
+      }
+      this.sendJson(res, HTTP_STATUS.OK, {
+        settings: this.systemSettings,
+        readonlyInfo: {
+          targetGithubRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+          targetBaseBranch: 'release/target-v2.14.8',
+          targetStatusProvider: 'manifest',
+          grafanaRepeatInterval: '1m',
+          persistenceEngine: SettingsPersistenceEngine.SQLITE
+        },
+        editable: true,
+        requiresAuthKey: false,
+        auditLog: this.settingsAuditLog.slice(0, 25)
       });
       return;
     }

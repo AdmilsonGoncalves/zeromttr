@@ -42,10 +42,10 @@
       </div>
     </div>
 
-    <!-- Demo Drawer Trigger + Always-Available Language Switcher -->
-    <div class="flex items-center gap-2 shrink-0">
+    <!-- Demo Drawer Trigger + Settings + Always-Available Language Switcher -->
+    <div class="flex items-center gap-2 shrink-0 ms-auto">
       @if (demoModeEnabledSignal()) {
-        <app-main-menu
+        <app-demo-settings
           [demoModeEnabled]="demoModeEnabledSignal()"
           [targetStatus]="targetStatusSignal()"
           [activeMode]="activeModeSignal()"
@@ -65,6 +65,7 @@
         />
       }
 
+      <app-system-settings />
       <app-locale-switcher [currentLang]="i18n.currentLang()" (langChange)="onLangSelect($event)" />
     </div>
   </div>

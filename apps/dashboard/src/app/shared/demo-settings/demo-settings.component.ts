@@ -28,12 +28,12 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
  * Hidden automatically when `demoModeEnabled` is false for production deployments.
  */
 @Component({
-  selector: 'app-main-menu',
+  selector: 'app-demo-settings',
   imports: [FormsModule, Drawer, ToggleSwitch, Button, Tooltip],
-  templateUrl: './main-menu.component.html',
+  templateUrl: './demo-settings.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class MainMenuComponent {
+export class DemoSettingsComponent {
   readonly i18n: I18nService;
   readonly executionMode = IncidentExecutionMode;
 

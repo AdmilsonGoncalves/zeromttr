@@ -1,0 +1,466 @@
+<!-- Gear Icon Trigger (Always Available — Demo & Production) -->
+<button
+  type="button"
+  (click)="openDrawer()"
+  [attr.aria-expanded]="isDrawerOpenSignal()"
+  aria-controls="system-settings-drawer"
+  [attr.aria-label]="i18n.t('settingsBtnAriaLabel')"
+  [pTooltip]="i18n.t('tooltipSystemSettings')"
+  tooltipPosition="bottom"
+  class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-slate-950/90 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/70 text-slate-300 hover:text-cyan-300 cursor-pointer shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+>
+  <i class="pi pi-cog text-sm" aria-hidden="true"></i>
+</button>
+
+<!-- Tabbed System Settings Sidebar (Drawer) -->
+<p-drawer
+  id="system-settings-drawer"
+  [visible]="isDrawerOpenSignal()"
+  (visibleChange)="onDrawerVisibilityChange($event)"
+  position="right"
+  [modal]="true"
+  [dismissible]="true"
+  [closeOnEscape]="true"
+  [closable]="true"
+  appendTo="body"
+  styleClass="!bg-slate-900 !border-l !border-slate-800 !text-slate-100 !w-full sm:!w-[28rem]"
+>
+  <ng-template #header>
+    <div class="flex items-center gap-2.5 min-w-0">
+      <span
+        class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 shrink-0"
+      >
+        <i class="pi pi-cog text-sm" aria-hidden="true"></i>
+      </span>
+      <div class="min-w-0">
+        <h2 class="text-sm font-bold text-white leading-tight m-0 truncate">
+          {{ i18n.t('settingsDrawerTitle') }}
+        </h2>
+        <p class="text-[11px] text-slate-400 m-0 leading-snug">
+          {{ i18n.t('settingsDrawerSubtitle') }}
+        </p>
+      </div>
+    </div>
+  </ng-template>
+
+  @if (settingsService.isLoading() && !draftSignal()) {
+    <div class="py-10 flex items-center justify-center gap-2 text-xs text-slate-400">
+      <i class="pi pi-spin pi-spinner text-cyan-400"></i>
+      <span>{{ i18n.t('settingsLoading') }}</span>
+    </div>
+  } @else if (draftSignal(); as draft) {
+    <div class="flex flex-col gap-3 h-full">
+      @if (!settingsService.editable()) {
+        <div
+          class="bg-slate-950/90 border border-slate-700 rounded-lg px-2.5 py-2 text-[11px] text-slate-300 flex items-start gap-2"
+        >
+          <i class="pi pi-lock text-slate-400 mt-0.5 shrink-0"></i>
+          <span>{{ i18n.t('settingsReadonlyNotice') }}</span>
+        </div>
+      } @else if (settingsService.requiresAuthKey()) {
+        <div
+          class="bg-amber-950/35 border border-amber-500/40 rounded-lg px-2.5 py-2 flex flex-col gap-1.5"
+        >
+          <div class="flex items-center gap-1.5 text-[11px] text-amber-200 font-medium">
+            <i class="pi pi-key text-amber-400 shrink-0"></i>
+            <label for="settings-admin-token-input">{{ i18n.t('settingsAdminTokenLabel') }}</label>
+          </div>
+          <form (submit)="$event.preventDefault()" class="m-0">
+            <input
+              id="settings-admin-token-input"
+              type="password"
+              autocomplete="off"
+              [placeholder]="i18n.t('settingsAdminTokenPlaceholder')"
+              [ngModel]="adminTokenSignal()"
+              (ngModelChange)="onAdminTokenChange($event)"
+              name="settingsAdminToken"
+              class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+            />
+          </form>
+        </div>
+      }
+
+      @if (feedbackSignal(); as feedback) {
+        <div
+          class="rounded-lg px-2.5 py-2 text-xs flex items-center gap-2"
+          [class]="
+            feedback.type === 'success'
+              ? 'bg-emerald-950/60 border border-emerald-500/60 text-emerald-200'
+              : 'bg-rose-950/60 border border-rose-500/60 text-rose-200'
+          "
+        >
+          <i
+            class="pi shrink-0"
+            [class]="
+              feedback.type === 'success'
+                ? 'pi-check-circle text-emerald-400'
+                : 'pi-exclamation-triangle text-rose-400'
+            "
+          ></i>
+          <span>{{ feedback.message }}</span>
+        </div>
+      }
+
+      <p-tabs
+        [value]="activeTabSignal()"
+        (valueChange)="onTabChange($event)"
+        class="settings-drawer-tabs flex flex-col flex-1 min-h-0"
+      >
+        <p-tablist class="shrink-0">
+          <p-tab value="0">
+            <i class="pi pi-bell" aria-hidden="true"></i>
+            <span>{{ i18n.t('settingsTabAlerts') }}</span>
+          </p-tab>
+          <p-tab value="1">
+            <i class="pi pi-code" aria-hidden="true"></i>
+            <span>{{ i18n.t('settingsTabTarget') }}</span>
+          </p-tab>
+          <p-tab value="2">
+            <i class="pi pi-microchip-ai" aria-hidden="true"></i>
+            <span>{{ i18n.t('settingsTabLlm') }}</span>
+          </p-tab>
+          <p-tab value="3">
+            <i class="pi pi-history" aria-hidden="true"></i>
+            <span>{{ i18n.t('settingsTabAudit') }}</span>
+          </p-tab>
+        </p-tablist>
+
+        <p-tabpanels class="flex-1 min-h-0 overflow-y-auto pt-3 px-0">
+          <!-- Tab 0: Alert Policies & Cooldowns -->
+          <p-tabpanel value="0">
+            <div class="flex flex-col gap-3">
+              <div
+                class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-1.5"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <label
+                    for="setting-rejection-cooldown"
+                    class="text-xs font-semibold text-slate-200"
+                  >
+                    {{ i18n.t('settingsRejectionCooldownLabel') }}
+                  </label>
+                  <span class="text-[11px] font-mono text-cyan-300">
+                    {{ formatDurationSeconds(draft.rejectionCooldownSeconds) }}
+                  </span>
+                </div>
+                <input
+                  id="setting-rejection-cooldown"
+                  type="number"
+                  min="0"
+                  max="86400"
+                  step="30"
+                  [ngModel]="draft.rejectionCooldownSeconds"
+                  (ngModelChange)="updateNumberField('rejectionCooldownSeconds', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                />
+                <p class="text-[11px] text-slate-400 m-0 leading-snug">
+                  {{ i18n.t('settingsRejectionCooldownHint') }}
+                </p>
+              </div>
+
+              <div
+                class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-1.5"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <label
+                    for="setting-repeat-suppression"
+                    class="text-xs font-semibold text-slate-200"
+                  >
+                    {{ i18n.t('settingsRepeatSuppressionLabel') }}
+                  </label>
+                  <span class="text-[11px] font-mono text-cyan-300">
+                    {{ formatDurationSeconds(draft.repeatSuppressionSeconds) }}
+                  </span>
+                </div>
+                <input
+                  id="setting-repeat-suppression"
+                  type="number"
+                  min="0"
+                  max="86400"
+                  step="30"
+                  [ngModel]="draft.repeatSuppressionSeconds"
+                  (ngModelChange)="updateNumberField('repeatSuppressionSeconds', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                />
+                <p class="text-[11px] text-slate-400 m-0 leading-snug">
+                  {{ i18n.t('settingsRepeatSuppressionHint') }}
+                </p>
+              </div>
+
+              <div
+                class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-1.5"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <label for="setting-decision-ttl" class="text-xs font-semibold text-slate-200">
+                    {{ i18n.t('settingsDecisionTtlLabel') }}
+                  </label>
+                  <span class="text-[11px] font-mono text-cyan-300">
+                    {{ formatDurationSeconds(draft.decisionTtlSeconds) }}
+                  </span>
+                </div>
+                <input
+                  id="setting-decision-ttl"
+                  type="number"
+                  min="60"
+                  max="86400"
+                  step="60"
+                  [ngModel]="draft.decisionTtlSeconds"
+                  (ngModelChange)="updateNumberField('decisionTtlSeconds', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                />
+                <p class="text-[11px] text-slate-400 m-0 leading-snug">
+                  {{ i18n.t('settingsDecisionTtlHint') }}
+                </p>
+              </div>
+
+              <div
+                class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex items-start justify-between gap-3"
+              >
+                <label for="setting-auto-restore" class="flex flex-col gap-0.5 cursor-pointer">
+                  <span class="text-xs font-semibold text-slate-200">
+                    {{ i18n.t('settingsAutoRestoreLabel') }}
+                  </span>
+                  <span class="text-[11px] text-slate-400 leading-snug">
+                    {{ i18n.t('settingsAutoRestoreHint') }}
+                  </span>
+                </label>
+                <p-toggleswitch
+                  inputId="setting-auto-restore"
+                  [ngModel]="draft.autoRestoreOnApprove"
+                  (ngModelChange)="updateField('autoRestoreOnApprove', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="shrink-0 mt-0.5"
+                />
+              </div>
+            </div>
+          </p-tabpanel>
+
+          <!-- Tab 1: Target & Deploy Diff -->
+          <p-tabpanel value="1">
+            <div class="flex flex-col gap-3">
+              <div
+                class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-2.5"
+              >
+                <div class="flex flex-col gap-1">
+                  <label for="setting-service-path" class="text-xs font-semibold text-slate-200">
+                    {{ i18n.t('settingsTargetServicePathLabel') }}
+                  </label>
+                  <input
+                    id="setting-service-path"
+                    type="text"
+                    [ngModel]="draft.targetServicePath"
+                    (ngModelChange)="updateField('targetServicePath', $event)"
+                    [disabled]="!settingsService.editable()"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="flex flex-col gap-1">
+                    <label for="setting-base-ref" class="text-xs font-semibold text-slate-200">
+                      {{ i18n.t('settingsTargetBaseRefLabel') }}
+                    </label>
+                    <input
+                      id="setting-base-ref"
+                      type="text"
+                      [ngModel]="draft.targetBaseRef"
+                      (ngModelChange)="updateField('targetBaseRef', $event)"
+                      [disabled]="!settingsService.editable()"
+                      class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label for="setting-head-ref" class="text-xs font-semibold text-slate-200">
+                      {{ i18n.t('settingsTargetHeadRefLabel') }}
+                    </label>
+                    <input
+                      id="setting-head-ref"
+                      type="text"
+                      [ngModel]="draft.targetHeadRef"
+                      (ngModelChange)="updateField('targetHeadRef', $event)"
+                      [disabled]="!settingsService.editable()"
+                      class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <label for="setting-error-threshold" class="text-xs font-semibold text-slate-200">
+                    {{ i18n.t('settingsErrorThresholdLabel') }}
+                  </label>
+                  <input
+                    id="setting-error-threshold"
+                    type="number"
+                    min="0.1"
+                    max="100"
+                    step="0.5"
+                    [ngModel]="draft.targetErrorRateThresholdPercent"
+                    (ngModelChange)="updateNumberField('targetErrorRateThresholdPercent', $event)"
+                    [disabled]="!settingsService.editable()"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                  />
+                  <p class="text-[11px] text-slate-400 m-0 leading-snug">
+                    {{ i18n.t('settingsErrorThresholdHint') }}
+                  </p>
+                </div>
+              </div>
+
+              @if (settingsService.readonlyInfo(); as info) {
+                <div
+                  class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 flex flex-col gap-1.5 text-[11px]"
+                >
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {{ i18n.t('settingsReadonlySectionTitle') }}
+                  </span>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-slate-400">GitHub Repo:</span>
+                    <span class="font-mono text-slate-300 truncate">{{
+                      info.targetGithubRepo
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-slate-400">Base Branch:</span>
+                    <span class="font-mono text-slate-300">{{ info.targetBaseBranch }}</span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-slate-400">Status Provider:</span>
+                    <span class="font-mono text-cyan-300">{{ info.targetStatusProvider }}</span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-slate-400">Grafana Repeat:</span>
+                    <span class="font-mono text-slate-300">{{ info.grafanaRepeatInterval }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </p-tabpanel>
+
+          <!-- Tab 2: LLM & Operations -->
+          <p-tabpanel value="2">
+            <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-3">
+              <div class="flex flex-col gap-1">
+                <label for="setting-llm-model" class="text-xs font-semibold text-slate-200">
+                  {{ i18n.t('settingsLlmModelLabel') }}
+                </label>
+                <input
+                  id="setting-llm-model"
+                  type="text"
+                  [ngModel]="draft.llmModel"
+                  (ngModelChange)="updateField('llmModel', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                />
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label for="setting-llm-fallback" class="text-xs font-semibold text-slate-200">
+                  {{ i18n.t('settingsLlmFallbackLabel') }}
+                </label>
+                <input
+                  id="setting-llm-fallback"
+                  type="text"
+                  [ngModel]="draft.llmFallbackModel"
+                  (ngModelChange)="updateField('llmFallbackModel', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                />
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label for="setting-oncall-email" class="text-xs font-semibold text-slate-200">
+                  {{ i18n.t('settingsOnCallEmailLabel') }}
+                </label>
+                <input
+                  id="setting-oncall-email"
+                  type="email"
+                  [ngModel]="draft.onCallEmail"
+                  (ngModelChange)="updateField('onCallEmail', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                />
+                <p class="text-[11px] text-slate-400 m-0 leading-snug">
+                  {{ i18n.t('settingsOnCallEmailHint') }}
+                </p>
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label for="setting-log-level" class="text-xs font-semibold text-slate-200">
+                  {{ i18n.t('settingsLogLevelLabel') }}
+                </label>
+                <select
+                  id="setting-log-level"
+                  [ngModel]="draft.logLevel"
+                  (ngModelChange)="updateField('logLevel', $event)"
+                  [disabled]="!settingsService.editable()"
+                  class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                >
+                  @for (level of logLevels; track level) {
+                    <option [value]="level">{{ level.toUpperCase() }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </p-tabpanel>
+
+          <!-- Tab 3: Change Audit Log -->
+          <p-tabpanel value="3">
+            <div class="flex flex-col gap-2">
+              @if (settingsService.auditLog().length === 0) {
+                <div
+                  class="bg-slate-950/60 border border-slate-800 rounded-lg p-4 text-center text-xs text-slate-400"
+                >
+                  {{ i18n.t('settingsAuditEmpty') }}
+                </div>
+              } @else {
+                @for (entry of settingsService.auditLog(); track entry.id) {
+                  <div
+                    class="bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 flex flex-col gap-1 text-[11px]"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="font-mono font-semibold text-cyan-300">{{
+                        entry.settingKey
+                      }}</span>
+                      <span class="font-mono text-[10px] text-slate-500">
+                        {{ formatAuditTimestamp(entry.changedAt) }}
+                      </span>
+                    </div>
+                    <div class="font-mono text-[11px] flex items-center gap-1.5 flex-wrap">
+                      <span class="text-rose-300/80 line-through">{{ entry.oldValue || '—' }}</span>
+                      <i class="pi pi-arrow-right text-[9px] text-slate-500"></i>
+                      <span class="text-emerald-300">{{ entry.newValue || '—' }}</span>
+                    </div>
+                    <span class="text-[10px] text-slate-500">{{ entry.actor }}</span>
+                  </div>
+                }
+              }
+            </div>
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
+    </div>
+  }
+
+  <ng-template #footer>
+    <div class="flex items-center justify-between gap-2 w-full pt-2 border-t border-slate-800">
+      <p-button
+        [label]="i18n.t('settingsReloadBtn')"
+        severity="secondary"
+        size="small"
+        [disabled]="settingsService.isLoading() || settingsService.isSaving()"
+        (onClick)="reloadSettings()"
+        styleClass="text-xs"
+      />
+      <p-button
+        [label]="i18n.t('settingsSaveBtn')"
+        severity="info"
+        size="small"
+        [disabled]="!canSave()"
+        (onClick)="saveChanges()"
+        styleClass="text-xs font-semibold"
+      />
+    </div>
+  </ng-template>
+</p-drawer>
