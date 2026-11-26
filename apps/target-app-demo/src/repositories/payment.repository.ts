@@ -28,8 +28,8 @@ export class PaymentRepository {
   private waitingWaiters = 0;
   private pendingCleanups = new Set<() => void>();
 
-  // Pool Configuration (v2.14.8 regression: max 2)
-  private healthyMaxConnections = 2;
+  // Pool Configuration (Restored Baseline v2.14.7: max 10)
+  private healthyMaxConnections = 10;
   private degradedMaxConnections = 2;
   private acquireTimeoutMs = parseNumber(process.env.DB_ACQUIRE_TIMEOUT_MS, 150);
 
@@ -178,19 +178,19 @@ export class PaymentRepository {
 
         const payment = await this.executePaymentInsert(client, input);
 
-        // NOTE: In the v2.14.8 regression commit ("perf(db): inline payment lock query on high concurrency"),
-        // client.release() was omitted, leaking database connections!
-        // (client.release() is intentionally omitted here in degraded mode)
-
         telemetry.endSpan(span, { code: SpanStatusCode.OK });
         return payment;
       } else {
-        // --- REGRESSION (Release v2.14.8: perf(db): inline payment lock query on high concurrency) ---
-        // Reduced pool to max: 2 and omitted client.release(), leaking connections on concurrent load
+        // --- HEALTHY BASELINE (Restored Release v2.14.7) ---
+        // Knex pool max: 10, strictly releasing connections in try { ... } finally { client.release() }
         const client = await this.acquireConnection(traceId);
-        const payment = await this.executePaymentInsert(client, input);
-        telemetry.endSpan(span, { code: SpanStatusCode.OK });
-        return payment;
+        try {
+          const payment = await this.executePaymentInsert(client, input);
+          telemetry.endSpan(span, { code: SpanStatusCode.OK });
+          return payment;
+        } finally {
+          client.release();
+        }
       }
     } catch (err) {
       telemetry.endSpan(span, {
