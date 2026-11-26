@@ -16,6 +16,7 @@ export interface TranslationDictionary {
   sseConnected: string;
   sseOffline: string;
   targetStatusUnknown: string;
+  unreachable: string;
   demoMenuBtn: string;
   demoMenuTitle: string;
   demoMenuSubtitle: string;

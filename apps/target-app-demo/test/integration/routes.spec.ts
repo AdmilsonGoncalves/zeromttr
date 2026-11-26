@@ -8,6 +8,7 @@ import {
   postPayment,
   getPayment,
   toggleChaos,
+  toggleHealthyTraffic,
   getChaosStatus,
   getOpsStatus,
   getHealth
@@ -218,6 +219,71 @@ describe('target-app-demo routes integration', () => {
       expect(opsRes.status).toBe(200);
       expect(chaosRes.status).toBe(200);
       expect(chaosRes.body).toEqual(opsRes.body);
+    });
+
+    it('should_reject_chaos_mutation_routes_with_403_when_chaos_endpoints_are_disabled', async () => {
+      const previousFlag = process.env.CHAOS_ENDPOINTS_ENABLED;
+      process.env.CHAOS_ENDPOINTS_ENABLED = 'false';
+      try {
+        const chaosRes = await toggleChaos(server, true);
+        expect(chaosRes.status).toBe(403);
+        expect(chaosRes.body).toMatchObject({
+          code: 'CHAOS_ENDPOINTS_DISABLED'
+        });
+
+        const trafficRes = await toggleHealthyTraffic(server, true);
+        expect(trafficRes.status).toBe(403);
+        expect(trafficRes.body).toMatchObject({
+          code: 'CHAOS_ENDPOINTS_DISABLED'
+        });
+
+        const opsRes = await getOpsStatus(server);
+        expect(opsRes.status).toBe(200);
+        expect(opsRes.body).toMatchObject({
+          status: 'healthy',
+          capabilities: {
+            chaosSimulation: false,
+            healthyTrafficToggle: false
+          }
+        });
+      } finally {
+        if (previousFlag === undefined) {
+          delete process.env.CHAOS_ENDPOINTS_ENABLED;
+        } else {
+          process.env.CHAOS_ENDPOINTS_ENABLED = previousFlag;
+        }
+      }
+    });
+
+    it('should_fallback_to_ENABLE_DEMO_MODE_when_CHAOS_ENDPOINTS_ENABLED_is_empty_string', async () => {
+      const previousChaosFlag = process.env.CHAOS_ENDPOINTS_ENABLED;
+      const previousDemoFlag = process.env.ENABLE_DEMO_MODE;
+      process.env.CHAOS_ENDPOINTS_ENABLED = '';
+      process.env.ENABLE_DEMO_MODE = 'true';
+      try {
+        const opsRes = await getOpsStatus(server);
+        expect(opsRes.status).toBe(200);
+        expect(opsRes.body).toMatchObject({
+          capabilities: {
+            chaosSimulation: true,
+            healthyTrafficToggle: true
+          }
+        });
+
+        const disableRes = await toggleChaos(server, false);
+        expect(disableRes.status).toBe(200);
+      } finally {
+        if (previousChaosFlag === undefined) {
+          delete process.env.CHAOS_ENDPOINTS_ENABLED;
+        } else {
+          process.env.CHAOS_ENDPOINTS_ENABLED = previousChaosFlag;
+        }
+        if (previousDemoFlag === undefined) {
+          delete process.env.ENABLE_DEMO_MODE;
+        } else {
+          process.env.ENABLE_DEMO_MODE = previousDemoFlag;
+        }
+      }
     });
   });
 });

@@ -9,6 +9,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   sseConnected: 'SSE Conectado',
   sseOffline: 'SSE Desconectado',
   targetStatusUnknown: 'Alvo: --',
+  unreachable: 'Inacessível',
   demoMenuBtn: 'Demonstração',
   demoMenuTitle: 'Demonstração',
   demoMenuSubtitle: 'Configure o modo de execução, tráfego sintético e simulação de incidentes.',

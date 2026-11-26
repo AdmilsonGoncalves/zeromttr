@@ -10,7 +10,7 @@
 | Framework | **Angular (última versão estável)** — Standalone Components, Signals, control flow `@if/@for`, `--ssr=false` |
 | UI Components | **PrimeNG** (`primeng`, `@primeuix/themes` preset **Aura Dark**, `primeicons`) |
 | Estilo | **Tailwind CSS v4** + `tailwindcss-primeui` (`slate-950` de fundo, `border-slate-800`) com breakpoints padrão centralizados em `src/styles/breakpoints.css` (`@theme`) |
-| Componentes utilizados | `p-drawer`, `p-toggleswitch`, `p-inputnumber`, `p-select`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (barra de FSM horizontal e gráficos SVG responsivos em Signals + Tailwind) |
+| Componentes utilizados | `p-drawer`, `p-toggleswitch`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (inputs/selects nativos, barra de FSM horizontal e gráficos SVG responsivos em Signals + Tailwind) |
 | Controles Compartilhados (`app/shared/`) | **`DemoSettingsComponent`** (`<app-demo-settings>`, drawer de Demonstração com botão compacto apenas ícone abaixo de `lg` e oculto quando `ENABLE_DEMO_MODE=false`), **`SystemSettingsComponent`** (`<app-system-settings>`, ícone de engrenagem sempre visível abrindo drawer com 4 abas: Alertas, Alvo & Diff, LLM & Ops, Auditoria) e **`LocaleSwitcherComponent`** (`<app-locale-switcher>`, `🇧🇷 PT-BR \| 🇺🇸 EN-US \| 🇪🇸 ES-ES`), alinhados à direita (`ms-auto`) inclusive em coluna única |
 | Internacionalização (i18n) | **Serviço Modular com Signals (`core/i18n/`)**, enum tipado `Language` (`PT_BR`, `EN_US`, `ES_ES`) cobrindo 100% da UI, drawers e mensagens de erro |
 | Servidor Mock | `apps/dashboard/mock-server/` (Node puro) emitindo SSE e REST conforme o contrato da §3 |

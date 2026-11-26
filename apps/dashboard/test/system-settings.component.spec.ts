@@ -197,4 +197,16 @@ describe('SystemSettingsComponent', () => {
     expect(i18n.t('settingsDrawerSubtitle')).not.toContain('SQLite');
     expect(i18n.t('settingsOnCallEmailHint')).toContain('ON_CALL_ENGINEER_EMAIL');
   });
+
+  it('should_disable_autoRestoreOnApprove_control_when_demoModeEnabled_is_false', () => {
+    component.demoModeEnabled = false;
+    expect(component.isAutoRestoreControlDisabled()).toBe(true);
+
+    component.demoModeEnabled = true;
+    service.editable.set(true);
+    expect(component.isAutoRestoreControlDisabled()).toBe(false);
+
+    const html = readFileSync(SETTINGS_TEMPLATE_PATH, 'utf8');
+    expect(html).toContain('isAutoRestoreControlDisabled()');
+  });
 });

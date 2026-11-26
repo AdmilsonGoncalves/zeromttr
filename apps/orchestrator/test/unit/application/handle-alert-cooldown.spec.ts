@@ -85,4 +85,25 @@ describe('HandleAlert rejection cooldown and repeat suppression', () => {
     expect(suppressed.suppressionReason).toBe('repeat_suppression');
     expect(suppressed.incident?.id).toBe(inc.id);
   });
+
+  it('should_not_suppress_new_incident_after_FAILED_incident_during_repeatSuppressionSeconds', async () => {
+    const repository = new FileIncidentRepository();
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+
+    const handleAlert = new HandleAlert(repository, broadcaster, () => ({
+      rejectionCooldownSeconds: 900,
+      repeatSuppressionSeconds: 900,
+      decisionTtlSeconds: 900
+    }));
+
+    const first = await handleAlert.execute(FIRING_ALERT_PAYLOAD);
+    const inc = first.incident!;
+    inc.transition(IncidentState.FAILED, 'Demo reset by operator');
+    await repository.save(inc);
+
+    const reopened = await handleAlert.execute(FIRING_ALERT_PAYLOAD);
+    expect(reopened.isDuplicate).toBe(false);
+    expect(reopened.suppressed).toBeUndefined();
+    expect(reopened.incident?.id).not.toBe(inc.id);
+  });
 });

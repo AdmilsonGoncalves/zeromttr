@@ -207,9 +207,8 @@ export function createDemoChaosHandler(
         return;
       }
 
-      const previousTimestamp = deps.lifecycle.getLastChaosTimestamp();
-      const previousMode = deps.lifecycle.getLastChaosMode();
-      deps.lifecycle.setLastChaos(now, mode);
+      const previousSnapshot = deps.lifecycle.getLastChaosSnapshot();
+      deps.lifecycle.setProvisionalLastChaos(now, mode);
 
       try {
         let incidentId: string | undefined;
@@ -219,6 +218,7 @@ export function createDemoChaosHandler(
         } else if (deps.replayRunner) {
           incidentId = await deps.replayRunner.trigger();
         }
+        deps.lifecycle.commitLastChaos();
         res.status(HTTP_STATUS.ACCEPTED).json({
           status: HttpResponseStatus.ACCEPTED,
           mode,
@@ -226,7 +226,7 @@ export function createDemoChaosHandler(
           message: 'Chaos simulation initialized'
         });
       } catch (err) {
-        deps.lifecycle.setLastChaos(previousTimestamp, previousMode);
+        deps.lifecycle.restoreLastChaos(previousSnapshot);
         res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
           error: toErrorMessage(err, 'Failed to initialize chaos')
         });
@@ -274,7 +274,10 @@ export function createDemoResetHandler(
         const failedIncidentIds = await markIncidentsFailedOnReset(deps.repository, openIncidents);
 
         deps.replayRunner?.stop();
-        await deps.demoControlPort.reset();
+        const shouldResetTarget = await deps.lifecycle.canResetTarget();
+        if (shouldResetTarget) {
+          await deps.demoControlPort.reset();
+        }
         deps.lifecycle.clearPendingLiveReset();
         deps.lifecycle.clearPendingTargetResets();
         deps.lifecycle.clearLastChaos();
@@ -289,7 +292,9 @@ export function createDemoResetHandler(
 
         res.status(HTTP_STATUS.ACCEPTED).json({
           status: HttpResponseStatus.ACCEPTED,
-          message: 'Service restored and demo state reset'
+          message: shouldResetTarget
+            ? 'Service restored and demo state reset'
+            : 'Demo state reset (target workload unchanged)'
         });
       } catch (err) {
         res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({

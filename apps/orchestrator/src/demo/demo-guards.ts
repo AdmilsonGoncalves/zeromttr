@@ -46,11 +46,11 @@ export interface DemoAccessGuards {
  * Executes an Express authorization middleware programmatically inside an async handler,
  * enabling conditional auth checks (e.g., requiring `X-Live-Demo-Key` only for live sessions).
  *
- * - Resolves `true` when the middleware calls `next()` without arguments (request authorized).
+ * - Resolves `true` when the middleware calls `next()` or `next(null)` (request authorized).
  * - Resolves `false` when the middleware ends or writes the response (e.g., 401/403 denial).
- * - Rejects with `err` when the middleware calls `next(err)` or throws synchronously.
+ * - Rejects with `err` when the middleware calls `next(err)` with a non-nullish error or throws synchronously.
  */
-function runExpressMiddleware(
+function evaluateAuthMiddleware(
   middleware: RequestHandler,
   req: Request,
   res: Response
@@ -73,7 +73,7 @@ function runExpressMiddleware(
     res.once('finish', () => finish(false));
     try {
       middleware(req, res, (err?: unknown) => {
-        if (err !== undefined) {
+        if (err !== undefined && err !== null) {
           fail(err);
           return;
         }
@@ -157,7 +157,7 @@ export function createDemoAccessGuards(dependencies: DemoGuardDependencies): Dem
       turnstileRequired: Boolean(turnstileSiteKey && turnstileSecretKey)
     }),
     authorizeLiveDemo: (req: Request, res: Response) =>
-      runExpressMiddleware(liveDemoAuth, req, res),
+      evaluateAuthMiddleware(liveDemoAuth, req, res),
     checkCapability: async (
       capability: TargetCapabilityKey,
       res: Response,

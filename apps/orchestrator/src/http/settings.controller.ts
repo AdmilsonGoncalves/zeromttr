@@ -5,6 +5,7 @@ import {
   type SystemSettingsReadonlyInfo,
   type SystemSettingsResponse
 } from '@zeromttr/contracts';
+import { toErrorMessage } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { maskEmailForDisplay } from '../domain/system-settings.js';
 import type { SettingsRepositoryPort } from '../ports/settings-repository.port.js';
@@ -60,13 +61,19 @@ export function createSettingsRouter(dependencies: SettingsRouterDependencies): 
   }
 
   router.get('/settings', dependencies.dashboardAuthMiddleware, (_req: Request, res: Response) => {
-    const payload = buildSettingsResponse(
-      dependencies.settingsRepository,
-      dependencies.readonlyInfo,
-      editable,
-      requiresAuthKey
-    );
-    res.status(HTTP_STATUS.OK).json(payload);
+    try {
+      const payload = buildSettingsResponse(
+        dependencies.settingsRepository,
+        dependencies.readonlyInfo,
+        editable,
+        requiresAuthKey
+      );
+      res.status(HTTP_STATUS.OK).json(payload);
+    } catch (err) {
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: toErrorMessage(err, 'Failed to read system settings')
+      });
+    }
   });
 
   router.patch('/settings', ...writeMiddlewares, (req: Request, res: Response) => {
@@ -87,18 +94,24 @@ export function createSettingsRouter(dependencies: SettingsRouterDependencies): 
       return;
     }
 
-    const result = dependencies.settingsRepository.update(parsed.data, 'dashboard_operator');
-    if (result.changes.length > 0) {
-      dependencies.onSettingsUpdated?.(result.settings);
-    }
+    try {
+      const result = dependencies.settingsRepository.update(parsed.data, 'dashboard_operator');
+      if (result.changes.length > 0) {
+        dependencies.onSettingsUpdated?.(result.settings);
+      }
 
-    const payload = buildSettingsResponse(
-      dependencies.settingsRepository,
-      dependencies.readonlyInfo,
-      editable,
-      requiresAuthKey
-    );
-    res.status(HTTP_STATUS.OK).json(payload);
+      const payload = buildSettingsResponse(
+        dependencies.settingsRepository,
+        dependencies.readonlyInfo,
+        editable,
+        requiresAuthKey
+      );
+      res.status(HTTP_STATUS.OK).json(payload);
+    } catch (err) {
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: toErrorMessage(err, 'Failed to persist system settings')
+      });
+    }
   });
 
   return router;

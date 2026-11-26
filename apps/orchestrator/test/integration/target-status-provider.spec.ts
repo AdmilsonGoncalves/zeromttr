@@ -320,10 +320,47 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       expect(status.metrics?.errorRate5xxPercent).toBe(100);
     });
 
+    it('should_report_HEALTHY_with_zero_error_rate_when_prometheus_has_rps_and_latency_but_no_5xx_series', async () => {
+      process.env.TARGET_SERVICE_NAME = 'healthy-orders-api';
+      const executePromqlRange = vi.fn(async ({ query }: { query: string }) => {
+        if (query.includes('5..')) {
+          return {
+            seriesCount: 0,
+            summarizedSeries: [],
+            finops: createMockFinOpsData()
+          };
+        }
+        if (query.includes('histogram_quantile')) {
+          return {
+            seriesCount: 1,
+            summarizedSeries: [{ metric: {}, latest: 42, p95: 42, max: 60 }],
+            finops: createMockFinOpsData()
+          };
+        }
+        return {
+          seriesCount: 1,
+          summarizedSeries: [{ metric: {}, latest: 1, p95: 1, max: 1 }],
+          finops: createMockFinOpsData()
+        };
+      });
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange })
+      );
+      const status = await adapter.getStatus();
+
+      expect(status.status).toBe(TargetHealthStatus.HEALTHY);
+      expect(status.metrics).toMatchObject({
+        requestsPerSecond: 1,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 42
+      });
+    });
+
     it('should_prefer_dynamic_diff_refs_callback_over_static_env_refs', async () => {
       process.env.TARGET_SERVICE_NAME = 'orders-api';
-      process.env.TARGET_BASE_REF = 'v1.0.0-env';
-      process.env.TARGET_HEAD_REF = 'v1.0.1-env';
+      process.env.TARGET_PREVIOUS_VERSION = 'v1.0.0-env';
+      process.env.TARGET_VERSION = 'v1.0.1-env';
 
       const executePromqlRange = vi.fn(async () => ({
         seriesCount: 1,
@@ -344,6 +381,32 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
 
       expect(status.previousHealthyVersion).toBe('v2.9.0-runtime');
       expect(status.version).toBe('v2.9.1-runtime');
+    });
+
+    it('should_escape_quotes_and_backslashes_in_service_name_for_promql_queries', async () => {
+      const capturedQueries: string[] = [];
+      const executePromqlRange = vi.fn(async ({ query }: { query: string }) => {
+        capturedQueries.push(query);
+        return {
+          seriesCount: 1,
+          summarizedSeries: [{ metric: {}, latest: 1, p95: 1, max: 1 }],
+          finops: createMockFinOpsData()
+        };
+      });
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange }),
+        {
+          serviceName: 'orders\\"api'
+        }
+      );
+      await adapter.getStatus();
+
+      expect(capturedQueries).toHaveLength(3);
+      for (const query of capturedQueries) {
+        expect(query).toContain('service_name="orders\\\\\\"api"');
+        expect(query).toContain('service="orders\\\\\\"api"');
+      }
     });
 
     it('should_select_prometheus_provider_when_TARGET_STATUS_PROVIDER_is_prometheus', () => {

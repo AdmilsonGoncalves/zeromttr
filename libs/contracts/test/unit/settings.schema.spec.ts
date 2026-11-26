@@ -69,10 +69,43 @@ describe('SystemSettingsSchema', () => {
     ['/absolute/path'],
     ['apps\\windows\\path'],
     ['apps/../secret'],
+    ['C:/outside'],
+    ['d:/secret/path'],
     ['   ']
   ])('should_reject_unsafe_targetServicePath_%s', (unsafePath) => {
     const result = SystemSettingsPatchSchema.safeParse({ targetServicePath: unsafePath });
     expect(result.success).toBe(false);
+  });
+
+  it('should_accept_safe_git_refs_starting_with_underscore', () => {
+    const parsed = SystemSettingsPatchSchema.parse({
+      targetBaseRef: '_release',
+      targetHeadRef: '_release-hotfix'
+    });
+    expect(parsed.targetBaseRef).toBe('_release');
+    expect(parsed.targetHeadRef).toBe('_release-hotfix');
+  });
+
+  it('should_accept_short_masked_emails_in_response_schema', () => {
+    for (const maskedEmail of ['a***@example.com', '***@example.com']) {
+      const result = SystemSettingsResponseSchema.safeParse({
+        settings: {
+          ...VALID_SETTINGS,
+          onCallEmail: maskedEmail
+        },
+        readonlyInfo: {
+          targetGithubRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+          targetBaseBranch: 'release/target-v2.14.8',
+          targetStatusProvider: 'manifest',
+          grafanaRepeatInterval: '1m',
+          persistenceEngine: SettingsPersistenceEngine.SQLITE
+        },
+        editable: true,
+        requiresAuthKey: false,
+        auditLog: []
+      });
+      expect(result.success).toBe(true);
+    }
   });
 
   it.each([

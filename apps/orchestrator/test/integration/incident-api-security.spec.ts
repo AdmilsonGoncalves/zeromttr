@@ -824,6 +824,7 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     expect(authErrorRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
     expect(triggerChaos).not.toHaveBeenCalled();
 
+    const asyncRejectTriggerChaos = vi.fn(async () => {});
     const rejectingTargetPort: TargetStatusPort = {
       getStatus: vi.fn(async () => {
         throw new Error('target status probe failed');
@@ -840,7 +841,11 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       demoRouter: createDemoRouterFactory({
         repository: repo,
         targetStatusPort: rejectingTargetPort,
-        demoControlPort: { triggerChaos, toggleHealthyTraffic: vi.fn(), reset: vi.fn() },
+        demoControlPort: {
+          triggerChaos: asyncRejectTriggerChaos,
+          toggleHealthyTraffic: vi.fn(),
+          reset: vi.fn()
+        },
         simulateDemoDecision,
         publicLiveDemo: true
       })
@@ -851,7 +856,252 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
       .send({ mode: IncidentExecutionMode.LIVE });
     expect(asyncRejectRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
-    expect(triggerChaos).not.toHaveBeenCalled();
+    expect(rejectingTargetPort.getStatus).toHaveBeenCalledTimes(1);
+    expect(asyncRejectTriggerChaos).not.toHaveBeenCalled();
+
+    const nullNextTriggerChaos = vi.fn(async () => {});
+    const nullNextApp = createApp({
+      repository: repo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: repo,
+        targetStatusPort,
+        demoControlPort: {
+          triggerChaos: nullNextTriggerChaos,
+          toggleHealthyTraffic: vi.fn(),
+          reset: vi.fn()
+        },
+        simulateDemoDecision,
+        liveDemoMiddleware: (_req, _res, next) => {
+          (next as (err?: unknown) => void)(null);
+        }
+      })
+    });
+
+    const nullNextRes = await request(nullNextApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(nullNextRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(nullNextTriggerChaos).toHaveBeenCalledWith(true);
+  });
+
+  it('should_skip_demo_target_reset_when_target_lacks_chaos_capability_or_is_passive', async () => {
+    const replayIncident = new Incident({
+      id: 'inc-passive-replay-001',
+      service: 'external-orders-api',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:passive-replay',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.REPLAY
+    });
+    const localRepo: IncidentRepository = {
+      findById: vi.fn(async (id: string) => (id === replayIncident.id ? replayIncident : null)),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [replayIncident]),
+      save: vi.fn(async () => {})
+    };
+    const resetMock = vi.fn(async () => {
+      throw new Error('reset endpoint does not exist on passive target');
+    });
+    const passiveStatusPort: TargetStatusPort = {
+      getStatus: vi.fn(async () => ({
+        status: TargetHealthStatus.HEALTHY,
+        service: 'external-orders-api',
+        version: 'v1.0.0',
+        previousHealthyVersion: 'v0.9.9',
+        targetRepo: 'https://github.com/org/external-orders-api',
+        suspectFilePath: '',
+        capabilities: {
+          chaosSimulation: false,
+          healthyTrafficToggle: false
+        },
+        rawEdgeLogPreCollector: ''
+      }))
+    };
+
+    const passiveApp = createApp({
+      repository: localRepo,
+      targetStatusPort: passiveStatusPort,
+      handleAlert: createStubHandleAlert(localRepo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: localRepo,
+        targetStatusPort: passiveStatusPort,
+        demoControlPort: { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+        simulateDemoDecision: new SimulateDemoDecision(localRepo, toolsPort, broadcaster)
+      })
+    });
+
+    const simApproveRes = await request(passiveApp)
+      .post('/api/demo/simulate-decision')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ incidentId: replayIncident.id, action: DecisionAction.APPROVE });
+    expect(simApproveRes.status).toBe(HTTP_STATUS.OK);
+    expect(resetMock).not.toHaveBeenCalled();
+
+    const resetRes = await request(passiveApp)
+      .post('/api/demo/reset')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(resetRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(resetRes.body.message).toBe('Demo state reset (target workload unchanged)');
+    expect(resetMock).not.toHaveBeenCalled();
+
+    // Passive provider returning UNREACHABLE with chaosSimulation: false must also skip reset on live approval
+    const unreachablePassivePort: TargetStatusPort = {
+      getStatus: vi.fn(async () => ({
+        status: TargetHealthStatus.UNREACHABLE,
+        service: 'external-orders-api',
+        version: 'unknown',
+        previousHealthyVersion: 'unknown',
+        targetRepo: 'https://github.com/org/external-orders-api',
+        suspectFilePath: '',
+        capabilities: {
+          chaosSimulation: false,
+          healthyTrafficToggle: false
+        },
+        rawEdgeLogPreCollector: ''
+      }))
+    };
+    const passiveLifecycle = createDemoSessionLifecycle(
+      { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      undefined,
+      unreachablePassivePort,
+      { passiveTarget: true }
+    );
+    const liveIncident = new Incident({
+      id: 'inc-passive-live-001',
+      service: 'external-orders-api',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:passive-live',
+      state: IncidentState.RESOLVED,
+      mode: IncidentExecutionMode.LIVE
+    });
+    await passiveLifecycle.handleLiveIncidentApproved(liveIncident);
+    expect(resetMock).not.toHaveBeenCalled();
+  });
+
+  it('should_preserve_session_generation_when_failed_chaos_attempt_rolls_back', async () => {
+    let resolveStatusProbe!: (value: Awaited<ReturnType<TargetStatusPort['getStatus']>>) => void;
+    const deferredStatusPort: TargetStatusPort = {
+      getStatus: vi.fn(
+        () =>
+          new Promise<Awaited<ReturnType<TargetStatusPort['getStatus']>>>((resolve) => {
+            resolveStatusProbe = resolve;
+          })
+      )
+    };
+    const resetMock = vi.fn(async () => {});
+    const triggerChaosMock = vi.fn(async () => {
+      throw new Error('target chaos failed');
+    });
+    const lifecycle = createDemoSessionLifecycle(
+      { triggerChaos: triggerChaosMock, toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      undefined,
+      deferredStatusPort
+    );
+
+    const originalTimestamp = Date.now() - 5_000;
+    lifecycle.setLastChaos(originalTimestamp, IncidentExecutionMode.LIVE);
+    const originalSnapshot = lifecycle.getLastChaosSnapshot();
+    const activeIncident = new Incident({
+      id: 'inc-rollback-preserve-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:rollback-preserve',
+      state: IncidentState.RESOLVED,
+      mode: IncidentExecutionMode.LIVE,
+      startedAt: new Date(originalTimestamp + 500).toISOString()
+    });
+
+    const rollbackApp = createApp({
+      repository: repo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: repo,
+        targetStatusPort,
+        lifecycle,
+        demoControlPort: {
+          triggerChaos: triggerChaosMock,
+          toggleHealthyTraffic: vi.fn(),
+          reset: resetMock
+        },
+        simulateDemoDecision,
+        publicLiveDemo: true,
+        cooldownMs: 0
+      })
+    });
+
+    // Approval status lookup starts while original live session owns target
+    const approvalPromise = lifecycle.handleLiveIncidentApproved(activeIncident);
+
+    // Concurrent chaos attempt fails and rolls back timestamp/mode without invalidating active session
+    const failedChaosRes = await request(rollbackApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(failedChaosRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(triggerChaosMock).toHaveBeenCalledTimes(1);
+    expect(lifecycle.getLastChaosSnapshot()).toEqual(originalSnapshot);
+
+    resolveStatusProbe({
+      status: TargetHealthStatus.DEGRADED,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.8',
+      previousHealthyVersion: 'v2.14.7',
+      targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+      suspectFilePath: '',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: true
+      },
+      rawEdgeLogPreCollector: ''
+    });
+
+    await approvalPromise;
+    expect(resetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should_not_stop_newer_replay_session_when_stale_live_approval_runs', async () => {
+    const resetMock = vi.fn(async () => {});
+    const stopReplayMock = vi.fn();
+    const lifecycle = createDemoSessionLifecycle(
+      { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      { stop: stopReplayMock } as unknown as Parameters<typeof createDemoSessionLifecycle>[1],
+      targetStatusPort
+    );
+
+    const olderLiveTimestamp = Date.now() - 10_000;
+    const olderLiveIncident = new Incident({
+      id: 'inc-stale-live-vs-replay-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:stale-live-vs-replay',
+      state: IncidentState.RESOLVED,
+      mode: IncidentExecutionMode.LIVE,
+      startedAt: new Date(olderLiveTimestamp).toISOString()
+    });
+
+    // A newer REPLAY session started after the older live incident
+    lifecycle.setLastChaos(Date.now(), IncidentExecutionMode.REPLAY);
+
+    await lifecycle.handleLiveIncidentApproved(olderLiveIncident);
+
+    expect(stopReplayMock).not.toHaveBeenCalled();
+    expect(resetMock).not.toHaveBeenCalled();
   });
 
   it('should_discard_stale_approval_reset_when_newer_live_chaos_session_started', async () => {

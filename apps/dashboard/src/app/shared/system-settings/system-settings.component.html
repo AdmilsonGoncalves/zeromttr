@@ -231,7 +231,7 @@
                   inputId="setting-auto-restore"
                   [ngModel]="draft.autoRestoreOnApprove"
                   (ngModelChange)="updateField('autoRestoreOnApprove', $event)"
-                  [disabled]="!settingsService.editable()"
+                  [disabled]="isAutoRestoreControlDisabled()"
                   class="shrink-0 mt-0.5"
                 />
               </div>

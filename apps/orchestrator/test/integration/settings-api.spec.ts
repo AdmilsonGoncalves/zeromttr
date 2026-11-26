@@ -92,16 +92,24 @@ describe('System Settings REST API (/api/settings)', () => {
 
   it('should_return_400_Bad_Request_for_invalid_path_traversal_or_out_of_range_fields', async () => {
     const { app, settingsRepository } = createTestServer();
+    const initialSettings = settingsRepository.get();
 
-    const res = await request(app)
+    const invalidPathRes = await request(app)
       .patch('/api/settings')
       .set(HTTP_HEADERS.AUTHORIZATION, `Bearer ${DASHBOARD_TOKEN}`)
-      .send({
-        targetServicePath: '../../etc/passwd',
-        decisionTtlSeconds: 5
-      });
+      .send({ targetServicePath: '../../etc/passwd' });
 
-    expect(res.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(invalidPathRes.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(settingsRepository.get()).toEqual(initialSettings);
+    expect(settingsRepository.listAuditLog()).toEqual([]);
+
+    const invalidTtlRes = await request(app)
+      .patch('/api/settings')
+      .set(HTTP_HEADERS.AUTHORIZATION, `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ decisionTtlSeconds: 5 });
+
+    expect(invalidTtlRes.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(settingsRepository.get()).toEqual(initialSettings);
     expect(settingsRepository.listAuditLog()).toEqual([]);
     settingsRepository.close();
   });
@@ -141,6 +149,33 @@ describe('System Settings REST API (/api/settings)', () => {
       .send({ rejectionCooldownSeconds: 600 });
 
     expect(res.status).toBe(HTTP_STATUS.FORBIDDEN);
+    settingsRepository.close();
+  });
+
+  it('should_return_structured_JSON_500_when_settings_repository_throws_SQLite_error', async () => {
+    const { app, settingsRepository } = createTestServer();
+    vi.spyOn(settingsRepository, 'get').mockImplementationOnce(() => {
+      throw new Error('SQLITE_BUSY: database is locked');
+    });
+
+    const getRes = await request(app)
+      .get('/api/settings')
+      .set(HTTP_HEADERS.AUTHORIZATION, `Bearer ${DASHBOARD_TOKEN}`);
+    expect(getRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(getRes.headers['content-type']).toContain('application/json');
+    expect(getRes.body.error).toContain('SQLITE_BUSY');
+
+    vi.spyOn(settingsRepository, 'update').mockImplementationOnce(() => {
+      throw new Error('SQLITE_READONLY: attempt to write a readonly database');
+    });
+
+    const patchRes = await request(app)
+      .patch('/api/settings')
+      .set(HTTP_HEADERS.AUTHORIZATION, `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ rejectionCooldownSeconds: 1200 });
+    expect(patchRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(patchRes.headers['content-type']).toContain('application/json');
+    expect(patchRes.body.error).toContain('SQLITE_READONLY');
     settingsRepository.close();
   });
 });

@@ -5,7 +5,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SystemLogLevel } from '@zeromttr/contracts';
 import { SqliteSettingsRepository } from '../../src/adapters/settings.sqlite.js';
-import { resolveDefaultSystemSettings } from '../../src/domain/system-settings.js';
+import {
+  maskEmailForDisplay,
+  resolveDefaultSystemSettings
+} from '../../src/domain/system-settings.js';
 
 describe('SqliteSettingsRepository', () => {
   const tempDirs: string[] = [];
@@ -146,5 +149,12 @@ describe('SqliteSettingsRepository', () => {
     expect(repo.get().targetServicePath).toBe('apps/target-app-demo');
     expect(repo.listAuditLog()).toEqual([]);
     repo.close();
+  });
+
+  it('should_hide_at_least_one_character_when_masking_short_email_local_parts', () => {
+    expect(maskEmailForDisplay('sre-team@example.com')).toBe('sr***@example.com');
+    expect(maskEmailForDisplay('ab@example.com')).toBe('a***@example.com');
+    expect(maskEmailForDisplay('a@example.com')).toBe('***@example.com');
+    expect(maskEmailForDisplay('')).toBe('');
   });
 });

@@ -29,6 +29,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.log
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+var/
 
 # Evaluation, hackathon rules and auxiliary files
 docs/apoio/

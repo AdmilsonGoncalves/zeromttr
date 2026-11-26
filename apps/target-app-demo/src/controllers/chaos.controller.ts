@@ -1,4 +1,5 @@
 import type http from 'node:http';
+import { isNonEmptyString } from '@zeromttr/utils';
 import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
@@ -171,10 +172,10 @@ export class ChaosController {
   }
 
   private isAutoTrafficBurstEnabled(): boolean {
-    if (process.env.CHAOS_AUTO_TRAFFIC_BURST !== undefined) {
-      return process.env.CHAOS_AUTO_TRAFFIC_BURST === 'true';
+    if (isNonEmptyString(process.env.CHAOS_AUTO_TRAFFIC_BURST)) {
+      return process.env.CHAOS_AUTO_TRAFFIC_BURST.trim().toLowerCase() === 'true';
     }
-    return process.env.DEMO_MODE === 'true';
+    return (process.env.DEMO_MODE ?? '').trim().toLowerCase() === 'true';
   }
 
   private buildStatusPayload() {

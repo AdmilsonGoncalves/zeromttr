@@ -26,7 +26,7 @@ O **ZeroMTTR** é uma plataforma autônoma de AIOps e remediação de incidentes
 
 ### Como o Sistema Demo Funciona
 
-Ao abrir o painel lateral **Demonstração** (`app-demo-settings`) no War Room e clicar em **"Simular Incidente"** (`POST /api/demo/chaos`), o roteador modular de demonstração do Orchestrator (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) opera em um de dois modos sobre o serviço alvo **`api-pagamentos-core`** (`apps/target-app-demo`). De forma independente, o painel lateral **Configurações** (`app-system-settings`, ícone de engrenagem sempre visível em demo e produção) permite consultar ou ajustar em tempo real cooldowns de alerta, configurações do alvo/diff, modelos LLM, nível de log e histórico de auditoria (`GET`/`PATCH /api/settings`, `GET /api/settings/audit`) sem reiniciar os contêineres:
+Ao abrir o painel lateral **Demonstração** (`app-demo-settings`) no War Room e clicar em **"Simular Incidente"** (`POST /api/demo/chaos`), o roteador modular de demonstração do Orchestrator (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) opera em um de dois modos sobre o serviço alvo **`api-pagamentos-core`** (`apps/target-app-demo`). De forma independente, o painel lateral **Configurações** (`app-system-settings`, ícone de engrenagem sempre visível em demo e produção) permite consultar ou ajustar em tempo real cooldowns de alerta, configurações do alvo/diff, modelos LLM, nível de log e histórico de auditoria (`GET`/`PATCH /api/settings`) sem reiniciar os contêineres:
 
 1. **Modo `Replay` (padrão público):**
    - Reproduz em tempo real via SSE a linha do tempo de uma execução real gravada (`data/last-recorded-incident.json`), usando o `ReplayRunner`.

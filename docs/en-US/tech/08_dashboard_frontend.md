@@ -10,7 +10,7 @@
 | Framework | **Angular (latest stable)** — Standalone Components, Signals, control flow `@if/@for`, `--ssr=false` |
 | UI Components | **PrimeNG** (`primeng`, `@primeuix/themes` preset **Aura Dark**, `primeicons`) |
 | Styling | **Tailwind CSS v4** + `tailwindcss-primeui` (`slate-950` background, `border-slate-800`) with standard breakpoints centralized in `src/styles/breakpoints.css` (`@theme`) |
-| Components Used | `p-drawer`, `p-toggleswitch`, `p-inputnumber`, `p-select`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (horizontal FSM bar and responsive SVG time-series charts with Tailwind/Angular Signals) |
+| Components Used | `p-drawer`, `p-toggleswitch`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (native inputs/selects, horizontal FSM bar and responsive SVG time-series charts with Tailwind/Angular Signals) |
 | Shared Controls (`app/shared/`) | **`DemoSettingsComponent`** (`<app-demo-settings>`, Demo slide-over drawer with icon-only trigger below `lg` and hidden when `ENABLE_DEMO_MODE=false`), **`SystemSettingsComponent`** (`<app-system-settings>`, always-available gear icon opening a 4-tab drawer: Alerts, Target & Diff, LLM & Ops, Audit), and **`LocaleSwitcherComponent`** (`<app-locale-switcher>`, `🇧🇷 PT-BR \| 🇺🇸 EN-US \| 🇪🇸 ES-ES`), right-aligned (`ms-auto`) even in single-column layouts |
 | Internationalization (i18n) | **Modular Signal Service (`core/i18n/`)** with typed `Language` enum (`PT_BR`, `EN_US`, `ES_ES`) covering 100% of UI labels, drawers, and error feedback |
 | Mock Server | `apps/dashboard/mock-server/` (pure Node.js) emitting SSE and REST matching §3 contract |

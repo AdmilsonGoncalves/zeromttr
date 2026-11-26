@@ -15,9 +15,10 @@ export const SettingsPersistenceEngine = {
 export type SettingsPersistenceEngine =
   (typeof SettingsPersistenceEngine)[keyof typeof SettingsPersistenceEngine];
 
-const SAFE_GIT_REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/~^-]*$/;
+const SAFE_GIT_REF_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._/~^-]*$/;
 const SAFE_MODEL_NAME_PATTERN = /^[A-Za-z0-9._:-]+$/;
-const MASKED_EMAIL_PATTERN = /^[^@\s]{1,2}\*{3}@[^@\s]+\.[^@\s]+$/;
+const MASKED_EMAIL_PATTERN = /^[^@\s]{0,2}\*{3}@[^@\s]+\.[^@\s]+$/;
+const WINDOWS_DRIVE_PREFIX_PATTERN = /^[A-Za-z]:/;
 
 function isSafeGitRef(value: string): boolean {
   const trimmed = value.trim();
@@ -32,7 +33,12 @@ function isSafeGitRef(value: string): boolean {
 
 function isSafeRepoRelativePath(value: string): boolean {
   const trimmed = value.trim();
-  if (trimmed.length === 0 || trimmed.startsWith('/') || trimmed.includes('\\')) {
+  if (
+    trimmed.length === 0 ||
+    trimmed.startsWith('/') ||
+    trimmed.includes('\\') ||
+    WINDOWS_DRIVE_PREFIX_PATTERN.test(trimmed)
+  ) {
     return false;
   }
   if (trimmed.includes('\0')) {

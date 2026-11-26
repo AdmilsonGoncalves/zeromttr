@@ -74,4 +74,10 @@ describe('Grafana dashboard provisioning', () => {
     const annotationTags = dashboard.annotations?.list?.flatMap((a) => a.tags ?? []) ?? [];
     expect(annotationTags).toContain('zeromttr');
   });
+
+  it('should_interpolate_GRAFANA_ALERT_REPEAT_INTERVAL_in_alerting_policies_yaml', () => {
+    const policiesPath = path.join(REPO_ROOT, 'infra/grafana/provisioning/alerting/policies.yaml');
+    const policiesYaml = fs.readFileSync(policiesPath, 'utf8');
+    expect(policiesYaml).toContain('repeat_interval: ${GRAFANA_ALERT_REPEAT_INTERVAL}');
+  });
 });

@@ -174,7 +174,13 @@ export class HandleAlert {
           };
         }
 
-        if (repeatSuppressionSeconds > 0 && elapsedSeconds < repeatSuppressionSeconds) {
+        const isConclusiveState =
+          latest.state === IncidentState.RESOLVED || latest.state === IncidentState.REJECTED;
+        if (
+          isConclusiveState &&
+          repeatSuppressionSeconds > 0 &&
+          elapsedSeconds < repeatSuppressionSeconds
+        ) {
           return {
             incident: latest,
             isDuplicate: true,

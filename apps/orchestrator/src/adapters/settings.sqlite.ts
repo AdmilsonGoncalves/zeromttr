@@ -53,6 +53,7 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
   private readonly defaults: SystemSettings;
   private readonly logger?: LoggerPort;
   private current: SystemSettings;
+  private closed = false;
 
   public constructor(
     dbPath: string = ':memory:',
@@ -90,9 +91,6 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
         actor TEXT NOT NULL,
         changed_at TEXT NOT NULL
       );
-
-      CREATE INDEX IF NOT EXISTS idx_settings_audit_changed_at
-        ON settings_audit_log (id DESC);
     `);
 
     this.current = this.loadFromDatabase();
@@ -248,9 +246,13 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
   }
 
   /**
-   * Closes the underlying SQLite connection.
+   * Closes the underlying SQLite connection idempotently.
    */
   public close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
     this.db.close();
   }
 }

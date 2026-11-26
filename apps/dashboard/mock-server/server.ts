@@ -47,7 +47,7 @@ function maskEmailForDisplay(email: string): string {
   }
   const local = trimmed.slice(0, atIndex);
   const domain = trimmed.slice(atIndex);
-  const visiblePrefix = local.slice(0, Math.min(2, local.length));
+  const visiblePrefix = local.slice(0, Math.min(2, Math.max(0, local.length - 1)));
   return `${visiblePrefix}***${domain}`;
 }
 
