@@ -110,7 +110,15 @@ describe('RemediationPanelComponent', () => {
     expect(rendered).not.toMatch(/\sstyle\s*=/i);
   });
 
-  it('should_emit_simulate_decision_when_triggered', () => {
+  it('should emit simulateDecision when triggered and gate button on demoModeEnabled', () => {
+    expect(component.demoModeEnabledSignal()).toBe(true);
+    component.demoModeEnabled = false;
+    expect(component.demoModeEnabledSignal()).toBe(false);
+
+    const html = readFileSync(REMEDIATION_TEMPLATE_PATH, 'utf8');
+    expect(html).toContain('@if (demoModeEnabledSignal())');
+    expect(html).toContain('simulateDecisionBtn');
+
     const spy = vi.fn();
     component.simulateDecision.subscribe(spy);
     component.simulateDecision.emit();

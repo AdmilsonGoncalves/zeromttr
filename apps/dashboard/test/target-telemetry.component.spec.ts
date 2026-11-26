@@ -81,4 +81,52 @@ describe('TargetTelemetryComponent', () => {
     expect(html).toContain('<p-knob');
     expect(html).toContain('<p-metergroup');
   });
+
+  it('should render dynamic service name from input instead of hardcoded demo name', () => {
+    const html = readFileSync(TELEMETRY_TEMPLATE_PATH, 'utf8');
+    expect(html).not.toContain('api-pagamentos-core');
+
+    component.serviceName = 'expedicao-frete-worker';
+    expect(component.serviceNameSignal()).toBe('expedicao-frete-worker');
+  });
+
+  it('should render custom saturation resource label from api', () => {
+    component.metrics = {
+      healthyTrafficActive: false,
+      requestsPerSecond: 18,
+      errorRate5xxPercent: 0,
+      p95LatencyMs: 64,
+      saturation: {
+        resourceLabel: 'Worker Queue',
+        active: 6,
+        waiting: 2,
+        max: 10
+      }
+    };
+
+    expect(component.saturationSignal()).toEqual({
+      resourceLabel: 'Worker Queue',
+      active: 6,
+      waiting: 2,
+      max: 10
+    });
+    expect(component.poolLevel()).toBe(TelemetryHealthLevel.CRITICAL);
+    expect(component.poolMax()).toBe(10);
+    expect(component.poolMeters()).toHaveLength(2);
+  });
+
+  it('should hide saturation card cleanly when target does not report saturation', () => {
+    component.metrics = {
+      healthyTrafficActive: false,
+      requestsPerSecond: 45,
+      errorRate5xxPercent: 0,
+      p95LatencyMs: 92
+    };
+
+    expect(component.saturationSignal()).toBeNull();
+    expect(component.poolMeters()).toEqual([]);
+
+    const html = readFileSync(TELEMETRY_TEMPLATE_PATH, 'utf8');
+    expect(html).toContain('@if (saturationSignal(); as sat)');
+  });
 });

@@ -289,6 +289,8 @@ export class MockServer {
       res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
+          demoModeEnabled: true,
+          requireDemoKey: false,
           publicLiveDemo: true,
           turnstileSiteKey: null,
           turnstileRequired: false

@@ -80,12 +80,15 @@
         </div>
       </figure>
 
-      <!-- Chart B: Throughput Req/s & Pool Usage -->
+      <!-- Chart B: Throughput Req/s & Optional Target Saturation -->
       <figure class="bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 m-0">
         <figcaption class="flex items-center justify-between text-xs">
-          <span class="font-bold text-slate-200">{{ i18n.t('chartThroughputPoolTitle') }}</span>
+          <span class="font-bold text-slate-200">{{ throughputChartTitle() }}</span>
           <span class="font-mono text-[11px] text-cyan-300">
-            {{ latestRequestsPerSecond() }} rps · {{ latestPoolConnections() }} conn
+            {{ latestRequestsPerSecond() }} rps
+            @if (hasSaturationSeries()) {
+              · {{ latestPoolConnections() }} {{ saturationResourceLabel() }}
+            }
           </span>
         </figcaption>
         <svg
@@ -93,7 +96,7 @@
           viewBox="0 0 420 145"
           class="w-full h-40 sm:h-44 bg-slate-900/60 rounded border border-slate-800/80"
         >
-          <title>{{ i18n.t('chartThroughputPoolTitle') }}</title>
+          <title>{{ throughputChartTitle() }}</title>
           @for (tick of throughputTimeSeries().yTicks; track tick.y) {
             <line
               x1="6"
@@ -107,15 +110,17 @@
               {{ tick.label }}
             </text>
           }
-          @for (tick of poolTimeSeries().yTicks; track tick.y) {
-            <text
-              x="410"
-              [attr.y]="yTickLabelY(tick.y)"
-              text-anchor="end"
-              class="fill-emerald-400/80 text-[9px] font-mono"
-            >
-              {{ tick.label }}
-            </text>
+          @if (hasSaturationSeries()) {
+            @for (tick of poolTimeSeries().yTicks; track tick.y) {
+              <text
+                x="410"
+                [attr.y]="yTickLabelY(tick.y)"
+                text-anchor="end"
+                class="fill-emerald-400/80 text-[9px] font-mono"
+              >
+                {{ tick.label }}
+              </text>
+            }
           }
           <path [attr.d]="throughputTimeSeries().areaPath" fill="#06b6d4" fill-opacity="0.18" />
           <path
@@ -124,13 +129,15 @@
             stroke="#22d3ee"
             stroke-width="2"
           />
-          <path [attr.d]="poolTimeSeries().areaPath" fill="#10b981" fill-opacity="0.14" />
-          <path
-            [attr.d]="poolTimeSeries().linePath"
-            fill="none"
-            stroke="#34d399"
-            stroke-width="1.75"
-          />
+          @if (hasSaturationSeries()) {
+            <path [attr.d]="poolTimeSeries().areaPath" fill="#10b981" fill-opacity="0.14" />
+            <path
+              [attr.d]="poolTimeSeries().linePath"
+              fill="none"
+              stroke="#34d399"
+              stroke-width="1.75"
+            />
+          }
           @for (pt of throughputTimeSeries().points; track $index) {
             <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="2.2" fill="#22d3ee" />
           }
@@ -140,9 +147,12 @@
             <span class="inline-flex items-center gap-1 text-cyan-300">
               <span class="w-2.5 h-0.5 bg-cyan-400 inline-block"></span> Req/s
             </span>
-            <span class="inline-flex items-center gap-1 text-emerald-300">
-              <span class="w-2.5 h-0.5 bg-emerald-400 inline-block"></span> Pool Conn
-            </span>
+            @if (hasSaturationSeries()) {
+              <span class="inline-flex items-center gap-1 text-emerald-300">
+                <span class="w-2.5 h-0.5 bg-emerald-400 inline-block"></span>
+                {{ saturationResourceLabel() }}
+              </span>
+            }
           </span>
           <span>
             {{ throughputTimeSeries().xLabels[0]?.label }} →

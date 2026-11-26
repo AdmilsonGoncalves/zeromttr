@@ -16,5 +16,6 @@ export enum OrchestratorLogEvent {
   REPLAY_PLAYBACK_FAILED = 'replay_playback_failed',
   LLM_SYNTHESIS_FAILED = 'llm_synthesis_failed',
   LLM_PATCH_REJECTED = 'llm_patch_rejected',
-  PII_PROMPT_GUARD_BLOCKED = 'pii_prompt_guard_blocked'
+  PII_PROMPT_GUARD_BLOCKED = 'pii_prompt_guard_blocked',
+  POST_APPROVAL_HOOK_FAILED = 'post_approval_hook_failed'
 }

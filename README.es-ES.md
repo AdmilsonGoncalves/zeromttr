@@ -12,7 +12,7 @@
 
 En sistemas distribuidos de misión crítica — como liquidación de pagos instantáneos (PIX), logística de despacho, checkout de comercio electrónico o facturación — el tiempo medio entre la alerta y una corrección revisable está dominado por el cambio manual de contexto entre métricas, trazas, logs y diffs en Git.
 
-**ZeroMTTR** es una plataforma autónoma de AIOps y remediación de incidentes construida para la categoría **Logística y Automatización** (automatización de flujos operativos e integración de sistemas críticos). Su núcleo sigue **Clean Architecture / Arquitectura Hexagonal** y es **100% agnóstico al dominio**: cualquier servicio que emita telemetría OpenTelemetry (OTLP) y esté respaldado por un repositorio en **GitHub** (con soporte para otros proveedores Git como GitLab añadiendo un adaptador para `RepoInspectorPort` / `RemediationPort`) puede diagnosticarse y remediarse sin cambiar una sola línea en `apps/orchestrator` o `apps/mcp-server`.
+**ZeroMTTR** es una plataforma autónoma de AIOps y remediación de incidentes construida para la categoría **Logística y Automatización** (automatización de flujos operativos e integración de sistemas críticos). Su núcleo sigue **Clean Architecture / Arquitectura Hexagonal** y es **100% agnóstico al dominio**: cualquier servicio que emita telemetría OpenTelemetry (OTLP) y esté respaldado por un repositorio en **GitHub** (con soporte para otros proveedores Git como GitLab añadiendo un adaptador para `RepoInspectorPort` / `RemediationPort`) puede diagnosticarse y remediarse sin cambiar una sola línea en `apps/orchestrator` o `apps/mcp-server`. La inspección del estado del objetivo también se desacopla detrás de `TargetStatusPort`: las cargas cooperativas exponen un manifiesto neutro `GET /ops/status` (`capabilities` + `saturation` genérico), mientras que los servicios externos/legados pueden monitorizarse pasivamente vía `TARGET_STATUS_PROVIDER=prometheus` (MCP) sin endpoints personalizados.
 
 ### Posicionamiento Comparativo (referencia: noviembre de 2026)
 
@@ -33,7 +33,7 @@ Al hacer clic en **"Simular Incidente"** en el War Room (`POST /api/demo/chaos`)
    - Consume cero cuotas de APIs externas (Gemini, GitHub, Resend).
 2. **Modo `Live` (ejecución real de extremo a extremo, desbloqueada con `LIVE_DEMO_KEY` o Docker local):**
    1. **Inyección de Caos en `api-pagamentos-core`:** El Orchestrator invoca `chaos.controller.ts`, activando `chaosManager.setPoolSaturation(true)` (`chaos.manager.ts`). El estado cambia de `healthy` (`v2.14.7`) a `degraded` (`v2.14.8`), mientras `payment.repository.ts` reduce el límite del pool a `2` conexiones (`degradedMaxConnections`), inyecta un retraso de `4600 ms` y omite `client.release()`, provocando agotamiento de conexiones.
-   2. **Ráfaga de Tráfico Sintético:** Con `DEMO_MODE=true`, `startSyntheticTrafficBurst()` dispara oleadas de 6 peticiones `POST /payments` (en `0s, 3s, 6s, 9s, 12s, 15s`) con datos sintéticos de PIX (CPF, CNPJ, correo electrónico y token `Bearer` JWT).
+   2. **Ráfaga de Tráfico Sintético:** Con `CHAOS_AUTO_TRAFFIC_BURST=true`, `startSyntheticTrafficBurst()` dispara oleadas de 6 peticiones `POST /payments` (en `0s, 3s, 6s, 9s, 12s, 15s`) con datos sintéticos de PIX (CPF, CNPJ, correo electrónico y token `Bearer` JWT).
    3. **Observabilidad LGTM y Alertas:** El agotamiento del pool genera `KnexTimeoutError`, spans de error `pg.pool.acquire` en **Tempo**, picos de latencia en **Prometheus** y logs enmascarados en el borde por el procesador `transform` (OTTL) del OTel Collector antes de llegar a **Loki**. **Grafana** detecta la anomalía y dispara el webhook de alerta al Orchestrator.
    4. **Remediación Autónoma:** El Orchestrator recopila métricas, trazas, logs y `git diff v2.14.7...v2.14.8` mediante el **MCP Server**, audita el prompt a través de `PiiPromptGuard` (fail-closed), sintetiza RCA + parche completo del archivo (vía **Gemini** o fallback determinista), abre un PR real en GitHub contra `release/target-v2.14.8` y envía el correo Post-Mortem por **Resend** con un enlace HMAC en `#fragment`.
    5. **Restauración ("Restaurar Servicio" / `POST /api/demo/reset`):** Desactiva el caos en `ChaosManager`, cancela las ráfagas programadas y llama a `paymentRepository.resetPool()`, devolviendo `api-pagamentos-core` a `healthy` (`v2.14.7`).
@@ -167,7 +167,7 @@ Frente a la línea base manual de 7 pasos (1. triaje de alerta → 2. consulta P
 
 ```bash
 # 1. Clonar y configurar variables de entorno
-cp .env.example .env
+cp .env.prod.template .env
 
 # 2. Instalar dependencias con lockfile congelado
 pnpm install --frozen-lockfile

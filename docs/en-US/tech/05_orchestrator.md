@@ -11,7 +11,7 @@ ports/         ReasoningPort, IncidentRepository, ToolsPort (MCP client for the 
                TargetStatusPort, Clock
 application/   HandleAlert, InvestigateIncident, EnrichWithDeployDiff,
                DispatchRemediation, NotifyOnCall, RecordDecision
-adapters/      llm.gemini.ts, llm.fallback.ts, mcp.client.ts, repo.file.ts, target-status.http.ts
+adapters/      llm.gemini.ts, llm.fallback.ts, mcp.client.ts, repo.file.ts, target-status.http.ts, target-status.prometheus.ts
 http/          webhook.controller.ts, api.controller.ts, decision.controller.ts, events.sse.ts, auth.ts
 main.ts        composition root
 ```
@@ -61,7 +61,7 @@ export const PII_PATTERNS = {
 1. **HandleAlert:** Authenticates exclusively with `GRAFANA_WEBHOOK_TOKEN`, validates payload (`zod`), deduplicates by `fingerprint`, creates `Incident(RECEIVED)`, responds `202 Accepted` immediately, and starts asynchronous processing.
 2. **InvestigateIncident:**
    - Executes the deterministic collection workflow via `ToolsPort`:
-     `execute_promql_range` → `trace_id` from exemplar → `analyze_otel_trace` → `query_loki_logs` (filtered by `trace_id`), in addition to querying `TargetStatusPort` (`GET /chaos/status` on `target-app-demo`) to obtain `version` (`v2.14.8`), `previousHealthyVersion` (`v2.14.7`), and `rawEdgeLogPreCollector` (sample reported by the application before OTLP export, used only for visual comparison in the Dashboard and **never** included in the LLM prompt).
+     `execute_promql_range` → `trace_id` from exemplar → `analyze_otel_trace` → `query_loki_logs` (filtered by `trace_id`), in addition to querying `TargetStatusPort` (selected via `TARGET_STATUS_PROVIDER=manifest|prometheus`: `HttpTargetStatusAdapter` polling `TARGET_STATUS_PATH:-/ops/status` with `404` fallback to `/chaos/status`, or `PrometheusTargetStatusAdapter` querying Prometheus via MCP `ToolsPort`) to obtain `version`, `previousHealthyVersion`, `capabilities`, and optional `rawEdgeLogPreCollector` (sample reported by the application before OTLP export, used only for visual comparison in the Dashboard and **never** included in the LLM prompt).
 3. **EnrichWithDeployDiff:** Calls the MCP tool `inspect_git_deploy_diff` comparing the real tags `v2.14.7` and `v2.14.8` in `apps/target-app-demo`, isolating the commit and the file `apps/target-app-demo/src/repositories/payment.repository.ts` (with its `blobSha`).
 4. **DispatchRemediation:**
    - Audits the assembled prompt with **`PiiPromptGuard.inspectAndEnforceFailClosed`**.
@@ -73,14 +73,17 @@ export const PII_PATTERNS = {
    - Constant-time verification (`crypto.timingSafeEqual`) against timing attacks.
    - Sends the post-mortem via the MCP tool `send_post_mortem_resend` containing the signed links in the URL fragment: `${PUBLIC_DASHBOARD_URL}/decision/${id}#action=approve|reject&sig=<HMAC>&exp=<TS_SECONDS>`.
    - **Security rule:** `approveSig` and `rejectSig` **are never saved in the public `IncidentDetail` nor emitted in the `incident.notified` SSE event**.
-6. **RecordDecision:**
+6. **RecordDecision & Decoupled Post-Approval Hook:**
    - On the real route `POST /api/incidents/:id/decision`, requires valid `{ action, sig, exp }` (signed with `DECISION_HMAC_SECRET`, `exp` not expired on the current clock, and validated via `timingSafeEqual`) and verifies that the incident is still in `NOTIFIED` (rejecting with `409 Conflict` any attempt at a second decision on an incident already in `RESOLVED` or `REJECTED`).
+   - `RecordDecision` stays strictly agnostic of `DemoControlPort`, exposing only an optional `onIncidentApproved(incident)` callback wired in `main.ts` by the `demo/` layer (`createDemoSessionLifecycle`) when `ENABLE_DEMO_MODE !== 'false'` so live email approval resets the demo target consistently with `POST /api/demo/simulate-decision`.
+   - In `demo.controller.ts`, `POST /api/demo/chaos` (live mode) and `POST /api/demo/healthy-traffic` guard against targets declaring `capabilities.chaosSimulation === false` or `capabilities.healthyTrafficToggle === false` (`400 CAPABILITY_NOT_SUPPORTED`).
    - For interactive on-screen demonstration purposes when the evaluator is in `replay` mode (or authenticated with `X-Live-Demo-Key`), exposes `POST /api/demo/simulate-decision`, clearly separated from the production cryptographic endpoint.
 
 ## 4. "Live API" Mode vs. "Accelerated Replay Mode" & Access Segregation
-- On the public VPS (`https://zeromttr.agjworks.com`), anonymous visitors without an `X-Live-Demo-Key` header operate by default in **`replay`** mode (which replays in ~25 seconds the real SSE stream previously recorded in `data/last-recorded-incident.json`, without creating GitHub PRs or consuming email quota), unless `PUBLIC_LIVE_DEMO=true` is enabled (recommended with Cloudflare Turnstile verification).
-- When triggered locally (empty `LIVE_DEMO_KEY`), with `PUBLIC_LIVE_DEMO=true` + Turnstile, or on the VPS with a valid `X-Live-Demo-Key`, executes true end-to-end **`live` mode**.
-- **Global Cooldown (`SIMULATION_COOLDOWN_MS=120000`):** Prevents simultaneous clicks from opening concurrent runs.
+- Set `ENABLE_DEMO_MODE=false` for real/production usage (omits `/api/demo/*` routes and hides the War Room `app-main-menu` simulation controls).
+- On the public VPS (`https://zeromttr.agjworks.com`) with `ENABLE_DEMO_MODE=true`, anonymous visitors without an `X-Live-Demo-Key` header operate by default in **`replay`** mode (which replays in ~25 seconds the real SSE stream previously recorded in `data/last-recorded-incident.json`, without creating GitHub PRs or consuming email quota), unless `REQUIRE_DEMO_KEY=false` (or legacy `PUBLIC_LIVE_DEMO=true`) is enabled (recommended with Cloudflare Turnstile verification).
+- When triggered locally (empty `LIVE_DEMO_KEY`), with `REQUIRE_DEMO_KEY=false` (or `PUBLIC_LIVE_DEMO=true`) + Turnstile, or on the VPS with a valid `X-Live-Demo-Key`, executes true end-to-end **`live` mode**.
+- **Global Cooldown (`DEMO_COOLDOWN_MS=120000`):** Prevents simultaneous clicks from opening concurrent runs.
 
 ## 5. HTTP Interface and Token Segregation
 | Route | Description | Required Authentication |
@@ -90,8 +93,9 @@ export const PII_PATTERNS = {
 | `POST /api/incidents/:id/decision` | Executes real decision from the email link | Valid HMAC signature (`sig` + unexpired `exp`) |
 | `POST /api/demo/simulate-decision` | Simulates decision in the War Room (labeled as simulation) | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` if incident is `live` on VPS) |
 | `GET /api/events` | SSE stream (see [08 §4.2](./08_dashboard_frontend.md)) | Bearer `DASHBOARD_API_TOKEN` (injected by Nginx) |
-| `GET /api/target/status` | State of `api-pagamentos-core` | Bearer `DASHBOARD_API_TOKEN` |
-| `POST /api/demo/chaos` | Triggers `live` or `replay` simulation | Bearer `DASHBOARD_API_TOKEN` (+ Turnstile when configured; `X-Live-Demo-Key` for `mode: 'live'` unless `PUBLIC_LIVE_DEMO=true`) |
+| `GET /api/target/status` | Target workload state & capabilities | Bearer `DASHBOARD_API_TOKEN` |
+| `GET /api/demo/config` | Runtime demo/menu flags (`demoModeEnabled`, `requireDemoKey`, Turnstile) | Bearer `DASHBOARD_API_TOKEN` |
+| `POST /api/demo/chaos` | Triggers `live` or `replay` simulation | Bearer `DASHBOARD_API_TOKEN` (+ Turnstile when configured; `X-Live-Demo-Key` for `mode: 'live'` when `REQUIRE_DEMO_KEY=true`) |
 | `POST /api/demo/reset` | Restores service and cleans up demo PRs in target repo | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` if an active `live` session exists) |
 | `GET /health` | Liveness check | Public |
 

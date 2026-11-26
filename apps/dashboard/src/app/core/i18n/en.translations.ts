@@ -72,12 +72,13 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   fsmRejectedLabel: '7. Rejected',
   fsmRejectedTip: 'Hotfix rejected by on-call engineer.',
   fsmFailedLabel: 'Failed',
-  fsmHintIdle: 'Ready — choose a mode above and click "Simulate Incident" to start.',
+  fsmHintIdle: 'Ready — monitoring telemetry and awaiting incidents or on-demand execution.',
   fsmHintAwaitingAlert:
     'Service degraded — generating PIX traffic and waiting for Prometheus/Grafana alert ({N}s)...',
   fsmHintActive: 'Autonomous pipeline running — streaming live FSM state transitions.',
   fsmHintNotified: 'Awaiting human decision via email HMAC link (or demo simulation button).',
-  fsmHintResolved: 'Incident resolved and approved. Use "Restore Service" to reset the target.',
+  fsmHintResolved:
+    'Incident resolved and approved. Target service has been restored automatically.',
   fsmHintRejected: 'Hotfix rejected by on-call engineer. Pull Request remains unmerged.',
   fsmHintFailed: 'Pipeline stopped due to failure — check orchestrator logs.',
 
@@ -98,8 +99,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
   piiLogWithheldMessage: '[WITHHELD DUE TO PII VIOLATION: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
-  gitDiffIdleBody:
-    'No regression diff under inspection — target service is healthy. Trigger a simulation to inspect the v2.14.7...v2.14.8 diff and FinOps reduction.',
+  gitDiffIdleBody: 'No regression diff under inspection — target service is healthy.',
   githubPrTitle: 'Pull Request Opened on GitHub',
   githubPrViewBtn: 'View PR on GitHub ↗',
   githubPrIdleStatus: 'None',
@@ -108,18 +108,17 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   githubPrRejectedStatus: 'Rejected',
   githubPrClosedStatus: 'Closed',
   githubPrIdleBody: 'No active Pull Request — awaiting remediation stage.',
-  traceTreeIdleBody: 'No active trace — trigger a simulation to inspect the Tempo span hierarchy.',
+  traceTreeIdleBody: 'No active trace — awaiting span collection in Tempo.',
   traceTreeAwaitingBody: 'Collecting distributed spans from Tempo...',
   awaitingAuditBadge: 'Awaiting audit...',
-  piiIdleBadge: 'No active incident — awaiting simulation',
+  piiIdleBadge: 'No active incident',
   piiIdlePreCollectorLog: 'No active failure event in the edge collector.',
-  piiIdlePostOttlLog:
-    'No masked log collected from Loki. Trigger a simulation to inspect OTTL redaction.',
+  piiIdlePostOttlLog: 'No masked log collected from Loki yet.',
 
   // === Resend Post-Mortem & Human Decision / HMAC ===
   resendPreviewTitle: 'Resend Post-Mortem (Sanitized Preview)',
   resendIdleBody:
-    'No active incident right now. Trigger a simulation to preview the sanitized Post-Mortem sent via Resend.',
+    'No active incident right now — the sanitized Post-Mortem will appear here once dispatched.',
   resendDefaultBody: 'Awaiting on-call approval via exclusive signed link.',
   resendDispatchedBadge: 'Post-Mortem email dispatched to on-call engineer via Resend',
   resendDispatchedBody:
@@ -165,13 +164,14 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   targetSlaErrorOk: 'Healthy SLA',
   targetSlaErrorBreach: '5xx Errors Active',
   tooltipHealthyTraffic:
-    'Starts or stops continuous healthy traffic on api-pagamentos-core to demonstrate Before → During → After.',
+    'Starts or stops continuous healthy traffic on {{service}} to demonstrate Before → During → After.',
   tooltipHealthyTrafficRequiresRestore:
     'Target service is degraded (v2.14.8). Click "Restore Service" before starting healthy traffic.',
 
   // === Charts ===
   chartLatencyErrorTitle: 'p95 Latency (ms) & 5xx Error Rate (%)',
-  chartThroughputPoolTitle: 'Throughput (req/s) & DB Pool Usage',
+  chartThroughputTitle: 'Throughput (req/s)',
+  chartThroughputPoolTitle: 'Throughput (req/s) & {{resource}}',
   chartFinopsBarsTitle: 'LLM Payload (Raw vs Compacted)',
   chartAwaitingSamples: 'Awaiting live target service samples (2s polling)...',
 
@@ -218,7 +218,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   toastDecisionApprovedDetail:
     'Incident resolved and target service restored! Incident data remains on screen for inspection.',
   toastHealthyTrafficStartedSummary: 'Healthy traffic started',
-  toastHealthyTrafficStartedDetail: 'Continuous PIX requests streaming to api-pagamentos-core.',
+  toastHealthyTrafficStartedDetail: 'Continuous healthy requests streaming to {{service}}.',
   toastHealthyTrafficStoppedSummary: 'Healthy traffic stopped',
   toastHealthyTrafficStoppedDetail: 'Continuous request stream stopped.'
 };

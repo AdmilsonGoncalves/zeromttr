@@ -4,6 +4,7 @@ import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { handleChaosRoutes } from './routes/chaos.routes.js';
 import { handleHealthRoutes } from './routes/health.routes.js';
+import { handleOpsRoutes } from './routes/ops.routes.js';
 import { handlePaymentsRoutes } from './routes/payments.routes.js';
 import { initTelemetry } from './telemetry/otel.js';
 import { requestMetrics } from './telemetry/request-metrics.js';
@@ -16,7 +17,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   const parsedUrl = new URL(req.url || '/', `http://${host}`);
 
   const shouldTrackMetrics =
-    !parsedUrl.pathname.startsWith('/chaos/') && parsedUrl.pathname !== '/health';
+    !parsedUrl.pathname.startsWith('/chaos/') &&
+    !parsedUrl.pathname.startsWith('/ops/') &&
+    parsedUrl.pathname !== '/health';
   if (shouldTrackMetrics) {
     const startedAt = performance.now();
     res.once('finish', () => {
@@ -57,6 +60,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 
   // Route dispatch
+  if (handleOpsRoutes(req, res, parsedUrl)) {
+    return;
+  }
+
   if (handleChaosRoutes(req, res, parsedUrl)) {
     return;
   }

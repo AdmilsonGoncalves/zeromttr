@@ -1,4 +1,4 @@
-@if (activeModeSignal() === 'replay') {
+@if (demoModeEnabledSignal() && activeModeSignal() === executionMode.REPLAY) {
   <div
     class="shrink-0 bg-amber-950/50 border border-amber-700/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-200 flex items-center gap-2"
   >

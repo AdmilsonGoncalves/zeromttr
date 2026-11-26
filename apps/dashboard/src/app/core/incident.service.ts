@@ -32,6 +32,8 @@ import {
   ReasoningProvider,
   type ReasoningSource,
   type SimulateDecisionPayload,
+  type TargetCapabilities,
+  type TargetSaturation,
   type TargetStatusResponse
 } from './contract.js';
 import {
@@ -77,10 +79,32 @@ export interface TelemetryHistoryPoint {
   poolActive: number;
   poolWaiting: number;
   poolMax: number;
+  saturationResourceLabel?: string;
   healthyTrafficActive: boolean;
 }
 
+function resolveTargetSaturation(
+  metrics: TargetStatusResponse['metrics'] | null | undefined
+): TargetSaturation | null {
+  if (!metrics) {
+    return null;
+  }
+  if (metrics.saturation) {
+    return metrics.saturation;
+  }
+  if ([metrics.poolActive, metrics.poolWaiting, metrics.poolMax].some(isFilled)) {
+    return {
+      resourceLabel: 'DB Pool',
+      active: metrics.poolActive ?? 0,
+      waiting: metrics.poolWaiting ?? 0,
+      max: metrics.poolMax ?? 0
+    };
+  }
+  return null;
+}
+
 const LIVE_DEMO_KEY_STORAGE_KEY = 'zeromttr_live_demo_key';
+const ACTIVE_MODE_STORAGE_KEY = 'zeromttr_active_mode';
 const VISUAL_STEP_INTERVAL_MS = 450;
 const MAX_TELEMETRY_HISTORY_POINTS = 45;
 
@@ -109,10 +133,24 @@ export class IncidentService {
   private isSyncingFallback = false;
   private readonly incidentUpdateGeneration = new Map<string, number>();
   private chaosTriggeredAtMs = 0;
+  private activeModeModifiedByUser = false;
 
   readonly currentIncident = signal<IncidentDetail | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
+  readonly targetServiceName = computed<string>(() => this.targetStatus()?.service ?? '');
+  readonly targetCapabilities = computed<TargetCapabilities>(
+    () =>
+      this.targetStatus()?.capabilities ?? {
+        chaosSimulation: false,
+        healthyTrafficToggle: false
+      }
+  );
   readonly targetMetrics = computed(() => this.targetStatus()?.metrics ?? null);
+  readonly targetSaturation = computed<TargetSaturation | null>(() =>
+    resolveTargetSaturation(this.targetMetrics())
+  );
+  readonly demoModeEnabled = signal<boolean>(false);
+  readonly requireDemoKey = signal<boolean>(true);
   readonly telemetryHistory = signal<TelemetryHistoryPoint[]>([]);
   readonly sseConnected = signal<boolean>(false);
   readonly activeMode = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
@@ -163,6 +201,10 @@ export class IncidentService {
       const savedKey = globalThis.localStorage?.getItem(LIVE_DEMO_KEY_STORAGE_KEY);
       if (isNonEmptyString(savedKey)) {
         this.liveDemoKey.set(savedKey);
+      }
+      const savedMode = globalThis.localStorage?.getItem(ACTIVE_MODE_STORAGE_KEY);
+      if (savedMode === IncidentExecutionMode.LIVE && isNonEmptyString(this.liveDemoKey())) {
+        this.activeMode.set(IncidentExecutionMode.LIVE);
       }
     } catch {
       // Ignore storage access errors in headless/SSR environments
@@ -568,10 +610,16 @@ export class IncidentService {
   });
 
   /**
-   * Updates the active demo execution mode (`live` or `replay`).
+   * Updates the active demo execution mode (`live` or `replay`) and persists it for authorized cross-tab restoration.
    */
   setActiveMode(mode: IncidentMode): void {
+    this.activeModeModifiedByUser = true;
     this.activeMode.set(mode);
+    try {
+      globalThis.localStorage?.setItem(ACTIVE_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Ignore storage access errors
+    }
   }
 
   /**
@@ -976,16 +1024,18 @@ export class IncidentService {
     const now = new Date(timestampMs);
     const pad = (n: number): string => String(n).padStart(2, '0');
     const label = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const sat = resolveTargetSaturation(metrics);
     const point: TelemetryHistoryPoint = {
       timestampMs,
       label,
       requestsPerSecond: metrics.requestsPerSecond,
       errorRate5xxPercent: metrics.errorRate5xxPercent,
       p95LatencyMs: metrics.p95LatencyMs,
-      poolActive: metrics.poolActive,
-      poolWaiting: metrics.poolWaiting,
-      poolMax: metrics.poolMax,
-      healthyTrafficActive: metrics.healthyTrafficActive
+      poolActive: sat?.active ?? 0,
+      poolWaiting: sat?.waiting ?? 0,
+      poolMax: sat?.max ?? 0,
+      ...(sat ? { saturationResourceLabel: sat.resourceLabel } : {}),
+      healthyTrafficActive: metrics.healthyTrafficActive ?? false
     };
     this.telemetryHistory.update((prev) => {
       const next = [...prev, point];
@@ -1086,6 +1136,9 @@ export class IncidentService {
             signal: controller.signal
           });
           if (res.status === 404) {
+            this.demoModeEnabled.set(false);
+            this.requireDemoKey.set(true);
+            this.publicLiveDemo.set(false);
             this.demoConfigLoaded = true;
             return;
           }
@@ -1094,11 +1147,29 @@ export class IncidentService {
               res,
               controller.signal
             );
-            this.publicLiveDemo.set(config.publicLiveDemo === true);
+            const demoModeEnabled = config.demoModeEnabled !== false;
+            const requireDemoKey =
+              config.requireDemoKey !== undefined
+                ? config.requireDemoKey === true
+                : config.publicLiveDemo !== true;
+            this.demoModeEnabled.set(demoModeEnabled);
+            this.requireDemoKey.set(requireDemoKey);
+            const isPublicLive = !requireDemoKey;
+            this.publicLiveDemo.set(isPublicLive);
             this.turnstileSiteKey.set(
               isNonEmptyString(config.turnstileSiteKey) ? config.turnstileSiteKey : null
             );
             this.turnstileRequired.set(config.turnstileRequired === true);
+            if (isPublicLive && !this.activeModeModifiedByUser) {
+              try {
+                const savedMode = globalThis.localStorage?.getItem(ACTIVE_MODE_STORAGE_KEY);
+                if (savedMode === IncidentExecutionMode.LIVE) {
+                  this.activeMode.set(IncidentExecutionMode.LIVE);
+                }
+              } catch {
+                // Ignore storage access errors
+              }
+            }
             this.demoConfigLoaded = true;
             return;
           }

@@ -57,7 +57,7 @@ export function mockTargetAppStatusEndpoint(
 ): nock.Scope {
   return nock(TEST_TARGET_APP_URL)
     .persist()
-    .get('/chaos/status')
+    .get('/ops/status')
     .reply(HTTP_STATUS.OK, {
       status: overrides.status ?? TargetHealthStatus.DEGRADED,
       service: 'api-pagamentos-core',
@@ -65,6 +65,10 @@ export function mockTargetAppStatusEndpoint(
       previousHealthyVersion: overrides.previousHealthyVersion ?? 'v2.14.7',
       targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
       suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: true
+      },
       rawEdgeLogPreCollector: '2026-11-10T12:00:00Z ERROR raw edge log [REDACTED]'
     });
 }

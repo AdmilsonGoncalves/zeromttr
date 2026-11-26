@@ -1,6 +1,6 @@
 {
-  "uid": "zeromttr-payment-core",
-  "title": "ZeroMTTR — api-pagamentos-core Performance & Remediation",
+  "uid": "zeromttr-target-workload",
+  "title": "ZeroMTTR — $service Performance & Remediation",
   "tags": ["zeromttr", "aiops", "otel", "lgtm"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -9,6 +9,25 @@
   "time": {
     "from": "now-15m",
     "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Target Service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
+        "definition": "label_values(http_request_duration_seconds_count, service)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(http_request_duration_seconds_count, service)"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false
+      }
+    ]
   },
   "annotations": {
     "list": [
@@ -35,13 +54,13 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"api-pagamentos-core\"}[1m])) by (le)) * 1000",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"$service\"}[1m])) by (le)) * 1000",
           "legendFormat": "p95 latency (ms)"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=\"api-pagamentos-core\"}[1m])) by (le)) * 1000",
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=\"$service\"}[1m])) by (le)) * 1000",
           "legendFormat": "p50 latency (ms)"
         }
       ],
@@ -69,7 +88,7 @@
     },
     {
       "id": 2,
-      "title": "DB Connection Pool (Active vs Waiting)",
+      "title": "DB Connection Pool (Active vs Waiting — Optional)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
@@ -77,18 +96,19 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "db_pool_used{service=\"api-pagamentos-core\"}",
+          "expr": "db_pool_used{service=\"$service\"}",
           "legendFormat": "Active ({{version}})"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "db_pool_waiting{service=\"api-pagamentos-core\"}",
+          "expr": "db_pool_waiting{service=\"$service\"}",
           "legendFormat": "Waiting ({{version}})"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "0",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 30,
@@ -101,7 +121,7 @@
     },
     {
       "id": 3,
-      "title": "Pool Active Gauge",
+      "title": "Pool Active Gauge (Optional)",
       "type": "gauge",
       "gridPos": { "h": 4, "w": 3, "x": 18, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
@@ -109,11 +129,12 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "max(db_pool_used{service=\"api-pagamentos-core\"})"
+          "expr": "max(db_pool_used{service=\"$service\"})"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "0",
           "min": 0,
           "max": 10,
           "thresholds": {
@@ -137,7 +158,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"api-pagamentos-core\"}[1m])) by (le)) * 1000"
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"$service\"}[1m])) by (le)) * 1000"
         }
       ],
       "fieldConfig": {
@@ -158,7 +179,7 @@
     },
     {
       "id": 5,
-      "title": "PIX Throughput (req/s)",
+      "title": "HTTP Throughput (req/s)",
       "type": "stat",
       "gridPos": { "h": 4, "w": 3, "x": 18, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
@@ -166,7 +187,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "sum(rate(http_request_duration_seconds_count{service=\"api-pagamentos-core\"}[1m]))"
+          "expr": "sum(rate(http_request_duration_seconds_count{service=\"$service\"}[1m]))"
         }
       ],
       "options": {
@@ -182,7 +203,7 @@
     },
     {
       "id": 6,
-      "title": "Queued Pool Waiters",
+      "title": "Queued Pool Waiters (Optional)",
       "type": "stat",
       "gridPos": { "h": 4, "w": 3, "x": 21, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
@@ -190,7 +211,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "max(db_pool_waiting{service=\"api-pagamentos-core\"})"
+          "expr": "max(db_pool_waiting{service=\"$service\"})"
         }
       ],
       "options": {
@@ -199,6 +220,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -219,25 +241,25 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=\"api-pagamentos-core\"}[1m])) by (le)) * 1000",
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=\"$service\"}[1m])) by (le)) * 1000",
           "legendFormat": "p50"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket{service=\"api-pagamentos-core\"}[1m])) by (le)) * 1000",
+          "expr": "histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket{service=\"$service\"}[1m])) by (le)) * 1000",
           "legendFormat": "p90"
         },
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"api-pagamentos-core\"}[1m])) by (le)) * 1000",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"$service\"}[1m])) by (le)) * 1000",
           "legendFormat": "p95"
         },
         {
           "refId": "D",
           "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
-          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=\"api-pagamentos-core\"}[1m])) by (le)) * 1000",
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=\"$service\"}[1m])) by (le)) * 1000",
           "legendFormat": "p99"
         }
       ],

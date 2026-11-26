@@ -159,6 +159,7 @@ export interface TranslationDictionary {
 
   // === Charts ===
   chartLatencyErrorTitle: string;
+  chartThroughputTitle: string;
   chartThroughputPoolTitle: string;
   chartFinopsBarsTitle: string;
   chartAwaitingSamples: string;

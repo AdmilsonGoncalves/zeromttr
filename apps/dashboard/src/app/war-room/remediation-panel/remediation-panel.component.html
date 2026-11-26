@@ -55,7 +55,7 @@
   </div>
 
   <!-- Human-in-the-Loop Decision Controls -->
-  @if (displayedFsmStateSignal() === 'NOTIFIED') {
+  @if (displayedFsmStateSignal() === incidentState.NOTIFIED) {
     <div
       class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center gap-1.5"
     >
@@ -63,21 +63,23 @@
       <span class="leading-tight text-[11px]">{{ i18n.t('awaitingDecisionBadge') }}</span>
     </div>
 
-    <p-button
-      [label]="i18n.t('simulateDecisionBtn')"
-      severity="warn"
-      size="small"
-      [disabled]="simulationLockedByTurnstileSignal()"
-      [pTooltip]="
-        simulationLockedByTurnstileSignal()
-          ? i18n.t('tooltipTurnstilePending')
-          : i18n.t('tooltipSimulateDecision')
-      "
-      tooltipPosition="left"
-      styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
-      (onClick)="simulateDecision.emit()"
-    />
-  } @else if (displayedFsmStateSignal() === 'RESOLVED') {
+    @if (demoModeEnabledSignal()) {
+      <p-button
+        [label]="i18n.t('simulateDecisionBtn')"
+        severity="warn"
+        size="small"
+        [disabled]="simulationLockedByTurnstileSignal()"
+        [pTooltip]="
+          simulationLockedByTurnstileSignal()
+            ? i18n.t('tooltipTurnstilePending')
+            : i18n.t('tooltipSimulateDecision')
+        "
+        tooltipPosition="left"
+        styleClass="shrink-0 w-full text-xs font-semibold py-1.5"
+        (onClick)="simulateDecision.emit()"
+      />
+    }
+  } @else if (displayedFsmStateSignal() === incidentState.RESOLVED) {
     <div
       class="shrink-0 bg-emerald-950/60 border border-emerald-500/70 rounded p-2 text-xs text-emerald-200 flex items-center gap-1.5"
     >
@@ -86,7 +88,7 @@
         i18n.t('decisionSuccessMsg')
       }}</span>
     </div>
-  } @else if (displayedFsmStateSignal() === 'REJECTED') {
+  } @else if (displayedFsmStateSignal() === incidentState.REJECTED) {
     <div
       class="shrink-0 bg-rose-950/60 border border-rose-500/70 rounded p-2 text-xs text-rose-200 flex items-center gap-1.5"
     >

@@ -53,7 +53,9 @@ const TURNSTILE_SCRIPT_SRC =
 })
 export class WarRoomNoticesComponent implements OnDestroy {
   readonly i18n: I18nService;
+  readonly executionMode = IncidentExecutionMode;
 
+  readonly demoModeEnabledSignal = signal<boolean>(true);
   readonly activeModeSignal = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly turnstileSiteKeySignal = signal<string | null>(null);
   readonly simulationLockedByTurnstileSignal = signal<boolean>(false);
@@ -68,6 +70,11 @@ export class WarRoomNoticesComponent implements OnDestroy {
   @ViewChild('turnstileContainer')
   set turnstileContainer(ref: ElementRef<HTMLElement> | undefined) {
     this.turnstileHostSignal.set(ref?.nativeElement ?? null);
+  }
+
+  @Input()
+  set demoModeEnabled(value: boolean) {
+    this.demoModeEnabledSignal.set(value);
   }
 
   @Input({ required: true })

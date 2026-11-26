@@ -187,14 +187,29 @@ export const IncidentDetailSchema = IncidentSummarySchema.extend({
 });
 export type IncidentDetail = z.infer<typeof IncidentDetailSchema>;
 
+export const TargetCapabilitiesSchema = z.object({
+  chaosSimulation: z.boolean().default(false),
+  healthyTrafficToggle: z.boolean().default(false)
+});
+export type TargetCapabilities = z.infer<typeof TargetCapabilitiesSchema>;
+
+export const TargetSaturationSchema = z.object({
+  resourceLabel: z.string().min(1),
+  active: z.number().int().nonnegative(),
+  waiting: z.number().int().nonnegative(),
+  max: z.number().int().nonnegative()
+});
+export type TargetSaturation = z.infer<typeof TargetSaturationSchema>;
+
 export const TargetLiveMetricsSchema = z.object({
   requestsPerSecond: z.number().nonnegative(),
   errorRate5xxPercent: z.number().min(0).max(100),
   p95LatencyMs: z.number().nonnegative(),
-  poolActive: z.number().int().nonnegative(),
-  poolWaiting: z.number().int().nonnegative(),
-  poolMax: z.number().int().nonnegative(),
-  healthyTrafficActive: z.boolean()
+  healthyTrafficActive: z.boolean().default(false),
+  saturation: TargetSaturationSchema.optional(),
+  poolActive: z.number().int().nonnegative().optional(),
+  poolWaiting: z.number().int().nonnegative().optional(),
+  poolMax: z.number().int().nonnegative().optional()
 });
 export type TargetLiveMetrics = z.infer<typeof TargetLiveMetricsSchema>;
 
@@ -203,6 +218,12 @@ export const TargetStatusResponseSchema = z.object({
   service: z.string(),
   version: z.string(),
   previousHealthyVersion: z.string(),
+  targetRepo: z.string().optional(),
+  suspectFilePath: z.string().optional(),
+  capabilities: TargetCapabilitiesSchema.default({
+    chaosSimulation: false,
+    healthyTrafficToggle: false
+  }),
   rawEdgeLogPreCollector: z.string().optional(),
   metrics: TargetLiveMetricsSchema.optional()
 });

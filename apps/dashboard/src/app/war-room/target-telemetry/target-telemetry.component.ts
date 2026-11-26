@@ -1,16 +1,17 @@
 import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { isFilled } from '@zeromttr/utils';
 import { Knob } from 'primeng/knob';
 import { MeterGroup, type MeterItem } from 'primeng/metergroup';
 import { ProgressBar } from 'primeng/progressbar';
 import { Tag } from 'primeng/tag';
 import { TARGET_TELEMETRY_THRESHOLDS, TelemetryHealthLevel } from '../../core/constants.js';
-import type { TargetLiveMetrics } from '../../core/contract.js';
+import type { TargetLiveMetrics, TargetSaturation } from '../../core/contract.js';
 import { I18nService } from '../../core/i18n/i18n.service.js';
 
 /**
- * Displays compact instantaneous target workload telemetry cards (throughput, 5xx rate, p95 latency, and DB pool usage).
+ * Displays compact instantaneous target workload telemetry cards (throughput, 5xx rate, p95 latency, and generic saturation).
  */
 @Component({
   selector: 'app-target-telemetry',
@@ -21,13 +22,39 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
 })
 export class TargetTelemetryComponent {
   readonly i18n: I18nService;
+  readonly healthLevel = TelemetryHealthLevel;
 
   readonly metricsSignal = signal<TargetLiveMetrics | null>(null);
+  readonly serviceNameSignal = signal<string>('');
 
   @Input()
   set metrics(value: TargetLiveMetrics | null) {
     this.metricsSignal.set(value);
   }
+
+  @Input()
+  set serviceName(value: string) {
+    this.serviceNameSignal.set(value);
+  }
+
+  readonly saturationSignal = computed<TargetSaturation | null>(() => {
+    const current = this.metricsSignal();
+    if (!current) {
+      return null;
+    }
+    if (current.saturation) {
+      return current.saturation;
+    }
+    if ([current.poolActive, current.poolWaiting, current.poolMax].some(isFilled)) {
+      return {
+        resourceLabel: this.i18n.t('targetPoolLabel'),
+        active: current.poolActive ?? 0,
+        waiting: current.poolWaiting ?? 0,
+        max: current.poolMax ?? 0
+      };
+    }
+    return null;
+  });
 
   readonly throughputPercent = computed<number>(() => {
     const rps = this.metricsSignal()?.requestsPerSecond ?? 0;
@@ -79,12 +106,12 @@ export class TargetTelemetryComponent {
   });
 
   readonly poolLevel = computed<TelemetryHealthLevel>(() => {
-    const current = this.metricsSignal();
-    if (!current || current.poolMax <= 0) {
+    const sat = this.saturationSignal();
+    if (!sat || sat.max <= 0) {
       return TelemetryHealthLevel.HEALTHY;
     }
-    const ratio = current.poolActive / current.poolMax;
-    if (current.poolWaiting > 0 || ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_CRITICAL_RATIO) {
+    const ratio = sat.active / sat.max;
+    if (sat.waiting > 0 || ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_CRITICAL_RATIO) {
       return TelemetryHealthLevel.CRITICAL;
     }
     if (ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_WARN_RATIO) {
@@ -105,16 +132,16 @@ export class TargetTelemetryComponent {
   });
 
   readonly poolMax = computed<number>(() => {
-    const current = this.metricsSignal();
-    if (!current) {
+    const sat = this.saturationSignal();
+    if (!sat) {
       return 10;
     }
-    return Math.max(1, current.poolMax, current.poolActive + current.poolWaiting);
+    return Math.max(1, sat.max, sat.active + sat.waiting);
   });
 
   readonly poolMeters = computed<MeterItem[]>(() => {
-    const current = this.metricsSignal();
-    if (!current) {
+    const sat = this.saturationSignal();
+    if (!sat) {
       return [];
     }
     const level = this.poolLevel();
@@ -126,15 +153,15 @@ export class TargetTelemetryComponent {
           : '#10b981';
     const items: MeterItem[] = [
       {
-        label: `${this.i18n.t('targetPoolActiveLabel')} (${current.poolActive})`,
-        value: current.poolActive,
+        label: `${this.i18n.t('targetPoolActiveLabel')} (${sat.active})`,
+        value: sat.active,
         color: activeColor
       }
     ];
-    if (current.poolWaiting > 0) {
+    if (sat.waiting > 0) {
       items.push({
-        label: `${this.i18n.t('targetPoolWaitingLabel')} (${current.poolWaiting})`,
-        value: current.poolWaiting,
+        label: `${this.i18n.t('targetPoolWaitingLabel')} (${sat.waiting})`,
+        value: sat.waiting,
         color: '#f59e0b'
       });
     }

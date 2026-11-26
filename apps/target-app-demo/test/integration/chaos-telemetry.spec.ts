@@ -1,7 +1,9 @@
 import http from 'node:http';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { chaosController } from '../../src/controllers/chaos.controller.js';
+import { chaosManager } from '../../src/chaos/chaos.manager.js';
+import { paymentRepository } from '../../src/repositories/payment.repository.js';
 import { requestMetrics } from '../../src/telemetry/request-metrics.js';
 
 function requestJson(
@@ -48,8 +50,13 @@ describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
   let originalPort: string | undefined;
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     chaosController.stopHealthyTraffic();
+    chaosManager.reset();
+    paymentRepository.resetPool();
     requestMetrics.reset();
+    delete process.env.CHAOS_AUTO_TRAFFIC_BURST;
+    delete process.env.DEMO_MODE;
     if (originalPort !== undefined) {
       process.env.PORT = originalPort;
     } else {
@@ -104,5 +111,42 @@ describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
     const disableRes = await requestJson(server, 'POST', '/chaos/healthy-traffic?enable=false');
     expect(disableRes.status).toBe(200);
     expect(disableRes.body.healthyTrafficActive).toBe(false);
+  });
+
+  it('should trigger synthetic burst only when CHAOS_AUTO_TRAFFIC_BURST is true', async () => {
+    originalPort = process.env.PORT;
+    server = http.createServer(createApp());
+    await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Server address unavailable');
+    }
+    process.env.PORT = String(address.port);
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 500 }));
+
+    // 1. Disabled when both flags are unset or false
+    process.env.CHAOS_AUTO_TRAFFIC_BURST = 'false';
+    process.env.DEMO_MODE = 'true';
+    await requestJson(server, 'POST', '/chaos/pool-saturation?enable=true');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    await requestJson(server, 'POST', '/chaos/pool-saturation?enable=false');
+
+    // 2. Enabled when CHAOS_AUTO_TRAFFIC_BURST=true
+    process.env.CHAOS_AUTO_TRAFFIC_BURST = 'true';
+    delete process.env.DEMO_MODE;
+    await requestJson(server, 'POST', '/chaos/pool-saturation?enable=true');
+    expect(fetchSpy).toHaveBeenCalledTimes(6);
+    await requestJson(server, 'POST', '/chaos/pool-saturation?enable=false');
+
+    // 3. Legacy fallback when CHAOS_AUTO_TRAFFIC_BURST is unset and DEMO_MODE=true
+    fetchSpy.mockClear();
+    delete process.env.CHAOS_AUTO_TRAFFIC_BURST;
+    process.env.DEMO_MODE = 'true';
+    await requestJson(server, 'POST', '/chaos/pool-saturation?enable=true');
+    expect(fetchSpy).toHaveBeenCalledTimes(6);
+    await requestJson(server, 'POST', '/chaos/pool-saturation?enable=false');
   });
 });

@@ -66,20 +66,64 @@ describe('LiveMetricsTabComponent', () => {
     expect(component.latestPoolConnections()).toBe(0);
   });
 
-  it('should_render_only_dedicated_time_series_with_secondary_axis_labels_and_no_duplicate_gauges', () => {
+  it('should render only dedicated time series with secondary axis labels and no duplicate gauges', () => {
     const html = readFileSync(LIVE_METRICS_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('chartLatencyErrorTitle');
-    expect(html).toContain('chartThroughputPoolTitle');
+    expect(html).toContain('throughputChartTitle()');
+    expect(html).toContain('@if (hasSaturationSeries())');
     expect(html).toContain('latestLatencyMs()');
     expect(html).toContain('latestPoolConnections()');
     expect(html).toContain('errorTimeSeries().yTicks');
     expect(html).toContain('poolTimeSeries().yTicks');
+    expect(html).not.toContain('Pool Conn');
+    expect(html).not.toContain(' conn');
     expect(html).not.toContain('chartPoolGaugeLabel');
     expect(html).not.toContain('chartFinopsGaugeLabel');
     expect(html).not.toContain('chartMttrBarsTitle');
     expect(html).not.toContain('chartFinopsBarsTitle');
     expect(html).not.toContain('tick.y + 9');
     expect(html).toContain('yTickLabelY(tick.y)');
+  });
+
+  it('should hide secondary saturation series and show neutral throughput title when target has no saturation', () => {
+    component.telemetryHistory = [
+      {
+        timestampMs: 1000,
+        label: '11:00:00',
+        requestsPerSecond: 12.5,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 24,
+        poolActive: 0,
+        poolWaiting: 0,
+        poolMax: 0,
+        healthyTrafficActive: false
+      }
+    ];
+
+    expect(component.hasSaturationSeries()).toBe(false);
+    expect(component.saturationResourceLabel()).toBeNull();
+    expect(component.throughputChartTitle()).toBe('Throughput (req/s)');
+  });
+
+  it('should render custom saturation resource label on throughput chart from telemetry history', () => {
+    component.telemetryHistory = [
+      {
+        timestampMs: 1000,
+        label: '11:00:00',
+        requestsPerSecond: 19,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 32,
+        poolActive: 5,
+        poolWaiting: 1,
+        poolMax: 16,
+        saturationResourceLabel: 'Worker Queue',
+        healthyTrafficActive: false
+      }
+    ];
+
+    expect(component.hasSaturationSeries()).toBe(true);
+    expect(component.saturationResourceLabel()).toBe('Worker Queue');
+    expect(component.throughputChartTitle()).toBe('Throughput (req/s) & Worker Queue');
   });
 
   it('should_keep_all_svg_y_tick_labels_inside_the_145px_viewbox_bounds', () => {

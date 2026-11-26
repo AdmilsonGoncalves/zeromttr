@@ -2,9 +2,8 @@ import type http from 'node:http';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
-import { paymentService } from '../services/payment.service.js';
+import { buildTargetStatusManifest } from './ops-status.controller.js';
 import { telemetry } from '../telemetry/otel.js';
-import { requestMetrics } from '../telemetry/request-metrics.js';
 
 const HEALTHY_TRAFFIC_INTERVAL_MS = 1500;
 const HEALTHY_TRAFFIC_BATCH_SIZE = 2;
@@ -38,7 +37,7 @@ export class ChaosController {
     if (!shouldEnable) {
       telemetry.recordPoolUsed(0);
       telemetry.recordPoolWaiting(0);
-    } else if (process.env.DEMO_MODE === 'true') {
+    } else if (this.isAutoTrafficBurstEnabled()) {
       this.startSyntheticTrafficBurst();
     }
 
@@ -164,21 +163,22 @@ export class ChaosController {
     }
   }
 
+  /**
+   * Returns whether continuous healthy synthetic traffic is currently active.
+   */
+  public isHealthyTrafficActive(): boolean {
+    return this.healthyTrafficActive;
+  }
+
+  private isAutoTrafficBurstEnabled(): boolean {
+    if (process.env.CHAOS_AUTO_TRAFFIC_BURST !== undefined) {
+      return process.env.CHAOS_AUTO_TRAFFIC_BURST === 'true';
+    }
+    return process.env.DEMO_MODE === 'true';
+  }
+
   private buildStatusPayload() {
-    const pool = paymentService.getPoolStats();
-    const snapshot = requestMetrics.getSnapshot();
-    return {
-      ...chaosManager.getStatus(),
-      metrics: {
-        requestsPerSecond: snapshot.requestsPerSecond,
-        errorRate5xxPercent: snapshot.errorRate5xxPercent,
-        p95LatencyMs: snapshot.p95LatencyMs,
-        poolActive: pool.active,
-        poolWaiting: pool.waiting,
-        poolMax: pool.max,
-        healthyTrafficActive: this.healthyTrafficActive
-      }
-    };
+    return buildTargetStatusManifest(this.healthyTrafficActive);
   }
 
   /**

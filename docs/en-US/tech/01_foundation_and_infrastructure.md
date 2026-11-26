@@ -55,7 +55,7 @@ Create the 3 workflows in `.github/workflows/`:
 3. **`cd-release.yml`:** publishes Docker images to **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**. **Operational stability rule:** the `deploy-vps` job **does not** run on every push to the main branch or on demo workload comparison tags (`v2.14.*`); it runs **exclusively when a platform release tag `v1.*.*` is published or via manual trigger (`workflow_dispatch`)**, keeping the demo VPS frozen and stable during evaluation periods.
 
 ### T1.6 Initial Documentation
-`README.md` (en-US) and `README.pt-BR.md` stating the track (**Logistics & Automation** — workflow automation and cross-system integration), the open and domain-agnostic architecture, technical market positioning, local execution instructions, and a clear distinction between `Live` mode and `Replay` mode. Create `LICENSE` (MIT), `.env.example`, `AGENTS.md` (specification below), and `GEMINI.md` (just a pointer instructing to read and follow `AGENTS.md`, already created at the root).
+`README.md` (en-US) and `README.pt-BR.md` stating the track (**Logistics & Automation** — workflow automation and cross-system integration), the open and domain-agnostic architecture, technical market positioning, local execution instructions, and a clear distinction between `Live` mode and `Replay` mode. Create `LICENSE` (MIT), `.env.prod.template`, `AGENTS.md` (specification below), and `GEMINI.md` (just a pointer instructing to read and follow `AGENTS.md`, already created at the root).
 
 #### `AGENTS.md` Specification (repository root)
 Short, imperative file written in Portuguese, read by every coding agent before any implementation. It must contain the mandatory sections below:
@@ -99,7 +99,7 @@ Create `docker-compose.prod.yml`, `infra/otel-collector-config.prod.yaml`, and `
 
 ---
 
-## 3. Environment Variables (`.env.example` / `.env.prod.template`)
+## 3. Environment Variables (`.env.prod.template`)
 > **Formatting rule:** never use *inline* comments on the same line as a value, and always wrap values containing spaces or `< >` in double quotes.
 
 ```dotenv
@@ -116,21 +116,26 @@ TEMPO_URL=http://tempo:3200
 GRAFANA_URL=http://grafana:3000
 GRAFANA_SA_TOKEN=
 
-# Token Segregation (Least Privilege)
+# Token Segregation, Demo Menu & Live Protection
 MCP_AUTH_TOKEN=change-me-mcp-token
 GRAFANA_WEBHOOK_TOKEN=change-me-grafana-webhook-token
 DASHBOARD_API_TOKEN=change-me-dashboard-api-token
 # Exclusively signs Approve/Reject links sent via email
 DECISION_HMAC_SECRET=change-me-hmac-secret
-# Key required on the public VPS to trigger real Live mode (protects quota against anonymous traffic)
+# true = shows app-main-menu (Replay/Live/Simulate/Restore); false = real/production mode
+ENABLE_DEMO_MODE=true
+# When ENABLE_DEMO_MODE=true: requires LIVE_DEMO_KEY for real Live API execution
+REQUIRE_DEMO_KEY=true
 LIVE_DEMO_KEY=
-SIMULATION_COOLDOWN_MS=120000
+DEMO_COOLDOWN_MS=120000
 PUBLIC_BASE_URL=http://localhost:8080
 PUBLIC_DASHBOARD_URL=http://localhost:4200
 
-# Orchestrator -> MCP & Demo Workload
+# Orchestrator -> MCP & Target Workload
 MCP_URL=http://mcp-server:8000
-TARGET_DEMO_URL=http://target-app-demo:3001
+TARGET_APP_URL=http://target-app-demo:3001
+TARGET_STATUS_PROVIDER=manifest
+TARGET_STATUS_PATH=/ops/status
 DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
 
 # External Integrations (GitHub API & Resend)
@@ -145,11 +150,11 @@ ON_CALL_ENGINEER_EMAIL=oncall-sre@example.com
 # LLM (Orchestrator ReasoningPort — Configurable Model)
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash
-LLM_API_KEY=
+GEMINI_API_KEY=
 
-# Workload Flags
+# Target Workload Simulator Flags (target-app-demo only)
 CHAOS_ENABLED=false
-DEMO_MODE=true
+CHAOS_AUTO_TRAFFIC_BURST=true
 ```
 
 ---
@@ -206,7 +211,7 @@ jobs:
     needs: quality-and-tests
     steps:
       - uses: actions/checkout@v4
-      - run: cp .env.example .env
+      - run: cp .env.prod.template .env
       - run: docker compose config -q
       - run: docker compose build
 ```

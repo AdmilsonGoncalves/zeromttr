@@ -34,9 +34,15 @@ export class I18nService {
   }
 
   /**
-   * Resolves a localized string for the given translation key.
+   * Resolves a localized string for the given translation key and interpolates `{{param}}` placeholders.
    */
-  t(key: keyof TranslationDictionary): string {
-    return this.dict()[key];
+  t(key: keyof TranslationDictionary, params?: Record<string, string>): string {
+    let text = this.dict()[key];
+    if (params) {
+      for (const [paramKey, paramValue] of Object.entries(params)) {
+        text = text.replaceAll(`{{${paramKey}}}`, paramValue);
+      }
+    }
+    return text;
   }
 }

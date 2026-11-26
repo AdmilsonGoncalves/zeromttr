@@ -5,7 +5,10 @@
         class="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5"
       >
         <i class="pi pi-heart-fill text-cyan-400 text-xs"></i>
-        <span>{{ i18n.t('targetTelemetryLabel') }} — api-pagamentos-core</span>
+        <span>
+          {{ i18n.t('targetTelemetryLabel') }} —
+          {{ serviceNameSignal() || i18n.t('serviceStatusLabel') }}
+        </span>
       </span>
       <p-tag
         [value]="
@@ -18,11 +21,16 @@
       />
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+    <div
+      class="grid grid-cols-2 gap-2"
+      [ngClass]="saturationSignal() ? 'lg:grid-cols-4' : 'lg:grid-cols-3'"
+    >
       <!-- Card 1: Throughput Req/s -->
       <div
         class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex flex-col justify-between gap-1 shadow-sm"
-        [ngClass]="throughputLevel() === 'warn' ? 'border-amber-500/70' : 'border-slate-800'"
+        [ngClass]="
+          throughputLevel() === healthLevel.WARN ? 'border-amber-500/70' : 'border-slate-800'
+        "
       >
         <div class="flex items-center justify-between">
           <span class="text-[11px] text-slate-400 font-medium">
@@ -30,13 +38,13 @@
           </span>
           <i
             class="pi pi-bolt text-xs"
-            [ngClass]="throughputLevel() === 'warn' ? 'text-amber-400' : 'text-cyan-400'"
+            [ngClass]="throughputLevel() === healthLevel.WARN ? 'text-amber-400' : 'text-cyan-400'"
           ></i>
         </div>
         <div class="flex items-baseline gap-1.5">
           <span
             class="text-lg font-mono font-bold"
-            [ngClass]="throughputLevel() === 'warn' ? 'text-amber-300' : 'text-cyan-300'"
+            [ngClass]="throughputLevel() === healthLevel.WARN ? 'text-amber-300' : 'text-cyan-300'"
           >
             {{ m.requestsPerSecond }}
           </span>
@@ -47,7 +55,9 @@
           [showValue]="false"
           [class]="
             'h-1.5 bg-slate-800 ' +
-            (throughputLevel() === 'warn' ? 'telemetry-bar-warn' : 'telemetry-bar-healthy')
+            (throughputLevel() === healthLevel.WARN
+              ? 'telemetry-bar-warn'
+              : 'telemetry-bar-healthy')
           "
         />
       </div>
@@ -56,9 +66,9 @@
       <div
         class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex items-center justify-between gap-2 shadow-sm"
         [ngClass]="{
-          'border-rose-500/70': error5xxLevel() === 'critical',
-          'border-amber-500/70': error5xxLevel() === 'warn',
-          'border-slate-800': error5xxLevel() === 'healthy'
+          'border-rose-500/70': error5xxLevel() === healthLevel.CRITICAL,
+          'border-amber-500/70': error5xxLevel() === healthLevel.WARN,
+          'border-slate-800': error5xxLevel() === healthLevel.HEALTHY
         }"
       >
         <div class="flex flex-col justify-between gap-0.5">
@@ -68,9 +78,9 @@
           <span
             class="text-lg font-mono font-bold"
             [ngClass]="{
-              'text-rose-400': error5xxLevel() === 'critical',
-              'text-amber-300': error5xxLevel() === 'warn',
-              'text-emerald-400': error5xxLevel() === 'healthy'
+              'text-rose-400': error5xxLevel() === healthLevel.CRITICAL,
+              'text-amber-300': error5xxLevel() === healthLevel.WARN,
+              'text-emerald-400': error5xxLevel() === healthLevel.HEALTHY
             }"
           >
             {{ m.errorRate5xxPercent }}%
@@ -78,13 +88,13 @@
           <span
             class="text-[10px] font-medium"
             [ngClass]="{
-              'text-rose-300': error5xxLevel() === 'critical',
-              'text-amber-300': error5xxLevel() === 'warn',
-              'text-emerald-400': error5xxLevel() === 'healthy'
+              'text-rose-300': error5xxLevel() === healthLevel.CRITICAL,
+              'text-amber-300': error5xxLevel() === healthLevel.WARN,
+              'text-emerald-400': error5xxLevel() === healthLevel.HEALTHY
             }"
           >
             {{
-              error5xxLevel() === 'healthy'
+              error5xxLevel() === healthLevel.HEALTHY
                 ? i18n.t('targetSlaErrorOk')
                 : i18n.t('targetSlaErrorBreach')
             }}
@@ -106,9 +116,9 @@
       <div
         class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex flex-col justify-between gap-1 shadow-sm"
         [ngClass]="{
-          'border-rose-500/70': latencyLevel() === 'critical',
-          'border-amber-500/70': latencyLevel() === 'warn',
-          'border-slate-800': latencyLevel() === 'healthy'
+          'border-rose-500/70': latencyLevel() === healthLevel.CRITICAL,
+          'border-amber-500/70': latencyLevel() === healthLevel.WARN,
+          'border-slate-800': latencyLevel() === healthLevel.HEALTHY
         }"
       >
         <div class="flex items-center justify-between">
@@ -123,9 +133,9 @@
           <span
             class="text-lg font-mono font-bold"
             [ngClass]="{
-              'text-rose-400': latencyLevel() === 'critical',
-              'text-amber-300': latencyLevel() === 'warn',
-              'text-emerald-400': latencyLevel() === 'healthy'
+              'text-rose-400': latencyLevel() === healthLevel.CRITICAL,
+              'text-amber-300': latencyLevel() === healthLevel.WARN,
+              'text-emerald-400': latencyLevel() === healthLevel.HEALTHY
             }"
           >
             {{ m.p95LatencyMs }}
@@ -139,35 +149,37 @@
         />
       </div>
 
-      <!-- Card 4: DB Pool with PrimeNG MeterGroup -->
-      <div
-        class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex flex-col justify-between gap-1 shadow-sm"
-        [ngClass]="{
-          'border-rose-500/70': poolLevel() === 'critical',
-          'border-amber-500/70': poolLevel() === 'warn',
-          'border-slate-800': poolLevel() === 'healthy'
-        }"
-      >
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] text-slate-400 font-medium">
-            {{ i18n.t('targetPoolLabel') }}
-          </span>
-          <span
-            class="text-sm font-mono font-bold"
-            [ngClass]="{
-              'text-rose-400': poolLevel() === 'critical',
-              'text-amber-300': poolLevel() === 'warn',
-              'text-emerald-400': poolLevel() === 'healthy'
-            }"
-          >
-            {{ m.poolActive }}/{{ m.poolMax }}
-            @if (m.poolWaiting > 0) {
-              <span class="text-amber-300 text-xs">(+{{ m.poolWaiting }})</span>
-            }
-          </span>
+      <!-- Card 4: Dynamic Saturation Resource with PrimeNG MeterGroup -->
+      @if (saturationSignal(); as sat) {
+        <div
+          class="bg-slate-900/95 border rounded-md px-3 py-1.5 flex flex-col justify-between gap-1 shadow-sm"
+          [ngClass]="{
+            'border-rose-500/70': poolLevel() === healthLevel.CRITICAL,
+            'border-amber-500/70': poolLevel() === healthLevel.WARN,
+            'border-slate-800': poolLevel() === healthLevel.HEALTHY
+          }"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] text-slate-400 font-medium">
+              {{ sat.resourceLabel }}
+            </span>
+            <span
+              class="text-sm font-mono font-bold"
+              [ngClass]="{
+                'text-rose-400': poolLevel() === healthLevel.CRITICAL,
+                'text-amber-300': poolLevel() === healthLevel.WARN,
+                'text-emerald-400': poolLevel() === healthLevel.HEALTHY
+              }"
+            >
+              {{ sat.active }}/{{ sat.max }}
+              @if (sat.waiting > 0) {
+                <span class="text-amber-300 text-xs">(+{{ sat.waiting }})</span>
+              }
+            </span>
+          </div>
+          <p-metergroup [value]="poolMeters()" [max]="poolMax()" />
         </div>
-        <p-metergroup [value]="poolMeters()" [max]="poolMax()" />
-      </div>
+      }
     </div>
   </div>
 }

@@ -18,6 +18,7 @@ export interface PromqlRangeOutput {
   seriesCount: number;
   summarizedSeries: Array<{
     metric: Record<string, string>;
+    latest?: number;
     p50?: number;
     p95?: number;
     max?: number;

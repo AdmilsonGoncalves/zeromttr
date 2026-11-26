@@ -68,4 +68,34 @@ describe('I18nService', () => {
       }
     }
   });
+
+  it('should provide neutral idle copy without simulation jargon and interpolate service name', () => {
+    const service = new I18nService();
+
+    service.setLang(Language.PT_BR);
+    expect(service.t('piiIdleBadge')).toBe('Nenhum incidente ativo');
+    expect(service.t('tooltipHealthyTraffic', { service: 'orders-api' })).toContain('orders-api');
+    expect(service.t('tooltipHealthyTraffic', { service: 'orders-api' })).not.toContain(
+      'api-pagamentos-core'
+    );
+
+    service.setLang(Language.EN_US);
+    expect(service.t('piiIdleBadge')).toBe('No active incident');
+    expect(service.t('toastHealthyTrafficStartedDetail', { service: 'orders-api' })).toContain(
+      'orders-api'
+    );
+
+    service.setLang(Language.ES_ES);
+    expect(service.t('piiIdleBadge')).toBe('Ningún incidente activo');
+    expect(service.t('tooltipHealthyTraffic', { service: 'orders-api' })).toContain('orders-api');
+
+    for (const lang of [Language.PT_BR, Language.EN_US, Language.ES_ES]) {
+      service.setLang(lang);
+      expect(service.dict().tooltipHealthyTraffic).not.toContain('api-pagamentos-core');
+      expect(service.dict().toastHealthyTrafficStartedDetail).not.toContain('api-pagamentos-core');
+      expect(service.dict().traceTreeIdleBody.toLowerCase()).not.toMatch(/simula/);
+      expect(service.dict().gitDiffIdleBody.toLowerCase()).not.toMatch(/simula/);
+      expect(service.dict().resendIdleBody.toLowerCase()).not.toMatch(/simula/);
+    }
+  });
 });

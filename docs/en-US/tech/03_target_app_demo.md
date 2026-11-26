@@ -13,8 +13,8 @@ For the practical demonstration, the **`api-pagamentos-core`** service (PIX tran
 ## 2. Layered MVC Pattern (`apps/target-app-demo/src/`)
 ```text
 apps/target-app-demo/src/
-  routes/        payments.routes.ts, chaos.routes.ts, health.routes.ts
-  controllers/   PaymentsController, ChaosController
+  routes/        payments.routes.ts, ops.routes.ts, chaos.routes.ts, health.routes.ts
+  controllers/   PaymentsController, OpsStatusController, ChaosController
   services/      PaymentService
   repositories/  payment.repository.ts (Knex / pg)
   models/        payment.ts
@@ -25,8 +25,8 @@ apps/target-app-demo/src/
 
 ## 3. Local Container Functional Requirements
 - `POST /payments` (processes PIX transaction), `GET /payments/:id`, `GET /health`.
-- `POST /chaos/pool-saturation?enable=true|false` toggles `PaymentRepository` operation mode between the healthy `v2.14.7` release behavior and the regressed `v2.14.8` release behavior (only when `CHAOS_ENABLED=true`).
-- `GET /chaos/status` returns:
+- `POST /chaos/pool-saturation?enable=true|false` toggles `PaymentRepository` operation mode between the healthy `v2.14.7` release behavior and the regressed `v2.14.8` release behavior (when `CHAOS_AUTO_TRAFFIC_BURST=true`, also triggers synthetic traffic burst waves).
+- `GET /ops/status` (with backward-compatible `GET /chaos/status` delegating to the same manifest builder) returns the neutral operational manifest with `capabilities` and generic `saturation`:
   ```json
   {
     "status": "degraded",
@@ -35,7 +35,23 @@ apps/target-app-demo/src/
     "previousHealthyVersion": "v2.14.7",
     "targetRepo": "https://github.com/AdmilsonGoncalves/zeromttr",
     "suspectFilePath": "apps/target-app-demo/src/repositories/payment.repository.ts",
-    "rawEdgeLogPreCollector": "ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig"
+    "capabilities": {
+      "chaosSimulation": true,
+      "healthyTrafficToggle": true
+    },
+    "rawEdgeLogPreCollector": "ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig",
+    "metrics": {
+      "requestsPerSecond": 12.4,
+      "errorRate5xxPercent": 80,
+      "p95LatencyMs": 4610,
+      "healthyTrafficActive": false,
+      "saturation": {
+        "resourceLabel": "DB Pool",
+        "active": 2,
+        "waiting": 8,
+        "max": 2
+      }
+    }
   }
   ```
 
@@ -44,7 +60,7 @@ apps/target-app-demo/src/
 - Metrics exported via OTLP: `http_server_duration` (histogram with exemplars containing `trace_id`), `db_pool_waiting`, `db_pool_used`.
 - Error spans (`SpanStatusCode.ERROR`) on the `pg.pool.acquire` / `PaymentRepository.createPayment` operation.
 - Structured logs sent via OTLP/HTTP (`http://otel-collector:4318`) containing `trace_id`, `span_id`, and synthetic Brazilian data in `body` (CPF, CNPJ, email PIX key, and Bearer JWT token).
-- The `rawEdgeLogPreCollector` field returned by `GET /chaos/status` is an application-reported sample of the exact log emitted before OTLP transmission to the Collector (clearly labeled in the UI as *"App-Reported Pre-Collector Log"*), allowing visual comparison between the string emitted by the application and the log persisted in Loki after the **`transform/pii_logs` (OTTL `replace_pattern`)** processor.
+- The `rawEdgeLogPreCollector` field returned by `GET /ops/status` (and legacy `GET /chaos/status`) is an application-reported sample of the exact log emitted before OTLP transmission to the Collector (clearly labeled in the UI as *"App-Reported Pre-Collector Log"*), allowing visual comparison between the string emitted by the application and the log persisted in Loki after the **`transform/pii_logs` (OTTL `replace_pattern`)** processor.
 
 ## 5. Real Tag Strategy (`v2.14.7` and `v2.14.8`), Creation Order, and Branch/Tag Protection (ADR-001)
 To keep everything inside the single **`https://github.com/AdmilsonGoncalves/zeromttr`** repository without breaking CI on `master` and ensuring `.github/workflows/hotfix-verify.yml` always triggers:

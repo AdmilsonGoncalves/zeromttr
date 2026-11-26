@@ -288,8 +288,7 @@ zeromttr/
 │   ├── ci.yml                    # Lint, typecheck, Gitleaks, Vitest (≥80%), Compose smoke (via pnpm + Nx)
 │   ├── hotfix-verify.yml         # Automated gate on hotfix/zeromttr-* PRs opened against release/target-v2.14.8
 │   └── cd-release.yml            # GHCR push on main/tags; VPS deploy frozen ONLY for v* tags or workflow_dispatch
-├── .env.example                  # Local template (dev)
-├── .env.prod.template            # VPS production template (e.g., /path/to/secrets/.env)
+├── .env.prod.template            # Environment template (local dev .env & VPS secrets)
 ├── infra/
 │   ├── otel-collector-config.yaml
 │   ├── otel-collector-config.prod.yaml
@@ -324,12 +323,12 @@ zeromttr/
 │   │   │   ├── domain/           # Incident, IncidentState (FSM), RcaReport, EvidenceCoverage, DecisionHmac, PiiPromptGuard
 │   │   │   ├── application/      # HandleAlert, InvestigateIncident, EnrichWithDeployDiff, DispatchRemediation, NotifyOnCall, RecordDecision
 │   │   │   ├── ports/            # ReasoningPort, ToolsPort (MCP client), IncidentRepository, TargetStatusPort, Clock
-│   │   │   ├── adapters/         # llm.gemini (with PiiPromptGuard), mcp.client, repo.file, target-status.http
+│   │   │   ├── adapters/         # llm.gemini (with PiiPromptGuard), mcp.client, repo.file, target-status.http, target-status.prometheus
 │   │   │   ├── http/             # Grafana webhook (GRAFANA_WEBHOOK_TOKEN), REST API (DASHBOARD_API_TOKEN), HMAC decisions, SSE
 │   │   │   └── main.ts
 │   │   └── test/
-│   ├── target-app-demo/          # Layered MVC (api-pagamentos-core — local OTel emitter)
-│   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/
+│   ├── target-app-demo/          # Layered MVC (api-pagamentos-core — local OTel emitter + neutral /ops/status)
+│   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/ # includes ops.routes.ts & ops-status.controller.ts
 │   │   └── test/
 │   └── dashboard/                # Lean Angular + PrimeNG (Aura Dark) War Room, Phase 4b
 ├── scripts/                      # demo.sh, chaos.sh, reset.sh, measure-mttr.sh, smoke-integrations.sh

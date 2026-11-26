@@ -5,16 +5,11 @@ import {
   EventEmitter,
   Input,
   Output,
-  computed,
   inject,
   signal
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { isNonEmptyString, isString } from '@zeromttr/utils';
-import { Button } from 'primeng/button';
-import { SelectButton } from 'primeng/selectbutton';
+import { isNonEmptyString } from '@zeromttr/utils';
 import { Tag } from 'primeng/tag';
-import { Tooltip } from 'primeng/tooltip';
 import {
   IncidentExecutionMode,
   TargetHealthStatus,
@@ -23,41 +18,39 @@ import {
 } from '../../core/contract.js';
 import { I18nService, type Language } from '../../core/i18n/i18n.service.js';
 import { LocaleSwitcherComponent } from '../locale-switcher/locale-switcher.component.js';
-
-interface ModeOption {
-  label: string;
-  value: IncidentMode;
-}
+import { MainMenuComponent } from '../main-menu/main-menu.component.js';
 
 /**
- * Pure top War Room header displaying project identity, target connection tags, command actions, and locale switcher.
+ * Pure top War Room header displaying project identity, target connection tags, modular main menu, and locale switcher.
  */
 @Component({
   selector: 'app-war-room-header',
-  imports: [NgClass, FormsModule, SelectButton, Tag, Button, Tooltip, LocaleSwitcherComponent],
+  imports: [NgClass, Tag, MainMenuComponent, LocaleSwitcherComponent],
   templateUrl: './war-room-header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WarRoomHeaderComponent {
   readonly i18n: I18nService;
+  readonly healthStatus = TargetHealthStatus;
 
+  readonly demoModeEnabledSignal = signal<boolean>(false);
   readonly sseConnectedSignal = signal<boolean>(false);
   readonly targetStatusSignal = signal<TargetStatusResponse | null>(null);
   readonly activeModeSignal = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly isWorkflowRunningSignal = signal<boolean>(false);
   readonly liveDemoKeySignal = signal<string>('');
-  readonly publicLiveDemoSignal = signal<boolean>(false);
+  readonly requireDemoKeySignal = signal<boolean>(true);
   readonly simulationLockedByTurnstileSignal = signal<boolean>(false);
   readonly healthyTrafficActiveSignal = signal<boolean>(false);
   readonly isTogglingTrafficSignal = signal<boolean>(false);
   readonly isResettingSignal = signal<boolean>(false);
   readonly isSimulatingSignal = signal<boolean>(false);
   readonly isMobileMenuOpenSignal = signal<boolean>(false);
-  readonly isHealthyTrafficStartBlockedSignal = computed<boolean>(
-    () =>
-      !this.healthyTrafficActiveSignal() &&
-      this.targetStatusSignal()?.status === TargetHealthStatus.DEGRADED
-  );
+
+  @Input()
+  set demoModeEnabled(value: boolean) {
+    this.demoModeEnabledSignal.set(value);
+  }
 
   @Input({ required: true })
   set sseConnected(value: boolean) {
@@ -85,8 +78,8 @@ export class WarRoomHeaderComponent {
   }
 
   @Input()
-  set publicLiveDemo(value: boolean) {
-    this.publicLiveDemoSignal.set(value);
+  set requireDemoKey(value: boolean) {
+    this.requireDemoKeySignal.set(value);
   }
 
   @Input()
@@ -121,11 +114,6 @@ export class WarRoomHeaderComponent {
   @Output() readonly triggerChaos = new EventEmitter<void>();
   @Output() readonly resetService = new EventEmitter<void>();
 
-  readonly modeOptions = computed<ModeOption[]>(() => [
-    { label: this.i18n.t('liveMode'), value: IncidentExecutionMode.LIVE },
-    { label: this.i18n.t('replayMode'), value: IncidentExecutionMode.REPLAY }
-  ]);
-
   constructor(...args: [I18nService?]) {
     const [i18n] = args;
     this.i18n = i18n ?? inject(I18nService);
@@ -136,25 +124,6 @@ export class WarRoomHeaderComponent {
    */
   toggleMobileMenu(): void {
     this.isMobileMenuOpenSignal.update((open) => !open);
-  }
-
-  /**
-   * Emits the newly selected execution mode when valid.
-   */
-  onModeSelect(mode: IncidentMode): void {
-    if (isNonEmptyString(mode)) {
-      this.modeChange.emit(mode);
-    }
-  }
-
-  /**
-   * Emits the updated live demo key from the password input.
-   */
-  onLiveKeyInput(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    if (target && isString(target.value)) {
-      this.liveKeyChange.emit(target.value);
-    }
   }
 
   /**

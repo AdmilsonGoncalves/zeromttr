@@ -128,8 +128,8 @@ sequenceDiagram
     ORCH->>MCP: CallTool: query_loki_logs (trace_id)
     MCP->>LGTM: LogQL filtrado por trace_id
     MCP-->>ORCH: Logs mascarados ([REDACTED_CPF]) + FinOps telemetry
-    ORCH->>DEMO: GET /chaos/status (TargetStatusPort)
-    DEMO-->>ORCH: status="degraded", version="v2.14.8", previousHealthyVersion="v2.14.7"
+    ORCH->>DEMO: GET /ops/status (TargetStatusPort)
+    DEMO-->>ORCH: status="degraded", version="v2.14.8", previousHealthyVersion="v2.14.7", capabilities, saturation
 
     Note over ORCH,EXT: Fase 4 — Diff Real (v2.14.7...v2.14.8) no GitHub e Auditoria PiiPromptGuard (Fail-Closed)
     ORCH-->>UI: SSE event: incident.transition (ENRICHING)
@@ -270,7 +270,6 @@ classDiagram
     class TargetStatusPort {
         <<interface>>
         +getStatus() Promise~TargetStatus~
-        +triggerChaos(enable: boolean) Promise~void~
     }
 
     Incident *-- IncidentState
@@ -322,6 +321,7 @@ classDiagram
     class GeminiReasoningAdapter
     class DeterministicFallbackReasoningAdapter
     class HttpTargetStatusAdapter
+    class PrometheusTargetStatusAdapter
 
     HandleAlert --> IncidentRepository
     InvestigateIncident --> ToolsPort
@@ -342,6 +342,8 @@ classDiagram
     GeminiReasoningAdapter ..|> ReasoningPort
     DeterministicFallbackReasoningAdapter ..|> ReasoningPort
     HttpTargetStatusAdapter ..|> TargetStatusPort
+    PrometheusTargetStatusAdapter ..|> TargetStatusPort
+    PrometheusTargetStatusAdapter --> ToolsPort
 ```
 
 ---

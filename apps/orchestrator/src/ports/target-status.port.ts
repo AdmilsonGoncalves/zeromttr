@@ -1,13 +1,26 @@
 import type { TargetHealthStatus } from '../domain/incident-enums.js';
 
+export interface TargetCapabilities {
+  chaosSimulation: boolean;
+  healthyTrafficToggle: boolean;
+}
+
+export interface TargetSaturation {
+  resourceLabel: string;
+  active: number;
+  waiting: number;
+  max: number;
+}
+
 export interface TargetLiveMetrics {
   requestsPerSecond: number;
   errorRate5xxPercent: number;
   p95LatencyMs: number;
-  poolActive: number;
-  poolWaiting: number;
-  poolMax: number;
   healthyTrafficActive: boolean;
+  saturation?: TargetSaturation;
+  poolActive?: number;
+  poolWaiting?: number;
+  poolMax?: number;
 }
 
 export interface TargetStatus {
@@ -17,6 +30,7 @@ export interface TargetStatus {
   previousHealthyVersion: string;
   targetRepo: string;
   suspectFilePath: string;
+  capabilities?: TargetCapabilities;
   rawEdgeLogPreCollector: string;
   metrics?: TargetLiveMetrics;
 }

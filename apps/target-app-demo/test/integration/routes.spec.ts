@@ -9,8 +9,9 @@ import {
   getPayment,
   toggleChaos,
   getChaosStatus,
+  getOpsStatus,
   getHealth
-} from '../helpers/http-test-client.js';
+} from '../helpers/http.js';
 
 describe('target-app-demo routes integration', () => {
   let server: http.Server;
@@ -163,6 +164,60 @@ describe('target-app-demo routes integration', () => {
           poolMax: 10
         })
       });
+    });
+
+    it('should return neutral manifest with capabilities and saturation on ops status', async () => {
+      const res = await getOpsStatus(server);
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        status: 'healthy',
+        service: 'api-pagamentos-core',
+        version: 'v2.14.7',
+        previousHealthyVersion: 'v2.14.7',
+        targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        capabilities: {
+          chaosSimulation: true,
+          healthyTrafficToggle: true
+        },
+        metrics: expect.objectContaining({
+          healthyTrafficActive: false,
+          saturation: {
+            resourceLabel: 'DB Pool',
+            active: 0,
+            waiting: 0,
+            max: 10
+          }
+        })
+      });
+
+      const previousFlag = process.env.CHAOS_ENDPOINTS_ENABLED;
+      process.env.CHAOS_ENDPOINTS_ENABLED = 'false';
+      try {
+        const disabledRes = await getOpsStatus(server);
+        expect(disabledRes.status).toBe(200);
+        expect(disabledRes.body).toMatchObject({
+          capabilities: {
+            chaosSimulation: false,
+            healthyTrafficToggle: false
+          }
+        });
+      } finally {
+        if (previousFlag === undefined) {
+          delete process.env.CHAOS_ENDPOINTS_ENABLED;
+        } else {
+          process.env.CHAOS_ENDPOINTS_ENABLED = previousFlag;
+        }
+      }
+    });
+
+    it('should preserve legacy chaos status compatibility', async () => {
+      const opsRes = await getOpsStatus(server);
+      const chaosRes = await getChaosStatus(server);
+
+      expect(opsRes.status).toBe(200);
+      expect(chaosRes.status).toBe(200);
+      expect(chaosRes.body).toEqual(opsRes.body);
     });
   });
 });

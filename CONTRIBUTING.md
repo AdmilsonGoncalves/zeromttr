@@ -11,7 +11,7 @@ Thank you for your interest in contributing to **ZeroMTTR**. Please read these g
 - **Docker & Docker Compose v2.40+** (for local LGTM observability stack)
 
 ```bash
-cp .env.example .env
+cp .env.prod.template .env
 pnpm install --frozen-lockfile
 ```
 
