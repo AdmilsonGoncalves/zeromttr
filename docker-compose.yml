@@ -215,8 +215,17 @@ services:
       - TARGET_BASE_REF=v2.14.7
       - TARGET_HEAD_REF=v2.14.8
       - TARGET_SERVICE_PATH=${TARGET_SERVICE_PATH:-apps/target-app-demo}
+      - TARGET_BASE_BRANCH=${TARGET_BASE_BRANCH:-release/target-v2.14.8}
       - ON_CALL_ENGINEER_EMAIL=${ON_CALL_ENGINEER_EMAIL:-oncall-sre@example.com}
       - REPLAY_SPEED_FACTOR=${REPLAY_SPEED_FACTOR:-1}
+      - SETTINGS_DB_PATH=/app/var/zeromttr-settings.sqlite
+      - SETTINGS_ADMIN_TOKEN=${SETTINGS_ADMIN_TOKEN:-}
+      - REJECTION_COOLDOWN_SECONDS=${REJECTION_COOLDOWN_SECONDS:-900}
+      - REPEAT_SUPPRESSION_SECONDS=${REPEAT_SUPPRESSION_SECONDS:-60}
+      - DECISION_TTL_SECONDS=${DECISION_TTL_SECONDS:-900}
+      - GRAFANA_ALERT_REPEAT_INTERVAL=${GRAFANA_ALERT_REPEAT_INTERVAL:-1m}
+    volumes:
+      - orchestrator-data:/app/var
     depends_on:
       - mcp-server
     networks:
@@ -264,3 +273,6 @@ services:
 networks:
   aiops-net:
     driver: bridge
+
+volumes:
+  orchestrator-data:

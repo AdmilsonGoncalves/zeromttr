@@ -133,6 +133,30 @@ export class FileIncidentRepository implements IncidentRepository {
   }
 
   /**
+   * Finds the most recent incident (including terminal states) matching the alert fingerprint.
+   */
+  public async findLatestByFingerprint(fingerprint: string): Promise<Incident | null> {
+    let latest: Incident | null = null;
+    let latestRefTime = -Infinity;
+
+    for (const inc of this.store.values()) {
+      if (inc.fingerprint !== fingerprint) {
+        continue;
+      }
+      const lastTransition = inc.transitions[inc.transitions.length - 1];
+      const refIso = lastTransition ? lastTransition.at : inc.startedAt;
+      const refMs = Date.parse(refIso);
+      const score = Number.isFinite(refMs) ? refMs : 0;
+      if (!latest || score >= latestRefTime) {
+        latest = inc;
+        latestRefTime = score;
+      }
+    }
+
+    return latest;
+  }
+
+  /**
    * Returns all stored incidents sorted chronologically by start timestamp.
    */
   public async findAll(): Promise<Incident[]> {

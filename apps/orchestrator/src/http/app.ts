@@ -15,7 +15,7 @@ import type { OrchestratorWorkflow } from '../application/orchestrator-workflow.
 import type { RecordDecision } from '../application/record-decision.js';
 import { createInitialIncident } from '../application/create-initial-incident.js';
 import { createGrafanaAuthMiddleware, createDashboardAuthMiddleware } from './auth.js';
-import { createIpRateLimitMiddleware } from './rate-limit.js';
+import { registerApiRateLimits } from './rate-limit.js';
 import { SseEventBroadcaster } from './events.sse.js';
 import { createWebhookRouter } from './webhook.controller.js';
 import { createApiRouter } from './api.controller.js';
@@ -36,15 +36,16 @@ export interface AppDependencies {
   grafanaWebhookToken?: string;
   dashboardApiToken?: string;
   demoRouter?: Router | PluggableRouterFactory;
+  settingsRouter?: Router | PluggableRouterFactory;
   enableRateLimiting?: boolean;
 }
 
-/**
- * Builds the Express application with health endpoints, webhook, decision, API, and demo routers.
- */
-export function createApp(dependencies: AppDependencies): Express {
-  const app = express();
+interface ResolvedAppAuthTokens {
+  grafanaToken: string;
+  dashboardToken: string;
+}
 
+function registerJsonBodyParser(app: Express): void {
   app.use(express.json({ limit: '1mb' }));
   app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (err instanceof SyntaxError && 'body' in err) {
@@ -53,8 +54,12 @@ export function createApp(dependencies: AppDependencies): Express {
     }
     next(err);
   });
+}
 
-  const isTest = process.env.NODE_ENV === 'test';
+function resolveAppAuthTokens(
+  dependencies: Pick<AppDependencies, 'grafanaWebhookToken' | 'dashboardApiToken'>,
+  isTest: boolean
+): ResolvedAppAuthTokens {
   const grafanaToken =
     dependencies.grafanaWebhookToken ||
     process.env.GRAFANA_WEBHOOK_TOKEN ||
@@ -73,37 +78,12 @@ export function createApp(dependencies: AppDependencies): Express {
     }
   }
 
-  const broadcaster = dependencies.broadcaster || new SseEventBroadcaster();
+  return { grafanaToken, dashboardToken };
+}
 
-  const grafanaAuth = createGrafanaAuthMiddleware(grafanaToken, dashboardToken);
-  const dashboardAuth = createDashboardAuthMiddleware(dashboardToken);
-
-  const shouldRateLimit = dependencies.enableRateLimiting ?? !isTest;
-  if (shouldRateLimit) {
-    const strictActionLimiter = createIpRateLimitMiddleware({
-      windowMs: 60_000,
-      maxRequests: 30,
-      message: 'Rate limit exceeded for simulation/decision actions. Please wait a minute.'
-    });
-    const readApiLimiter = createIpRateLimitMiddleware({
-      windowMs: 60_000,
-      maxRequests: 600,
-      message: 'Rate limit exceeded for API read endpoints. Please slow down.'
-    });
-
-    app.use('/api/demo/chaos', strictActionLimiter);
-    app.use('/api/demo/reset', strictActionLimiter);
-    app.use('/api/demo/simulate-decision', strictActionLimiter);
-    app.use('/api/demo/healthy-traffic', strictActionLimiter);
-    app.use('/api/incidents/:id/decision', strictActionLimiter);
-    app.get('/api/incidents', readApiLimiter);
-    app.get('/api/incidents/:id', readApiLimiter);
-    app.get('/api/target/status', readApiLimiter);
-  }
-
+function registerPublicRoutes(app: Express): void {
   const initialIncident = createInitialIncident();
 
-  // Health check endpoint (public)
   app.get('/health', (_req, res) => {
     res.status(HTTP_STATUS.OK).json({
       status: HttpResponseStatus.OK,
@@ -112,42 +92,62 @@ export function createApp(dependencies: AppDependencies): Express {
     });
   });
 
-  // Root endpoint (public)
   app.get('/', (_req, res) => {
     res.status(HTTP_STATUS.OK).type(CONTENT_TYPE.TEXT_PLAIN).send('ZeroMTTR Orchestrator Running');
   });
+}
 
-  // Webhook Router
-  const webhookRouter = createWebhookRouter(
-    dependencies.handleAlert,
-    dependencies.orchestratorWorkflow,
-    grafanaAuth
-  );
-  app.use('/webhook', webhookRouter);
+function mountPluggableRouter(
+  app: Express,
+  basePath: string,
+  pluggable: Router | PluggableRouterFactory | undefined,
+  dashboardAuthMiddleware: RequestHandler
+): void {
+  if (!pluggable) {
+    return;
+  }
+  const router = 'create' in pluggable ? pluggable.create({ dashboardAuthMiddleware }) : pluggable;
+  app.use(basePath, router);
+}
 
-  // Decision Router (mounted under /api)
-  const decisionRouter = createDecisionRouter(dependencies.recordDecision);
-  app.use('/api', decisionRouter);
+/**
+ * Builds the Express application by composing JSON parsing, auth, rate limits, public routes, and API routers.
+ */
+export function createApp(dependencies: AppDependencies): Express {
+  const app = express();
+  const isTest = process.env.NODE_ENV === 'test';
 
-  // Core Operational API Router (mounted under /api)
-  const apiRouter = createApiRouter(
-    dependencies.repository,
-    dependencies.targetStatusPort,
-    broadcaster,
-    dashboardAuth
-  );
-  app.use('/api', apiRouter);
+  registerJsonBodyParser(app);
 
-  // Optional Pluggable Demo Router (dependency inversion: core does not depend on demo)
-  if (dependencies.demoRouter) {
-    const resolvedDemoRouter =
-      'create' in dependencies.demoRouter
-        ? dependencies.demoRouter.create({ dashboardAuthMiddleware: dashboardAuth })
-        : dependencies.demoRouter;
-    app.use('/api', resolvedDemoRouter);
+  const { grafanaToken, dashboardToken } = resolveAppAuthTokens(dependencies, isTest);
+  const grafanaAuth = createGrafanaAuthMiddleware(grafanaToken, dashboardToken);
+  const dashboardAuth = createDashboardAuthMiddleware(dashboardToken);
+  const broadcaster = dependencies.broadcaster || new SseEventBroadcaster();
+
+  if (dependencies.enableRateLimiting ?? !isTest) {
+    registerApiRateLimits(app);
   }
 
-  // 404 handler for unknown routes
+  registerPublicRoutes(app);
+
+  app.use(
+    '/webhook',
+    createWebhookRouter(dependencies.handleAlert, dependencies.orchestratorWorkflow, grafanaAuth)
+  );
+  app.use('/api', createDecisionRouter(dependencies.recordDecision));
+  app.use(
+    '/api',
+    createApiRouter(
+      dependencies.repository,
+      dependencies.targetStatusPort,
+      broadcaster,
+      dashboardAuth
+    )
+  );
+
+  mountPluggableRouter(app, '/api', dependencies.settingsRouter, dashboardAuth);
+  mountPluggableRouter(app, '/api', dependencies.demoRouter, dashboardAuth);
+
   app.use((_req, res) => {
     res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Not Found' });
   });

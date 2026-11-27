@@ -141,6 +141,8 @@ export const HTTP_HEADERS = {
   CONTENT_TYPE: 'Content-Type',
   LIVE_DEMO_KEY: 'X-Live-Demo-Key',
   LIVE_DEMO_KEY_LOWER: 'x-live-demo-key',
+  SETTINGS_ADMIN_TOKEN: 'X-Settings-Admin-Token',
+  SETTINGS_ADMIN_TOKEN_LOWER: 'x-settings-admin-token',
   TURNSTILE_TOKEN: 'X-Turnstile-Token',
   TURNSTILE_TOKEN_LOWER: 'x-turnstile-token',
   CF_TURNSTILE_RESPONSE: 'CF-Turnstile-Response',

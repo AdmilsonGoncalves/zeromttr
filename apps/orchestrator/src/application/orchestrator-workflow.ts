@@ -1,3 +1,4 @@
+import type { SystemSettings } from '@zeromttr/contracts';
 import { toErrorMessage } from '@zeromttr/utils';
 import {
   IncidentEventType,
@@ -24,7 +25,8 @@ export class OrchestratorWorkflow {
     private readonly enrichWithDeployDiff: EnrichWithDeployDiff,
     private readonly dispatchRemediation: DispatchRemediation,
     private readonly notifyOnCall: NotifyOnCall,
-    private readonly broadcaster: EventBroadcasterPort
+    private readonly broadcaster: EventBroadcasterPort,
+    private readonly getDiffRefs?: () => Pick<SystemSettings, 'targetBaseRef' | 'targetHeadRef'>
   ) {}
 
   /**
@@ -39,17 +41,20 @@ export class OrchestratorWorkflow {
 
       // Step 1: Telemetry Investigation
       const investigation = await this.investigateIncident.execute(incidentId);
+      const dynamicRefs = this.getDiffRefs?.();
 
       const baseRef =
         (investigation.targetStatus?.status !== TargetHealthStatus.UNREACHABLE &&
           investigation.targetStatus?.previousHealthyVersion !== OrchestratorDefault.UNKNOWN &&
           investigation.targetStatus?.previousHealthyVersion) ||
+        dynamicRefs?.targetBaseRef ||
         process.env.TARGET_BASE_REF ||
         OrchestratorDefault.DEFAULT_BASE_REF;
       const headRef =
         (investigation.targetStatus?.status !== TargetHealthStatus.UNREACHABLE &&
           investigation.targetStatus?.version !== OrchestratorDefault.UNKNOWN &&
           investigation.targetStatus?.version) ||
+        dynamicRefs?.targetHeadRef ||
         process.env.TARGET_HEAD_REF ||
         OrchestratorDefault.DEFAULT_HEAD_REF;
 

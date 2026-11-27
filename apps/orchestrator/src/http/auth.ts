@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { isEmpty, isNonEmptyString, isString } from '@zeromttr/utils';
 import { HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
+import { SecurityErrorCode } from './http-constants.js';
 
 /**
  * Performs a constant-time SHA-256 comparison between two secret token strings.
@@ -118,9 +119,36 @@ export function createLiveDemoKeyMiddleware(
 
     const rawHeader = req.headers[HTTP_HEADERS.LIVE_DEMO_KEY_LOWER];
     const liveKeyHeader = isString(rawHeader) ? rawHeader : undefined;
-    if (!liveKeyHeader || !safeTokenCompare(liveKeyHeader, configuredKey)) {
+    if (isEmpty(liveKeyHeader) || !safeTokenCompare(liveKeyHeader, configuredKey)) {
       res.status(HTTP_STATUS.FORBIDDEN).json({
         error: 'Forbidden: Valid X-Live-Demo-Key required for live execution on public host'
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Creates Express middleware requiring a valid `X-Settings-Admin-Token` header for settings mutations.
+ */
+export function createSettingsAdminMiddleware(configuredToken?: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (isEmpty(configuredToken)) {
+      res.status(HTTP_STATUS.FORBIDDEN).json({
+        code: SecurityErrorCode.SETTINGS_READ_ONLY,
+        error: 'Forbidden: SETTINGS_ADMIN_TOKEN must be configured to modify system settings'
+      });
+      return;
+    }
+
+    const rawHeader = req.headers[HTTP_HEADERS.SETTINGS_ADMIN_TOKEN_LOWER];
+    const headerToken = isString(rawHeader) ? rawHeader : undefined;
+    if (isEmpty(headerToken) || !safeTokenCompare(headerToken, configuredToken)) {
+      res.status(HTTP_STATUS.FORBIDDEN).json({
+        code: SecurityErrorCode.SETTINGS_ADMIN_TOKEN_INVALID,
+        error: 'Forbidden: Valid X-Settings-Admin-Token required to modify system settings'
       });
       return;
     }

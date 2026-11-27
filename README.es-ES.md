@@ -12,7 +12,7 @@
 
 En sistemas distribuidos de misión crítica — como liquidación de pagos instantáneos (PIX), logística de despacho, checkout de comercio electrónico o facturación — el tiempo medio entre la alerta y una corrección revisable está dominado por el cambio manual de contexto entre métricas, trazas, logs y diffs en Git.
 
-**ZeroMTTR** es una plataforma autónoma de AIOps y remediación de incidentes construida para la categoría **Logística y Automatización** (automatización de flujos operativos e integración de sistemas críticos). Su núcleo sigue **Clean Architecture / Arquitectura Hexagonal** y es **100% agnóstico al dominio**: cualquier servicio que emita telemetría OpenTelemetry (OTLP) y esté respaldado por un repositorio en **GitHub** (con soporte para otros proveedores Git como GitLab añadiendo un adaptador para `RepoInspectorPort` / `RemediationPort`) puede diagnosticarse y remediarse sin cambiar una sola línea en `apps/orchestrator` o `apps/mcp-server`. La inspección del estado del objetivo también se desacopla detrás de `TargetStatusPort`: las cargas cooperativas exponen un manifiesto neutro `GET /ops/status` (`capabilities` + `saturation` genérico), mientras que los servicios externos/legados pueden monitorizarse pasivamente vía `TARGET_STATUS_PROVIDER=prometheus` (MCP) sin endpoints personalizados.
+**ZeroMTTR** es una plataforma autónoma de AIOps y remediación de incidentes construida para la categoría **Logística y Automatización** (automatización de flujos operativos e integración de sistemas críticos). Su núcleo sigue **Clean Architecture / Arquitectura Hexagonal** y es **100% agnóstico al dominio**: cualquier servicio que emita telemetría OpenTelemetry (OTLP) y esté respaldado por un repositorio en **GitHub** (con soporte para otros proveedores Git como GitLab añadiendo un adaptador para `RepoInspectorPort` / `RemediationPort`) puede diagnosticarse y remediarse sin cambiar una sola línea en `apps/orchestrator` o `apps/mcp-server`. La inspección del estado del objetivo se desacopla detrás de `TargetStatusPort`: las cargas cooperativas exponen un manifiesto neutro `GET /ops/status` (`capabilities` + `saturation` genérico), mientras que los servicios externos/legados pueden monitorizarse pasivamente vía `TARGET_STATUS_PROVIDER=prometheus` (MCP) sin endpoints personalizados. Las políticas operativas (cooldown tras rechazo _Human Takeover_, supresión de repetición, TTL de decisión, refs de diff del objetivo, modelos LLM y nivel de log del orquestador) son editables en tiempo real mediante almacenamiento **SQLite nativo de Node 24** con registro de auditoría (`GET`/`PATCH /api/settings`) protegido por un `SETTINGS_ADMIN_TOKEN` dedicado.
 
 ### Posicionamiento Comparativo (referencia: noviembre de 2026)
 
@@ -26,7 +26,7 @@ En sistemas distribuidos de misión crítica — como liquidación de pagos inst
 
 ### Cómo Funciona la Demo Interactiva
 
-Al hacer clic en **"Simular Incidente"** en el War Room (`POST /api/demo/chaos`), el `demo.controller.ts` del Orchestrator opera en uno de dos modos sobre el servicio objetivo **`api-pagamentos-core`** (`apps/target-app-demo`):
+Al abrir el panel lateral **Demostración** (`app-demo-settings`) en el War Room y hacer clic en **"Simular Incidente"** (`POST /api/demo/chaos`), el enrutador modular de demostración del Orchestrator (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) opera en uno de dos modos sobre el servicio objetivo **`api-pagamentos-core`** (`apps/target-app-demo`). De forma independiente, el panel lateral **Configuración** (`app-system-settings`, icono de engranaje siempre visible en demo y producción) permite consultar o actualizar en tiempo real cooldowns de alerta, parámetros del objetivo/diff, modelos LLM, nivel de log y el historial de auditoría (`GET`/`PATCH /api/settings`, `GET /api/settings/audit`) sin reiniciar contenedores:
 
 1. **Modo `Replay` (predeterminado público):**
    - Transmite en tiempo real por SSE la línea de tiempo de una ejecución real grabada (`data/last-recorded-incident.json`) mediante `ReplayRunner`.
@@ -194,7 +194,7 @@ Endpoints locales:
 - [Índice de Documentación en Español (`docs/es-ES/README.md`)](./docs/es-ES/README.md)
 - [Documento Maestro de Arquitectura (es-ES)](./docs/es-ES/00_architecture_master.md)
 - [Diagramas y Flujos del Sistema (es-ES)](./docs/es-ES/01_system_diagrams.md)
-- [Registros de Decisión de Arquitectura — ADRs 001–009 (es-ES)](./docs/es-ES/adr/README.md)
+- [Registros de Decisión de Arquitectura — ADRs 001–011 (es-ES)](./docs/es-ES/adr/README.md)
 - [Especificaciones Técnicas (`docs/es-ES/tech/`)](./docs/es-ES/tech/)
 - [English Documentation (`docs/en-US/`)](./docs/en-US/README.md)
 - [Documentação em Português (`docs/pt-BR/`)](./docs/pt-BR/00_architecture_master.md)

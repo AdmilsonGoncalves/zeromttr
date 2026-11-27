@@ -5,21 +5,21 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentExecutionMode, TargetHealthStatus } from '../src/app/core/contract.js';
 import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { MainMenuComponent } from '../src/app/war-room/main-menu/main-menu.component.js';
+import { DemoSettingsComponent } from '../src/app/shared/demo-settings/demo-settings.component.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN_MENU_TEMPLATE_PATH = resolve(
+const DEMO_SETTINGS_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/main-menu/main-menu.component.html'
+  '../src/app/shared/demo-settings/demo-settings.component.html'
 );
 
-describe('MainMenuComponent', () => {
+describe('DemoSettingsComponent', () => {
   let i18n: I18nService;
-  let component: MainMenuComponent;
+  let component: DemoSettingsComponent;
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new MainMenuComponent(i18n);
+    component = new DemoSettingsComponent(i18n);
   });
 
   it('should open and close drawer and close automatically on triggerChaos and resetService', () => {
@@ -155,12 +155,15 @@ describe('MainMenuComponent', () => {
   });
 
   it('should compute reactive hints from active i18n language', () => {
+    expect(i18n.t('demoMenuBtn')).toBe('Demonstração');
+    expect(i18n.t('demoMenuTitle')).toBe('Demonstração');
+
     component.requireDemoKey = false;
     expect(component.liveKeyHint()).toBe(i18n.t('demoMenuKeyNotRequiredHint'));
 
     i18n.setLang(Language.ES_ES);
     expect(component.liveKeyHint()).toBe(
-      'Deshabilitada — el servidor está configurado para Modo Live público (.env).'
+      'Deshabilitada — el servidor está configurado para Modo Live público.'
     );
   });
 
@@ -182,7 +185,7 @@ describe('MainMenuComponent', () => {
     expect(component.canToggleHealthyTraffic()).toBe(false);
     expect(component.showHealthyTrafficControl()).toBe(false);
 
-    const html = readFileSync(MAIN_MENU_TEMPLATE_PATH, 'utf8');
+    const html = readFileSync(DEMO_SETTINGS_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('@if (canSimulateChaos())');
     expect(html).toContain('@if (showHealthyTrafficControl())');
   });
@@ -212,9 +215,12 @@ describe('MainMenuComponent', () => {
   });
 
   it('should render demo drawer trigger, toggles, live key input, and action buttons gated on demoModeEnabled', () => {
-    const html = readFileSync(MAIN_MENU_TEMPLATE_PATH, 'utf8');
+    const html = readFileSync(DEMO_SETTINGS_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('@if (demoModeEnabledSignal())');
     expect(html).toContain('demoMenuBtn');
+    expect(html).toContain('w-8 lg:w-auto');
+    expect(html).toContain('hidden lg:inline');
+    expect(html).toContain('hidden lg:inline-flex');
     expect(html).toContain('<p-drawer');
     expect(html).toContain('<p-toggleswitch');
     expect(html).toContain('demo-live-mode-toggle');

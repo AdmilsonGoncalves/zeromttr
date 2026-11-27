@@ -16,15 +16,16 @@ import {
   type TargetStatusResponse
 } from '../../core/contract.js';
 import { I18nService, type Language } from '../../core/i18n/i18n.service.js';
-import { LocaleSwitcherComponent } from '../locale-switcher/locale-switcher.component.js';
-import { MainMenuComponent } from '../main-menu/main-menu.component.js';
+import { DemoSettingsComponent } from '../../shared/demo-settings/demo-settings.component.js';
+import { LocaleSwitcherComponent } from '../../shared/locale-switcher/locale-switcher.component.js';
+import { SystemSettingsComponent } from '../../shared/system-settings/system-settings.component.js';
 
 /**
- * Pure top War Room header displaying project identity, target connection tags, demo drawer trigger, and locale switcher.
+ * Pure top War Room header displaying project identity, target connection tags, demo drawer trigger, settings trigger, and locale switcher.
  */
 @Component({
   selector: 'app-war-room-header',
-  imports: [Tag, MainMenuComponent, LocaleSwitcherComponent],
+  imports: [Tag, DemoSettingsComponent, SystemSettingsComponent, LocaleSwitcherComponent],
   templateUrl: './war-room-header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

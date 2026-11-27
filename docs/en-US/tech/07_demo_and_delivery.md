@@ -46,7 +46,7 @@ INCIDENT_ID="inc-001" # set to the actual incident ID
     3. Clarification that the FinOps metric measures **payload reduction via summarization and policy truncation** (using `bytes / 4` estimation), and that PII masking covers the **5 official Central Bank PIX Key types** (CPF and CNPJ via Federal Revenue Modulo-11, Mobile/Landline Phone via ANATEL rules, RFC 5322 Email, and Random Key EVP / RFC 4122 UUID v4 in PIX context) plus JWT/Bearer tokens (while technical UUIDs such as `request_id` and proper names in free text are not blocked).
   - How to connect an external MCP client using the root `.mcp.json` file.
   - Explanation of tags `v2.14.7` (healthy on `master`) and `v2.14.8` (regression on `release/target-v2.14.8`) for deterministic Pull Request reproduction.
-- `docs/en-US/adr/` with ADRs 001–009.
+- `docs/en-US/adr/` with ADRs 001–011.
 - `CONTRIBUTING.md` and `SECURITY.md`.
 
 ## 4. Pre-Recording Rehearsal, Delivery, and Production Stability Checklist

@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { LocaleSwitcherComponent } from '../src/app/war-room/locale-switcher/locale-switcher.component.js';
+import { LocaleSwitcherComponent } from '../src/app/shared/locale-switcher/locale-switcher.component.js';
 
 describe('LocaleSwitcherComponent', () => {
   let i18n: I18nService;

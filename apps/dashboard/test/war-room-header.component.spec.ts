@@ -43,14 +43,16 @@ describe('WarRoomHeaderComponent', () => {
     expect(component.requireDemoKeySignal()).toBe(false);
   });
 
-  it('should delegate demo drawer controls to app-main-menu and keep header pure', () => {
+  it('should delegate demo drawer controls to app-demo-settings and keep header pure', () => {
     const html = readFileSync(HEADER_TEMPLATE_PATH, 'utf8');
     expect(html).not.toContain('<ng-content');
     expect(html).not.toContain('finopsPayloadReduction');
     expect(html).not.toContain('kpiTtdLabel');
     expect(html).not.toContain('turnstileContainer');
-    expect(html).toContain('<app-main-menu');
+    expect(html).toContain('<app-demo-settings');
+    expect(html).toContain('<app-system-settings');
     expect(html).toContain('<app-locale-switcher');
+    expect(html).toContain('ms-auto');
     expect(html).not.toContain('<p-selectbutton');
     expect(html).not.toContain('<p-drawer');
     expect(html).not.toContain('liveKeyPlaceholder');

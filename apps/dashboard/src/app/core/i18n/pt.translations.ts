@@ -5,12 +5,12 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   appTitle: 'ZeroMTTR — War Room Mission Control',
   appSubtitle: 'Remediação Autônoma de Incidentes & Governança com Humano no Circuito',
   headerMenuBtn: 'Menu',
-  headerMenuAriaLabel: 'Abrir menu de demonstração',
+  headerMenuAriaLabel: 'Abrir demonstração',
   sseConnected: 'SSE Conectado',
   sseOffline: 'SSE Desconectado',
   targetStatusUnknown: 'Alvo: --',
-  demoMenuBtn: 'Menu de Demonstração',
-  demoMenuTitle: 'Menu de Demonstração',
+  demoMenuBtn: 'Demonstração',
+  demoMenuTitle: 'Demonstração',
   demoMenuSubtitle: 'Configure o modo de execução, tráfego sintético e simulação de incidentes.',
   demoMenuModeSection: 'Modo de Execução',
   demoMenuLiveToggleLabel: 'Modo Live (APIs Reais)',
@@ -19,8 +19,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   demoMenuLiveKeyLabel: 'Chave do Modo Live',
   demoMenuKeyRequiredBadge: 'Obrigatória',
   demoMenuKeyOptionalBadge: 'Não exigida',
-  demoMenuKeyNotRequiredHint:
-    'Desabilitada — o servidor está configurado para Modo Live público (.env).',
+  demoMenuKeyNotRequiredHint: 'Desabilitada — o servidor está configurado para Modo Live público.',
   demoMenuKeyReplayHint: 'Ative o Modo Live acima para editar a chave de autorização.',
   demoMenuKeySavedHint: 'Persistida no navegador e enviada no cabeçalho X-Live-Demo-Key.',
   demoMenuTrafficSection: 'Tráfego Sintético',
@@ -251,5 +250,55 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   toastHealthyTrafficStartedDetail:
     'Requisições saudáveis contínuas sendo enviadas para {{service}}.',
   toastHealthyTrafficStoppedSummary: 'Tráfego saudável interrompido',
-  toastHealthyTrafficStoppedDetail: 'Fluxo contínuo de requisições encerrado.'
+  toastHealthyTrafficStoppedDetail: 'Fluxo contínuo de requisições encerrado.',
+
+  // === System Settings Drawer ===
+  settingsBtnAriaLabel: 'Abrir configurações',
+  tooltipSystemSettings: 'Configurações',
+  settingsDrawerTitle: 'Configurações',
+  settingsDrawerSubtitle:
+    'Ajuste políticas de alertas, serviço alvo, modelo LLM e consulte o histórico de alterações.',
+  settingsLoading: 'Carregando configurações...',
+  settingsReadonlyNotice:
+    'Modo somente leitura — configure SETTINGS_ADMIN_TOKEN no servidor para habilitar alterações.',
+  settingsAdminTokenLabel: 'Token administrativo (X-Settings-Admin-Token)',
+  settingsAdminTokenPlaceholder: 'Informe o SETTINGS_ADMIN_TOKEN...',
+  settingsTabAlerts: 'Alertas',
+  settingsTabTarget: 'Alvo & Diff',
+  settingsTabLlm: 'LLM & Ops',
+  settingsTabAudit: 'Auditoria',
+  settingsRejectionCooldownLabel: 'Cooldown pós-rejeição (segundos)',
+  settingsRejectionCooldownHint:
+    'Após rejeitar um hotfix (Human Takeover), suprime novos incidentes para o mesmo fingerprint por esta janela (0 desativa).',
+  settingsRepeatSuppressionLabel: 'Supressão de repetição (segundos)',
+  settingsRepeatSuppressionHint:
+    'Intervalo mínimo antes de reabrir incidente para o mesmo fingerprint após encerramento.',
+  settingsDecisionTtlLabel: 'TTL de decisão / incidente aberto (segundos)',
+  settingsDecisionTtlHint:
+    'Validade do link HMAC enviado por e-mail e tempo máximo antes de expirar incidente pendente.',
+  settingsAutoRestoreLabel: 'Restaurar serviço alvo ao aprovar',
+  settingsAutoRestoreHint:
+    'Executa o hook de pós-aprovação no alvo de demonstração. Desative em produção real.',
+  settingsTargetServicePathLabel: 'Caminho do serviço no repositório (TARGET_SERVICE_PATH)',
+  settingsTargetBaseRefLabel: 'Ref Base (saudável)',
+  settingsTargetHeadRefLabel: 'Ref Head (atual)',
+  settingsErrorThresholdLabel: 'Limiar de erro 5xx para degradação (%)',
+  settingsErrorThresholdHint:
+    'Usado pelo provider Prometheus para classificar o serviço alvo como degradado.',
+  settingsReadonlySectionTitle: 'Infraestrutura (Somente Leitura via .env)',
+  settingsLlmModelLabel: 'Modelo LLM Principal',
+  settingsLlmFallbackLabel: 'Modelo LLM Secundário (Fallback)',
+  settingsOnCallEmailLabel: 'E-mail do Plantonista (Resend)',
+  settingsOnCallEmailHint:
+    'Destinatário do post-mortem e links HMAC. Mascarado automaticamente para proteção de privacidade.',
+  settingsLogLevelLabel: 'Nível de Log do Orquestrador',
+  settingsAuditEmpty: 'Nenhuma alteração de configuração registrada ainda.',
+  settingsReloadBtn: 'Recarregar',
+  settingsSaveBtn: 'Salvar Configurações',
+  settingsSavedSuccess: 'Configurações salvas e aplicadas em tempo real!',
+  settingsSaveError: 'Não foi possível salvar as configurações.',
+  settingsInvalidAdminTokenError:
+    'Token administrativo inválido ou ausente. Verifique o SETTINGS_ADMIN_TOKEN informado.',
+  settingsValidationError: 'Um ou mais valores são inválidos. Revise os campos e tente novamente.',
+  settingsDisabledValue: 'Desativado'
 };

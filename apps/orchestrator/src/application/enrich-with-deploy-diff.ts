@@ -1,3 +1,4 @@
+import type { SystemSettings } from '@zeromttr/contracts';
 import { round } from '@zeromttr/utils';
 import {
   IncidentEventType,
@@ -10,6 +11,11 @@ import type { IncidentRepository } from '../ports/incident-repository.port.js';
 import type { ToolsPort, GitDeployDiffOutput } from '../ports/tools.port.js';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
+export type DiffTargetSettings = Pick<
+  SystemSettings,
+  'targetServicePath' | 'targetBaseRef' | 'targetHeadRef'
+>;
+
 /**
  * Use case enriching an investigating incident with Git deploy diffs, docs references, and FinOps stats.
  */
@@ -18,7 +24,9 @@ export class EnrichWithDeployDiff {
     private readonly repository: IncidentRepository,
     private readonly tools: ToolsPort,
     private readonly broadcaster: EventBroadcasterPort,
-    private readonly servicePath: string = process.env.TARGET_SERVICE_PATH || 'apps/target-app-demo'
+    private readonly servicePath: string = process.env.TARGET_SERVICE_PATH ||
+      'apps/target-app-demo',
+    private readonly getDiffSettings?: () => DiffTargetSettings
   ) {}
 
   /**
@@ -26,9 +34,22 @@ export class EnrichWithDeployDiff {
    */
   public async execute(
     incidentId: string,
-    baseRef = process.env.TARGET_BASE_REF || OrchestratorDefault.DEFAULT_BASE_REF,
-    headRef = process.env.TARGET_HEAD_REF || OrchestratorDefault.DEFAULT_HEAD_REF
+    baseRef?: string,
+    headRef?: string
   ): Promise<GitDeployDiffOutput> {
+    const dynamicSettings = this.getDiffSettings?.();
+    const resolvedServicePath = dynamicSettings?.targetServicePath || this.servicePath;
+    const resolvedBaseRef =
+      baseRef ||
+      dynamicSettings?.targetBaseRef ||
+      process.env.TARGET_BASE_REF ||
+      OrchestratorDefault.DEFAULT_BASE_REF;
+    const resolvedHeadRef =
+      headRef ||
+      dynamicSettings?.targetHeadRef ||
+      process.env.TARGET_HEAD_REF ||
+      OrchestratorDefault.DEFAULT_HEAD_REF;
+
     const incident = await this.repository.findById(incidentId);
     if (!incident) {
       throw new Error(`Incident '${incidentId}' not found`);
@@ -51,9 +72,9 @@ export class EnrichWithDeployDiff {
     }
 
     const diffOutput = await this.tools.inspectGitDeployDiff({
-      base_ref: baseRef,
-      head_ref: headRef,
-      service_path: this.servicePath
+      base_ref: resolvedBaseRef,
+      head_ref: resolvedHeadRef,
+      service_path: resolvedServicePath
     });
 
     incident.finops = {
@@ -67,7 +88,7 @@ export class EnrichWithDeployDiff {
       {
         url: resolveTargetRepoUrl(),
         title: `${incident.service} Deploy & Architecture Reference`,
-        markdownExcerpt: `Deploy diff inspected for ${incident.service} (${baseRef} -> ${headRef}) at ${this.servicePath}.`
+        markdownExcerpt: `Deploy diff inspected for ${incident.service} (${resolvedBaseRef} -> ${resolvedHeadRef}) at ${resolvedServicePath}.`
       }
     ];
 

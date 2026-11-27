@@ -46,7 +46,7 @@ INCIDENT_ID="inc-001" # defina el ID real del incidente
     3. Aclaración de que la métrica FinOps mide la **reducción de payload mediante sumarización y truncamiento por política** (usando estimación `bytes / 4`), y que el enmascaramiento de PII cubre los **5 tipos oficiales de clave PIX del Banco Central** (CPF y CNPJ vía Módulo-11 de la Receita Federal, Teléfono móvil/fijo vía reglas de ANATEL, Correo RFC 5322 y Clave aleatoria EVP / UUID v4 RFC 4122 en contexto PIX) además de tokens JWT/Bearer (mientras que los UUID técnicos como `request_id` y los nombres propios en texto libre no se bloquean).
   - Cómo conectar un cliente MCP externo usando el archivo `.mcp.json` de la raíz.
   - Explicación de los tags `v2.14.7` (saludable en `master`) y `v2.14.8` (regresión en `release/target-v2.14.8`) para la reproducción determinista del Pull Request.
-- `docs/en-US/adr/` con los ADR 001–009.
+- `docs/es-ES/adr/` con los ADR 001–011.
 - `CONTRIBUTING.md` y `SECURITY.md`.
 
 ## 4. Lista de verificación de ensayo previo a la grabación, entrega y estabilidad en producción

@@ -49,7 +49,9 @@ export type ToastSeverity = (typeof ToastSeverity)[keyof typeof ToastSeverity];
 
 export const DashboardApiErrorCode = {
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
-  TURNSTILE_PREFIX: 'TURNSTILE_'
+  TURNSTILE_PREFIX: 'TURNSTILE_',
+  SETTINGS_ADMIN_TOKEN_INVALID: 'SETTINGS_ADMIN_TOKEN_INVALID',
+  SETTINGS_READ_ONLY: 'SETTINGS_READ_ONLY'
 } as const;
 
 export const FsmStageStatus = {

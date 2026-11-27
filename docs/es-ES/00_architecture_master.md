@@ -238,6 +238,8 @@ stateDiagram-v2
 | ADR-007 | Persistencia de incidentes en memoria + archivo JSON (MVP) | Simplicidad operativa y soporte nativo para grabar artefactos del modo Replay | Base de datos relacional dedicada para el orquestador |
 | ADR-008 | Las 8 herramientas y sus adaptadores HTTP viven en `apps/mcp-server`; `apps/orchestrator` consume vía `ToolsPort` | Cero duplicación de adaptadores; servidor MCP 100% autónomo | Adaptadores duplicados en ambos servicios |
 | ADR-009 | Enmascaramiento de PII en logs mediante procesador **`transform` (OTTL `replace_pattern`)** en el OTel Collector | Garantiza sanitización determinista directamente sobre `log.body` y atributos en cualquier versión Collector 0.114+ | Depender solo del procesador `redaction` (restringido a atributos de span en algunas versiones) |
+| ADR-010 | Desacoplamiento del servicio objetivo mediante manifiesto neutro `GET /ops/status` (`TargetCapabilities` + `TargetSaturation`) y proveedor pasivo `TARGET_STATUS_PROVIDER=prometheus` | Permite monitorizar cualquier servicio OTel sin acoplarse a `api-pagamentos-core` ni endpoints personalizados, y condiciona los controles demo a las capacidades reales del objetivo | Hardcodear campos de pool DB (`payment-pool`) y endpoints `/chaos/status` en el orquestador y el dashboard |
+| ADR-011 | Configuración operativa en tiempo de ejecución persistida en **SQLite nativo de Node 24 (`node:sqlite`)** con traza de auditoría atómica y `SETTINGS_ADMIN_TOKEN` dedicado | Permite ajustar cooldown tras rechazo (_Human Takeover_), supresión de repetición, TTL, refs de diff, modelos LLM y nivel de log sin reiniciar contenedores, manteniendo `onCallEmail` enmascarado y privilegios segregados | Editar `.env` y reiniciar contenedores ante cada ajuste o reutilizar `LIVE_DEMO_KEY` como credencial administrativa |
 
 ---
 
@@ -262,7 +264,7 @@ Ciclo **Red → Green → Refactor** centrado en la filosofía *Testing Trophy*:
 ### 6.3 Otras Reglas
 - **Clean Code / DRY / YAGNI / KISS**; funciones pequeñas, sin `any` fuera de las fronteras (usar `zod` para validar entradas externas).
 - **Idioma:** código, herramientas, logs y commits en en-US; documentación principal y README en en-US, pt-BR y es-ES.
-- **Seguridad por defecto:** tres tokens distintos (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`), `decisionToken` restringido al correo, escape HTML en plantillas, redacción OTTL en borde + `PiiPromptGuard` pre-LLM.
+- **Seguridad por defecto:** tokens estrictamente segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN` y `SETTINGS_ADMIN_TOKEN` para `PATCH /api/settings`), `decisionToken` restringido al correo, `onCallEmail` siempre enmascarado en lecturas/auditoría, escape HTML en plantillas, redacción OTTL en borde + `PiiPromptGuard` pre-LLM.
 
 ---
 
@@ -300,12 +302,13 @@ zeromttr/
 │       ├── datasources/datasources.yaml
 │       └── alerting/{rules.yaml,contact-points.yaml,policies.yaml}
 ├── libs/
+│   ├── contracts/                # Contratos Zod compartidos (@zeromttr/contracts: incidentes, target-status, settings/audit)
 │   └── utils/                    # Paquete compartido de utilidades y Type Guards (@zeromttr/utils)
 │       ├── src/
 │       │   ├── string.utils.ts   # isNonEmptyString, sanitize, truncate, etc.
 │       │   ├── object.utils.ts   # isEmpty, isFilled, omit, pick, etc.
 │       │   ├── array.utils.ts    # compact, chunk, etc.
-│       │   ├── http.utils.ts     # Helpers HTTP (aislados, consumidos por adapters, infra y telemetry; prohibidos en domain y application)
+│       │   ├── http.utils.ts     # HTTP_HEADERS, CONTENT_TYPE y helpers HTTP (aislados; prohibidos en domain y application)
 │       │   └── index.ts          # Barrel export de funciones puras
 │       └── test/unit/            # Pruebas unitarias puras con Vitest
 ├── apps/
@@ -319,19 +322,20 @@ zeromttr/
 │   │   │   ├── config/
 │   │   │   └── main.ts           # raíz de composición
 │   │   └── test/{helpers,integration,unit}/
-│   ├── orchestrator/             # Hexagonal + FSM + PiiPromptGuard
+│   ├── orchestrator/             # Hexagonal + FSM + PiiPromptGuard + SQLite Runtime Settings
 │   │   ├── src/
-│   │   │   ├── domain/           # Incident, IncidentState (FSM), RcaReport, EvidenceCoverage, DecisionHmac, PiiPromptGuard
+│   │   │   ├── domain/           # Incident, IncidentState (FSM), RcaReport, EvidenceCoverage, DecisionHmac, PiiPromptGuard, SystemSettings
 │   │   │   ├── application/      # HandleAlert, InvestigateIncident, EnrichWithDeployDiff, DispatchRemediation, NotifyOnCall, RecordDecision
-│   │   │   ├── ports/            # ReasoningPort, ToolsPort (cliente MCP), IncidentRepository, TargetStatusPort, Clock
-│   │   │   ├── adapters/         # llm.gemini (con PiiPromptGuard), mcp.client, repo.file, target-status.http, target-status.prometheus
-│   │   │   ├── http/             # Webhook Grafana (GRAFANA_WEBHOOK_TOKEN), API REST (DASHBOARD_API_TOKEN), decisiones HMAC, SSE
+│   │   │   ├── ports/            # ReasoningPort, ToolsPort, IncidentRepository, SettingsRepositoryPort, TargetStatusPort, Clock
+│   │   │   ├── adapters/         # llm.gemini, mcp.client, repo.file, settings.sqlite, target-status.http, target-status.prometheus, logger.console
+│   │   │   ├── demo/             # demo.controller, demo-session-lifecycle, demo-guards, demo-handlers, replay-runner
+│   │   │   ├── http/             # app (SRP), rate-limit, auth (incl. SETTINGS_ADMIN_TOKEN), webhook, api, settings, decision, events.sse
 │   │   │   └── main.ts
 │   │   └── test/
 │   ├── target-app-demo/          # MVC en Capas (api-pagamentos-core — emisor local OTel + /ops/status neutro)
 │   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/ # incluye ops.routes.ts y ops-status.controller.ts
 │   │   └── test/
-│   └── dashboard/                # War Room compacto Angular + PrimeNG (Aura Dark), Fase 4b
+│   └── dashboard/                # Angular + PrimeNG (Aura Dark) War Room + shared/{demo-settings,system-settings,locale-switcher} + styles/breakpoints.css
 ├── scripts/                      # demo.sh, chaos.sh, reset.sh, measure-mttr.sh, smoke-integrations.sh
 └── docs/
     ├── pt-BR/
@@ -377,7 +381,7 @@ flowchart TD
 | :--- | :--- |
 | Rendimiento | TTD (RCA + Diff) ≤ 15 s; TTPR (creación de PR) ≤ 30 s; respuesta de herramientas ≤ 5 s (p95) |
 | Economía de Tokens (FinOps) | ≤ 500 chars/línea de log, ≤ 100 líneas, ≤ 1500 chars/GitHub diff, ≤ 5 series PromQL |
-| Seguridad y Gobernanza | Tres tokens segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`); `decisionToken` enviado **solo** por correo; PII enmascarada en el borde (OTTL `transform`) y auditada pre-LLM (`PiiPromptGuard`) |
+| Seguridad y Gobernanza | Tokens segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`, `SETTINGS_ADMIN_TOKEN`); `decisionToken` enviado **solo** por correo; `onCallEmail` enmascarado en `GET /api/settings` y auditoría; PII enmascarada en el borde (OTTL `transform`) y auditada pre-LLM (`PiiPromptGuard`) |
 | Confiabilidad | Timeouts; reintento con backoff; idempotencia por `incident_id`; deduplicación de alertas por fingerprint; fallback determinista si falla el LLM |
 | Estabilidad en Producción | Despliegue en VPS disparado solo en tags de release de plataforma `v1.*.*` o `workflow_dispatch` (nunca en pushes regulares a main ni en tags `v2.14.*` de la carga demo), manteniendo estable el entorno durante las evaluaciones |
 | Licencia | MIT |

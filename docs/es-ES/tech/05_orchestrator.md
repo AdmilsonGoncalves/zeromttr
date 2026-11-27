@@ -5,14 +5,17 @@
 
 ## 1. Estructura (`apps/orchestrator/src`)
 ```text
-domain/        incident.ts, incident-state.ts (pure FSM), rca-report.ts,
+domain/        incident.ts, incident-state.ts (pure FSM), rca-report.ts, system-settings.ts,
                evidence-coverage.ts, pii-prompt-guard.ts, fingerprint.ts, decision-hmac.ts
-ports/         ReasoningPort, IncidentRepository, ToolsPort (MCP client for the 8 tools),
+ports/         ReasoningPort, IncidentRepository, SettingsRepositoryPort, ToolsPort (MCP client for the 8 tools),
                TargetStatusPort, Clock
 application/   HandleAlert, InvestigateIncident, EnrichWithDeployDiff,
                DispatchRemediation, NotifyOnCall, RecordDecision
-adapters/      llm.gemini.ts, llm.fallback.ts, mcp.client.ts, repo.file.ts, target-status.http.ts, target-status.prometheus.ts
-http/          webhook.controller.ts, api.controller.ts, decision.controller.ts, events.sse.ts, auth.ts
+adapters/      llm.gemini.ts, llm.fallback.ts, mcp.client.ts, repo.file.ts, settings.sqlite.ts,
+               logger.console.ts, target-status.http.ts, target-status.prometheus.ts
+demo/          demo.controller.ts, demo-session-lifecycle.ts, demo-guards.ts, demo-handlers.ts, replay-runner.ts
+http/          app.ts (composición SRP), rate-limit.ts, auth.ts (incl. SETTINGS_ADMIN_TOKEN),
+               webhook.controller.ts, api.controller.ts, settings.controller.ts, decision.controller.ts, events.sse.ts
 main.ts        composition root
 ```
 
@@ -58,7 +61,7 @@ export const PII_PATTERNS = {
    - Si no se encuentra alguna señal (p. ej., diff sin commit sospechoso o métrica sin ejemplar), la puntuación desciende proporcionalmente (**75 % — 3/4 señales**, **50 % — 2/4 señales**, **25 % — 1/4 señales**).
 
 ## 3. Casos de Uso (Flujo Determinista de Recopilación + Síntesis LLM)
-1. **HandleAlert:** Se autentica exclusivamente con `GRAFANA_WEBHOOK_TOKEN`, valida el payload (`zod`), deduplica por `fingerprint`, crea `Incident(RECEIVED)`, responde `202 Accepted` de inmediato e inicia el procesamiento asíncrono.
+1. **HandleAlert:** Se autentica exclusivamente con `GRAFANA_WEBHOOK_TOKEN`, valida el payload (`zod`), deduplica incidentes abiertos por `fingerprint`, aplica ventanas dinámicas de supresión mediante `SettingsRepositoryPort` + `findLatestByFingerprint` (`rejectionCooldownSeconds` tras rechazo / _Human Takeover_ y `repeatSuppressionSeconds` tras el cierre), crea `Incident(RECEIVED)`, responde `202 Accepted` de inmediato e inicia el procesamiento asíncrono.
 2. **InvestigateIncident:**
    - Ejecuta el flujo determinista de recopilación mediante `ToolsPort`:
      `execute_promql_range` → `trace_id` desde ejemplar → `analyze_otel_trace` → `query_loki_logs` (filtrado por `trace_id`), además de consultar `TargetStatusPort` (seleccionado vía `TARGET_STATUS_PROVIDER=manifest|prometheus`: `HttpTargetStatusAdapter` consultando `TARGET_STATUS_PATH:-/ops/status` con fallback `404` hacia `/chaos/status`, o `PrometheusTargetStatusAdapter` consultando Prometheus vía `ToolsPort` MCP) para obtener `version`, `previousHealthyVersion`, `capabilities` y `rawEdgeLogPreCollector` opcional (muestra reportada por la aplicación antes de la exportación OTLP, usada únicamente para comparación visual en el Dashboard y **nunca** incluida en el prompt del LLM).
@@ -79,11 +82,12 @@ export const PII_PATTERNS = {
    - En `demo.controller.ts`, `POST /api/demo/chaos` (modo live) y `POST /api/demo/healthy-traffic` validan `capabilities.chaosSimulation` y `capabilities.healthyTrafficToggle` (`400 CAPABILITY_NOT_SUPPORTED` cuando son `false`).
    - Para fines de demostración interactiva en pantalla cuando el evaluador está en modo `replay` (o autenticado con `X-Live-Demo-Key`), expone `POST /api/demo/simulate-decision`, claramente separado del endpoint criptográfico de producción.
 
-## 4. Modo "Live API" frente a "Modo Replay Acelerado" y Segregación de Acceso
-- Configure `ENABLE_DEMO_MODE=false` para uso real/producción (omite rutas `/api/demo/*` y oculta los controles de simulación `app-main-menu` en el War Room).
+## 4. Modo "Live API" frente a "Modo Replay Acelerado", Configuración en Runtime y Segregación de Acceso
+- Configure `ENABLE_DEMO_MODE=false` para uso real/producción (omite rutas `/api/demo/*` y oculta el drawer de demostración `app-demo-settings` en el War Room, manteniendo siempre disponible `app-system-settings`).
 - En el VPS público (`https://zeromttr.agjworks.com`) con `ENABLE_DEMO_MODE=true`, los visitantes anónimos sin cabecera `X-Live-Demo-Key` operan por defecto en modo **`replay`** (que reproduce en ~25 segundos el stream SSE real previamente grabado en `data/last-recorded-incident.json`, sin crear PRs en GitHub ni consumir cuota de correo), salvo que esté habilitado `REQUIRE_DEMO_KEY=false` (o el legado `PUBLIC_LIVE_DEMO=true`) (recomendado con verificación de Cloudflare Turnstile).
 - Cuando se dispara en local (`LIVE_DEMO_KEY` vacío), con `REQUIRE_DEMO_KEY=false` (o `PUBLIC_LIVE_DEMO=true`) + Turnstile, o en el VPS con un `X-Live-Demo-Key` válido, ejecuta el verdadero **`modo live` de extremo a extremo**.
 - **Cooldown Global (`DEMO_COOLDOWN_MS=120000`):** Evita que clics simultáneos inicien ejecuciones concurrentes.
+- **Configuración en Runtime (SQLite Node 24 + `SETTINGS_ADMIN_TOKEN`):** `SqliteSettingsRepository` (`SETTINGS_DB_PATH=/app/var/zeromttr-settings.sqlite`, modo WAL) persiste políticas operativas y `settings_audit_log` atómicamente, con aplicación inmediata en `HandleAlert`, `EnrichWithDeployDiff`, `NotifyOnCall`, `GeminiReasoningAdapter`, `PrometheusTargetStatusAdapter`, `RecordDecision` y `ConsoleJsonLogger.setMinLevel()`. `onCallEmail` siempre se enmascara en `GET /api/settings` y en la auditoría. `PATCH /api/settings` exige `X-Settings-Admin-Token` cuando `SETTINGS_ADMIN_TOKEN` está definido; si no está definido y `ENABLE_DEMO_MODE=true`, opera estrictamente en modo solo lectura (`403 SETTINGS_READ_ONLY`).
 
 ## 5. Interfaz HTTP y Segregación de Tokens
 | Ruta | Descripción | Autenticación Requerida |
@@ -91,8 +95,11 @@ export const PII_PATTERNS = {
 | `POST /webhook/grafana-alert` | Recibe webhooks de Grafana Alerting | Bearer `GRAFANA_WEBHOOK_TOKEN` (exclusivo) |
 | `GET /api/incidents` / `GET /api/incidents/:id` | Estado y línea temporal (sin `decisionToken`) | Bearer `DASHBOARD_API_TOKEN` (inyectado por Nginx) |
 | `POST /api/incidents/:id/decision` | Ejecuta decisión real desde el enlace del correo | Firma HMAC válida (`sig` + `exp` no expirado) |
+| `GET /api/settings` | Lee la configuración operativa activa (`onCallEmail` enmascarado) + flags `editable` / `adminTokenRequired` | Bearer `DASHBOARD_API_TOKEN` |
+| `PATCH /api/settings` | Actualiza la configuración en runtime y registra entrada de auditoría SQLite | Bearer `DASHBOARD_API_TOKEN` + `X-Settings-Admin-Token` (cuando `SETTINGS_ADMIN_TOKEN` está configurado; `403` solo lectura en modo demo sin token) |
+| `GET /api/settings/audit` | Lista el historial de cambios de configuración (sin PII) | Bearer `DASHBOARD_API_TOKEN` |
 | `POST /api/demo/simulate-decision` | Simula decisión en la War Room (etiquetada como simulación) | Bearer `DASHBOARD_API_TOKEN` (+ `X-Live-Demo-Key` si el incidente es `live` en el VPS) |
-| `GET /api/events` | Stream SSE (véase [08 §4.2](./08_dashboard_frontend.md)) | Bearer `DASHBOARD_API_TOKEN` (inyectado por Nginx) |
+| `GET /api/events` | Stream SSE (véase [08 §3.2](./08_dashboard_frontend.md)) | Bearer `DASHBOARD_API_TOKEN` (inyectado por Nginx) |
 | `GET /api/target/status` | Estado y capacidades del workload objetivo | Bearer `DASHBOARD_API_TOKEN` |
 | `GET /api/demo/config` | Flags en tiempo de ejecución del menú/demo (`demoModeEnabled`, `requireDemoKey`, Turnstile) | Bearer `DASHBOARD_API_TOKEN` |
 | `POST /api/demo/chaos` | Dispara simulación `live` o `replay` | Bearer `DASHBOARD_API_TOKEN` (+ Turnstile cuando esté configurado; `X-Live-Demo-Key` para `mode: 'live'` cuando `REQUIRE_DEMO_KEY=true`) |
