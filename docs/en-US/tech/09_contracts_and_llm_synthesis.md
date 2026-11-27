@@ -218,7 +218,7 @@ Your mission:
 
 Strict security and code rules:
 - The fixed code in patchedContent must contain the COMPLETE file (do not use ellipses or partial snippets).
-- In the payments service (payment.repository.ts), strictly ensure that connections acquired from the pool are released in a 'finally { client.release(); }' block and that the pool size is restored to safe defaults (max: 10).
+- Preserve the suspectFilePath identified in the deploy diff and fix the root cause of the regression (such as resource leaks, missing cleanup in finally blocks, or degraded pool/timeout settings), restoring the healthy baseline behavior.
 - Never invent dependencies or alter public method signatures.
 - You must respond strictly in structured JSON format matching the requested schema.
 ```
@@ -275,7 +275,7 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 - **Model:** `${LLM_MODEL}` (default: `gemini-3.5-flash`, with operational fallback to `gemini-3.5-flash-lite` or the selected provider defaults).
 - **Temperature:** `0.1` (low variability to ensure predictability and deterministic patches).
 - **MaxOutputTokens:** `8192`.
-- **Timeout:** `${LLM_TIMEOUT_MS}` (legacy fallback: `${GEMINI_TIMEOUT_MS}`, default: 25,000 ms / 25 s), with at most 1 automatic retry using 1 s exponential backoff.
+- **Timeout:** `${LLM_TIMEOUT_MS}` per attempt (legacy fallback: `${GEMINI_TIMEOUT_MS}`, default: 25,000 ms / 25 s), with at most 1 automatic retry on the primary model using 1 s exponential backoff; if both primary attempts fail and a distinct fallback model is configured, a third separate attempt is made on the fallback model (each subject to the same per-attempt timeout).
 - **Suspect File Diff Cap:** up to `24,000` chars returned by `inspect_git_deploy_diff` (`MAX_SUSPECT_FILE_CHARS`).
 
 ### 2.5 Defensive Pre-PR Patch Validation

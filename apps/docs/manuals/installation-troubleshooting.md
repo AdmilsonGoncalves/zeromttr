@@ -25,11 +25,13 @@ cp .env.prod.template .env
 # ON_CALL_ENGINEER_EMAIL) e tokens de segurança (MCP_AUTH_TOKEN,
 # GRAFANA_WEBHOOK_TOKEN, DASHBOARD_API_TOKEN, SETTINGS_ADMIN_TOKEN e
 # DECISION_HMAC_SECRET). Deixe LLM_MODEL e LLM_FALLBACK_MODEL vazios para usar
-# os padrões do provedor selecionado (ou informe modelos compatíveis; valores
-# salvos em Configurações no SQLite sobrescrevem os padrões do .env). Para
-# gateways customizados ou Ollama/vLLM no host via Docker, informe uma
-# LLM_BASE_URL acessível de dentro do contêiner (ex.:
-# http://host.docker.internal:11434/v1 ou http://ollama:11434/v1).
+# os padrões do provedor selecionado (ou informe modelos compatíveis; ao trocar
+# o LLM_PROVIDER, modelos salvos anteriormente no SQLite são resetados
+# automaticamente para o novo provedor). Para gateways customizados ou
+# Ollama/vLLM via Docker, informe uma LLM_BASE_URL acessível do contêiner
+# (ex.: http://ollama:11434/v1 como serviço Compose ou IP/host acessível; no
+# Linux Docker Engine, host.docker.internal só funciona se extra_hosts com
+# host-gateway for configurado no serviço orchestrator).
 
 # 3. Instalar dependências
 pnpm install --frozen-lockfile

@@ -26,11 +26,13 @@ cp .env.prod.template .env
 # (MCP_AUTH_TOKEN, GRAFANA_WEBHOOK_TOKEN, DASHBOARD_API_TOKEN,
 # SETTINGS_ADMIN_TOKEN y DECISION_HMAC_SECRET). Deja LLM_MODEL y
 # LLM_FALLBACK_MODEL en blanco para usar los valores predeterminados del
-# proveedor elegido (o indica modelos compatibles; los cambios guardados en
-# SQLite desde Configuración sobrescriben los valores de .env). Para gateways
-# personalizados u Ollama/vLLM en el host con Docker, define una LLM_BASE_URL
-# accesible desde el contenedor (p. ej., http://host.docker.internal:11434/v1
-# o http://ollama:11434/v1).
+# proveedor elegido (o indica modelos compatibles; al cambiar LLM_PROVIDER, los
+# modelos guardados anteriormente en SQLite se restablecen automáticamente para
+# el nuevo proveedor). Para gateways personalizados u Ollama/vLLM con Docker,
+# define una LLM_BASE_URL accesible desde el contenedor (p. ej.,
+# http://ollama:11434/v1 como servicio Compose o una IP/host accesible; en
+# Linux Docker Engine, host.docker.internal solo funciona si añades
+# extra_hosts mapeando host.docker.internal a host-gateway en orchestrator).
 
 # 3. Instalar dependencias del workspace
 pnpm install --frozen-lockfile

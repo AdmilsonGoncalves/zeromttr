@@ -218,7 +218,7 @@ Your mission:
 
 Strict security and code rules:
 - The fixed code in patchedContent must contain the COMPLETE file (do not use ellipses or partial snippets).
-- In the payments service (payment.repository.ts), strictly ensure that connections acquired from the pool are released in a 'finally { client.release(); }' block and that the pool size is restored to safe defaults (max: 10).
+- Preserve the suspectFilePath identified in the deploy diff and fix the root cause of the regression (such as resource leaks, missing cleanup in finally blocks, or degraded pool/timeout settings), restoring the healthy baseline behavior.
 - Never invent dependencies or alter public method signatures.
 - You must respond strictly in structured JSON format matching the requested schema.
 ```
@@ -275,7 +275,7 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 - **Modelo:** `${LLM_MODEL}` (por defecto: `gemini-3.5-flash`, con fallback operativo a `gemini-3.5-flash-lite` o los valores predeterminados del proveedor seleccionado).
 - **Temperature:** `0.1` (baja variabilidad para garantizar previsibilidad y parches deterministas).
 - **MaxOutputTokens:** `8192`.
-- **Timeout:** `${LLM_TIMEOUT_MS}` (fallback legado: `${GEMINI_TIMEOUT_MS}`, por defecto: 25 000 ms / 25 s), con como máximo 1 reintento automático mediante backoff exponencial de 1 s.
+- **Timeout:** `${LLM_TIMEOUT_MS}` por intento (fallback legado: `${GEMINI_TIMEOUT_MS}`, por defecto: 25 000 ms / 25 s), con como máximo 1 reintento automático en el modelo principal mediante backoff exponencial de 1 s; si ambos intentos fallan y existe un modelo de fallback distinto configurado, se realiza un tercer intento independiente con el modelo de fallback (sujeto al mismo timeout por intento).
 - **Límite de archivo sospechoso:** hasta `24 000` caracteres devueltos por `inspect_git_deploy_diff` (`MAX_SUSPECT_FILE_CHARS`).
 
 ### 2.5 Validación defensiva del parche previa al PR

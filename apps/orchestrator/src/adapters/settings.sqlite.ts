@@ -34,6 +34,11 @@ const AuditRowSchema = z.object({
 
 const DEFAULT_AUDIT_LIMIT = 25;
 const MAX_AUDIT_LIMIT = 200;
+const META_LLM_PROVIDER_KEY = '_llmProvider';
+const LLM_MODEL_KEYS: ReadonlyArray<'llmModel' | 'llmFallbackModel'> = [
+  'llmModel',
+  'llmFallbackModel'
+];
 
 function formatAuditValue(
   key: keyof SystemSettings,
@@ -58,7 +63,8 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
   public constructor(
     dbPath: string = ':memory:',
     defaults: SystemSettings = resolveDefaultSystemSettings(process.env),
-    logger?: LoggerPort
+    logger?: LoggerPort,
+    activeLlmProvider?: string
   ) {
     this.defaults = SystemSettingsSchema.parse(defaults);
     this.logger = logger;
@@ -93,7 +99,74 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
       );
     `);
 
+    if (isNonEmptyString(activeLlmProvider)) {
+      this.reconcileLlmProviderChange(activeLlmProvider.trim().toLowerCase());
+    }
+
     this.current = this.loadFromDatabase();
+  }
+
+  private reconcileLlmProviderChange(activeProvider: string): void {
+    const storedRow = this.db
+      .prepare('SELECT value FROM system_settings WHERE key = ?')
+      .get(META_LLM_PROVIDER_KEY) as { value?: unknown } | undefined;
+
+    const storedProvider =
+      typeof storedRow?.value === 'string'
+        ? safeJsonParse<string>(storedRow.value)?.trim().toLowerCase()
+        : undefined;
+
+    // Legacy databases without _llmProvider only existed when Gemini was the sole provider.
+    const providerChanged = storedProvider
+      ? storedProvider !== activeProvider
+      : activeProvider !== 'gemini';
+
+    const timestamp = nowIso();
+    this.db.exec('BEGIN');
+    try {
+      if (providerChanged) {
+        const selectKey = this.db.prepare('SELECT value FROM system_settings WHERE key = ?');
+        const deleteKey = this.db.prepare('DELETE FROM system_settings WHERE key = ?');
+        const insertAudit = this.db.prepare(`
+          INSERT INTO settings_audit_log (setting_key, old_value, new_value, actor, changed_at)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+
+        for (const modelKey of LLM_MODEL_KEYS) {
+          const existing = selectKey.get(modelKey) as { value?: unknown } | undefined;
+          if (typeof existing?.value === 'string') {
+            const oldParsed = safeJsonParse<string>(existing.value) ?? existing.value;
+            deleteKey.run(modelKey);
+            insertAudit.run(
+              modelKey,
+              String(oldParsed),
+              this.defaults[modelKey],
+              'system_provider_switch',
+              timestamp
+            );
+          }
+        }
+      }
+
+      if (storedProvider !== activeProvider) {
+        this.db
+          .prepare(
+            `
+            INSERT INTO system_settings (key, value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+              value = excluded.value,
+              updated_at = excluded.updated_at
+          `
+          )
+          .run(META_LLM_PROVIDER_KEY, JSON.stringify(activeProvider), timestamp);
+      }
+
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   private loadFromDatabase(): SystemSettings {

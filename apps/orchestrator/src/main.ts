@@ -63,13 +63,18 @@ function validateAndResolveBootCredentials(isTest: boolean): BootCredentials {
   };
 }
 
-function initializeSettingsAndLogger(isTest: boolean) {
+function initializeSettingsAndLogger(isTest: boolean, activeLlmProvider: string) {
   const defaultSettings = resolveDefaultSystemSettings(process.env);
   const logger = new ConsoleJsonLogger(defaultSettings.logLevel);
   const settingsDbPath =
     process.env.SETTINGS_DB_PATH ||
     (isTest ? ':memory:' : path.resolve(process.cwd(), 'var/zeromttr-settings.sqlite'));
-  const settingsRepository = new SqliteSettingsRepository(settingsDbPath, defaultSettings, logger);
+  const settingsRepository = new SqliteSettingsRepository(
+    settingsDbPath,
+    defaultSettings,
+    logger,
+    activeLlmProvider
+  );
   const getSettings = () => settingsRepository.get();
   logger.setMinLevel(getSettings().logLevel);
 
@@ -271,12 +276,16 @@ export { createReasoningAdapter } from './adapters/llm.factory.js';
 export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
   const isTest = process.env.NODE_ENV === 'test';
   const credentials = validateAndResolveBootCredentials(isTest);
-  if (!resolveLlmProvider(process.env.LLM_PROVIDER)) {
+  const activeLlmProvider = resolveLlmProvider(process.env.LLM_PROVIDER);
+  if (!activeLlmProvider) {
     throw new Error(
       `Unsupported LLM_PROVIDER '${process.env.LLM_PROVIDER}'. Supported providers: ${SUPPORTED_LLM_PROVIDERS.join(', ')}`
     );
   }
-  const { settingsRepository, getSettings, logger } = initializeSettingsAndLogger(isTest);
+  const { settingsRepository, getSettings, logger } = initializeSettingsAndLogger(
+    isTest,
+    activeLlmProvider
+  );
   const adapters = createCoreAdapters(getSettings, logger);
   const { demoEnabled, demoLifecycle, demoRouter, replayRunner } = createDemoWiring({
     repository: adapters.repository,
