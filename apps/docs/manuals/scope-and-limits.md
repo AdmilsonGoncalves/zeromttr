@@ -2,7 +2,6 @@
 id: scope-and-limits
 title: Escopo, Limitações e Governança
 slug: /scope-and-limits
-sidebar_position: 6
 ---
 
 # Escopo, Limitações e Governança
@@ -13,14 +12,14 @@ Esta página documenta com transparência **o que o ZeroMTTR faz automaticamente
 
 Por decisão deliberada de governança (**Human-in-the-Loop**), o ZeroMTTR **nunca realiza merge automático de Pull Requests nem dispara deploys em produção**.
 
-| Ação                                                                        | Executada pelo ZeroMTTR? | Quem executa                                              |
-| :-------------------------------------------------------------------------- | :----------------------- | :-------------------------------------------------------- |
-| Investigar métricas, traces, logs mascarados e diff de deploy               | Sim                      | Automático (Orchestrator + MCP Server)                    |
-| Gerar diagnóstico (RCA) e abrir branch `hotfix/zeromttr-*` com Pull Request | Sim                      | Automático (validado por CI no repositório alvo)          |
-| Enviar e-mail Post-Mortem com links assinados (HMAC)                        | Sim                      | Automático                                                |
-| Validar HMAC, encerrar incidente (`RESOLVED`) e anotar no Grafana           | Sim (após clique humano) | Engenheiro de plantão confirma na tela de decisão         |
-| **Fazer merge do Pull Request na branch alvo / produção**                   | **Não**                  | **Sempre manual pelo engenheiro diretamente no GitHub**   |
-| **Disparar build/redeploy em produção após o merge**                        | **Não**                  | **Pipeline de deploy controlado pela equipe responsável** |
+| Ação                                                                        | Executada pelo ZeroMTTR? | Quem executa                                                                       |
+| :-------------------------------------------------------------------------- | :----------------------- | :--------------------------------------------------------------------------------- |
+| Investigar métricas, traces, logs mascarados e diff de deploy               | Sim                      | Automático (Orchestrator + MCP Server)                                             |
+| Gerar diagnóstico (RCA) e abrir branch `hotfix/zeromttr-*` com Pull Request | Sim                      | Automático (validado por CI quando o repositório alvo possui workflow configurado) |
+| Enviar e-mail Post-Mortem com links assinados (HMAC)                        | Sim                      | Automático                                                                         |
+| Validar HMAC, encerrar incidente (`RESOLVED`) e anotar no Grafana           | Sim (após clique humano) | Engenheiro de plantão confirma na tela de decisão                                  |
+| **Fazer merge do Pull Request na branch alvo / produção**                   | **Não**                  | **Sempre manual pelo engenheiro diretamente no GitHub**                            |
+| **Disparar build/redeploy em produção após o merge**                        | **Não**                  | **Pipeline de deploy controlado pela equipe responsável**                          |
 
 :::important Sobre a opção "Restauração Automática ao Aprovar"
 A configuração `autoRestoreOnApprove` existe **apenas para ambientes de demonstração** com alvos que suportam simulação de caos em memória. Em produção (ou em serviços monitorados passivamente), clicar em **Aprovar** apenas registra a decisão auditável, encerra o incidente e anota o evento no Grafana.

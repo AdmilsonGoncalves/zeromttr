@@ -2,7 +2,6 @@
 id: scope-and-limits
 title: Scope, Limitations & Governance
 slug: /scope-and-limits
-sidebar_position: 6
 ---
 
 # Scope, Limitations & Governance
@@ -13,14 +12,14 @@ This page transparently documents **what ZeroMTTR automates**, **what it intenti
 
 By deliberate **Human-in-the-Loop** governance design, ZeroMTTR **never auto-merges Pull Requests and never triggers production deploys**.
 
-| Action                                                               | Automated by ZeroMTTR?  | Who performs it                                        |
-| :------------------------------------------------------------------- | :---------------------- | :----------------------------------------------------- |
-| Correlate metrics, traces, masked logs, and deploy diffs             | Yes                     | Automatic (Orchestrator + MCP Server)                  |
-| Generate root-cause analysis (RCA) and open a `hotfix/zeromttr-*` PR | Yes                     | Automatic (verified by CI in the target repository)    |
-| Send Post-Mortem email with signed HMAC links                        | Yes                     | Automatic                                              |
-| Verify HMAC, close incident (`RESOLVED`), and annotate Grafana       | Yes (after human click) | On-call engineer confirms on the Decision screen       |
-| **Merge the Pull Request into the target / production branch**       | **No**                  | **Always performed manually by an engineer on GitHub** |
-| **Trigger production build/redeploy after merge**                    | **No**                  | **Managed by the team's own release pipeline**         |
+| Action                                                               | Automated by ZeroMTTR?  | Who performs it                                                                |
+| :------------------------------------------------------------------- | :---------------------- | :----------------------------------------------------------------------------- |
+| Correlate metrics, traces, masked logs, and deploy diffs             | Yes                     | Automatic (Orchestrator + MCP Server)                                          |
+| Generate root-cause analysis (RCA) and open a `hotfix/zeromttr-*` PR | Yes                     | Automatic (verified by CI when the target repository configures a CI workflow) |
+| Send Post-Mortem email with signed HMAC links                        | Yes                     | Automatic                                                                      |
+| Verify HMAC, close incident (`RESOLVED`), and annotate Grafana       | Yes (after human click) | On-call engineer confirms on the Decision screen                               |
+| **Merge the Pull Request into the target / production branch**       | **No**                  | **Always performed manually by an engineer on GitHub**                         |
+| **Trigger production build/redeploy after merge**                    | **No**                  | **Managed by the team's own release pipeline**                                 |
 
 :::important About "Auto-Restore on Approve"
 The `autoRestoreOnApprove` setting applies **only to demo environments** running workloads that expose in-memory chaos simulation. In production (or passively monitored workloads), clicking **Approve** strictly records the auditable decision, closes the incident, and annotates Grafana.

@@ -2,7 +2,6 @@
 id: architecture
 title: Arquitectura del Sistema
 slug: /architecture
-sidebar_position: 2
 ---
 
 # Arquitectura del Sistema

@@ -2,12 +2,11 @@
 id: human-approval
 title: Human Approval & Governance
 slug: /human-approval
-sidebar_position: 4
 ---
 
 # Human Approval & Governance
 
-ZeroMTTR enforces **Human-in-the-Loop** governance: automation accelerates investigation and produces a CI-tested fix, while **no change is merged or deployed to production without explicit human confirmation**.
+ZeroMTTR enforces **Human-in-the-Loop** governance: automation accelerates investigation and opens a hotfix Pull Request (verified automatically when the target repository configures a CI workflow), while **no change is merged or deployed to production without explicit human confirmation**.
 
 ## Decision Flow
 

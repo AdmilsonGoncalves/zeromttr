@@ -2,7 +2,6 @@
 id: settings
 title: Configuración en Tiempo Real
 slug: /settings
-sidebar_position: 5
 ---
 
 # Configuración en Tiempo Real

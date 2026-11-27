@@ -2,7 +2,6 @@
 id: installation-troubleshooting
 title: Instalação Local e Troubleshooting
 slug: /installation-troubleshooting
-sidebar_position: 8
 ---
 
 # Instalação Local e Troubleshooting
@@ -10,7 +9,7 @@ sidebar_position: 8
 ## Requisitos
 
 - **Node.js 24 LTS**
-- **pnpm 10+**
+- **pnpm 12+**
 - **Docker & Docker Compose v2.40+**
 
 ## Subindo o ambiente local
@@ -19,13 +18,19 @@ sidebar_position: 8
 # 1. Copiar o modelo de variáveis de ambiente
 cp .env.prod.template .env
 
-# 2. Instalar dependências
+# 2. (Opcional para Modo Replay; obrigatório para Modo Live)
+# Edite o .env e preencha suas credenciais reais:
+# LLM_API_KEY, GITHUB_TOKEN, RESEND_API_KEY, ON_CALL_ENGINEER_EMAIL
+# e substitua os tokens de segurança (MCP_AUTH_TOKEN, GRAFANA_WEBHOOK_TOKEN,
+# DASHBOARD_API_TOKEN, SETTINGS_ADMIN_TOKEN e DECISION_HMAC_SECRET)
+
+# 3. Instalar dependências
 pnpm install --frozen-lockfile
 
-# 3. Validar qualidade do workspace (formatação, lint, tipos, testes e build)
+# 4. Validar qualidade do workspace (formatação, lint, tipos, testes e build)
 pnpm run check:workspace
 
-# 4. Subir toda a stack (Observabilidade LGTM + ZeroMTTR + Manual)
+# 5. Subir toda a stack (Observabilidade LGTM + ZeroMTTR + Manual)
 docker compose up -d --build
 ```
 

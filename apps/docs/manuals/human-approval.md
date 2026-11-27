@@ -2,12 +2,11 @@
 id: human-approval
 title: Aprovação Humana e Governança
 slug: /human-approval
-sidebar_position: 4
 ---
 
 # Aprovação Humana e Governança
 
-O ZeroMTTR segue o princípio de **Human-in-the-Loop**: a automação acelera o diagnóstico e prepara a correção testada em CI, mas **nenhuma alteração é aplicada automaticamente em produção sem decisão explícita do plantonista**.
+O ZeroMTTR segue o princípio de **Human-in-the-Loop**: a automação acelera o diagnóstico e prepara o Pull Request de correção (validado automaticamente quando o repositório alvo possui workflow de CI configurado), mas **nenhuma alteração é aplicada automaticamente em produção sem decisão explícita do plantonista**.
 
 ## Fluxo de decisão
 

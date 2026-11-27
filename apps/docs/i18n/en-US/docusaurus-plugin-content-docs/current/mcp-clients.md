@@ -2,7 +2,6 @@
 id: mcp-clients
 title: MCP Client Integration
 slug: /mcp-clients
-sidebar_position: 7
 ---
 
 # MCP Client Integration
@@ -27,6 +26,13 @@ The repository root includes a ready-to-use `.mcp.json` configuration:
     }
   }
 }
+```
+
+Because `.env` is not automatically loaded into the MCP client's process environment, export `MCP_AUTH_TOKEN` in your shell before launching **Claude Code** (or another compatible client) so `${MCP_AUTH_TOKEN}` expands in the request header:
+
+```bash
+export MCP_AUTH_TOKEN="$(grep '^MCP_AUTH_TOKEN=' .env | cut -d= -f2-)"
+claude
 ```
 
 :::info Cursor users

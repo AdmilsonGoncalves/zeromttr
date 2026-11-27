@@ -2,7 +2,6 @@
 id: war-room
 title: Usando o War Room
 slug: /war-room
-sidebar_position: 2
 ---
 
 # Usando o War Room

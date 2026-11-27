@@ -2,7 +2,6 @@
 id: scope-and-limits
 title: Alcance, Limitaciones y Gobernanza
 slug: /scope-and-limits
-sidebar_position: 6
 ---
 
 # Alcance, Limitaciones y Gobernanza
@@ -13,14 +12,14 @@ Esta página documenta con transparencia **qué automatiza ZeroMTTR**, **qué no
 
 Por decisión deliberada de gobernanza (**Human-in-the-Loop**), ZeroMTTR **nunca realiza merge automático de Pull Requests ni dispara despliegues a producción**.
 
-| Acción                                                                      | ¿Automatizada por ZeroMTTR? | Quién la ejecuta                                                |
-| :-------------------------------------------------------------------------- | :-------------------------- | :-------------------------------------------------------------- |
-| Correlacionar métricas, trazas, logs enmascarados y diff de despliegue      | Sí                          | Automático (Orchestrator + MCP Server)                          |
-| Generar diagnóstico (RCA) y abrir rama `hotfix/zeromttr-*` con Pull Request | Sí                          | Automático (validado por CI en el repositorio objetivo)         |
-| Enviar correo Post-Mortem con enlaces firmados (HMAC)                       | Sí                          | Automático                                                      |
-| Validar HMAC, cerrar incidente (`RESOLVED`) y anotar en Grafana             | Sí (tras clic humano)       | El ingeniero de guardia confirma en la pantalla de decisión     |
-| **Hacer merge del Pull Request en la rama objetivo / producción**           | **No**                      | **Siempre manual por un ingeniero directamente en GitHub**      |
-| **Disparar build/redespliegue en producción tras el merge**                 | **No**                      | **Pipeline de despliegue controlado por el equipo responsable** |
+| Acción                                                                      | ¿Automatizada por ZeroMTTR? | Quién la ejecuta                                                                        |
+| :-------------------------------------------------------------------------- | :-------------------------- | :-------------------------------------------------------------------------------------- |
+| Correlacionar métricas, trazas, logs enmascarados y diff de despliegue      | Sí                          | Automático (Orchestrator + MCP Server)                                                  |
+| Generar diagnóstico (RCA) y abrir rama `hotfix/zeromttr-*` con Pull Request | Sí                          | Automático (validado por CI cuando el repositorio objetivo configura un workflow de CI) |
+| Enviar correo Post-Mortem con enlaces firmados (HMAC)                       | Sí                          | Automático                                                                              |
+| Validar HMAC, cerrar incidente (`RESOLVED`) y anotar en Grafana             | Sí (tras clic humano)       | El ingeniero de guardia confirma en la pantalla de decisión                             |
+| **Hacer merge del Pull Request en la rama objetivo / producción**           | **No**                      | **Siempre manual por un ingeniero directamente en GitHub**                              |
+| **Disparar build/redespliegue en producción tras el merge**                 | **No**                      | **Pipeline de despliegue controlado por el equipo responsable**                         |
 
 :::important Sobre "Restauración Automática al Aprobar"
 La configuración `autoRestoreOnApprove` aplica **únicamente a entornos de demostración** con servicios de ejemplo que soportan simulación de caos en memoria. En producción (o en servicios monitorizados pasivamente), hacer clic en **Aprobar** solo registra la decisión auditable, cierra el incidente y anota el evento en Grafana.

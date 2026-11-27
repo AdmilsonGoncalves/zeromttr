@@ -2,12 +2,11 @@
 id: introduction
 title: Bem-vindo ao ZeroMTTR
 slug: /
-sidebar_position: 1
 ---
 
 # Bem-vindo ao ZeroMTTR
 
-O **ZeroMTTR** é uma plataforma autônoma de **Remediação de Incidentes e Governança Humana**. Quando um serviço monitorado apresenta degradação, o ZeroMTTR investiga automaticamente métricas, traces distribuídos, logs e mudanças recentes no código, propõe uma correção em um **Pull Request validado por CI** e solicita **aprovação humana por e-mail** — mantendo o controle final nas mãos do engenheiro de plantão.
+O **ZeroMTTR** é uma plataforma autônoma de **Remediação de Incidentes e Governança Humana**. Quando um serviço monitorado apresenta degradação, o ZeroMTTR investiga automaticamente métricas, traces distribuídos, logs e mudanças recentes no código, propõe uma correção em um **Pull Request** (validado automaticamente quando o repositório alvo possui workflow de CI configurado) e solicita **aprovação humana por e-mail** — mantendo o controle final nas mãos do engenheiro de plantão.
 
 :::important Governança Human-in-the-Loop
 O ZeroMTTR **não realiza merge automático de Pull Requests nem dispara redeploy em produção**. A aprovação pelo plantonista registra a decisão auditável e encerra o incidente; o merge final permanece sob controle explícito da equipe no GitHub. Veja todos os detalhes em **[Escopo, Limitações e Governança](/scope-and-limits)**.

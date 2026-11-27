@@ -2,7 +2,6 @@
 id: settings
 title: Live Runtime Settings
 slug: /settings
-sidebar_position: 5
 ---
 
 # Live Runtime Settings

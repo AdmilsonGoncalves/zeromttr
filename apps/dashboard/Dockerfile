@@ -7,7 +7,9 @@ COPY libs ./libs
 COPY apps/dashboard ./apps/dashboard
 
 ARG VITE_PRIMEUI_LICENSE_KEY=""
+ARG VITE_DOCS_URL=""
 ENV VITE_PRIMEUI_LICENSE_KEY=${VITE_PRIMEUI_LICENSE_KEY}
+ENV VITE_DOCS_URL=${VITE_DOCS_URL}
 
 RUN pnpm install --frozen-lockfile --filter @zeromttr/dashboard...
 RUN pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build

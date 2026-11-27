@@ -5,9 +5,27 @@ import { themes as prismThemes } from 'prism-react-renderer';
 const docsUrl = process.env.ZEROMTTR_DOCS_URL || 'https://docs.zeromttr.agjworks.com';
 const dashboardUrl = process.env.PUBLIC_DASHBOARD_URL || 'https://zeromttr.agjworks.com';
 
+const LOCALE_METADATA: Record<string, { title: string; tagline: string }> = {
+  'pt-BR': {
+    title: 'ZeroMTTR — Manual de Instruções',
+    tagline: 'Remediação Autônoma de Incidentes & Governança Humana'
+  },
+  'en-US': {
+    title: 'ZeroMTTR — User Manual',
+    tagline: 'Autonomous Incident Remediation & Human Governance'
+  },
+  'es-ES': {
+    title: 'ZeroMTTR — Manual de Usuario',
+    tagline: 'Remediación Autónoma de Incidentes y Gobernanza Humana'
+  }
+};
+
+const currentLocale = process.env.DOCUSAURUS_CURRENT_LOCALE || 'pt-BR';
+const activeMetadata = LOCALE_METADATA[currentLocale] ?? LOCALE_METADATA['pt-BR'];
+
 const config: Config = {
-  title: 'ZeroMTTR — Manual de Instruções',
-  tagline: 'Remediação Autônoma de Incidentes & Governança Humana',
+  title: activeMetadata.title,
+  tagline: activeMetadata.tagline,
   favicon: 'img/logo.svg',
 
   url: docsUrl,

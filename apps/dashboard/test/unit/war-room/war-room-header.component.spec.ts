@@ -82,11 +82,23 @@ describe('WarRoomHeaderComponent', () => {
     expect(resolveDocsManualUrl(Language.ES_ES, { hostname: 'zeromttr.agjworks.com' })).toBe(
       'https://docs.zeromttr.agjworks.com/es-ES/'
     );
+    expect(resolveDocsManualUrl(Language.PT_BR, { hostname: 'zeromttr.company.io' })).toBe(
+      'https://docs.zeromttr.company.io/'
+    );
     expect(resolveDocsManualUrl(Language.PT_BR, { hostname: 'localhost' })).toBe(
       'http://localhost:4300/'
     );
+    expect(resolveDocsManualUrl(Language.EN_US, { hostname: '::1' })).toBe(
+      'http://localhost:4300/en-US/'
+    );
+    expect(resolveDocsManualUrl(Language.ES_ES, { hostname: '[::1]' })).toBe(
+      'http://localhost:4300/es-ES/'
+    );
     expect(resolveDocsManualUrl(Language.ES_ES, { hostname: '127.0.0.1' })).toBe(
       'http://localhost:4300/es-ES/'
+    );
+    expect(resolveDocsManualUrl(Language.PT_BR, { hostname: '10.0.0.5' })).toBe(
+      'https://docs.zeromttr.agjworks.com/'
     );
     expect(
       resolveDocsManualUrl(Language.EN_US, {

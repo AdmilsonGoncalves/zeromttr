@@ -24,6 +24,12 @@ import { SystemSettingsComponent } from '../../shared/system-settings/system-set
 
 const DEFAULT_PROD_DOCS_URL = 'https://docs.zeromttr.agjworks.com';
 const DEFAULT_LOCAL_DOCS_URL = 'http://localhost:4300';
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const IPV4_HOSTNAME_PATTERN = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+function isCustomPublicDomain(hostname: string): boolean {
+  return hostname.includes('.') && !IPV4_HOSTNAME_PATTERN.test(hostname) && !hostname.includes(':');
+}
 
 /**
  * Resolves the external Docusaurus user manual URL for the active dashboard locale.
@@ -33,10 +39,16 @@ export function resolveDocsManualUrl(
   options?: { configuredBaseUrl?: string; hostname?: string }
 ): string {
   let baseUrl = DEFAULT_PROD_DOCS_URL;
+  const normalizedHost = options?.hostname?.trim().toLowerCase();
+
   if (isNonEmptyString(options?.configuredBaseUrl)) {
     baseUrl = options.configuredBaseUrl.trim().replace(/\/+$/, '');
-  } else if (options?.hostname === 'localhost' || options?.hostname === '127.0.0.1') {
+  } else if (isNonEmptyString(normalizedHost) && LOCAL_HOSTNAMES.has(normalizedHost)) {
     baseUrl = DEFAULT_LOCAL_DOCS_URL;
+  } else if (isNonEmptyString(normalizedHost) && isCustomPublicDomain(normalizedHost)) {
+    baseUrl = normalizedHost.startsWith('docs.')
+      ? `https://${normalizedHost}`
+      : `https://docs.${normalizedHost}`;
   }
 
   let localePath = '/';
@@ -63,8 +75,7 @@ export class WarRoomHeaderComponent {
   readonly healthStatus = TargetHealthStatus;
 
   readonly docsManualUrl = computed<string>(() => {
-    const configuredBaseUrl = (import.meta as unknown as { env?: { VITE_DOCS_URL?: string } }).env
-      ?.VITE_DOCS_URL;
+    const configuredBaseUrl = import.meta.env?.VITE_DOCS_URL;
     const hostname = typeof window !== 'undefined' ? window.location.hostname : undefined;
     return resolveDocsManualUrl(this.i18n.currentLang(), { configuredBaseUrl, hostname });
   });

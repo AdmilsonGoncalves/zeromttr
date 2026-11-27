@@ -104,4 +104,15 @@ describe('ZeroMTTR Docusaurus manual integrity', () => {
       }
     }
   });
+
+  it('should_return_true_http_404_and_cache_localized_assets_in_nginx_conf', () => {
+    const nginxConf = readFileSync(resolve(APP_ROOT, 'nginx.conf'), 'utf8');
+    expect(nginxConf).toContain('listen [::]:80;');
+    expect(nginxConf).toContain('absolute_redirect off;');
+    expect(nginxConf).toContain('try_files $uri $uri/ $uri.html =404;');
+    expect(nginxConf).not.toContain('try_files $uri $uri/ $uri.html /404.html;');
+    expect(nginxConf).toContain('error_page 404 /en-US/404.html;');
+    expect(nginxConf).toContain('error_page 404 /es-ES/404.html;');
+    expect(nginxConf).toContain('location ~* ^/(?:(?:en-US|es-ES)/)?assets/');
+  });
 });

@@ -2,7 +2,6 @@
 id: installation-troubleshooting
 title: Local Setup & Troubleshooting
 slug: /installation-troubleshooting
-sidebar_position: 8
 ---
 
 # Local Setup & Troubleshooting
@@ -10,7 +9,7 @@ sidebar_position: 8
 ## Prerequisites
 
 - **Node.js 24 LTS**
-- **pnpm 10+**
+- **pnpm 12+**
 - **Docker & Docker Compose v2.40+**
 
 ## Starting the Local Stack
@@ -19,13 +18,19 @@ sidebar_position: 8
 # 1. Copy the environment template
 cp .env.prod.template .env
 
-# 2. Install workspace dependencies
+# 2. (Optional for Replay Mode; required for Live Mode)
+# Edit .env with your real credentials:
+# LLM_API_KEY, GITHUB_TOKEN, RESEND_API_KEY, ON_CALL_ENGINEER_EMAIL
+# and replace placeholder security tokens (MCP_AUTH_TOKEN, GRAFANA_WEBHOOK_TOKEN,
+# DASHBOARD_API_TOKEN, SETTINGS_ADMIN_TOKEN, and DECISION_HMAC_SECRET)
+
+# 3. Install workspace dependencies
 pnpm install --frozen-lockfile
 
-# 3. Run the full quality gate (formatting, lint, typecheck, tests, build)
+# 4. Run the full quality gate (formatting, lint, typecheck, tests, build)
 pnpm run check:workspace
 
-# 4. Start the entire stack (LGTM observability + ZeroMTTR + User Manual)
+# 5. Start the entire stack (LGTM observability + ZeroMTTR + User Manual)
 docker compose up -d --build
 ```
 

@@ -2,7 +2,6 @@
 id: demo-modes
 title: Modo Replay vs. Modo Live
 slug: /demo-modes
-sidebar_position: 3
 ---
 
 # Modo Replay vs. Modo Live

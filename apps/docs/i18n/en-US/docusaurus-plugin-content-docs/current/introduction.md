@@ -2,12 +2,11 @@
 id: introduction
 title: Welcome to ZeroMTTR
 slug: /
-sidebar_position: 1
 ---
 
 # Welcome to ZeroMTTR
 
-**ZeroMTTR** is an autonomous **Incident Remediation & Human-in-the-Loop Governance** platform. When a monitored service degrades, ZeroMTTR automatically correlates metrics, distributed traces, logs, and recent code changes, opens a **CI-verified hotfix Pull Request**, and requests **signed human approval via email** — keeping final production control in the on-call engineer's hands.
+**ZeroMTTR** is an autonomous **Incident Remediation & Human-in-the-Loop Governance** platform. When a monitored service degrades, ZeroMTTR automatically correlates metrics, distributed traces, logs, and recent code changes, opens a **hotfix Pull Request** (verified automatically when the target repository configures a CI workflow), and requests **signed human approval via email** — keeping final production control in the on-call engineer's hands.
 
 :::important Human-in-the-Loop Governance
 ZeroMTTR **never auto-merges Pull Requests and never triggers production redeploys**. On-call approval records the auditable decision and closes the incident; final merging remains explicitly under human control on GitHub. See full details in **[Scope, Limitations & Governance](/scope-and-limits)**.
