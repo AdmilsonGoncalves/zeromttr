@@ -2,7 +2,7 @@ import type { TranslationDictionary } from './i18n.types.js';
 
 export const EN_TRANSLATIONS: TranslationDictionary = {
   // === App, Header & Mode Controls ===
-  appTitle: 'ZeroMTTR — War Room Mission Control',
+  appTitle: 'ZeroMTTR — War Room',
   appSubtitle: 'Autonomous Incident Remediation & Human-in-the-Loop Governance',
   headerMenuBtn: 'Menu',
   headerMenuAriaLabel: 'Open demo',
@@ -70,8 +70,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   step8Desc:
     'Executive report delivered to on-call engineer with HMAC #fragment link for approval.',
 
-  // === FSM Flow & Hints ===
-  fsmFlowLabel: 'FSM Flow',
+  // === Remediation Flow & Hints ===
+  fsmFlowLabel: 'Remediation Flow',
   fsmAwaitingAlertLabel: '0. LGTM Collect',
   fsmAwaitingAlertTip:
     'Degraded service emitting telemetry — waiting for Prometheus/Grafana to fire the alert.',
@@ -97,10 +97,9 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   fsmHintIdle: 'Ready — monitoring telemetry and awaiting incidents or on-demand execution.',
   fsmHintAwaitingAlert:
     'Service degraded — generating PIX traffic and waiting for Prometheus/Grafana alert ({N}s)...',
-  fsmHintActive: 'Autonomous pipeline running — streaming live FSM state transitions.',
+  fsmHintActive: 'Autonomous pipeline running — streaming live incident stages.',
   fsmHintNotified: 'Awaiting human decision via email HMAC link (or demo simulation button).',
-  fsmHintResolved:
-    'Incident resolved and approved. Target service has been restored automatically.',
+  fsmHintResolved: 'Incident approved and resolved.',
   fsmHintRejected: 'Hotfix rejected by on-call engineer. Pull Request remains unmerged.',
   fsmHintFailed: 'Pipeline stopped due to failure — check orchestrator logs.',
 
@@ -242,7 +241,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   toastServiceRestoredDetail: 'Chaos state cleared and target service returned to healthy.',
   toastDecisionApprovedSummary: 'Hotfix approved',
   toastDecisionApprovedDetail:
-    'Incident resolved and target service restored! Incident data remains on screen for inspection.',
+    'Approval recorded and incident resolved. Incident data remains on screen for inspection.',
   toastHealthyTrafficStartedSummary: 'Healthy traffic started',
   toastHealthyTrafficStartedDetail: 'Continuous healthy requests streaming to {{service}}.',
   toastHealthyTrafficStoppedSummary: 'Healthy traffic stopped',

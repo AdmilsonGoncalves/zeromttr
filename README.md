@@ -1,4 +1,4 @@
-# ⚡ ZeroMTTR — Autonomous AIOps & Incident Remediation
+# ⚡ ZeroMTTR — Autonomous Incident Remediation & Human-in-the-Loop Governance
 
 > **Read in Portuguese:** [README.pt-BR.md](./README.pt-BR.md) | **Leer en Español:** [README.es-ES.md](./README.es-ES.md)  
 > **Track:** Logistics & Automation (_Operational workflow automation & mission-critical system integrations_)  
@@ -12,31 +12,36 @@
 
 In mission-critical distributed systems — such as instant payment settlement (PIX), logistics fulfillment, e-commerce checkout, or billing — the mean time from alert to reviewable fix is dominated by manual context switching across siloed metrics, traces, logs, and Git diffs.
 
-**ZeroMTTR** is an autonomous AIOps and incident remediation platform built for the **Logistics & Automation** track (automating operational workflows and integrating mission-critical systems). Its core follows **Clean / Hexagonal Architecture** and is **100% domain-agnostic**: any service emitting OpenTelemetry (OTLP) telemetry and backed by a **GitHub** repository (with other Git hosts like GitLab supported by adding an adapter for `RepoInspectorPort` / `RemediationPort`) can be diagnosed and remediated without changing a single line in `apps/orchestrator` or `apps/mcp-server`. Target status inspection is decoupled behind `TargetStatusPort`: cooperative workloads expose a neutral `GET /ops/status` manifest (`capabilities` + generic `saturation`), while external/legacy workloads can be monitored passively via `TARGET_STATUS_PROVIDER=prometheus` (MCP) with zero target-side endpoints. Operational policies (post-rejection Human Takeover cooldown, repeat suppression, decision TTL, target diff refs, LLM models, and orchestrator log level) are editable at runtime via an audited **Node 24 SQLite** settings store (`GET`/`PATCH /api/settings`) protected by a dedicated `SETTINGS_ADMIN_TOKEN`.
+**ZeroMTTR** is an autonomous AIOps and incident remediation platform that connects observability, code analysis, and human-in-the-loop governance in a single workflow:
 
-### Comparative Positioning (as of November 2026)
+- **Service-agnostic core:** works with any application emitting OpenTelemetry telemetry with a GitHub repository (extensible to other Git hosts), without modifying the core platform.
+- **Active or passive monitoring:** integrates with cooperative workloads via a health manifest or monitors external/legacy services passively through Prometheus, with no custom target endpoints required.
+- **Audited live configuration:** operational policies (alert cooldowns, AI models, target parameters, and log level) can be adjusted directly from the UI with local persistence, change history, and access control.
 
-| Capability                     | HolmesGPT / OpenSRE                         | Datadog Bits AI / Sentry Seer       | ZeroMTTR                                                                                                                                                |
-| :----------------------------- | :------------------------------------------ | :---------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Deployment & Protocol**      | Self-hosted (CLI / ChatOps)                 | Proprietary cloud SaaS              | **100% Self-Hosted & Open Source** exposing an open **Model Context Protocol (MCP)** Streamable HTTP contract (8 tools + `.mcp.json`)                   |
-| **Edge PII Protection (LGPD)** | No native Brazilian PII / PIX edge pipeline | Telemetry processed in vendor cloud | **Dual-barrier:** OTTL `transform` redaction in OTel Collector before Loki persistence + **fail-closed `PiiPromptGuard`** before LLM dispatch           |
-| **FinOps Payload Telemetry**   | Raw context dumps                           | Vendor-managed billing              | Deterministic summarization & policy truncation in MCP with per-incident `raw` vs. `compacted` byte tracking and token-savings estimate                 |
-| **Remediation Governance**     | Ad-hoc scripts or ChatOps advice            | Vendor-managed PR / suggestions     | **Automated hotfix PR** against the release branch + **CI gate (`hotfix-verify.yml`)** + **human-in-the-loop HMAC approval sent exclusively via email** |
-| **Resilience Without LLM**     | Depends on configured LLM                   | Cloud SaaS dependent                | Explicit `ReasoningPort` with **deterministic fallback** (`reasoningSource: 'llm' \| 'fallback'`)                                                       |
+### Comparison with AIOps / AI-SRE Solutions
+
+| Capability                     | HolmesGPT / OpenSRE                         | Datadog Bits AI / Sentry Seer       | ZeroMTTR                                                                                                                                   |
+| :----------------------------- | :------------------------------------------ | :---------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Deployment & Protocol**      | Self-hosted (CLI / ChatOps)                 | Proprietary cloud SaaS              | **100% Self-Hosted & Open Source**, exposing an open **Model Context Protocol (MCP)** contract over HTTP                                   |
+| **Edge PII Protection (LGPD)** | No native Brazilian PII / PIX edge pipeline | Telemetry processed in vendor cloud | **Dual-barrier:** edge PII redaction before log storage + fail-closed privacy guard before any external LLM dispatch                       |
+| **FinOps Payload Telemetry**   | Raw context dumps                           | Vendor-managed billing              | Deterministic evidence summarization & truncation with per-incident raw vs. compacted payload tracking and estimated token savings         |
+| **Remediation Governance**     | Ad-hoc scripts or ChatOps advice            | Vendor-managed PR / suggestions     | **Automated hotfix PR** against the release branch + **automated CI verification** + **signed human approval delivered strictly by email** |
+| **Resilience Without LLM**     | Depends on configured LLM                   | Cloud SaaS dependent                | Diagnosis with **explicit deterministic fallback** whenever the LLM is unavailable or blocked by the privacy guard                         |
 
 ### How the Interactive Demo Works
 
-When you open the **Demo** slide-over drawer (`app-demo-settings`) in the War Room and click **"Simulate Incident"** (`POST /api/demo/chaos`), the Orchestrator's modular demo router (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) operates in one of two modes targeting the **`api-pagamentos-core`** workload (`apps/target-app-demo`). Separately, the always-available **Settings** drawer (`app-system-settings`, gear icon) lets operators inspect or update runtime alert cooldowns, target diff settings, LLM models, log levels, and the change audit log (`GET`/`PATCH /api/settings`) without restarting containers:
+From the War Room **Demo** panel, you can explore the platform in two modes targeting the **`api-pagamentos-core`** sample service (while the always-available **Settings** gear panel lets you inspect and update runtime operational policies and change history without restarting the stack):
 
 1. **Replay Mode (public default):**
-   - Streams a real-time SSE timeline of a recorded real execution (`data/last-recorded-incident.json`) via `ReplayRunner`.
-   - Consumes zero external API quotas (Gemini, GitHub, Resend).
-2. **Live Mode (end-to-end real execution, unlocked with `LIVE_DEMO_KEY` or local Docker):**
-   1. **Chaos Injection on `api-pagamentos-core`:** The Orchestrator triggers `chaos.controller.ts`, enabling `chaosManager.setPoolSaturation(true)` (`chaos.manager.ts`). Service status switches from `healthy` (`v2.14.7`) to `degraded` (`v2.14.8`), while `payment.repository.ts` drops the pool cap to `2` connections (`degradedMaxConnections`), injects a `4600 ms` delay, and omits `client.release()`, causing connection exhaustion.
-   2. **Synthetic Traffic Burst:** With `CHAOS_AUTO_TRAFFIC_BURST=true`, `startSyntheticTrafficBurst()` fires waves of 6 `POST /payments` requests (at `0s, 3s, 6s, 9s, 12s, 15s`) carrying synthetic PIX PII (CPF, CNPJ, email, and `Bearer` JWT).
-   3. **LGTM Observability & Alerting:** Pool exhaustion raises `KnexTimeoutError`, emits error `pg.pool.acquire` spans in **Tempo**, latency spikes in **Prometheus**, and logs masked at the edge by the OTel Collector's `transform` (OTTL) processor before reaching **Loki**. **Grafana** detects the anomaly and fires the alert webhook to the Orchestrator.
-   4. **Autonomous Remediation:** The Orchestrator gathers metrics, traces, logs, and `git diff v2.14.7...v2.14.8` via the **MCP Server**, audits the prompt through fail-closed `PiiPromptGuard`, synthesizes RCA + full-file patch (via **Gemini** or deterministic fallback), opens a real GitHub PR against `release/target-v2.14.8`, and sends the **Resend** Post-Mortem email with an HMAC link in `#fragment`.
-   5. **Restoration ("Restore Service" / `POST /api/demo/reset`):** Disables chaos in `ChaosManager`, cancels scheduled traffic bursts, and calls `paymentRepository.resetPool()`, returning `api-pagamentos-core` to `healthy` (`v2.14.7`).
+   - Streams the timeline of a recorded real execution in real time, consuming zero external API quotas (Gemini, GitHub, or Resend).
+2. **Live Mode (end-to-end real execution, via evaluation key or local Docker):**
+   1. **Fault injection:** enables a controlled connection-pool degradation on the sample service (`v2.14.7` → `v2.14.8`), simulating pool exhaustion under concurrent load.
+   2. **Synthetic traffic with mock PII:** sends simulated PIX requests containing synthetic sensitive data (CPF, CNPJ, email, and token) to showcase privacy redaction.
+   3. **Observability & alerting:** saturation triggers errors and latency spikes in Prometheus, error traces in Tempo, and edge-redacted logs in Loki; Grafana detects the anomaly and alerts the orchestrator.
+   4. **Autonomous diagnosis & remediation:** the orchestrator correlates metrics, traces, logs, and the version diff via the MCP server, verifies zero PII leakage, synthesizes root cause and patch, opens a real GitHub Pull Request, and emails a post-mortem report with a signed approval link.
+   5. **Restoration:** clears chaos state and returns the sample service to its healthy baseline (`v2.14.7`).
+
+> Detailed architecture, API contracts, environment variables, and technical decisions are documented under [`docs/en-US/`](./docs/en-US/00_architecture_master.md).
 
 ---
 
@@ -186,6 +191,8 @@ Local endpoints:
 - **Prometheus:** [http://localhost:9090](http://localhost:9090)
 - **MCP Server:** `http://localhost:8000/mcp`
 - **OTel Collector:** OTLP gRPC `4317` / HTTP `4318`
+
+> **Note on running host CLI scripts with `.env`:** `.env.prod.template` sets `TARGET_APP_URL=http://target-app-demo:3001` for Docker-internal container networking. When running `./scripts/chaos.sh`, `./scripts/reset.sh`, `./scripts/record-replay.sh`, or `./scripts/load-test-lgtm.sh` directly from your host machine, override it **inline per command** (e.g., `TARGET_APP_URL=http://127.0.0.1:3001 ./scripts/reset.sh`). Do **not** export `TARGET_APP_URL=http://127.0.0.1:3001` globally in `~/.zshrc` or `~/.bashrc`, because Docker Compose prioritizes shell variables over `.env` and would point the `orchestrator` container to its own loopback.
 
 ---
 

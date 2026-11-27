@@ -1,4 +1,4 @@
-# ⚡ ZeroMTTR — AIOps Autónomo y Remediación de Incidentes
+# ⚡ ZeroMTTR — Remediación Autónoma de Incidentes y Gobernanza Humana
 
 > **Read in English:** [README.md](./README.md) | **Leia em Português:** [README.pt-BR.md](./README.pt-BR.md)  
 > **Track:** Logística y Automatización (_Automatización de flujos de trabajo operativos e integraciones entre sistemas críticos_)  
@@ -12,31 +12,36 @@
 
 En sistemas distribuidos de misión crítica — como liquidación de pagos instantáneos (PIX), logística de despacho, checkout de comercio electrónico o facturación — el tiempo medio entre la alerta y una corrección revisable está dominado por el cambio manual de contexto entre métricas, trazas, logs y diffs en Git.
 
-**ZeroMTTR** es una plataforma autónoma de AIOps y remediación de incidentes construida para la categoría **Logística y Automatización** (automatización de flujos operativos e integración de sistemas críticos). Su núcleo sigue **Clean Architecture / Arquitectura Hexagonal** y es **100% agnóstico al dominio**: cualquier servicio que emita telemetría OpenTelemetry (OTLP) y esté respaldado por un repositorio en **GitHub** (con soporte para otros proveedores Git como GitLab añadiendo un adaptador para `RepoInspectorPort` / `RemediationPort`) puede diagnosticarse y remediarse sin cambiar una sola línea en `apps/orchestrator` o `apps/mcp-server`. La inspección del estado del objetivo se desacopla detrás de `TargetStatusPort`: las cargas cooperativas exponen un manifiesto neutro `GET /ops/status` (`capabilities` + `saturation` genérico), mientras que los servicios externos/legados pueden monitorizarse pasivamente vía `TARGET_STATUS_PROVIDER=prometheus` (MCP) sin endpoints personalizados. Las políticas operativas (cooldown tras rechazo _Human Takeover_, supresión de repetición, TTL de decisión, refs de diff del objetivo, modelos LLM y nivel de log del orquestador) son editables en tiempo real mediante almacenamiento **SQLite nativo de Node 24** con registro de auditoría (`GET`/`PATCH /api/settings`) protegido por un `SETTINGS_ADMIN_TOKEN` dedicado.
+**ZeroMTTR** es una plataforma autónoma de AIOps y remediación de incidentes que conecta observabilidad, análisis de código y gobernanza humana en un solo flujo:
 
-### Posicionamiento Comparativo (referencia: noviembre de 2026)
+- **Agnóstico al servicio monitorizado:** funciona con cualquier aplicación que emita telemetría OpenTelemetry y cuente con un repositorio en GitHub (extensible a otros proveedores Git), sin modificar el núcleo de la plataforma.
+- **Monitorización activa o pasiva:** se integra con servicios cooperativos mediante un manifiesto de salud o monitoriza servicios externos/legados de forma pasiva vía Prometheus, sin requerir endpoints personalizados en la aplicación objetivo.
+- **Configuración en tiempo real con auditoría:** las políticas operativas (ventanas de cooldown, modelos de IA, parámetros del objetivo y nivel de log) se ajustan directamente desde la interfaz, con persistencia local, historial de cambios y control de acceso.
 
-| Capacidad                          | HolmesGPT / OpenSRE                                   | Datadog Bits AI / Sentry Seer                 | ZeroMTTR                                                                                                                                                   |
-| :--------------------------------- | :---------------------------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Despliegue y Protocolo**         | Self-hosted (CLI / ChatOps)                           | SaaS propietario en la nube                   | **100% Self-Hosted y Open Source**, exponiendo un contrato abierto **Model Context Protocol (MCP)** sobre Streamable HTTP (8 herramientas + `.mcp.json`)   |
-| **Protección PII en Borde (LGPD)** | Sin pipeline nativo en borde para PII brasileña / PIX | Telemetría procesada en la nube del proveedor | **Doble barrera:** redacción OTTL `transform` en OTel Collector antes de Loki + **`PiiPromptGuard` (fail-closed)** antes del envío al LLM                  |
-| **Telemetría FinOps de Payload**   | Dumps brutos de contexto                              | Facturación gestionada en el SaaS             | Sumarización determinista y truncamiento de política en MCP con seguimiento `raw` vs. `compacted` por incidente y estimación de tokens ahorrados           |
-| **Gobernanza de Remediación**      | Scripts ad-hoc o sugerencias por ChatOps              | PR / sugerencias propietarias                 | **PR automatizado de hotfix** contra la rama de release + **CI gate (`hotfix-verify.yml`)** + **aprobación humana HMAC enviada exclusivamente por correo** |
-| **Resiliencia sin LLM**            | Depende del LLM configurado                           | Dependiente del SaaS en la nube               | `ReasoningPort` explícito con **fallback determinista** (`reasoningSource: 'llm' \| 'fallback'`)                                                           |
+### Comparativa con Soluciones de AIOps / AI-SRE
+
+| Capacidad                          | HolmesGPT / OpenSRE                                   | Datadog Bits AI / Sentry Seer                 | ZeroMTTR                                                                                                                                  |
+| :--------------------------------- | :---------------------------------------------------- | :-------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Despliegue y Protocolo**         | Self-hosted (CLI / ChatOps)                           | SaaS propietario en la nube                   | **100% Self-Hosted y Open Source**, exponiendo un contrato abierto **Model Context Protocol (MCP)** sobre HTTP                            |
+| **Protección PII en Borde (LGPD)** | Sin pipeline nativo en borde para PII brasileña / PIX | Telemetría procesada en la nube del proveedor | **Doble barrera:** redacción de datos sensibles en el borde antes del almacenamiento + guardia _fail-closed_ antes de enviar al LLM       |
+| **Telemetría FinOps de Payload**   | Dumps brutos de contexto                              | Facturación gestionada en el SaaS             | Sumarización determinista y truncamiento de evidencias con seguimiento de payload bruto vs. compactado y estimación de tokens ahorrados   |
+| **Gobernanza de Remediación**      | Scripts ad-hoc o sugerencias por ChatOps              | PR / sugerencias propietarias                 | **Pull Request de hotfix** contra la rama de release + **validación automática en CI** + **aprobación humana firmada enviada por correo** |
+| **Resiliencia sin LLM**            | Depende del LLM configurado                           | Dependiente del SaaS en la nube               | Diagnóstico con **fallback determinista explícito** cuando el LLM no está disponible o es bloqueado por la guardia de privacidad          |
 
 ### Cómo Funciona la Demo Interactiva
 
-Al abrir el panel lateral **Demostración** (`app-demo-settings`) en el War Room y hacer clic en **"Simular Incidente"** (`POST /api/demo/chaos`), el enrutador modular de demostración del Orchestrator (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) opera en uno de dos modos sobre el servicio objetivo **`api-pagamentos-core`** (`apps/target-app-demo`). De forma independiente, el panel lateral **Configuración** (`app-system-settings`, icono de engranaje siempre visible en demo y producción) permite consultar o actualizar en tiempo real cooldowns de alerta, parámetros del objetivo/diff, modelos LLM, nivel de log y el historial de auditoría (`GET`/`PATCH /api/settings`) sin reiniciar contenedores:
+Desde el panel **Demostración** en el War Room puedes probar la plataforma en dos modos sobre el servicio de ejemplo **`api-pagamentos-core`** (mientras el panel **Configuración**, siempre visible en el icono de engranaje, permite consultar y ajustar políticas operativas e historial de cambios sin reiniciar la pila):
 
 1. **Modo `Replay` (predeterminado público):**
-   - Transmite en tiempo real por SSE la línea de tiempo de una ejecución real grabada (`data/last-recorded-incident.json`) mediante `ReplayRunner`.
-   - Consume cero cuotas de APIs externas (Gemini, GitHub, Resend).
-2. **Modo `Live` (ejecución real de extremo a extremo, desbloqueada con `LIVE_DEMO_KEY` o Docker local):**
-   1. **Inyección de Caos en `api-pagamentos-core`:** El Orchestrator invoca `chaos.controller.ts`, activando `chaosManager.setPoolSaturation(true)` (`chaos.manager.ts`). El estado cambia de `healthy` (`v2.14.7`) a `degraded` (`v2.14.8`), mientras `payment.repository.ts` reduce el límite del pool a `2` conexiones (`degradedMaxConnections`), inyecta un retraso de `4600 ms` y omite `client.release()`, provocando agotamiento de conexiones.
-   2. **Ráfaga de Tráfico Sintético:** Con `CHAOS_AUTO_TRAFFIC_BURST=true`, `startSyntheticTrafficBurst()` dispara oleadas de 6 peticiones `POST /payments` (en `0s, 3s, 6s, 9s, 12s, 15s`) con datos sintéticos de PIX (CPF, CNPJ, correo electrónico y token `Bearer` JWT).
-   3. **Observabilidad LGTM y Alertas:** El agotamiento del pool genera `KnexTimeoutError`, spans de error `pg.pool.acquire` en **Tempo**, picos de latencia en **Prometheus** y logs enmascarados en el borde por el procesador `transform` (OTTL) del OTel Collector antes de llegar a **Loki**. **Grafana** detecta la anomalía y dispara el webhook de alerta al Orchestrator.
-   4. **Remediación Autónoma:** El Orchestrator recopila métricas, trazas, logs y `git diff v2.14.7...v2.14.8` mediante el **MCP Server**, audita el prompt a través de `PiiPromptGuard` (fail-closed), sintetiza RCA + parche completo del archivo (vía **Gemini** o fallback determinista), abre un PR real en GitHub contra `release/target-v2.14.8` y envía el correo Post-Mortem por **Resend** con un enlace HMAC en `#fragment`.
-   5. **Restauración ("Restaurar Servicio" / `POST /api/demo/reset`):** Desactiva el caos en `ChaosManager`, cancela las ráfagas programadas y llama a `paymentRepository.resetPool()`, devolviendo `api-pagamentos-core` a `healthy` (`v2.14.7`).
+   - Reproduce en tiempo real la línea temporal de una ejecución real grabada, sin consumir cuotas de APIs externas (Gemini, GitHub o Resend).
+2. **Modo `Live` (ejecución real de extremo a extremo, con clave de evaluación o Docker local):**
+   1. **Inyección de fallo:** activa una degradación controlada del pool de conexiones en el servicio de ejemplo (`v2.14.7` → `v2.14.8`), simulando agotamiento bajo carga concurrente.
+   2. **Tráfico sintético con PII ficticia:** envía solicitudes simuladas de PIX con datos sintéticos (CPF, CNPJ, correo y token) para demostrar el enmascaramiento de privacidad.
+   3. **Observabilidad y alerta:** la saturación genera errores y picos de latencia en Prometheus, trazas de error en Tempo y logs enmascarados en el borde antes de llegar a Loki; Grafana detecta la anomalía y alerta al orquestador.
+   4. **Diagnóstico y remediación autónoma:** el orquestador correlaciona métricas, trazas, logs y el diff entre versiones mediante el servidor MCP, verifica la ausencia de fugas de PII, sintetiza causa raíz y parche, abre un Pull Request real en GitHub y envía el informe post-mortem por correo con enlace firmado de aprobación.
+   5. **Restauración:** limpia el estado de caos y devuelve el servicio de ejemplo a su versión saludable (`v2.14.7`).
+
+> Los detalles de arquitectura, contratos de API, variables de entorno y decisiones técnicas están documentados en [`docs/es-ES/`](./docs/es-ES/00_architecture_master.md).
 
 ---
 
@@ -186,6 +191,8 @@ Endpoints locales:
 - **Prometheus:** [http://localhost:9090](http://localhost:9090)
 - **MCP Server:** `http://localhost:8000/mcp`
 - **OTel Collector:** OTLP gRPC `4317` / HTTP `4318`
+
+> **Nota sobre la ejecución de scripts CLI en el host con `.env`:** `.env.prod.template` define `TARGET_APP_URL=http://target-app-demo:3001` para la red interna de Docker. Al ejecutar `./scripts/chaos.sh`, `./scripts/reset.sh`, `./scripts/record-replay.sh` o `./scripts/load-test-lgtm.sh` directamente desde el host, sobrescribe la variable **en línea por comando** (p. ej., `TARGET_APP_URL=http://127.0.0.1:3001 ./scripts/reset.sh`). **No** exportes `TARGET_APP_URL=http://127.0.0.1:3001` globalmente en `~/.zshrc` o `~/.bashrc`, ya que Docker Compose prioriza las variables del shell sobre `.env` y haría que el contenedor `orchestrator` apuntara a su propio loopback.
 
 ---
 

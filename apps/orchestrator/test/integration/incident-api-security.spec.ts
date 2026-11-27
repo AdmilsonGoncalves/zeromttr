@@ -292,6 +292,10 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
         repository: localRepo,
         demoControlPort,
         simulateDemoDecision: localSimDecision,
+        replayRunner: {
+          trigger: vi.fn(async () => 'inc-replay-001'),
+          stop: vi.fn()
+        } as unknown as Parameters<typeof createDemoRouterFactory>[0]['replayRunner'],
         liveDemoKey: 'secret-demo-key-123',
         cooldownMs: 0
       })
@@ -495,6 +499,10 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       demoRouter: createDemoRouterFactory({
         demoControlPort,
         simulateDemoDecision,
+        replayRunner: {
+          trigger: vi.fn(async () => 'inc-replay-cooldown'),
+          stop: vi.fn()
+        } as unknown as Parameters<typeof createDemoRouterFactory>[0]['replayRunner'],
         cooldownMs: 5000
       })
     });
@@ -1045,10 +1053,7 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       })
     });
 
-    // Approval status lookup starts while original live session owns target
-    const approvalPromise = lifecycle.handleLiveIncidentApproved(activeIncident);
-
-    // Concurrent chaos attempt fails and rolls back timestamp/mode without invalidating active session
+    // Failed chaos attempt rolls back timestamp/mode without invalidating active session generation
     const failedChaosRes = await request(rollbackApp)
       .post('/api/demo/chaos')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
@@ -1056,6 +1061,10 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     expect(failedChaosRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
     expect(triggerChaosMock).toHaveBeenCalledTimes(1);
     expect(lifecycle.getLastChaosSnapshot()).toEqual(originalSnapshot);
+
+    // Approval reset for the original live session still succeeds afterward
+    const approvalPromise = lifecycle.handleLiveIncidentApproved(activeIncident);
+    await Promise.resolve();
 
     resolveStatusProbe({
       status: TargetHealthStatus.DEGRADED,
@@ -1072,6 +1081,207 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     });
 
     await approvalPromise;
+    expect(resetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should_queue_replay_behind_in_flight_approval_target_status_lookup', async () => {
+    const order: string[] = [];
+    let resolveStatusProbe!: (value: Awaited<ReturnType<TargetStatusPort['getStatus']>>) => void;
+    const deferredStatusPort: TargetStatusPort = {
+      getStatus: vi.fn(
+        () =>
+          new Promise<Awaited<ReturnType<TargetStatusPort['getStatus']>>>((resolve) => {
+            resolveStatusProbe = resolve;
+          })
+      )
+    };
+    const resetMock = vi.fn(async () => {
+      order.push('approval-reset');
+    });
+    const replayRunnerStub = {
+      trigger: vi.fn(async () => {
+        order.push('replay-trigger');
+        return 'inc-replay-after-approval';
+      }),
+      stop: vi.fn(() => {
+        order.push('replay-stop');
+      })
+    };
+    const lifecycle = createDemoSessionLifecycle(
+      { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      replayRunnerStub as unknown as Parameters<typeof createDemoSessionLifecycle>[1],
+      deferredStatusPort
+    );
+
+    const liveIncident = new Incident({
+      id: 'inc-serialized-lookup-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:serialized-lookup',
+      state: IncidentState.RESOLVED,
+      mode: IncidentExecutionMode.LIVE
+    });
+
+    const queuedApp = createApp({
+      repository: repo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: repo,
+        targetStatusPort,
+        lifecycle,
+        demoControlPort: {
+          triggerChaos: vi.fn(),
+          toggleHealthyTraffic: vi.fn(),
+          reset: resetMock
+        },
+        replayRunner: replayRunnerStub as unknown as Parameters<
+          typeof createDemoRouterFactory
+        >[0]['replayRunner'],
+        simulateDemoDecision,
+        publicLiveDemo: true,
+        cooldownMs: 0
+      })
+    });
+
+    const approvalPromise = lifecycle.handleLiveIncidentApproved(liveIncident);
+    const replayPromise = request(queuedApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.REPLAY });
+
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(replayRunnerStub.trigger).not.toHaveBeenCalled();
+
+    resolveStatusProbe({
+      status: TargetHealthStatus.DEGRADED,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.8',
+      previousHealthyVersion: 'v2.14.7',
+      targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+      suspectFilePath: '',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: true
+      },
+      rawEdgeLogPreCollector: ''
+    });
+
+    const [_, replayRes] = await Promise.all([approvalPromise, replayPromise]);
+    expect(replayRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(order).toEqual(['replay-stop', 'approval-reset', 'replay-trigger']);
+  });
+
+  it('should_complete_pending_approval_reset_on_signed_retry_without_duplicate_decision_or_reset', async () => {
+    const resetMock = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('transient reset timeout'))
+      .mockResolvedValueOnce();
+    const lifecycle = createDemoSessionLifecycle(
+      { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      undefined,
+      targetStatusPort
+    );
+
+    const liveIncident = new Incident({
+      id: 'inc-signed-retry-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:signed-retry',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.LIVE
+    });
+    const localRepo: IncidentRepository = {
+      findById: vi.fn(async (id: string) => (id === liveIncident.id ? liveIncident : null)),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [liveIncident]),
+      save: vi.fn(async () => {})
+    };
+
+    const broadcastSpy = vi.spyOn(broadcaster, 'broadcast');
+    const retryRecordDecision = new RecordDecision(
+      localRepo,
+      toolsPort,
+      clock,
+      broadcaster,
+      HMAC_SECRET,
+      undefined,
+      (approved) => lifecycle.handleLiveIncidentApproved(approved),
+      (approved) => lifecycle.retryPendingApprovalReset(approved)
+    );
+
+    const retryApp = createApp({
+      repository: localRepo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(localRepo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: retryRecordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN
+    });
+
+    const exp = Math.floor(clock.now() / 1000) + 900;
+    const sig = DecisionHmac.sign(liveIncident.id, DecisionAction.APPROVE, exp, HMAC_SECRET);
+
+    // 1st attempt: records RESOLVED and attempts reset, which fails transiently
+    const firstRes = await request(retryApp)
+      .post(`/api/incidents/${liveIncident.id}/decision`)
+      .send({ action: DecisionAction.APPROVE, sig, exp });
+    expect(firstRes.status).toBe(HTTP_STATUS.OK);
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(lifecycle.hasPendingTargetReset(liveIncident.id)).toBe(true);
+    const broadcastsAfterFirst = broadcastSpy.mock.calls.length;
+
+    // 2nd attempt (signed retry): completes pending reset without re-recording or duplicating SSE
+    const secondRes = await request(retryApp)
+      .post(`/api/incidents/${liveIncident.id}/decision`)
+      .send({ action: DecisionAction.APPROVE, sig, exp });
+    expect(secondRes.status).toBe(HTTP_STATUS.OK);
+    expect(resetMock).toHaveBeenCalledTimes(2);
+    expect(lifecycle.hasPendingTargetReset(liveIncident.id)).toBe(false);
+    expect(broadcastSpy.mock.calls.length).toBe(broadcastsAfterFirst);
+
+    // 3rd attempt: no pending reset left -> returns 409 Conflict without calling reset again
+    const thirdRes = await request(retryApp)
+      .post(`/api/incidents/${liveIncident.id}/decision`)
+      .send({ action: DecisionAction.APPROVE, sig, exp });
+    expect(thirdRes.status).toBe(HTTP_STATUS.CONFLICT);
+    expect(resetMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('should_not_execute_stale_pending_approval_retry_after_newer_demo_session_generation', async () => {
+    const resetMock = vi.fn<() => Promise<void>>().mockRejectedValueOnce(new Error('transient'));
+    const lifecycle = createDemoSessionLifecycle(
+      { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      undefined,
+      targetStatusPort
+    );
+
+    const session1Incident = new Incident({
+      id: 'inc-stale-retry-gen-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:stale-retry-gen',
+      state: IncidentState.RESOLVED,
+      mode: IncidentExecutionMode.LIVE
+    });
+
+    await expect(lifecycle.handleLiveIncidentApproved(session1Incident)).rejects.toThrow(
+      'transient'
+    );
+    expect(lifecycle.hasPendingTargetReset(session1Incident.id)).toBe(true);
+
+    // Newer session starts and later clears timestamp (advancing generation)
+    lifecycle.setLastChaos(Date.now(), IncidentExecutionMode.LIVE);
+    lifecycle.clearLastChaos();
+
+    const recovered = await lifecycle.retryPendingApprovalReset(session1Incident);
+    expect(recovered).toBe(false);
+    expect(lifecycle.hasPendingTargetReset(session1Incident.id)).toBe(false);
     expect(resetMock).toHaveBeenCalledTimes(1);
   });
 
@@ -1135,6 +1345,7 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     });
 
     const approvalPromise = lifecycle.handleLiveIncidentApproved(olderIncident);
+    await Promise.resolve();
 
     // While olderIncident's getStatus() is still in flight, a newer live chaos session starts
     const newerTimestamp = Date.now();

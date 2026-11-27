@@ -101,11 +101,17 @@ export class TargetTelemetryComponent {
 
   readonly poolLevel = computed<TelemetryHealthLevel>(() => {
     const sat = this.saturationSignal();
-    if (!sat || sat.max <= 0) {
+    if (!sat) {
+      return TelemetryHealthLevel.HEALTHY;
+    }
+    if (sat.waiting > 0) {
+      return TelemetryHealthLevel.CRITICAL;
+    }
+    if (sat.max <= 0) {
       return TelemetryHealthLevel.HEALTHY;
     }
     const ratio = sat.active / sat.max;
-    if (sat.waiting > 0 || ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_CRITICAL_RATIO) {
+    if (ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_CRITICAL_RATIO) {
       return TelemetryHealthLevel.CRITICAL;
     }
     if (ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_WARN_RATIO) {

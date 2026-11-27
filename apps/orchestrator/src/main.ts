@@ -326,6 +326,14 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
             await demoLifecycle.handleLiveIncidentApproved(incident);
           }
         }
+      : undefined,
+    demoLifecycle
+      ? async (incident) => {
+          if (!getSettings().autoRestoreOnApprove) {
+            return false;
+          }
+          return demoLifecycle.retryPendingApprovalReset(incident);
+        }
       : undefined
   );
   const orchestratorWorkflow = new OrchestratorWorkflow(

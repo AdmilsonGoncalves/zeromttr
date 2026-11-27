@@ -4,9 +4,22 @@ set -euo pipefail
 # scripts/chaos.sh — ZeroMTTR Demo Chaos Injection
 # Ativa a degradação da release v2.14.8 (saturação do pool de conexões) e gera carga concorrente por 60s.
 
-TARGET_URL="${TARGET_DEMO_URL:-http://localhost:3001}"
-DURATION="${CHAOS_DURATION:-60}"
-CONCURRENCY="${CHAOS_CONCURRENCY:-5}"
+CALLER_TARGET_APP_URL="${TARGET_APP_URL:-}"
+CALLER_TARGET_DEMO_URL="${TARGET_DEMO_URL:-}"
+CALLER_CHAOS_DURATION="${CHAOS_DURATION:-}"
+CALLER_CHAOS_CONCURRENCY="${CHAOS_CONCURRENCY:-}"
+
+ENV_FILE="${ENV_FILE:-.env}"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+TARGET_URL="${CALLER_TARGET_APP_URL:-${TARGET_APP_URL:-${CALLER_TARGET_DEMO_URL:-${TARGET_DEMO_URL:-http://localhost:3001}}}}"
+DURATION="${CALLER_CHAOS_DURATION:-${CHAOS_DURATION:-60}}"
+CONCURRENCY="${CALLER_CHAOS_CONCURRENCY:-${CHAOS_CONCURRENCY:-5}}"
 
 echo "=========================================================="
 echo "⚡ ZeroMTTR — Injeção de Caos (Release v2.14.8 Simulation)"

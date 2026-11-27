@@ -132,4 +132,34 @@ describe('TargetTelemetryComponent', () => {
     const html = readFileSync(TELEMETRY_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('@if (saturationSignal(); as sat)');
   });
+
+  it('should_report_critical_poolLevel_when_waiting_is_positive_even_with_zero_max_capacity', () => {
+    component.metrics = {
+      healthyTrafficActive: false,
+      requestsPerSecond: 10,
+      errorRate5xxPercent: 0,
+      p95LatencyMs: 80,
+      saturation: {
+        resourceLabel: 'Worker Queue',
+        active: 0,
+        waiting: 3,
+        max: 0
+      }
+    };
+    expect(component.poolLevel()).toBe(TelemetryHealthLevel.CRITICAL);
+
+    component.metrics = {
+      healthyTrafficActive: false,
+      requestsPerSecond: 10,
+      errorRate5xxPercent: 0,
+      p95LatencyMs: 80,
+      saturation: {
+        resourceLabel: 'Worker Queue',
+        active: 0,
+        waiting: 0,
+        max: 0
+      }
+    };
+    expect(component.poolLevel()).toBe(TelemetryHealthLevel.HEALTHY);
+  });
 });

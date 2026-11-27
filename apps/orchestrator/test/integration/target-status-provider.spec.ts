@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import nock from 'nock';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { HttpTargetStatusAdapter } from '../../src/adapters/target-status.http.js';
@@ -37,6 +37,10 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
     }
   });
 
+  beforeEach(() => {
+    delete process.env.TARGET_STATUS_PATH;
+  });
+
   afterEach(() => {
     cleanOrchestratorNock();
     for (const key of envKeys) {
@@ -51,6 +55,14 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
   });
 
   afterAll(() => {
+    for (const key of envKeys) {
+      const value = savedEnv.get(key);
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
     teardownOrchestratorNock();
   });
 

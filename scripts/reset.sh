@@ -4,12 +4,26 @@ set -euo pipefail
 # scripts/reset.sh — ZeroMTTR Demo Restoration & Cleanup
 # Desativa a degradação no contêiner, limpa incidentes ativos e fecha PRs/branches hotfix/zeromttr-* no GitHub.
 
-TARGET_URL="${TARGET_DEMO_URL:-http://localhost:3001}"
-ORCH_URL="${ORCHESTRATOR_URL:-http://localhost:8080}"
-GITHUB_REPO="${TARGET_GITHUB_REPO:-AdmilsonGoncalves/zeromttr}"
+CALLER_TARGET_APP_URL="${TARGET_APP_URL:-}"
+CALLER_TARGET_DEMO_URL="${TARGET_DEMO_URL:-}"
+CALLER_ORCH_URL="${ORCHESTRATOR_URL:-}"
+CALLER_GITHUB_REPO="${TARGET_GITHUB_REPO:-}"
+CALLER_GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+
+ENV_FILE="${ENV_FILE:-.env}"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+TARGET_URL="${CALLER_TARGET_APP_URL:-${TARGET_APP_URL:-${CALLER_TARGET_DEMO_URL:-${TARGET_DEMO_URL:-http://localhost:3001}}}}"
+ORCH_URL="${CALLER_ORCH_URL:-${ORCHESTRATOR_URL:-http://localhost:8080}}"
+GITHUB_REPO="${CALLER_GITHUB_REPO:-${TARGET_GITHUB_REPO:-AdmilsonGoncalves/zeromttr}}"
 # Normalize repo string in case full URL was passed
 GITHUB_REPO="${GITHUB_REPO#https://github.com/}"
-GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+GITHUB_TOKEN="${CALLER_GITHUB_TOKEN:-${GITHUB_TOKEN:-}}"
 
 echo "=========================================================="
 echo "⚡ ZeroMTTR — Restauração de Ambiente e Limpeza (Reset)"
