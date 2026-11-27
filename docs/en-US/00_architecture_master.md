@@ -53,18 +53,18 @@ To immediately understand the role of each architectural block, **ZeroMTTR** str
      - **Eyes (Reading and FinOps Context Pruning):** `execute_promql_range` (Prometheus), `analyze_otel_trace` (Tempo), `search_traces_by_traceql` (ad-hoc TraceQL search and fallback when no exemplar is present), `query_loki_logs` (Loki), and `inspect_git_deploy_diff` (compares the previous healthy version with the current version on GitHub).
      - **Hands (Action and Governance):** `create_remediation_pr` (creates a `hotfix/zeromttr-*` branch, applies the fix commit — always at the semantic `PATCH` level — and opens the Pull Request on GitHub), `annotate_grafana_incident` (marks the Grafana chart), and `send_post_mortem_resend` (sends the report by email).
 2. **The AI (`Gemini API` via `ReasoningPort`) = The "Brain":**
-   - The AI does **not** access databases, observability backends, or GitHub directly. It receives only the summary pruned by MCP and validated in *fail-closed* mode by `PiiPromptGuard`, synthesizes the root cause (RCA), and writes the fixed code (the surgical patch), explicitly recording `reasoningSource: 'llm' | 'fallback'`.
+   - The AI does **not** access databases, observability backends, or GitHub directly. It receives only the summary pruned by MCP and validated in *fail-closed* mode by `PiiPromptGuard`, synthesizes the root cause (RCA), and writes the fixed code (the patch), explicitly recording `reasoningSource: 'llm' | 'fallback'`.
 3. **The `orchestrator` = The "Conductor" (Deterministic Workflow + FSM):**
    - Receives the Grafana alert → predictably executes the collection sequence on the **MCP Eyes** → validates the absence of PII (`PiiPromptGuard`) and sends it to the **Brain (AI)** to synthesize the RCA and generate the patch → invokes the **MCP Hands** to open the Pull Request on GitHub (triggering branch CI) and send the human approval email to the on-call engineer, while streaming everything live via SSE to the **War Room Dashboard**.
 
 ```mermaid
 flowchart TD
     APP(["Monitored System (Agnostic / OTel SDK)"]) -.->|"Emits Metrics, Logs, and Traces (OTLP)"| GRAF["LGTM Stack & Grafana Alerting"]
-    GRAF -->|"1. Fires Anomaly Webhook"| ORCH["Orchestrator (The Conductor / FSM)"]
+    GRAF -->|"1. Fires Anomaly Webhook"| ORCH["Orchestrator (The Conductor)"]
     ORCH <-->|"2. Uses MCP EYES (Fetches Metrics, Trace, PII-Free Logs & Git Diff)"| MCP["MCP Server (8 Deterministic Tools)"]
-    ORCH <-->|"3. Sends audited evidence (structured PII masked) to the BRAIN to diagnose & generate Patch"| IA["Gemini AI (The Brain / ReasoningPort)"]
+    ORCH <-->|"3. Sends audited evidence (structured PII masked) to the BRAIN to diagnose & generate Patch"| IA["LLM Provider (The Brain / ReasoningPort)"]
     ORCH -->|"4. Uses MCP HANDS (Requests hotfix/* branch, PR & Email)"| MCP
-    MCP -->|"5. Opens PR on GitHub + Sends Post-Mortem (Resend)"| GOV(["War Room Dashboard & On-Call Engineer (Human Approval)"])
+    MCP -->|"5. Opens PR on GitHub + Sends Post-Mortem Email"| GOV(["War Room Dashboard & On-Call Engineer (Human Approval)"])
     ORCH -.->|"Real-Time SSE Stream"| GOV
 ```
 
@@ -112,7 +112,7 @@ To avoid skewed comparisons with processes that include full production deployme
 | Storage | Prometheus (exemplars), Loki, Tempo | LGTM stack |
 | Visualization / Trigger | Grafana 11.2+ (Alerting) | Incident webhook and annotations API (`POST /api/annotations`) |
 | Agent Protocol | **MCP** (`@modelcontextprotocol/sdk`) | Standardized open interface of 8 AIOps tools |
-| Agent LLM | Google Gemini API (`ReasoningPort`, model configurable via `LLM_MODEL`, default `gemini-3.5-flash`) | RCA synthesis and surgical patch generation (with explicit `reasoningSource: 'llm' \| 'fallback'`) |
+| Agent LLM | Google Gemini API (`ReasoningPort`, model configurable via `LLM_MODEL`, default `gemini-3.5-flash`) | RCA synthesis and patch generation (with explicit `reasoningSource: 'llm' \| 'fallback'`) |
 | **Deploy Inspection & Auto-Remediation** | **GitHub REST API (Octokit)** on `apps/target-app-demo` in the `zeromttr` repository | Real comparison between tags `v2.14.7...v2.14.8`, code reading, `hotfix/zeromttr-*` branch creation, and Pull Request creation targeting `release/target-v2.14.8` |
 | **Notification & Governance** | **Resend** | HTML Post-Mortem delivery (`sre@zeromttr.agjworks.com`) exclusively containing HMAC-signed decision links |
 | Testing | Vitest, Supertest, `nock`/MSW + **Test Helpers (`test/helpers/`)** | **Testing Trophy (Integration & E2E priority)** exercising HTTP routes, MCP, and `PiiPromptGuard` end-to-end (Happy & Unhappy Paths); unit tests restricted to pure helper functions |
@@ -142,22 +142,23 @@ To avoid skewed comparisons with processes that include full production deployme
 | `apps/orchestrator/` and `apps/mcp-server/` | **Hexagonal (Ports & Adapters)** | `domain` → `application` → `ports` → `adapters`, with composition root in `main.ts` |
 | `apps/target-app-demo/` | **Layered MVC** | `routes` → `controllers` → `services` → `repositories` (`payment.repository.ts`) |
 | `apps/dashboard/` | **Single-Pane War Room with Signals** (Angular + PrimeNG Aura Dark) | Standalone Components (`WarRoomComponent` + `DecisionComponent`) focused on the 3-minute main flow |
+| `apps/docs/` | **Multilingual Static Manual** (Docusaurus + Nginx) | `pt-BR`, `en-US`, and `es-ES` manuals (`manuals/` + `i18n/`) served via dedicated Nginx container |
 
 ### 5.3 Context View (C4 Level 1)
 ```mermaid
 flowchart TD
     SRE(["On-Call Engineer (SRE)"])
     EXT_MCP(["External MCP Client (Cursor / Claude / Inspector)"])
-    APP["Monitored Service: api-pagamentos-core (OTel SDK)"]
+    APP["Monitored Service (Agnostic / OTel SDK)"]
     ZMT[["ZeroMTTR Platform (MCP Server + Orchestrator + LGTM)"]]
-    LLM["LLM Provider (Gemini API — Structured PII Masked)"]
-    GH["GitHub API & Repository (zeromttr: tags v2.14.7...v2.14.8 in apps/target-app-demo)"]
-    RS["Resend API (Post-Mortem Email with Exclusive HMAC)"]
+    LLM["LLM Provider (Structured PII Masked)"]
+    GH["GitHub API & Target Repository"]
+    RS["Email Service (Post-Mortem with Exclusive HMAC)"]
 
-    APP -->|"1. OTLP Telemetry (Metrics, Logs with CPF/CNPJ/PIX, Traces)"| ZMT
+    APP -->|"1. OTLP Telemetry (Metrics, Logs with PII, Traces)"| ZMT
     EXT_MCP -.->|"Consumes the 8 Tools via Open MCP Contract"| ZMT
     ZMT <-->|"2. RCA Reasoning & Patch (Validated by PiiPromptGuard)"| LLM
-    ZMT <-->|"3. Inspects real Diff v2.14.7...v2.14.8 & opens hotfix/* PR"| GH
+    ZMT <-->|"3. Inspects real diff healthy-version...buggy-version & opens hotfix/* PR"| GH
     ZMT -->|"4. Sends HTML Post-Mortem with exclusive HMAC links"| RS
     RS -->|"5. Email with diagnosis and /decision/:id links"| SRE
     SRE -->|"6. Confirms Approval/Rejection via POST with email HMAC"| ZMT
@@ -168,7 +169,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph Workload["Monitored Service (Edge Detail)"]
-        DEMO["target-app-demo: api-pagamentos-core (Express + Knex + OTel)"]
+        DEMO["Target Service (OTel SDK / OTLP)"]
     end
 
     subgraph Observability["Observability Layer (OTel + LGTM)"]
@@ -181,14 +182,14 @@ flowchart TD
 
     subgraph ZeroMTTR["ZeroMTTR Core (Orchestration + MCP)"]
         DASH["War Room Dashboard (Angular + Nginx Proxy w/ DASHBOARD_API_TOKEN)"]
-        ORCH["Orchestrator (Webhook + FSM + PiiPromptGuard + SSE)"]
+        ORCH["Orchestrator (Webhook + State Machine + PiiPromptGuard + SSE)"]
         MCP["MCP Server (8 Tools + FinOps Telemetry)"]
     end
 
     subgraph External["External APIs"]
-        LLM["Gemini API (ReasoningPort)"]
-        GH["GitHub REST API (AdmilsonGoncalves/zeromttr)"]
-        RS["Resend API (Post-Mortem w/ HMAC)"]
+        LLM["LLM Provider (ReasoningPort)"]
+        GH["GitHub REST API (Target Repository)"]
+        RS["Email Service (Post-Mortem w/ HMAC)"]
     end
 
     DEMO -->|"OTLP/HTTP 4318"| OTEL
@@ -200,11 +201,11 @@ flowchart TD
     ORCH <-->|"Audited Prompt (Structured PII: 0 Detected)"| LLM
     MCP -->|"PromQL / LogQL / TraceQL"| PROM & LOKI & TEMPO
     MCP -->|"POST /api/annotations"| GRAF
-    MCP <-->|"Compare Tags v2.14.7...v2.14.8 & Create PR"| GH
+    MCP <-->|"Compare Diff healthy-version...buggy-version & Create PR"| GH
     MCP -->|"POST /emails"| RS
 ```
 
-### 5.5 Incident State Machine (FSM)
+### 5.5 Incident State Machine
 ```mermaid
 stateDiagram-v2
     direction TB
@@ -212,7 +213,7 @@ stateDiagram-v2
     RECEIVED --> INVESTIGATING: Fingerprint deduplication
     INVESTIGATING --> ENRICHING: OTel collection complete (PromQL + Tempo + Loki)
     INVESTIGATING --> FAILED: No evidence / critical error
-    ENRICHING --> REMEDIATING: Real diff v2.14.7...v2.14.8 inspected in target repo
+    ENRICHING --> REMEDIATING: Real diff healthy-version...buggy-version inspected in target repo
     REMEDIATING --> AWAITING_PR: Patch validated by PiiPromptGuard & hotfix/* branch created
     AWAITING_PR --> NOTIFIED: Pull Request opened in target repo
     AWAITING_PR --> FAILED: Timeout / GitHub API error
@@ -264,7 +265,7 @@ stateDiagram-v2
 ### 6.3 Other Rules
 - **Clean Code / DRY / YAGNI / KISS**; small functions, no `any` outside boundaries (use `zod` to validate external inputs).
 - **Language:** code, tools, logs, and commits in en-US; main documentation and README in en-US, pt-BR, and es-ES.
-- **Security by default:** strictly segregated tokens (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`, and `SETTINGS_ADMIN_TOKEN` for `PATCH /api/settings` when configured; in private deployments with `ENABLE_DEMO_MODE=false` and without `SETTINGS_ADMIN_TOKEN`, `PATCH /api/settings` remains editable by operators authenticated with `DASHBOARD_API_TOKEN`), `decisionToken` restricted to email, `onCallEmail` always masked in settings/audit reads, HTML escaping in templates, edge OTTL redaction + pre-LLM `PiiPromptGuard`.
+- **Security by default:** strictly segregated tokens (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`, and `SETTINGS_ADMIN_TOKEN` for `PATCH /api/settings` when configured; in private deployments with `ENABLE_DEMO_MODE=false` and without `SETTINGS_ADMIN_TOKEN`, any client able to reach the dashboard can edit settings because Nginx injects `DASHBOARD_API_TOKEN` on `/api/*` requests, so access relies on network controls such as VPN/SSO rather than per-operator authentication), `decisionToken` restricted to email, `onCallEmail` always masked in settings/audit reads, HTML escaping in templates, edge OTTL redaction + pre-LLM `PiiPromptGuard`.
 
 ---
 
@@ -334,7 +335,13 @@ zeromttr/
 │   ├── target-app-demo/          # Layered MVC (api-pagamentos-core — local OTel emitter + neutral /ops/status)
 │   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/ # includes ops.routes.ts & ops-status.controller.ts
 │   │   └── test/
-│   └── dashboard/                # Angular + PrimeNG (Aura Dark) War Room + shared/{demo-settings,system-settings,locale-switcher} + styles/breakpoints.css
+│   ├── dashboard/                # Angular + PrimeNG (Aura Dark) War Room + shared/{demo-settings,system-settings,locale-switcher} + styles/breakpoints.css
+│   └── docs/                     # Multilingual Docusaurus User Manual (pt-BR, en-US, es-ES) + dedicated Nginx container (Dockerfile, nginx.conf)
+│       ├── manuals/              # Default pt-BR chapters (English filenames and slugs)
+│       ├── i18n/{en-US,es-ES}/   # Complete content, navbar, footer, and sidebar translations
+│       ├── src/css/              # Slate/Cyan dark theme aligned with the War Room
+│       ├── static/img/           # Static assets (SVG logo)
+│       └── test/                 # Locale, sidebar, and slug integrity tests (Vitest)
 ├── scripts/                      # demo.sh, chaos.sh, reset.sh, measure-mttr.sh, smoke-integrations.sh
 └── docs/
     ├── pt-BR/
@@ -365,9 +372,9 @@ zeromttr/
 flowchart TD
     F0["0. Planning & Diagrams (v0.3)"] --> F1["1. Foundation (pnpm + Nx + LGTM w/ OTTL Transform)"]
     F1 --> F2["2. MCP Server (8 Tools + FinOps + .mcp.json in TDD)"]
-    F1 --> F3["3. Demo App + Target Repo (tags v2.14.7 & v2.14.8)"]
+    F1 --> F3["3. Demo App + Target Repo (healthy-version & buggy-version tags)"]
     F1 --> F4B["4b. Lean War Room Dashboard (Frontend Agent)"]
-    F2 & F3 --> F4["4. Orchestrator (FSM + PiiPromptGuard + PR + Resend HMAC)"]
+    F2 & F3 --> F4["4. Orchestrator (State Machine + PiiPromptGuard + PR + Email HMAC)"]
     F4 & F4B --> F5["5. Hardening, LGTM Load Test & TTD/TTPR Measurement"]
     F5 --> F6["6. Live Video (3 min) & Release v1.0.0 Frozen on VPS"]
 ```

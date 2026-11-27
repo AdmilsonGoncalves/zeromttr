@@ -4,34 +4,119 @@ import {
   EventEmitter,
   Input,
   Output,
+  computed,
   inject,
   signal
 } from '@angular/core';
 import { isNonEmptyString } from '@zeromttr/utils';
 import { Tag } from 'primeng/tag';
+import { Tooltip } from 'primeng/tooltip';
 import {
   IncidentExecutionMode,
   TargetHealthStatus,
   type IncidentMode,
   type TargetStatusResponse
 } from '../../core/contract.js';
-import { I18nService, type Language } from '../../core/i18n/i18n.service.js';
+import { I18nService, Language } from '../../core/i18n/i18n.service.js';
 import { DemoSettingsComponent } from '../../shared/demo-settings/demo-settings.component.js';
 import { LocaleSwitcherComponent } from '../../shared/locale-switcher/locale-switcher.component.js';
 import { SystemSettingsComponent } from '../../shared/system-settings/system-settings.component.js';
 
+const DEFAULT_PROD_DOCS_URL = 'https://docs.zeromttr.agjworks.com';
+const DEFAULT_LOCAL_DOCS_URL = 'http://localhost:4300';
+const RUNTIME_DOCS_DOMAIN_PLACEHOLDER = '__ZEROMTTR_DOCS_DOMAIN__';
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const IPV4_HOSTNAME_PATTERN = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+const SAFE_DOCS_DOMAIN_PATTERN =
+  /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?::\d{1,5})?$/i;
+
+function isCustomPublicDomain(hostname: string): boolean {
+  return hostname.includes('.') && !IPV4_HOSTNAME_PATTERN.test(hostname) && !hostname.includes(':');
+}
+
+function normalizeRuntimeDocsDomain(raw?: string | null): string | null {
+  if (!isNonEmptyString(raw)) {
+    return null;
+  }
+  const trimmed = raw.trim().replace(/\/+$/, '');
+  if (trimmed === RUNTIME_DOCS_DOMAIN_PLACEHOLDER || trimmed.includes('${')) {
+    return null;
+  }
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (SAFE_DOCS_DOMAIN_PATTERN.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return null;
+}
+
+function readRuntimeDocsDomainMeta(): string | undefined {
+  if (typeof document === 'undefined') {
+    return undefined;
+  }
+  return (
+    document.querySelector('meta[name="zeromttr-docs-domain"]')?.getAttribute('content') ??
+    undefined
+  );
+}
+
 /**
- * Pure top War Room header displaying project identity, target connection tags, demo drawer trigger, settings trigger, and locale switcher.
+ * Resolves the external Docusaurus user manual URL for the active dashboard locale.
+ */
+export function resolveDocsManualUrl(
+  lang: Language,
+  options?: { configuredBaseUrl?: string; runtimeDocsDomain?: string; hostname?: string }
+): string {
+  let baseUrl = DEFAULT_PROD_DOCS_URL;
+  const normalizedHost = options?.hostname?.trim().toLowerCase();
+  const runtimeBaseUrl = normalizeRuntimeDocsDomain(options?.runtimeDocsDomain);
+
+  if (isNonEmptyString(options?.configuredBaseUrl)) {
+    baseUrl = options.configuredBaseUrl.trim().replace(/\/+$/, '');
+  } else if (runtimeBaseUrl) {
+    baseUrl = runtimeBaseUrl;
+  } else if (isNonEmptyString(normalizedHost) && LOCAL_HOSTNAMES.has(normalizedHost)) {
+    baseUrl = DEFAULT_LOCAL_DOCS_URL;
+  } else if (isNonEmptyString(normalizedHost) && isCustomPublicDomain(normalizedHost)) {
+    baseUrl = normalizedHost.startsWith('docs.')
+      ? `https://${normalizedHost}`
+      : `https://docs.${normalizedHost}`;
+  }
+
+  let localePath = '/';
+  if (lang === Language.EN_US) {
+    localePath = '/en-US/';
+  } else if (lang === Language.ES_ES) {
+    localePath = '/es-ES/';
+  }
+
+  return `${baseUrl}${localePath}`;
+}
+
+/**
+ * Pure top War Room header displaying project identity, target connection tags, demo drawer trigger, settings trigger, manual link, and locale switcher.
  */
 @Component({
   selector: 'app-war-room-header',
-  imports: [Tag, DemoSettingsComponent, SystemSettingsComponent, LocaleSwitcherComponent],
+  imports: [Tag, Tooltip, DemoSettingsComponent, SystemSettingsComponent, LocaleSwitcherComponent],
   templateUrl: './war-room-header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WarRoomHeaderComponent {
   readonly i18n = inject(I18nService);
   readonly healthStatus = TargetHealthStatus;
+
+  readonly docsManualUrl = computed<string>(() => {
+    const configuredBaseUrl = import.meta.env?.VITE_DOCS_URL;
+    const runtimeDocsDomain = readRuntimeDocsDomainMeta();
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : undefined;
+    return resolveDocsManualUrl(this.i18n.currentLang(), {
+      configuredBaseUrl,
+      runtimeDocsDomain,
+      hostname
+    });
+  });
 
   readonly demoModeEnabledSignal = signal<boolean>(false);
   readonly sseConnectedSignal = signal<boolean>(false);

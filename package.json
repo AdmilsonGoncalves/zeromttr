@@ -12,9 +12,15 @@
     "lint:workspace": "nx run-many -t lint",
     "test:workspace": "nx run-many -t test",
     "build:workspace": "nx run-many -t build",
-    "dashboard:mock": "pnpm --filter @zeromttr/utils run build && pnpm --filter @zeromttr/dashboard run mock",
+    "dashboard:mock": "pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build && pnpm --filter @zeromttr/dashboard run mock",
     "dashboard:dev": "pnpm --filter @zeromttr/dashboard run dev",
-    "dashboard:start": "pnpm run dashboard:mock & pnpm run dashboard:dev"
+    "dashboard:start": "pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build && (pnpm --dir apps/dashboard dlx tsx mock-server/index.ts & pnpm run dashboard:dev)",
+    "docs:build": "pnpm --filter @zeromttr/docs run build",
+    "docs:serve": "pnpm --filter @zeromttr/docs run serve",
+    "docs:start": "pnpm --filter @zeromttr/docs run start",
+    "docs:start:pt": "pnpm --filter @zeromttr/docs run start:pt",
+    "docs:start:en": "pnpm --filter @zeromttr/docs run start:en",
+    "docs:start:es": "pnpm --filter @zeromttr/docs run start:es"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",

@@ -222,7 +222,9 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
     'Inicia el incidente: degrada el servicio objetivo (v2.14.8) en Modo Live o reproduce la grabación en Modo Replay.',
   tooltipRestoreService:
     'Elimina la saturación del pool y restaura el servicio objetivo al estado saludable.',
-  tooltipLanguageSelector: 'Cambia el idioma de la interfaz (Portugués, Inglés o Español).',
+  tooltipLanguageSelector: 'Idioma de la interfaz.',
+  userManualAriaLabel: 'Abrir manual de instrucciones',
+  tooltipUserManual: 'Manual de instrucciones',
   tooltipViewPr: 'Abre en GitHub el Pull Request de hotfix generado automáticamente.',
   tooltipSimulateDecision:
     'Registra la aprobación del ingeniero de guardia desde el panel (en producción, la confirmación requiere el enlace HMAC enviado por correo).',
@@ -269,7 +271,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
     'No se pudo cargar la configuración. Haga clic en Recargar para intentarlo nuevamente.',
   settingsReadonlyNotice:
     'Modo solo lectura — configure SETTINGS_ADMIN_TOKEN en el servidor para habilitar cambios.',
-  settingsAdminTokenLabel: 'Token administrativo (X-Settings-Admin-Token)',
+  settingsAdminTokenLabel: 'Token administrativo',
   settingsAdminTokenPlaceholder: 'Ingrese SETTINGS_ADMIN_TOKEN...',
   settingsTabAlerts: 'Alertas',
   settingsTabTarget: 'Objetivo & Diff',
@@ -303,7 +305,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   settingsAuditEmpty: 'Aún no hay cambios de configuración registrados.',
   settingsReloadBtn: 'Recargar',
   settingsSaveBtn: 'Guardar Configuración',
-  settingsSavedSuccess: '¡Configuración guardada y aplicada en tiempo real!',
+  settingsSavedSuccess: 'Configuración guardada',
   settingsSaveError: 'No se pudo guardar la configuración.',
   settingsInvalidAdminTokenError:
     'Token administrativo inválido o ausente. Verifique el SETTINGS_ADMIN_TOKEN ingresado.',

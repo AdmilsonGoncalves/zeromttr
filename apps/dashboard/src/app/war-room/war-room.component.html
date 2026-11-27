@@ -1,8 +1,9 @@
-<p-toast position="top-right" />
+<p-toast position="bottom-center" class="war-room-toast" />
 <div
   class="min-h-dvh lg:h-full lg:max-h-full bg-slate-950 text-slate-100 font-sans p-2 sm:p-2.5 flex flex-col gap-2 lg:overflow-hidden"
 >
   <app-war-room-header
+    class="block sticky top-0 z-30 bg-slate-950/95 backdrop-blur-sm -mt-2 pt-2 sm:-mt-2.5 sm:pt-2.5 pb-0.5"
     [demoModeEnabled]="incidentService.demoModeEnabled()"
     [sseConnected]="incidentService.sseConnected()"
     [targetStatus]="incidentService.targetStatus()"

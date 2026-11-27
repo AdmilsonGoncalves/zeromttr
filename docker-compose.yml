@@ -264,6 +264,7 @@ services:
       dockerfile: apps/dashboard/Dockerfile
       args:
         - VITE_PRIMEUI_LICENSE_KEY=${VITE_PRIMEUI_LICENSE_KEY:-}
+        - VITE_DOCS_URL=${VITE_DOCS_URL:-}
     container_name: zeromttr-dashboard
     restart: unless-stopped
     ports:
@@ -272,6 +273,26 @@ services:
       - DASHBOARD_API_TOKEN=${DASHBOARD_API_TOKEN:-change-me-dashboard-api-token}
     depends_on:
       - orchestrator
+    networks:
+      - aiops-net
+
+  docs:
+    build:
+      context: .
+      dockerfile: apps/docs/Dockerfile
+      args:
+        - ZEROMTTR_DOCS_URL=${ZEROMTTR_DOCS_URL:-http://localhost:4300}
+        - PUBLIC_DASHBOARD_URL=${PUBLIC_DASHBOARD_URL:-http://localhost:4200}
+    container_name: zeromttr-docs
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:4300:80'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://127.0.0.1:80/healthz || exit 1']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - aiops-net
 

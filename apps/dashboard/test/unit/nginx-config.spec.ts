@@ -21,5 +21,6 @@ describe('nginx.conf.template proxy & rate-limit IP restoration', () => {
     expect(content).toContain('proxy_set_header X-Real-IP $remote_addr;');
     expect(content).toContain('proxy_set_header X-Forwarded-For $remote_addr;');
     expect(content).toContain('proxy_set_header Authorization "Bearer ${DASHBOARD_API_TOKEN}";');
+    expect(content).toContain("sub_filter '__ZEROMTTR_DOCS_DOMAIN__' '${ZEROMTTR_DOCS_DOMAIN}';");
   });
 });

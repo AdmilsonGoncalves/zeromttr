@@ -4,7 +4,7 @@ import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { MessageService } from 'primeng/api';
 import { Toast } from 'primeng/toast';
 import { DashboardApiErrorCode, ToastSeverity } from '../core/constants.js';
-import { DecisionAction, type IncidentMode } from '../core/contract.js';
+import { DecisionAction, IncidentExecutionMode, type IncidentMode } from '../core/contract.js';
 import { I18nService, type Language } from '../core/i18n/i18n.service.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
 import { EvidencePanelComponent } from './evidence-panel/evidence-panel.component.js';
@@ -54,11 +54,19 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Applies the selected execution mode to the incident service.
+   * Applies the selected execution mode and forces synthetic healthy traffic off when exiting Live mode.
    */
   onModeChange(mode: IncidentMode): void {
-    if (isNonEmptyString(mode)) {
-      this.incidentService.setActiveMode(mode);
+    if (!isNonEmptyString(mode)) {
+      return;
+    }
+    this.incidentService.setActiveMode(mode);
+    if (
+      mode !== IncidentExecutionMode.LIVE &&
+      (this.incidentService.targetMetrics()?.healthyTrafficActive ?? false) &&
+      !this.incidentService.isTogglingTraffic()
+    ) {
+      void this.applyHealthyTrafficToggle(false);
     }
   }
 
@@ -146,9 +154,18 @@ export class WarRoomComponent implements OnInit, OnDestroy {
    */
   async onToggleHealthyTraffic(): Promise<void> {
     const nextEnable = !(this.incidentService.targetMetrics()?.healthyTrafficActive ?? false);
+    await this.applyHealthyTrafficToggle(nextEnable);
+  }
+
+  private async applyHealthyTrafficToggle(nextEnable: boolean): Promise<void> {
     const result = await this.incidentService.toggleHealthyTraffic(nextEnable);
     if (!result.ok) {
       this.notifyActionError(result);
+      return;
+    }
+
+    if (nextEnable && this.incidentService.activeMode() !== IncidentExecutionMode.LIVE) {
+      await this.applyHealthyTrafficToggle(false);
       return;
     }
 

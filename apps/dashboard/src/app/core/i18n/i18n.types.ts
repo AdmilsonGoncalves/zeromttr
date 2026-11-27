@@ -203,6 +203,8 @@ export interface TranslationDictionary {
   tooltipSimulateIncident: string;
   tooltipRestoreService: string;
   tooltipLanguageSelector: string;
+  userManualAriaLabel: string;
+  tooltipUserManual: string;
   tooltipViewPr: string;
   tooltipSimulateDecision: string;
 

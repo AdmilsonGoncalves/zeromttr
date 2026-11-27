@@ -298,6 +298,7 @@ services:
           memory: 128M
     environment:
       - DASHBOARD_API_TOKEN=${DASHBOARD_API_TOKEN}
+      - ZEROMTTR_DOCS_DOMAIN=${ZEROMTTR_DOCS_DOMAIN:-docs.${ZEROMTTR_DOMAIN}}
     depends_on:
       - orchestrator
     labels:
@@ -308,6 +309,29 @@ services:
       - 'traefik.http.services.zeromttr.loadbalancer.server.port=80'
     networks:
       - aiops-net
+      - traefik_public
+
+  docs:
+    image: ghcr.io/admilsongoncalves/zeromttr/docs:${IMAGE_TAG:-latest}
+    container_name: zeromttr-docs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://127.0.0.1:80/healthz || exit 1']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.zeromttr-docs.rule=Host(`${ZEROMTTR_DOCS_DOMAIN:-docs.${ZEROMTTR_DOMAIN}}`)'
+      - 'traefik.http.routers.zeromttr-docs.entrypoints=websecure'
+      - 'traefik.http.routers.zeromttr-docs.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.zeromttr-docs.loadbalancer.server.port=80'
+    networks:
       - traefik_public
 
 networks:

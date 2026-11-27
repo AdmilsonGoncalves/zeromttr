@@ -27,7 +27,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [mcp-server, orchestrator, target-app-demo, dashboard]
+        service: [mcp-server, orchestrator, target-app-demo, dashboard, docs]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

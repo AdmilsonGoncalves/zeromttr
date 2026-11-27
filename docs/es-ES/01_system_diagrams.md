@@ -36,19 +36,19 @@ flowchart TD
             UC_RCA(["2. Ejecutar RCA vía MCP (PromQL + Tempo + Loki sanitizado)"])
             UC_COV(["3. Calcular Evidence Coverage (0-4 señales) y Blast Radius"])
             UC_FIN(["4. Contabilizar reducción de payload (FinOps Context Pruning)"])
-            UC_DIFF(["5. Inspeccionar diff real (v2.14.7...v2.14.8) en repo objetivo"])
+            UC_DIFF(["5. Inspeccionar diff real (version-saludable...version-con-bug) en repo objetivo"])
             UC_GUARD(["6. Auditar prompt con PiiPromptGuard (Fail-Closed)"])
             UC_ANN(["7. Inyectar anotación de remediación en gráfico de Grafana"])
-            UC_PR(["8. Generar parche quirúrgico y abrir PR en repo objetivo (hotfix/*)"])
+            UC_PR(["8. Generar parche y abrir PR en repo objetivo (hotfix/*)"])
             UC_NOT(["9. Enviar Post-Mortem con enlaces HMAC exclusivos por correo"])
         end
     end
 
     subgraph External_Providers["3. Integraciones externas y CI"]
-        LLM(["Proveedor LLM (Gemini API)"])
-        GH(["GitHub API y Repositorio (AdmilsonGoncalves/zeromttr)"])
-        GHCI(["GitHub Actions (hotfix-verify.yml)"])
-        RS(["Resend API (Correo al ingeniero de guardia)"])
+        LLM(["Proveedor LLM (ReasoningPort)"])
+        GH(["GitHub API y Repositorio Objetivo"])
+        GHCI(["GitHub Actions (CI de Verificación)"])
+        RS(["Servicio de Correo (Post-Mortem al ingeniero de guardia)"])
     end
 
     %% Acciones del SRE y Cliente MCP externo
@@ -99,19 +99,19 @@ sequenceDiagram
     autonumber
     actor SRE as Ingeniero SRE
     participant UI as Panel War Room (Angular + Nginx)
-    participant DEMO as target-app-demo (api-pagamentos-core)
+    participant DEMO as Servicio Monitorizado (OTel SDK)
     participant OTEL as OTel Collector (Transform OTTL enmascaramiento PII)
     participant LGTM as Stack LGTM (Prom/Loki/Tempo/Grafana)
-    participant ORCH as Orchestrator (FSM + PiiPromptGuard)
+    participant ORCH as Orchestrator (Máquina de Estados + PiiPromptGuard)
     participant MCP as MCP Server (8 herramientas + FinOps)
-    participant EXT as APIs externas (Gemini / GitHub / Resend)
+    participant EXT as APIs externas (LLM / GitHub / Correo)
 
     Note over SRE,DEMO: Fase 1 — Generación de anomalía y enmascaramiento OTTL en el borde
     SRE->>UI: Hace clic en "Simular Incidente" (POST /api/demo/chaos)
     UI->>ORCH: POST /api/demo/chaos (Bearer DASHBOARD_API_TOKEN + X-Live-Demo-Key)
-    ORCH->>DEMO: POST /chaos/pool-saturation?enable=true
-    DEMO-->>OTEL: Emite Spans de error, Métricas y Log con CPF/CNPJ/Clave PIX/JWT vía OTLP (4318)
-    Note right of OTEL: transform processor (OTTL replace_pattern) enmascara CPF/CNPJ/PIX/JWT en log.body y atributos
+    ORCH->>DEMO: Activa degradación controlada (cuando el servicio objetivo lo soporta)
+    DEMO-->>OTEL: Emite Spans de error, Métricas y Logs con PII vía OTLP (4318)
+    Note right of OTEL: transform processor (OTTL replace_pattern) enmascara PII y tokens en log.body y atributos
     OTEL->>LGTM: Persiste métricas (con exemplars), trazas y logs ya enmascarados ([REDACTED_CPF], Bearer [REDACTED_TOKEN])
 
     Note over LGTM,ORCH: Fase 2 — Detección y creación asíncrona del incidente
@@ -131,41 +131,41 @@ sequenceDiagram
     MCP->>LGTM: LogQL filtrado por trace_id
     MCP-->>ORCH: Logs enmascarados ([REDACTED_CPF]) + telemetría FinOps
     ORCH->>DEMO: GET /ops/status (TargetStatusPort)
-    DEMO-->>ORCH: status="degraded", version="v2.14.8", previousHealthyVersion="v2.14.7", capabilities, saturation
+    DEMO-->>ORCH: status="degraded", version="<version-con-bug>", previousHealthyVersion="<version-saludable>", capabilities, saturation
 
-    Note over ORCH,EXT: Fase 4 — Diff real (v2.14.7...v2.14.8) en GitHub y auditoría PiiPromptGuard (Fail-Closed)
+    Note over ORCH,EXT: Fase 4 — Diff real (version-saludable...version-con-bug) en GitHub y auditoría PiiPromptGuard (Fail-Closed)
     ORCH-->>UI: Evento SSE: incident.transition (ENRICHING)
-    ORCH->>MCP: CallTool: inspect_git_deploy_diff (base_ref: "v2.14.7", head_ref: "v2.14.8", service_path: "apps/target-app-demo")
-    MCP->>EXT: GitHub API (AdmilsonGoncalves/zeromttr): Compare v2.14.7...v2.14.8 & Get File Content
-    EXT-->>MCP: Commit de regresión, diff real de payment.repository.ts y blob sha
+    ORCH->>MCP: CallTool: inspect_git_deploy_diff (base_ref, head_ref, service_path)
+    MCP->>EXT: GitHub API (Repo Objetivo): Compare version-saludable...version-con-bug & Get File Content
+    EXT-->>MCP: Commit de regresión, diff real del archivo sospechoso y blob sha
     MCP-->>ORCH: Diff truncado (<= 1500 chars) + telemetría FinOps [Señal 4/4 = 100% (4/4 Signals)]
-    ORCH->>ORCH: PiiPromptGuard.inspect(prompt): valida CPF/CNPJ módulo-11 y JWT (leakedPatternsDetected === 0)
+    ORCH->>ORCH: PiiPromptGuard.inspect(prompt): valida patrones sensibles y JWT (leakedPatternsDetected === 0)
     ORCH-->>UI: Eventos SSE: incident.finops, incident.docs
 
     Note over ORCH,EXT: Fase 5 — Síntesis del parche, anotación en Grafana y creación de PR
     ORCH-->>UI: Evento SSE: incident.transition (REMEDIATING)
     ORCH->>MCP: CallTool: annotate_grafana_incident (tag: aiops-remediation)
     MCP->>LGTM: POST /api/annotations
-    ORCH->>EXT: ReasoningPort (Gemini 3.5 Flash): sintetiza RCA + genera parche quirúrgico (registra reasoningSource="llm")
-    EXT-->>ORCH: Código corregido (restaura finally { client.release() } y pool max: 10)
+    ORCH->>EXT: ReasoningPort (Proveedor LLM): sintetiza RCA + genera parche (registra reasoningSource="llm")
+    EXT-->>ORCH: Código corregido (parche)
     ORCH-->>UI: Evento SSE: incident.rca (Evidence 4/4, Blast Radius, PiiGuardAudit, reasoningSource)
     ORCH-->>UI: Evento SSE: incident.transition (AWAITING_PR)
     ORCH->>MCP: CallTool: create_remediation_pr (incident_id, file_path, patched_content, blob_sha, title, rca_markdown, reasoning_source)
-    MCP->>EXT: GitHub API (AdmilsonGoncalves/zeromttr): crea rama, realiza commit del fix y abre Pull Request contra release/target-v2.14.8
-    EXT-->>MCP: branchUrl + pullRequestUrl + commitSha (dispara hotfix-verify.yml en el repo objetivo)
+    MCP->>EXT: GitHub API (Repo Objetivo): crea rama hotfix/*, realiza commit del fix y abre Pull Request contra rama base
+    EXT-->>MCP: branchUrl + pullRequestUrl + commitSha (dispara CI de verificación en el repo objetivo)
     MCP-->>ORCH: RemediationPrReceipt
     ORCH-->>UI: Evento SSE: incident.remediation (branchUrl, pullRequestUrl, commitSha)
 
-    Note over ORCH,SRE: Fase 6 — Post-Mortem (Resend) con HMAC exclusivo en el fragmento URI (#) del correo
+    Note over ORCH,SRE: Fase 6 — Post-Mortem por Correo con HMAC exclusivo en el fragmento URI (#)
     ORCH->>ORCH: Genera approveSig, rejectSig y exp vía HMAC-SHA256 (NO persistido en API pública ni SSE)
     ORCH->>MCP: CallTool: send_post_mortem_resend (HTML escapado + enlaces /decision/:id#action=...&sig=...&exp=...)
-    MCP->>EXT: Resend API: POST /emails (From: sre@zeromttr.agjworks.com)
+    MCP->>EXT: Servicio de Correo: POST /emails (remitente configurado)
     EXT-->>SRE: Entrega correo Post-Mortem con botones firmados Approve / Reject
     ORCH-->>UI: Evento SSE: incident.transition (NOTIFIED) & incident.notified (solo emailId y htmlPreview sanitizado, SIN sig)
 
     SRE->>UI: Abre el enlace del correo (/decision/:id#action=approve&sig=...&exp=...) y confirma (el fragmento # nunca llega a logs HTTP)
     UI->>ORCH: POST /api/incidents/:id/decision { action: "approve", sig, exp }
-    ORCH->>ORCH: Valida firma HMAC + expiración + estado NOTIFIED y transiciona FSM a RESOLVED
+    ORCH->>ORCH: Valida firma HMAC + expiración + estado NOTIFIED y transiciona el estado a RESOLVED
     ORCH->>MCP: CallTool: annotate_grafana_incident ("Incident RESOLVED by human approval")
     ORCH-->>UI: 200 OK + Evento SSE: incident.decision & incident.transition (RESOLVED)
 ```
@@ -494,8 +494,8 @@ flowchart TD
         subgraph Internal_Network["2B. Red Docker aislada: aiops-net (solo expose:)"]
             ORCH["zeromttr-orchestrator (:8080 + SQLite /app/var)"]
             MCP["zeromttr-mcp-server (:8000)"]
-            DEMO["zeromttr-target-demo (:3001 — api-pagamentos-core)"]
-            PG[("zeromttr-postgres (:5432)")]
+            DEMO["Servicio Monitorizado (:3001 — OTel SDK)"]
+            PG[("Base de Datos Objetivo (:5432)")]
             OTEL["zeromttr-otel-collector (:4317 / :4318 — Transform OTTL)"]
             PROM[("zeromttr-prometheus (:9090 — 512M)")]
             LOKI[("zeromttr-loki (:3100 — 512M)")]
@@ -505,18 +505,18 @@ flowchart TD
     end
 
     subgraph Cloud_APIs["3. APIs externas (HTTPS saliente)"]
-        GEMINI["Google Gemini API (PII estructurada enmascarada)"]
-        GITHUB["GitHub REST API (AdmilsonGoncalves/zeromttr)"]
-        RESEND["Resend Email API (Enlaces HMAC exclusivos)"]
+        GEMINI["Proveedor LLM (PII estructurada enmascarada)"]
+        GITHUB["GitHub REST API (Repositorio Objetivo)"]
+        RESEND["Servicio de Correo (Enlaces HMAC exclusivos)"]
     end
 
-    USER -->|"HTTPS (zeromttr.agjworks.com)"| CF
+    USER -->|"HTTPS (dominio público)"| CF
     CF -->|"HTTPS"| TRAEFIK
     TRAEFIK -->|"HTTP :80 (X-Accel-Buffering: no)"| DASH
     DASH -->|"Proxy /api/* + Bearer DASHBOARD_API_TOKEN"| ORCH
 
     ORCH <-->|"MCP Streamable HTTP (:8000 + MCP_AUTH_TOKEN)"| MCP
-    ORCH -->|"Caos / Estado (:3001)"| DEMO
+    ORCH -->|"Estado / Control (:3001)"| DEMO
     ORCH <-->|"ReasoningPort (PiiPromptGuard)"| GEMINI
     GRAF -->|"POST /webhook/grafana-alert (GRAFANA_WEBHOOK_TOKEN)"| ORCH
 
@@ -531,6 +531,6 @@ flowchart TD
     MCP -->|"LogQL"| LOKI
     MCP -->|"TraceQL"| TEMPO
     MCP -->|"POST /api/annotations"| GRAF
-    MCP <-->|"Diff v2.14.7...v2.14.8 y Pull Request"| GITHUB
+    MCP <-->|"Diff version-saludable...version-con-bug y Pull Request"| GITHUB
     MCP -->|"POST /emails"| RESEND
 ```

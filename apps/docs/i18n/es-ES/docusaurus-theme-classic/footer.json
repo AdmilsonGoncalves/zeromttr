@@ -1,0 +1,29 @@
+{
+  "link.title.Manual": {
+    "message": "Manual"
+  },
+  "link.title.Plataforma": {
+    "message": "Plataforma"
+  },
+  "link.item.label.Introdução": {
+    "message": "Introducción"
+  },
+  "link.item.label.Arquitetura do Sistema": {
+    "message": "Arquitectura del Sistema"
+  },
+  "link.item.label.Usando o War Room": {
+    "message": "Usando el War Room"
+  },
+  "link.item.label.Conectando seu Serviço": {
+    "message": "Conectando tu Servicio"
+  },
+  "link.item.label.War Room Dashboard": {
+    "message": "Panel War Room"
+  },
+  "link.item.label.Repositório GitHub": {
+    "message": "Repositorio GitHub"
+  },
+  "link.item.label.Documentação de Engenharia": {
+    "message": "Documentación de Ingeniería"
+  }
+}

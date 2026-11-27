@@ -20,7 +20,7 @@
       sans-serif;
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   code,
@@ -84,4 +84,41 @@
 
 .settings-drawer-tabs .p-tab .pi {
   font-size: 0.7rem !important;
+}
+
+/* Compact, wide rectangular bottom-center toast in War Room */
+.p-toast.war-room-toast {
+  width: min(30rem, calc(100vw - 2rem)) !important;
+  max-width: calc(100vw - 2rem) !important;
+}
+
+.p-toast.war-room-toast .p-toast-message {
+  margin-bottom: 0.45rem !important;
+  border-radius: 0.5rem !important;
+}
+
+.p-toast.war-room-toast .p-toast-message-content {
+  padding: 0.45rem 0.9rem !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+}
+
+.p-toast.war-room-toast .p-toast-message-text {
+  gap: 0.1rem !important;
+}
+
+.p-toast.war-room-toast .p-toast-summary {
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+}
+
+.p-toast.war-room-toast .p-toast-detail {
+  font-size: 0.75rem !important;
+  line-height: 1.25 !important;
+}
+
+.p-toast.war-room-toast .p-toast-close-button {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  align-self: center !important;
 }

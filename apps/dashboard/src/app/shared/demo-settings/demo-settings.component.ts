@@ -80,10 +80,17 @@ export class DemoSettingsComponent {
   });
 
   readonly canToggleHealthyTraffic = computed<boolean>(() => {
-    if (!this.demoModeEnabledSignal() || this.activeModeSignal() !== IncidentExecutionMode.LIVE) {
+    if (!this.demoModeEnabledSignal()) {
       return false;
     }
-    return this.targetStatusSignal()?.capabilities?.healthyTrafficToggle ?? false;
+    const capabilitySupported =
+      this.targetStatusSignal()?.capabilities?.healthyTrafficToggle ?? false;
+    if (!capabilitySupported) {
+      return false;
+    }
+    return (
+      this.activeModeSignal() === IncidentExecutionMode.LIVE || this.healthyTrafficActiveSignal()
+    );
   });
 
   readonly showHealthyTrafficControl = computed<boolean>(() => {

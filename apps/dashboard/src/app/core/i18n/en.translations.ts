@@ -213,7 +213,9 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   tooltipSimulateIncident:
     'Starts the incident: degrades the target service (v2.14.8) in Live Mode or plays the recorded run in Replay Mode.',
   tooltipRestoreService: 'Clears pool saturation chaos and restores the target service to healthy.',
-  tooltipLanguageSelector: 'Switch UI language between Portuguese, English, and Spanish.',
+  tooltipLanguageSelector: 'UI language.',
+  userManualAriaLabel: 'Open user manual',
+  tooltipUserManual: 'User manual',
   tooltipViewPr: 'Open the autonomously generated hotfix Pull Request on GitHub.',
   tooltipSimulateDecision:
     'Records on-call approval directly from the dashboard (in production, confirmation requires the HMAC link sent by email).',
@@ -257,7 +259,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   settingsLoadError: 'Could not load settings. Click Reload to try again.',
   settingsReadonlyNotice:
     'Read-only mode — configure SETTINGS_ADMIN_TOKEN on the server to enable edits.',
-  settingsAdminTokenLabel: 'Admin token (X-Settings-Admin-Token)',
+  settingsAdminTokenLabel: 'Admin token',
   settingsAdminTokenPlaceholder: 'Enter SETTINGS_ADMIN_TOKEN...',
   settingsTabAlerts: 'Alerts',
   settingsTabTarget: 'Target & Diff',
@@ -291,7 +293,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   settingsAuditEmpty: 'No configuration changes recorded yet.',
   settingsReloadBtn: 'Reload',
   settingsSaveBtn: 'Save Settings',
-  settingsSavedSuccess: 'Settings saved and applied in real time!',
+  settingsSavedSuccess: 'Settings saved',
   settingsSaveError: 'Failed to save settings.',
   settingsInvalidAdminTokenError:
     'Invalid or missing admin token. Check the SETTINGS_ADMIN_TOKEN provided.',
