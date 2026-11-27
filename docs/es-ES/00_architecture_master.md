@@ -53,18 +53,18 @@ Para comprender de inmediato el papel de cada bloque arquitectónico, **ZeroMTTR
      - **Ojos (Lectura y Poda de Contexto FinOps):** `execute_promql_range` (Prometheus), `analyze_otel_trace` (Tempo), `search_traces_by_traceql` (búsqueda ad-hoc en TraceQL y respaldo cuando falta exemplar), `query_loki_logs` (Loki) e `inspect_git_deploy_diff` (compara la versión saludable anterior con la versión actual en GitHub).
      - **Manos (Acción y Gobernanza):** `create_remediation_pr` (crea una rama `hotfix/zeromttr-*`, aplica el commit de corrección — siempre a nivel semántico `PATCH` — y abre el Pull Request en GitHub), `annotate_grafana_incident` (marca el gráfico en Grafana) y `send_post_mortem_resend` (envía el informe por correo).
 2. **La IA (`Gemini API` vía `ReasoningPort`) = El "Cerebro":**
-   - La IA **no** accede directamente a bases de datos, backends de observabilidad ni a GitHub. Recibe únicamente el resumen podado por MCP y validado en modo *fail-closed* por `PiiPromptGuard`, sintetiza la causa raíz (RCA) y redacta el código corregido (el parche quirúrgico), registrando explícitamente `reasoningSource: 'llm' | 'fallback'`.
+   - La IA **no** accede directamente a bases de datos, backends de observabilidad ni a GitHub. Recibe únicamente el resumen podado por MCP y validado en modo *fail-closed* por `PiiPromptGuard`, sintetiza la causa raíz (RCA) y redacta el código corregido (el parche), registrando explícitamente `reasoningSource: 'llm' | 'fallback'`.
 3. **El `orchestrator` = El "Director" (Flujo Determinista + FSM):**
    - Recibe la alerta de Grafana → ejecuta de forma predecible la secuencia de recolección en los **Ojos MCP** → valida la ausencia de PII (`PiiPromptGuard`) y la envía al **Cerebro (IA)** para sintetizar el RCA y generar el parche → invoca las **Manos MCP** para abrir el Pull Request en GitHub (disparando el CI de la rama) y enviar el correo de aprobación humana al ingeniero de guardia, transmitiendo todo en vivo vía SSE al **War Room Dashboard**.
 
 ```mermaid
 flowchart TD
     APP(["Sistema Monitorizado (Agnóstico / OTel SDK)"]) -.->|"Emite Métricas, Logs y Trazas (OTLP)"| GRAF["Stack LGTM y Alertas Grafana"]
-    GRAF -->|"1. Dispara Webhook de Anomalía"| ORCH["Orchestrator (El Director / FSM)"]
+    GRAF -->|"1. Dispara Webhook de Anomalía"| ORCH["Orchestrator (El Director)"]
     ORCH <-->|"2. Usa OJOS MCP (Obtiene Métricas, Traza, Logs sin PII y Git Diff)"| MCP["MCP Server (8 Herramientas Deterministas)"]
-    ORCH <-->|"3. Envía evidencia auditada (PII estructurada enmascarada) al CEREBRO para diagnosticar y generar Parche"| IA["Gemini AI (El Cerebro / ReasoningPort)"]
+    ORCH <-->|"3. Envía evidencia auditada (PII estructurada enmascarada) al CEREBRO para diagnosticar y generar Parche"| IA["Proveedor LLM (El Cerebro / ReasoningPort)"]
     ORCH -->|"4. Usa MANOS MCP (Solicita rama hotfix/*, PR y Correo)"| MCP
-    MCP -->|"5. Abre PR en GitHub + Envía Post-Mortem (Resend)"| GOV(["War Room Dashboard e Ingeniero de Guardia (Aprobación Humana)"])
+    MCP -->|"5. Abre PR en GitHub + Envía Post-Mortem por Correo"| GOV(["War Room Dashboard e Ingeniero de Guardia (Aprobación Humana)"])
     ORCH -.->|"Stream SSE en Tiempo Real"| GOV
 ```
 
@@ -112,7 +112,7 @@ Para evitar comparaciones sesgadas con procesos que incluyen despliegue completo
 | Almacenamiento | Prometheus (exemplars), Loki, Tempo | Stack LGTM |
 | Visualización / Disparo | Grafana 11.2+ (Alerting) | Webhook de incidentes y API de anotaciones (`POST /api/annotations`) |
 | Protocolo de Agente | **MCP** (`@modelcontextprotocol/sdk`) | Interfaz abierta estandarizada de 8 herramientas AIOps |
-| LLM del Agente | Google Gemini API (`ReasoningPort`, modelo configurable vía `LLM_MODEL`, predeterminado `gemini-3.5-flash`) | Síntesis de RCA y generación de parche quirúrgico (con `reasoningSource: 'llm' \| 'fallback'` explícito) |
+| LLM del Agente | Google Gemini API (`ReasoningPort`, modelo configurable vía `LLM_MODEL`, predeterminado `gemini-3.5-flash`) | Síntesis de RCA y generación de parche (con `reasoningSource: 'llm' \| 'fallback'` explícito) |
 | **Inspección de Despliegue y Auto-Remediación** | **GitHub REST API (Octokit)** sobre `apps/target-app-demo` en el repositorio `zeromttr` | Comparación real entre tags `v2.14.7...v2.14.8`, lectura de código, creación de rama `hotfix/zeromttr-*` y Pull Request apuntando a `release/target-v2.14.8` |
 | **Notificación y Gobernanza** | **Resend** | Envío de Post-Mortem HTML (`sre@zeromttr.agjworks.com`) conteniendo exclusivamente enlaces de decisión firmados con HMAC |
 | Pruebas | Vitest, Supertest, `nock`/MSW + **Helpers de Prueba (`test/helpers/`)** | **Testing Trophy (prioridad Integración y E2E)** ejercitando rutas HTTP, MCP y `PiiPromptGuard` de extremo a extremo (Happy y Unhappy Paths); pruebas unitarias restringidas a funciones puras auxiliares |
@@ -142,22 +142,23 @@ Para evitar comparaciones sesgadas con procesos que incluyen despliegue completo
 | `apps/orchestrator/` y `apps/mcp-server/` | **Hexagonal (Puertos y Adaptadores)** | `domain` → `application` → `ports` → `adapters`, con raíz de composición en `main.ts` |
 | `apps/target-app-demo/` | **MVC en Capas** | `routes` → `controllers` → `services` → `repositories` (`payment.repository.ts`) |
 | `apps/dashboard/` | **War Room Single-Pane con Signals** (Angular + PrimeNG Aura Dark) | Componentes Standalone (`WarRoomComponent` + `DecisionComponent`) enfocados en el flujo principal de 3 minutos |
+| `apps/docs/` | **Manual Estático Multilingüe** (Docusaurus + Nginx) | Contenido en `pt-BR`, `en-US` y `es-ES` (`manuals/` + `i18n/`) servido en un contenedor Nginx dedicado |
 
 ### 5.3 Vista de Contexto (C4 Nivel 1)
 ```mermaid
 flowchart TD
     SRE(["Ingeniero de Guardia (SRE)"])
     EXT_MCP(["Cliente MCP Externo (Cursor / Claude / Inspector)"])
-    APP["Servicio Monitorizado: api-pagamentos-core (OTel SDK)"]
+    APP["Servicio Monitorizado (Agnóstico / OTel SDK)"]
     ZMT[["Plataforma ZeroMTTR (MCP Server + Orchestrator + LGTM)"]]
-    LLM["Proveedor LLM (Gemini API — PII Estructurada Enmascarada)"]
-    GH["GitHub API y Repositorio (zeromttr: tags v2.14.7...v2.14.8 en apps/target-app-demo)"]
-    RS["Resend API (Correo Post-Mortem con HMAC Exclusivo)"]
+    LLM["Proveedor LLM (PII Estructurada Enmascarada)"]
+    GH["GitHub API y Repositorio Objetivo"]
+    RS["Servicio de Correo (Post-Mortem con HMAC Exclusivo)"]
 
-    APP -->|"1. Telemetría OTLP (Métricas, Logs con CPF/CNPJ/PIX, Trazas)"| ZMT
+    APP -->|"1. Telemetría OTLP (Métricas, Logs con PII, Trazas)"| ZMT
     EXT_MCP -.->|"Consume las 8 Herramientas vía Contrato MCP Abierto"| ZMT
     ZMT <-->|"2. Razonamiento RCA y Parche (Validado por PiiPromptGuard)"| LLM
-    ZMT <-->|"3. Inspecciona Diff real v2.14.7...v2.14.8 y abre PR hotfix/*"| GH
+    ZMT <-->|"3. Inspecciona Diff real version-saludable...version-con-bug y abre PR hotfix/*"| GH
     ZMT -->|"4. Envía Post-Mortem HTML con enlaces HMAC exclusivos"| RS
     RS -->|"5. Correo con diagnóstico y enlaces /decision/:id"| SRE
     SRE -->|"6. Confirma Aprobación/Rechazo vía POST con HMAC del correo"| ZMT
@@ -168,7 +169,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph Workload["Servicio Monitorizado (Detalle de Borde)"]
-        DEMO["target-app-demo: api-pagamentos-core (Express + Knex + OTel)"]
+        DEMO["Servicio Objetivo (OTel SDK / OTLP)"]
     end
 
     subgraph Observability["Capa de Observabilidad (OTel + LGTM)"]
@@ -181,14 +182,14 @@ flowchart TD
 
     subgraph ZeroMTTR["Núcleo ZeroMTTR (Orquestación + MCP)"]
         DASH["War Room Dashboard (Angular + Proxy Nginx con DASHBOARD_API_TOKEN)"]
-        ORCH["Orchestrator (Webhook + FSM + PiiPromptGuard + SSE)"]
+        ORCH["Orchestrator (Webhook + Máquina de Estados + PiiPromptGuard + SSE)"]
         MCP["MCP Server (8 Herramientas + Telemetría FinOps)"]
     end
 
     subgraph External["APIs Externas"]
-        LLM["Gemini API (ReasoningPort)"]
-        GH["GitHub REST API (AdmilsonGoncalves/zeromttr)"]
-        RS["Resend API (Post-Mortem con HMAC)"]
+        LLM["Proveedor LLM (ReasoningPort)"]
+        GH["GitHub REST API (Repositorio Objetivo)"]
+        RS["Servicio de Correo (Post-Mortem con HMAC)"]
     end
 
     DEMO -->|"OTLP/HTTP 4318"| OTEL
@@ -200,11 +201,11 @@ flowchart TD
     ORCH <-->|"Prompt Auditado (PII Estructurada: 0 Detectados)"| LLM
     MCP -->|"PromQL / LogQL / TraceQL"| PROM & LOKI & TEMPO
     MCP -->|"POST /api/annotations"| GRAF
-    MCP <-->|"Compara Tags v2.14.7...v2.14.8 y Crea PR"| GH
+    MCP <-->|"Compara Diff version-saludable...version-con-bug y Crea PR"| GH
     MCP -->|"POST /emails"| RS
 ```
 
-### 5.5 Máquina de Estados del Incidente (FSM)
+### 5.5 Máquina de Estados del Incidente
 ```mermaid
 stateDiagram-v2
     direction TB
@@ -212,7 +213,7 @@ stateDiagram-v2
     RECEIVED --> INVESTIGATING: Deduplicación por fingerprint
     INVESTIGATING --> ENRICHING: Recolección OTel completa (PromQL + Tempo + Loki)
     INVESTIGATING --> FAILED: Sin evidencia / error crítico
-    ENRICHING --> REMEDIATING: Diff real v2.14.7...v2.14.8 inspeccionado en repo objetivo
+    ENRICHING --> REMEDIATING: Diff real version-saludable...version-con-bug inspeccionado en repo objetivo
     REMEDIATING --> AWAITING_PR: Parche validado por PiiPromptGuard y rama hotfix/* creada
     AWAITING_PR --> NOTIFIED: Pull Request abierto en repo objetivo
     AWAITING_PR --> FAILED: Timeout / error de GitHub API
@@ -335,7 +336,13 @@ zeromttr/
 │   ├── target-app-demo/          # MVC en Capas (api-pagamentos-core — emisor local OTel + /ops/status neutro)
 │   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/ # incluye ops.routes.ts y ops-status.controller.ts
 │   │   └── test/
-│   └── dashboard/                # Angular + PrimeNG (Aura Dark) War Room + shared/{demo-settings,system-settings,locale-switcher} + styles/breakpoints.css
+│   ├── dashboard/                # Angular + PrimeNG (Aura Dark) War Room + shared/{demo-settings,system-settings,locale-switcher} + styles/breakpoints.css
+│   └── docs/                     # Manual de Usuario Docusaurus multilingüe (pt-BR, en-US, es-ES) + contenedor Nginx dedicado (Dockerfile, nginx.conf)
+│       ├── manuals/              # Capítulos predeterminados en pt-BR (archivos y slugs en inglés)
+│       ├── i18n/{en-US,es-ES}/   # Traducciones completas de contenido, navbar, footer y sidebar
+│       ├── src/css/              # Tema oscuro Slate/Cyan alineado con el War Room
+│       ├── static/img/           # Assets estáticos (logo SVG)
+│       └── test/                 # Pruebas de integridad de idiomas, sidebar y slugs (Vitest)
 ├── scripts/                      # demo.sh, chaos.sh, reset.sh, measure-mttr.sh, smoke-integrations.sh
 └── docs/
     ├── pt-BR/
@@ -366,9 +373,9 @@ zeromttr/
 flowchart TD
     F0["0. Planificación y Diagramas (v0.3)"] --> F1["1. Base (pnpm + Nx + LGTM con OTTL Transform)"]
     F1 --> F2["2. Servidor MCP (8 Tools + FinOps + .mcp.json en TDD)"]
-    F1 --> F3["3. App Demo + Repo Objetivo (tags v2.14.7 y v2.14.8)"]
+    F1 --> F3["3. App Demo + Repo Objetivo (tags version-saludable y version-con-bug)"]
     F1 --> F4B["4b. War Room Dashboard Compacto (Agente Frontend)"]
-    F2 & F3 --> F4["4. Orquestador (FSM + PiiPromptGuard + PR + Resend HMAC)"]
+    F2 & F3 --> F4["4. Orquestador (Máquina de Estados + PiiPromptGuard + PR + Correo HMAC)"]
     F4 & F4B --> F5["5. Endurecimiento, Prueba de Carga LGTM y Medición TTD/TTPR"]
     F5 --> F6["6. Video en Vivo (3 min) y Release v1.0.0 Congelada en VPS"]
 ```

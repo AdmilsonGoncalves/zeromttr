@@ -1,11 +1,12 @@
 node_modules
 dist
 build
+.docusaurus
 coverage
 .nx
 .pnpm-store
 pnpm-lock.yaml
-docs
+/docs
 .agents
 .claude
 skills-lock.json

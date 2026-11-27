@@ -2,6 +2,7 @@ packages:
   - apps/*
   - libs/*
 allowBuilds:
+  core-js: false
   esbuild: false
   nx: false
 

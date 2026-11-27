@@ -223,6 +223,8 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   tooltipRestoreService:
     'Elimina la saturación del pool y restaura el servicio objetivo al estado saludable.',
   tooltipLanguageSelector: 'Cambia el idioma de la interfaz (Portugués, Inglés o Español).',
+  userManualAriaLabel: 'Abrir manual de instrucciones',
+  tooltipUserManual: 'Manual de instrucciones',
   tooltipViewPr: 'Abre en GitHub el Pull Request de hotfix generado automáticamente.',
   tooltipSimulateDecision:
     'Registra la aprobación del ingeniero de guardia desde el panel (en producción, la confirmación requiere el enlace HMAC enviado por correo).',

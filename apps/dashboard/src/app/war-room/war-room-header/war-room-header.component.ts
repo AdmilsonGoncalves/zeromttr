@@ -4,34 +4,70 @@ import {
   EventEmitter,
   Input,
   Output,
+  computed,
   inject,
   signal
 } from '@angular/core';
 import { isNonEmptyString } from '@zeromttr/utils';
 import { Tag } from 'primeng/tag';
+import { Tooltip } from 'primeng/tooltip';
 import {
   IncidentExecutionMode,
   TargetHealthStatus,
   type IncidentMode,
   type TargetStatusResponse
 } from '../../core/contract.js';
-import { I18nService, type Language } from '../../core/i18n/i18n.service.js';
+import { I18nService, Language } from '../../core/i18n/i18n.service.js';
 import { DemoSettingsComponent } from '../../shared/demo-settings/demo-settings.component.js';
 import { LocaleSwitcherComponent } from '../../shared/locale-switcher/locale-switcher.component.js';
 import { SystemSettingsComponent } from '../../shared/system-settings/system-settings.component.js';
 
+const DEFAULT_PROD_DOCS_URL = 'https://docs.zeromttr.agjworks.com';
+const DEFAULT_LOCAL_DOCS_URL = 'http://localhost:4300';
+
 /**
- * Pure top War Room header displaying project identity, target connection tags, demo drawer trigger, settings trigger, and locale switcher.
+ * Resolves the external Docusaurus user manual URL for the active dashboard locale.
+ */
+export function resolveDocsManualUrl(
+  lang: Language,
+  options?: { configuredBaseUrl?: string; hostname?: string }
+): string {
+  let baseUrl = DEFAULT_PROD_DOCS_URL;
+  if (isNonEmptyString(options?.configuredBaseUrl)) {
+    baseUrl = options.configuredBaseUrl.trim().replace(/\/+$/, '');
+  } else if (options?.hostname === 'localhost' || options?.hostname === '127.0.0.1') {
+    baseUrl = DEFAULT_LOCAL_DOCS_URL;
+  }
+
+  let localePath = '/';
+  if (lang === Language.EN_US) {
+    localePath = '/en-US/';
+  } else if (lang === Language.ES_ES) {
+    localePath = '/es-ES/';
+  }
+
+  return `${baseUrl}${localePath}`;
+}
+
+/**
+ * Pure top War Room header displaying project identity, target connection tags, demo drawer trigger, settings trigger, manual link, and locale switcher.
  */
 @Component({
   selector: 'app-war-room-header',
-  imports: [Tag, DemoSettingsComponent, SystemSettingsComponent, LocaleSwitcherComponent],
+  imports: [Tag, Tooltip, DemoSettingsComponent, SystemSettingsComponent, LocaleSwitcherComponent],
   templateUrl: './war-room-header.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WarRoomHeaderComponent {
   readonly i18n = inject(I18nService);
   readonly healthStatus = TargetHealthStatus;
+
+  readonly docsManualUrl = computed<string>(() => {
+    const configuredBaseUrl = (import.meta as unknown as { env?: { VITE_DOCS_URL?: string } }).env
+      ?.VITE_DOCS_URL;
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : undefined;
+    return resolveDocsManualUrl(this.i18n.currentLang(), { configuredBaseUrl, hostname });
+  });
 
   readonly demoModeEnabledSignal = signal<boolean>(false);
   readonly sseConnectedSignal = signal<boolean>(false);

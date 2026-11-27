@@ -76,6 +76,17 @@
       }
 
       <app-system-settings [demoModeEnabled]="demoModeEnabledSignal()" />
+      <a
+        [href]="docsManualUrl()"
+        target="_blank"
+        rel="noopener noreferrer"
+        [attr.aria-label]="i18n.t('userManualAriaLabel')"
+        [pTooltip]="i18n.t('tooltipUserManual')"
+        tooltipPosition="bottom"
+        class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-slate-950/90 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/70 text-slate-300 hover:text-cyan-300 cursor-pointer shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+      >
+        <i class="pi pi-question-circle text-sm" aria-hidden="true"></i>
+      </a>
       <app-locale-switcher [currentLang]="i18n.currentLang()" (langChange)="onLangSelect($event)" />
     </div>
   </div>

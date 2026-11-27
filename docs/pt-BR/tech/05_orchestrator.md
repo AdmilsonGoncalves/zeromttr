@@ -68,7 +68,7 @@ export const PII_PATTERNS = {
 3. **EnrichWithDeployDiff:** chama a tool MCP `inspect_git_deploy_diff` comparando as tags reais `v2.14.7` e `v2.14.8` em `apps/target-app-demo`, isolando o commit e o arquivo `apps/target-app-demo/src/repositories/payment.repository.ts` (com seu `blobSha`).
 4. **DispatchRemediation:**
    - Audita o prompt montado com **`PiiPromptGuard.inspectAndEnforceFailClosed`**.
-   - Se `passed === true`, sintetiza o RCA e o patch cirúrgico via `ReasoningPort` (`GeminiReasoningAdapter` configurável via `LLM_MODEL`, padrão `gemini-3.5-flash`) e registra `reasoningSource: 'llm'`. Caso o guard reprove (`fail-closed`) ou a API do LLM falhe, utiliza `DeterministicFallbackReasoningAdapter` e registra explicitamente `reasoningSource: 'fallback'`.
+   - Se `passed === true`, sintetiza o RCA e o patch via `ReasoningPort` (`GeminiReasoningAdapter` configurável via `LLM_MODEL`, padrão `gemini-3.5-flash`) e registra `reasoningSource: 'llm'`. Caso o guard reprove (`fail-closed`) ou a API do LLM falhe, utiliza `DeterministicFallbackReasoningAdapter` e registra explicitamente `reasoningSource: 'fallback'`.
    - Injeta anotação no Grafana via `annotate_grafana_incident` (`REMEDIATING`), aciona `create_remediation_pr` (mirando `release/target-v2.14.8` e incluindo `reasoningSource` no corpo do PR), recebe `branchUrl`, `pullRequestUrl` e `commitSha`, e só então transiciona para `AWAITING_PR`.
 5. **NotifyOnCall (HMAC Exclusivo no URI Fragment `#` do E-mail):**
    - Calcula `approveSig`, `rejectSig` e `exp` (timestamp Unix em segundos, TTL curto de 15 min / 900 s).
