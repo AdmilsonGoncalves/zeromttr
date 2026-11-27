@@ -48,6 +48,8 @@ export interface DemoSessionLifecycle {
   completeApprovalReset(incidentId: string): Promise<void>;
 
   handleLiveIncidentApproved(incident: Incident): Promise<void>;
+
+  retryPendingApprovalReset(incident: Incident): Promise<boolean>;
 }
 
 /**
@@ -63,7 +65,7 @@ export function createDemoSessionLifecycle(
   let lastChaosMode: IncidentMode = IncidentExecutionMode.REPLAY;
   let chaosSessionGeneration = 0;
   let pendingLiveReset = false;
-  const pendingTargetResetIncidentIds = new Set<string>();
+  const pendingTargetResetGenerations = new Map<string, number>();
   let lifecycleQueue: Promise<void> = Promise.resolve();
 
   const runSerialized = <T>(fn: () => Promise<T>): Promise<T> => {
@@ -96,7 +98,9 @@ export function createDemoSessionLifecycle(
     incidentId: string,
     resetOptions?: { skipCapabilityCheck?: boolean }
   ): Promise<void> => {
-    pendingTargetResetIncidentIds.add(incidentId);
+    if (!pendingTargetResetGenerations.has(incidentId)) {
+      pendingTargetResetGenerations.set(incidentId, chaosSessionGeneration);
+    }
     replayRunner?.stop();
     const shouldResetTarget = resetOptions?.skipCapabilityCheck ? true : await canResetTarget();
     if (shouldResetTarget) {
@@ -105,7 +109,7 @@ export function createDemoSessionLifecycle(
     lastChaosTimestamp = 0;
     lastChaosMode = IncidentExecutionMode.REPLAY;
     pendingLiveReset = false;
-    pendingTargetResetIncidentIds.delete(incidentId);
+    pendingTargetResetGenerations.delete(incidentId);
   };
 
   return {
@@ -138,9 +142,9 @@ export function createDemoSessionLifecycle(
       lastChaosMode = IncidentExecutionMode.REPLAY;
     },
     canResetTarget,
-    hasPendingTargetReset: (incidentId: string) => pendingTargetResetIncidentIds.has(incidentId),
+    hasPendingTargetReset: (incidentId: string) => pendingTargetResetGenerations.has(incidentId),
     clearPendingTargetResets: () => {
-      pendingTargetResetIncidentIds.clear();
+      pendingTargetResetGenerations.clear();
     },
     markPendingLiveReset: () => {
       pendingLiveReset = true;
@@ -157,22 +161,66 @@ export function createDemoSessionLifecycle(
       const observedGeneration = chaosSessionGeneration;
       const incidentStartedAtMs = Date.parse(incident.startedAt);
 
-      const shouldResetTarget = await canResetTarget();
-      if (!shouldResetTarget) {
-        return;
-      }
-
       await runSerialized(async () => {
-        const newerChaosStartedDuringLookup = chaosSessionGeneration !== observedGeneration;
+        const newerChaosStartedBeforeLookup = chaosSessionGeneration !== observedGeneration;
         const newerSessionOwnsDemo =
           lastChaosTimestamp > 0 &&
           Number.isFinite(incidentStartedAtMs) &&
           lastChaosTimestamp > incidentStartedAtMs;
-        if (newerChaosStartedDuringLookup || newerSessionOwnsDemo) {
+        if (newerChaosStartedBeforeLookup || newerSessionOwnsDemo) {
           return;
         }
+
+        pendingTargetResetGenerations.set(incident.id, observedGeneration);
+        const shouldResetTarget = await canResetTarget();
+        if (!shouldResetTarget) {
+          pendingTargetResetGenerations.delete(incident.id);
+          return;
+        }
+
+        const newerChaosStartedDuringLookup = chaosSessionGeneration !== observedGeneration;
+        const newerSessionNowOwnsDemo =
+          lastChaosTimestamp > 0 &&
+          Number.isFinite(incidentStartedAtMs) &&
+          lastChaosTimestamp > incidentStartedAtMs;
+        if (newerChaosStartedDuringLookup || newerSessionNowOwnsDemo) {
+          pendingTargetResetGenerations.delete(incident.id);
+          return;
+        }
+
         pendingLiveReset = true;
         await completeApprovalReset(incident.id, { skipCapabilityCheck: true });
+      });
+    },
+    retryPendingApprovalReset: async (incident: Incident): Promise<boolean> => {
+      if (incident.mode !== IncidentExecutionMode.LIVE) {
+        return false;
+      }
+      const incidentStartedAtMs = Date.parse(incident.startedAt);
+
+      return runSerialized(async () => {
+        const recordedGeneration = pendingTargetResetGenerations.get(incident.id);
+        if (recordedGeneration === undefined) {
+          return false;
+        }
+        const newerSessionStarted =
+          chaosSessionGeneration !== recordedGeneration ||
+          (lastChaosTimestamp > 0 &&
+            Number.isFinite(incidentStartedAtMs) &&
+            lastChaosTimestamp > incidentStartedAtMs);
+        if (newerSessionStarted) {
+          pendingTargetResetGenerations.delete(incident.id);
+          return false;
+        }
+
+        const shouldResetTarget = await canResetTarget();
+        if (!shouldResetTarget) {
+          return false;
+        }
+
+        pendingLiveReset = true;
+        await completeApprovalReset(incident.id, { skipCapabilityCheck: true });
+        return true;
       });
     }
   };

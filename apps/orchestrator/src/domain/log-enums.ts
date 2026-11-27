@@ -18,5 +18,7 @@ export enum OrchestratorLogEvent {
   LLM_PATCH_REJECTED = 'llm_patch_rejected',
   PII_PROMPT_GUARD_BLOCKED = 'pii_prompt_guard_blocked',
   POST_APPROVAL_HOOK_FAILED = 'post_approval_hook_failed',
-  SETTINGS_INVALID_PERSISTED_KEY = 'settings_invalid_persisted_key'
+  SETTINGS_INVALID_PERSISTED_KEY = 'settings_invalid_persisted_key',
+  SETTINGS_READ_FAILED = 'settings_read_failed',
+  SETTINGS_PERSIST_FAILED = 'settings_persist_failed'
 }

@@ -391,4 +391,45 @@ describe('Demo Replay Mode Integration (TECH 09 §6)', () => {
     expect(firstTriggerId).not.toBe(secondTriggerId);
     expect(activeReplayTimers.size).toBe(0);
   });
+
+  it('should_reject_replay_requests_without_updating_cooldown_when_replayRunner_is_unconfigured', async () => {
+    const storePath = path.join(tempDir, 'incidents-no-replay.json');
+    const repository = new FileIncidentRepository(storePath);
+    const toolsPort = createMockToolsPort();
+    const demoControlPort = createMockDemoControlPort();
+
+    const app = createApp({
+      repository,
+      targetStatusPort: createMockTargetStatusPort(),
+      handleAlert: createStubHandleAlert(repository),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: createStubRecordDecision(repository),
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository,
+        demoControlPort,
+        simulateDemoDecision: new SimulateDemoDecision(repository, toolsPort, broadcaster),
+        publicLiveDemo: true,
+        cooldownMs: 60_000
+      })
+    });
+
+    const replayRes = await request(app)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.REPLAY });
+
+    expect(replayRes.status).toBe(HTTP_STATUS.SERVICE_UNAVAILABLE);
+    expect(replayRes.body.code).toBe('REPLAY_UNAVAILABLE');
+
+    // Cooldown must NOT have been set by the rejected replay request
+    const liveRes = await request(app)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+
+    expect(liveRes.status).toBe(HTTP_STATUS.ACCEPTED);
+    expect(demoControlPort.triggerChaos).toHaveBeenCalledTimes(1);
+  });
 });

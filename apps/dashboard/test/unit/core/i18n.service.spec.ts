@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
 
 describe('I18nService', () => {
   it('should default to Portuguese translations', () => {
@@ -96,6 +96,21 @@ describe('I18nService', () => {
       expect(service.dict().traceTreeIdleBody.toLowerCase()).not.toMatch(/simula/);
       expect(service.dict().gitDiffIdleBody.toLowerCase()).not.toMatch(/simula/);
       expect(service.dict().resendIdleBody.toLowerCase()).not.toMatch(/simula/);
+    }
+  });
+
+  it('should_insert_dollar_replacement_tokens_literally_during_param_interpolation', () => {
+    const service = new I18nService();
+    const interpolated = service.t('tooltipHealthyTraffic', { service: 'svc-$&-$$-$`' });
+    expect(interpolated).toContain('svc-$&-$$-$`');
+  });
+
+  it('should_use_neutral_resolved_and_approval_wording_without_claiming_target_restoration', () => {
+    const service = new I18nService();
+    for (const lang of [Language.PT_BR, Language.EN_US, Language.ES_ES]) {
+      service.setLang(lang);
+      expect(service.t('fsmHintResolved').toLowerCase()).not.toMatch(/restaur|restor/);
+      expect(service.t('toastDecisionApprovedDetail').toLowerCase()).not.toMatch(/restaur|restor/);
     }
   });
 });

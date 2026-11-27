@@ -264,7 +264,7 @@ Ciclo **Red → Green → Refactor** com foco na filosofia *Testing Trophy*:
 ### 6.3 Outras Regras
 - **Clean Code / DRY / YAGNI / KISS**; funções pequenas, sem `any` fora de fronteiras (usar `zod` para validar entradas externas).
 - **Idioma:** código, tools, logs e commits em en-US; documentação principal e README em en-US, pt-BR e es-ES.
-- **Segurança por padrão:** tokens estritamente segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN` e `SETTINGS_ADMIN_TOKEN` para `PATCH /api/settings`), `decisionToken` restrito ao e-mail, `onCallEmail` sempre mascarado em leituras/auditoria, escape de HTML nos templates, redaction OTTL na borda + `PiiPromptGuard` pré-LLM.
+- **Segurança por padrão:** tokens estritamente segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN` e `SETTINGS_ADMIN_TOKEN` para `PATCH /api/settings` quando configurado; em implantações privadas com `ENABLE_DEMO_MODE=false` e sem `SETTINGS_ADMIN_TOKEN`, `PATCH /api/settings` permanece editável por operadores autenticados com `DASHBOARD_API_TOKEN`), `decisionToken` restrito ao e-mail, `onCallEmail` sempre mascarado em leituras/auditoria, escape de HTML nos templates, redaction OTTL na borda + `PiiPromptGuard` pré-LLM.
 
 ---
 

@@ -40,7 +40,7 @@ export class I18nService {
     let text = this.dict()[key];
     if (params) {
       for (const [paramKey, paramValue] of Object.entries(params)) {
-        text = text.replaceAll(`{{${paramKey}}}`, paramValue);
+        text = text.replaceAll(`{{${paramKey}}}`, () => paramValue);
       }
     }
     return text;

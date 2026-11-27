@@ -3,14 +3,15 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TelemetryHealthLevel } from '../src/app/core/constants.js';
-import { I18nService } from '../src/app/core/i18n/i18n.service.js';
-import { TargetTelemetryComponent } from '../src/app/war-room/target-telemetry/target-telemetry.component.js';
+import { TelemetryHealthLevel } from '../../../src/app/core/constants.js';
+import { I18nService } from '../../../src/app/core/i18n/i18n.service.js';
+import { TargetTelemetryComponent } from '../../../src/app/war-room/target-telemetry/target-telemetry.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TELEMETRY_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/target-telemetry/target-telemetry.component.html'
+  '../../../src/app/war-room/target-telemetry/target-telemetry.component.html'
 );
 
 describe('TargetTelemetryComponent', () => {
@@ -19,7 +20,9 @@ describe('TargetTelemetryComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new TargetTelemetryComponent(i18n);
+    component = createWithInjector(TargetTelemetryComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
   });
 
   it('should_return_healthy_defaults_when_metrics_signal_is_null', () => {
@@ -128,5 +131,35 @@ describe('TargetTelemetryComponent', () => {
 
     const html = readFileSync(TELEMETRY_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('@if (saturationSignal(); as sat)');
+  });
+
+  it('should_report_critical_poolLevel_when_waiting_is_positive_even_with_zero_max_capacity', () => {
+    component.metrics = {
+      healthyTrafficActive: false,
+      requestsPerSecond: 10,
+      errorRate5xxPercent: 0,
+      p95LatencyMs: 80,
+      saturation: {
+        resourceLabel: 'Worker Queue',
+        active: 0,
+        waiting: 3,
+        max: 0
+      }
+    };
+    expect(component.poolLevel()).toBe(TelemetryHealthLevel.CRITICAL);
+
+    component.metrics = {
+      healthyTrafficActive: false,
+      requestsPerSecond: 10,
+      errorRate5xxPercent: 0,
+      p95LatencyMs: 80,
+      saturation: {
+        resourceLabel: 'Worker Queue',
+        active: 0,
+        waiting: 0,
+        max: 0
+      }
+    };
+    expect(component.poolLevel()).toBe(TelemetryHealthLevel.HEALTHY);
   });
 });

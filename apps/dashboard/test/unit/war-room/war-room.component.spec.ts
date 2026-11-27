@@ -3,13 +3,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { WarRoomComponent } from '../src/app/war-room/war-room.component.js';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { IncidentService } from '../src/app/core/incident.service.js';
-import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
+import { WarRoomComponent } from '../../../src/app/war-room/war-room.component.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
+import { IncidentService } from '../../../src/app/core/incident.service.js';
+import { MOCK_INCIDENT } from '../../../mock-server/mock-data.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WAR_ROOM_TEMPLATE_PATH = resolve(HERE, '../src/app/war-room/war-room.component.html');
+const WAR_ROOM_TEMPLATE_PATH = resolve(HERE, '../../../src/app/war-room/war-room.component.html');
 
 describe('WarRoomComponent', () => {
   let component: WarRoomComponent;
@@ -27,8 +28,11 @@ describe('WarRoomComponent', () => {
     vi.spyOn(incidentService, 'fetchTargetStatus').mockImplementation(async () => {});
     vi.spyOn(incidentService, 'fetchIncidents').mockImplementation(async () => {});
 
-    // Instantiate component manually using Angular dependencies
-    component = new WarRoomComponent(i18n, incidentService);
+    // Instantiate component inside a synthetic Angular injection context
+    component = createWithInjector(WarRoomComponent, [
+      { provide: I18nService, useValue: i18n },
+      { provide: IncidentService, useValue: incidentService }
+    ]);
   });
 
   it('should initialize, fetch demo config, and connect SSE on ngOnInit', () => {

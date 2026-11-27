@@ -14,7 +14,7 @@ import { I18nService } from '../../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GitDiffFinopsTabComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
 
   readonly incidentSignal = signal<IncidentDetail | null>(null);
   readonly finopsReductionSignal = signal<number>(0);
@@ -54,9 +54,4 @@ export class GitDiffFinopsTabComponent {
       Math.max(2, round((finops.compactedBytesSent / finops.rawBytesFetched) * 100, 1))
     );
   });
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 }

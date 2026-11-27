@@ -7,7 +7,9 @@ import {
 } from '@zeromttr/contracts';
 import { toErrorMessage } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
 import { maskEmailForDisplay } from '../domain/system-settings.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 import type { SettingsRepositoryPort } from '../ports/settings-repository.port.js';
 import { createSettingsAdminMiddleware } from './auth.js';
 import { SecurityErrorCode } from './http-constants.js';
@@ -21,6 +23,7 @@ export interface SettingsRouterDependencies {
   adminToken?: string;
   writeAuthMiddleware?: RequestHandler;
   onSettingsUpdated?: (settings: SystemSettings) => void;
+  logger?: LoggerPort;
 }
 
 function buildSettingsResponse(
@@ -70,8 +73,12 @@ export function createSettingsRouter(dependencies: SettingsRouterDependencies): 
       );
       res.status(HTTP_STATUS.OK).json(payload);
     } catch (err) {
+      dependencies.logger?.error({
+        event: OrchestratorLogEvent.SETTINGS_READ_FAILED,
+        message: toErrorMessage(err, 'Failed to read system settings')
+      });
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-        error: toErrorMessage(err, 'Failed to read system settings')
+        error: 'Failed to read system settings'
       });
     }
   });
@@ -108,8 +115,12 @@ export function createSettingsRouter(dependencies: SettingsRouterDependencies): 
       );
       res.status(HTTP_STATUS.OK).json(payload);
     } catch (err) {
+      dependencies.logger?.error({
+        event: OrchestratorLogEvent.SETTINGS_PERSIST_FAILED,
+        message: toErrorMessage(err, 'Failed to persist system settings')
+      });
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-        error: toErrorMessage(err, 'Failed to persist system settings')
+        error: 'Failed to persist system settings'
       });
     }
   });

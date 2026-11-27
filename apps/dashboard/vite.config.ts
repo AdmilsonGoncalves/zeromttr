@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-function angularTemplateInlinePlugin() {
+export function angularTemplateInlinePlugin() {
   return {
     name: 'angular-template-inline',
     transform(this: { addWatchFile?: (id: string) => void }, code: string, id: string) {

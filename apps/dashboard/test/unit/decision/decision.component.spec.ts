@@ -1,9 +1,10 @@
 import '@angular/compiler';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import type { ActivatedRoute } from '@angular/router';
-import { DecisionComponent } from '../src/app/decision/decision.component.js';
-import { I18nService } from '../src/app/core/i18n/i18n.service.js';
-import { IncidentService } from '../src/app/core/incident.service.js';
+import { ActivatedRoute } from '@angular/router';
+import { DecisionComponent } from '../../../src/app/decision/decision.component.js';
+import { I18nService } from '../../../src/app/core/i18n/i18n.service.js';
+import { IncidentService } from '../../../src/app/core/incident.service.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 describe('DecisionComponent', () => {
   let component: DecisionComponent;
@@ -25,7 +26,11 @@ describe('DecisionComponent', () => {
       } as unknown as ActivatedRoute['snapshot']
     };
 
-    component = new DecisionComponent(mockRoute as ActivatedRoute, i18n, incidentService);
+    component = createWithInjector(DecisionComponent, [
+      { provide: ActivatedRoute, useValue: mockRoute as ActivatedRoute },
+      { provide: I18nService, useValue: i18n },
+      { provide: IncidentService, useValue: incidentService }
+    ]);
   });
 
   afterEach(() => {

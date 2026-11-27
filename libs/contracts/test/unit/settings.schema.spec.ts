@@ -87,7 +87,11 @@ describe('SystemSettingsSchema', () => {
   });
 
   it('should_accept_short_masked_emails_in_response_schema', () => {
-    for (const maskedEmail of ['a***@example.com', '***@example.com']) {
+    const maxLenDomain = `${'a'.repeat(149)}.example`;
+    const maxMaskedEmail = `a***@${maxLenDomain}`;
+    expect(maxMaskedEmail.length).toBe(162);
+
+    for (const maskedEmail of ['a***@example.com', '***@example.com', maxMaskedEmail]) {
       const result = SystemSettingsResponseSchema.safeParse({
         settings: {
           ...VALID_SETTINGS,

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createMockServer, type MockServer } from '../mock-server/server.js';
+import { createMockServer, type MockServer } from '../../mock-server/server.js';
 import type {
   IncidentDetail,
   SystemSettingsResponse,
   TargetStatusResponse
-} from '../src/app/core/contract.js';
+} from '../../src/app/core/contract.js';
 
 describe('Dashboard Mock Server', () => {
   let server: MockServer;

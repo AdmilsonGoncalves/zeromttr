@@ -121,8 +121,8 @@
     },
     {
       "id": 3,
-      "title": "Pool Active Gauge (Optional)",
-      "type": "gauge",
+      "title": "Pool Active Connections (Optional)",
+      "type": "stat",
       "gridPos": { "h": 4, "w": 3, "x": 18, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus-datasource" },
       "targets": [
@@ -134,17 +134,19 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "N/A",
           "min": 0,
-          "max": 10,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 7 },
-              { "color": "red", "value": 9 }
-            ]
-          }
+          "color": { "mode": "fixed", "fixedColor": "blue" }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
         }
       }
     },

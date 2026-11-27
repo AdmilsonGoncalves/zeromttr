@@ -33,9 +33,9 @@ import { IncidentService } from '../core/incident.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DecisionComponent implements OnInit {
-  readonly route: ActivatedRoute;
-  readonly i18n: I18nService;
-  readonly incidentService: IncidentService;
+  readonly route = inject(ActivatedRoute);
+  readonly i18n = inject(I18nService);
+  readonly incidentService = inject(IncidentService);
   readonly decisionAction = DecisionAction;
   readonly decisionUiStatus = DecisionUiStatus;
   readonly severity = UiSeverity;
@@ -63,13 +63,6 @@ export class DecisionComponent implements OnInit {
     }
     return new Date(expiration * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
   });
-
-  constructor(...args: [ActivatedRoute?, I18nService?, IncidentService?]) {
-    const [route, i18n, incidentService] = args;
-    this.route = route ?? inject(ActivatedRoute);
-    this.i18n = i18n ?? inject(I18nService);
-    this.incidentService = incidentService ?? inject(IncidentService);
-  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id') ?? '';

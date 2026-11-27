@@ -177,6 +177,7 @@
               </span>
             </label>
             <p-toggleswitch
+              #healthyTrafficModel="ngModel"
               inputId="demo-healthy-traffic-toggle"
               [ngModel]="healthyTrafficActiveSignal()"
               (ngModelChange)="onHealthyTrafficToggle($event)"

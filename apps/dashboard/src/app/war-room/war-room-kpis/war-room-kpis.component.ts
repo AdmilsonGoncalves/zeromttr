@@ -12,7 +12,7 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WarRoomKpisComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly reasoningProvider = ReasoningProvider;
 
   readonly ttdDisplaySignal = signal<string>('--');
@@ -56,10 +56,5 @@ export class WarRoomKpisComponent {
   @Input({ required: true })
   set estimatedTokensSaved(value: number) {
     this.estimatedTokensSavedSignal.set(value);
-  }
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
   }
 }

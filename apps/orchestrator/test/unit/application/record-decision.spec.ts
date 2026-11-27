@@ -123,6 +123,46 @@ describe('RecordDecision & SimulateDemoDecision Use Cases', () => {
     );
   });
 
+  it('should_process_pending_post_approval_retry_for_resolved_incident_without_duplicate_decision_events', async () => {
+    const incident = createMockIncident(IncidentState.RESOLVED);
+    incident.decision = DecisionAction.APPROVE;
+    incident.decisionSource = DecisionSource.EMAIL_HMAC;
+
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools = createMockToolsPort();
+    const clock: Clock = { now: () => now * 1000, iso: () => '' };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const onApprovedRetry = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    const useCase = new RecordDecision(
+      repo,
+      tools,
+      clock,
+      broadcaster,
+      secret,
+      undefined,
+      undefined,
+      onApprovedRetry
+    );
+    const sig = DecisionHmac.sign(incidentId, DecisionAction.APPROVE, exp, secret);
+
+    const recovered = await useCase.execute(incidentId, DecisionAction.APPROVE, sig, exp);
+    expect(recovered).toBe(incident);
+    expect(onApprovedRetry).toHaveBeenCalledTimes(1);
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(broadcaster.broadcast).not.toHaveBeenCalled();
+
+    // Subsequent retry once pending cleanup is already completed must fail with 409 conflict
+    await expect(useCase.execute(incidentId, DecisionAction.APPROVE, sig, exp)).rejects.toThrow(
+      IncidentAlreadyResolvedError
+    );
+  });
+
   it('should throw IncidentNotFoundError when trying to record decision for non-existent incident', async () => {
     const repo: IncidentRepository = {
       findById: vi.fn(async () => null),

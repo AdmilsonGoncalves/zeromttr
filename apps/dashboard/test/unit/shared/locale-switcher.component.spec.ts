@@ -1,7 +1,8 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { LocaleSwitcherComponent } from '../src/app/shared/locale-switcher/locale-switcher.component.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
+import { LocaleSwitcherComponent } from '../../../src/app/shared/locale-switcher/locale-switcher.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 describe('LocaleSwitcherComponent', () => {
   let i18n: I18nService;
@@ -9,7 +10,9 @@ describe('LocaleSwitcherComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new LocaleSwitcherComponent(i18n);
+    component = createWithInjector(LocaleSwitcherComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
   });
 
   it('should_expose_pt_br_en_us_and_es_es_locale_options_and_resolve_active_flag', () => {

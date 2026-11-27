@@ -191,6 +191,7 @@ export function createDemoChaosHandler(
     }
 
     await deps.lifecycle.runSerialized(async () => {
+      const replayRunner = deps.replayRunner;
       if (mode === IncidentExecutionMode.LIVE) {
         const supported = await deps.guards.checkCapability(
           'chaosSimulation',
@@ -200,6 +201,12 @@ export function createDemoChaosHandler(
         if (!supported) {
           return;
         }
+      } else if (!replayRunner) {
+        res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({
+          code: DemoErrorCode.REPLAY_UNAVAILABLE,
+          error: 'Replay mode is not configured on this orchestrator instance'
+        });
+        return;
       }
 
       const now = Date.now();
@@ -213,10 +220,10 @@ export function createDemoChaosHandler(
       try {
         let incidentId: string | undefined;
         if (mode === IncidentExecutionMode.LIVE) {
-          deps.replayRunner?.stop();
+          replayRunner?.stop();
           await deps.demoControlPort.triggerChaos(true);
-        } else if (deps.replayRunner) {
-          incidentId = await deps.replayRunner.trigger();
+        } else if (replayRunner) {
+          incidentId = await replayRunner.trigger();
         }
         deps.lifecycle.commitLastChaos();
         res.status(HTTP_STATUS.ACCEPTED).json({
@@ -332,8 +339,9 @@ export function createDemoSimulateDecisionHandler(
         existingIncident = deps.repository ? await deps.repository.findById(incidentId) : null;
 
         const isLiveSessionActive =
-          deps.lifecycle.getLastChaosTimestamp() > 0 &&
-          deps.lifecycle.getLastChaosMode() === IncidentExecutionMode.LIVE;
+          (deps.lifecycle.getLastChaosTimestamp() > 0 &&
+            deps.lifecycle.getLastChaosMode() === IncidentExecutionMode.LIVE) ||
+          deps.lifecycle.hasPendingLiveReset();
         const requiresLiveAuth =
           (existingIncident !== null && existingIncident.mode === IncidentExecutionMode.LIVE) ||
           (action === DecisionAction.APPROVE && isLiveSessionActive);

@@ -3,14 +3,15 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
-import { I18nService } from '../src/app/core/i18n/i18n.service.js';
-import { LokiPiiTabComponent } from '../src/app/war-room/evidence-panel/loki-pii-tab/loki-pii-tab.component.js';
+import { MOCK_INCIDENT } from '../../../../mock-server/mock-data.js';
+import { I18nService } from '../../../../src/app/core/i18n/i18n.service.js';
+import { LokiPiiTabComponent } from '../../../../src/app/war-room/evidence-panel/loki-pii-tab/loki-pii-tab.component.js';
+import { createWithInjector } from '../../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const LOKI_TAB_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/evidence-panel/loki-pii-tab/loki-pii-tab.component.html'
+  '../../../../src/app/war-room/evidence-panel/loki-pii-tab/loki-pii-tab.component.html'
 );
 
 describe('LokiPiiTabComponent', () => {
@@ -19,7 +20,7 @@ describe('LokiPiiTabComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new LokiPiiTabComponent(i18n);
+    component = createWithInjector(LokiPiiTabComponent, [{ provide: I18nService, useValue: i18n }]);
     component.leakedPatternsCount = 0;
     component.isPiiPassed = true;
   });

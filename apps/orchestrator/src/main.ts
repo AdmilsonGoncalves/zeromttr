@@ -210,7 +210,8 @@ function createSettingsRouterFactory(params: {
         adminToken,
         onSettingsUpdated: (updated) => {
           params.logger.setMinLevel(updated.logLevel);
-        }
+        },
+        logger: params.logger
       })
   };
 }
@@ -325,6 +326,14 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
           if (getSettings().autoRestoreOnApprove) {
             await demoLifecycle.handleLiveIncidentApproved(incident);
           }
+        }
+      : undefined,
+    demoLifecycle
+      ? async (incident) => {
+          if (!getSettings().autoRestoreOnApprove) {
+            return false;
+          }
+          return demoLifecycle.retryPendingApprovalReset(incident);
         }
       : undefined
   );

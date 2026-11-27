@@ -1,7 +1,38 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createMockServer, type MockServer } from '../mock-server/server.js';
-import { SystemLogLevel } from '../src/app/core/contract.js';
-import { SystemSettingsService } from '../src/app/core/system-settings.service.js';
+import { createMockServer, type MockServer } from '../../mock-server/server.js';
+import {
+  SettingsPersistenceEngine,
+  SystemLogLevel,
+  type SystemSettingsResponse
+} from '../../src/app/core/contract.js';
+import { SystemSettingsService } from '../../src/app/core/system-settings.service.js';
+
+const STALE_SETTINGS_RESPONSE: SystemSettingsResponse = {
+  settings: {
+    rejectionCooldownSeconds: 900,
+    repeatSuppressionSeconds: 60,
+    decisionTtlSeconds: 900,
+    autoRestoreOnApprove: true,
+    targetServicePath: 'apps/target-app-demo',
+    targetBaseRef: 'v2.14.7',
+    targetHeadRef: 'v2.14.8',
+    targetErrorRateThresholdPercent: 5,
+    llmModel: 'gemini-3.5-flash',
+    llmFallbackModel: 'gemini-3.5-flash-lite',
+    onCallEmail: 'on***@example.com',
+    logLevel: SystemLogLevel.INFO
+  },
+  readonlyInfo: {
+    targetGithubRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+    targetBaseBranch: 'release/target-v2.14.8',
+    targetStatusProvider: 'manifest',
+    grafanaRepeatInterval: '1m',
+    persistenceEngine: SettingsPersistenceEngine.SQLITE
+  },
+  editable: true,
+  requiresAuthKey: false,
+  auditLog: []
+};
 
 describe('SystemSettingsService', () => {
   let server: MockServer;
@@ -96,6 +127,44 @@ describe('SystemSettingsService', () => {
     const fetchFailed = await service.fetchSettings();
     expect(fetchFailed).toBe(false);
     expect(service.lastError()).toBe('network offline');
+    expect(service.isLoading()).toBe(false);
+  });
+
+  it('should_ignore_stale_fetch_responses_that_finish_after_save', async () => {
+    const service = new SystemSettingsService();
+    let resolveStaleFetch!: (response: Response) => void;
+
+    vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveStaleFetch = resolve;
+          })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...STALE_SETTINGS_RESPONSE,
+            settings: { ...STALE_SETTINGS_RESPONSE.settings, rejectionCooldownSeconds: 300 }
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+    const staleReadPromise = service.fetchSettings();
+    const saveResult = await service.saveSettings({ rejectionCooldownSeconds: 300 });
+    expect(saveResult.ok).toBe(true);
+    expect(service.settings()?.rejectionCooldownSeconds).toBe(300);
+
+    resolveStaleFetch(
+      new Response(JSON.stringify(STALE_SETTINGS_RESPONSE), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+    const staleApplied = await staleReadPromise;
+    expect(staleApplied).toBe(false);
+    expect(service.settings()?.rejectionCooldownSeconds).toBe(300);
     expect(service.isLoading()).toBe(false);
   });
 });

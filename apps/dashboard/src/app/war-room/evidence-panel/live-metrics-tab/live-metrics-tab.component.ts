@@ -17,7 +17,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LiveMetricsTabComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
 
   readonly telemetryHistorySignal = signal<TelemetryHistoryPoint[]>([]);
 
@@ -129,11 +129,6 @@ export class LiveMetricsTabComponent {
     }
     return this.i18n.t('chartThroughputTitle');
   });
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 
   /**
    * Computes SVG text baseline Y so bottom axis labels render cleanly inside the 145px viewBox.

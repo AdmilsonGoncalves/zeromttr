@@ -7,15 +7,16 @@ import {
   SettingsPersistenceEngine,
   SystemLogLevel,
   type SystemSettingsResponse
-} from '../src/app/core/contract.js';
-import { I18nService } from '../src/app/core/i18n/i18n.service.js';
-import { SystemSettingsService } from '../src/app/core/system-settings.service.js';
-import { SystemSettingsComponent } from '../src/app/shared/system-settings/system-settings.component.js';
+} from '../../../src/app/core/contract.js';
+import { I18nService } from '../../../src/app/core/i18n/i18n.service.js';
+import { SystemSettingsService } from '../../../src/app/core/system-settings.service.js';
+import { SystemSettingsComponent } from '../../../src/app/shared/system-settings/system-settings.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SETTINGS_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/shared/system-settings/system-settings.component.html'
+  '../../../src/app/shared/system-settings/system-settings.component.html'
 );
 
 const MOCK_RESPONSE: SystemSettingsResponse = {
@@ -53,7 +54,10 @@ describe('SystemSettingsComponent', () => {
   beforeEach(() => {
     i18n = new I18nService();
     service = new SystemSettingsService();
-    component = new SystemSettingsComponent(i18n, service);
+    component = createWithInjector(SystemSettingsComponent, [
+      { provide: I18nService, useValue: i18n },
+      { provide: SystemSettingsService, useValue: service }
+    ]);
   });
 
   it('should_require_admin_token_when_requiresAuthKey_is_true_and_send_only_modified_fields_on_save', async () => {

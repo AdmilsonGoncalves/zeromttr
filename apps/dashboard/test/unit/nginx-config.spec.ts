@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const NGINX_TEMPLATE_PATH = path.resolve(import.meta.dirname, '../nginx.conf.template');
+const NGINX_TEMPLATE_PATH = path.resolve(import.meta.dirname, '../../nginx.conf.template');
 
 describe('nginx.conf.template proxy & rate-limit IP restoration', () => {
   it('should restore the real visitor address from trusted proxy X-Forwarded-For headers while sanitizing upstream headers', () => {

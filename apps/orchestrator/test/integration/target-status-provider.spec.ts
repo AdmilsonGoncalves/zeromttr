@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import nock from 'nock';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { HttpTargetStatusAdapter } from '../../src/adapters/target-status.http.js';
@@ -37,6 +37,10 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
     }
   });
 
+  beforeEach(() => {
+    delete process.env.TARGET_STATUS_PATH;
+  });
+
   afterEach(() => {
     cleanOrchestratorNock();
     for (const key of envKeys) {
@@ -51,6 +55,14 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
   });
 
   afterAll(() => {
+    for (const key of envKeys) {
+      const value = savedEnv.get(key);
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
     teardownOrchestratorNock();
   });
 
@@ -407,6 +419,21 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
         expect(query).toContain('service_name="orders\\\\\\"api"');
         expect(query).toContain('service="orders\\\\\\"api"');
       }
+    });
+
+    it('should_report_unreachable_when_prometheus_series_have_zero_usable_samples', async () => {
+      const executePromqlRange = vi.fn(async () => ({
+        seriesCount: 1,
+        summarizedSeries: [{ metric: {}, latest: 0, p95: 0, max: 0, sampleCount: 0 }],
+        finops: createMockFinOpsData()
+      }));
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange }),
+        { serviceName: 'zero-samples-service' }
+      );
+      const status = await adapter.getStatus();
+      expect(status.status).toBe(TargetHealthStatus.UNREACHABLE);
     });
 
     it('should_select_prometheus_provider_when_TARGET_STATUS_PROVIDER_is_prometheus', () => {

@@ -7,7 +7,8 @@ set -euo pipefail
 # para acionar o alerta do Grafana e grava o snapshot validado por ReplaySnapshotSchema.
 
 CALLER_ORCH_URL="${ORCHESTRATOR_URL:-}"
-CALLER_TARGET_URL="${TARGET_DEMO_URL:-}"
+CALLER_TARGET_APP_URL="${TARGET_APP_URL:-}"
+CALLER_TARGET_DEMO_URL="${TARGET_DEMO_URL:-}"
 
 ENV_FILE="${ENV_FILE:-.env}"
 if [ -f "$ENV_FILE" ]; then
@@ -18,7 +19,7 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 ORCH_URL="${CALLER_ORCH_URL:-http://127.0.0.1:8080}"
-TARGET_URL="${CALLER_TARGET_URL:-http://127.0.0.1:3001}"
+TARGET_URL="${CALLER_TARGET_APP_URL:-${TARGET_APP_URL:-${CALLER_TARGET_DEMO_URL:-${TARGET_DEMO_URL:-http://127.0.0.1:3001}}}}"
 TOKEN="${DASHBOARD_API_TOKEN:-}"
 LIVE_KEY="${LIVE_DEMO_KEY:-}"
 OUTPUT_PATH="${REPLAY_SNAPSHOT_PATH:-data/last-recorded-incident.json}"

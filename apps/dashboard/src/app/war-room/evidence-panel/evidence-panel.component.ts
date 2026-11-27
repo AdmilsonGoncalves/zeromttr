@@ -29,7 +29,7 @@ import { TraceTreeTabComponent } from './trace-tree-tab/trace-tree-tab.component
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class EvidencePanelComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
 
   readonly incidentSignal = signal<IncidentDetail | null>(null);
   readonly targetStatusSignal = signal<TargetStatusResponse | null>(null);
@@ -85,11 +85,6 @@ export class EvidencePanelComponent {
   @Input({ required: true })
   set estimatedTokensSaved(value: number) {
     this.estimatedTokensSavedSignal.set(value);
-  }
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
   }
 
   /**

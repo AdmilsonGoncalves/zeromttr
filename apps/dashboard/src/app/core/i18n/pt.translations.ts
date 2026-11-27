@@ -2,8 +2,8 @@ import type { TranslationDictionary } from './i18n.types.js';
 
 export const PT_TRANSLATIONS: TranslationDictionary = {
   // === App, Header & Mode Controls ===
-  appTitle: 'ZeroMTTR — War Room Mission Control',
-  appSubtitle: 'Remediação Autônoma de Incidentes & Governança com Humano no Circuito',
+  appTitle: 'ZeroMTTR — War Room',
+  appSubtitle: 'Remediação Autônoma de Incidentes & Governança Humana',
   headerMenuBtn: 'Menu',
   headerMenuAriaLabel: 'Abrir demonstração',
   sseConnected: 'SSE Conectado',
@@ -72,8 +72,8 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   step8Desc:
     'Relatório executivo entregue ao plantonista com link HMAC em #fragment para aprovação.',
 
-  // === FSM Flow & Hints ===
-  fsmFlowLabel: 'Fluxo FSM',
+  // === Remediation Flow & Hints ===
+  fsmFlowLabel: 'Fluxo de Remediação',
   fsmAwaitingAlertLabel: '0. Coleta LGTM',
   fsmAwaitingAlertTip:
     'Serviço degradado emitindo telemetria — aguardando Prometheus/Grafana disparar o alerta.',
@@ -99,9 +99,9 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   fsmHintIdle: 'Pronto — monitorando telemetria e aguardando incidentes ou execução sob demanda.',
   fsmHintAwaitingAlert:
     'Serviço degradado — gerando tráfego PIX e aguardando Prometheus/Grafana disparar o alerta ({N}s)...',
-  fsmHintActive: 'Pipeline autônomo em execução — acompanhando transições da FSM em tempo real.',
+  fsmHintActive: 'Pipeline autônomo em execução — acompanhando etapas do incidente em tempo real.',
   fsmHintNotified: 'Aguardando decisão humana via link HMAC no e-mail (ou simulação no painel).',
-  fsmHintResolved: 'Incidente resolvido e aprovado. O serviço alvo foi restaurado automaticamente.',
+  fsmHintResolved: 'Incidente aprovado e resolvido.',
   fsmHintRejected: 'Hotfix rejeitado pelo plantonista. O PR permanece sem merge.',
   fsmHintFailed: 'Pipeline interrompido por falha — verifique os logs do orquestrador.',
 
@@ -246,7 +246,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   toastServiceRestoredDetail: 'O estado de caos foi limpo e o serviço alvo voltou ao normal.',
   toastDecisionApprovedSummary: 'Hotfix aprovado',
   toastDecisionApprovedDetail:
-    'Incidente resolvido e serviço alvo restaurado! Os dados permanecem na tela para inspeção.',
+    'Aprovação registrada e incidente resolvido. Os dados permanecem na tela para inspeção.',
   toastHealthyTrafficStartedSummary: 'Tráfego saudável ativado',
   toastHealthyTrafficStartedDetail:
     'Requisições saudáveis contínuas sendo enviadas para {{service}}.',

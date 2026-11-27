@@ -7,9 +7,9 @@ import {
   ReasoningProvider,
   TargetHealthStatus
 } from '@zeromttr/contracts';
-import { IncidentService } from '../src/app/core/incident.service.js';
-import { createMockServer, type MockServer } from '../mock-server/server.js';
-import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
+import { IncidentService } from '../../src/app/core/incident.service.js';
+import { createMockServer, type MockServer } from '../../mock-server/server.js';
+import { MOCK_INCIDENT } from '../../mock-server/mock-data.js';
 
 describe('IncidentService', () => {
   let server: MockServer;

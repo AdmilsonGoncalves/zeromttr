@@ -14,7 +14,7 @@ import { I18nService } from '../../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TraceTreeTabComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
 
   readonly incidentSignal = signal<IncidentDetail | null>(null);
   readonly signalsRatioSignal = signal<string>('0/4');
@@ -33,10 +33,5 @@ export class TraceTreeTabComponent {
   @Input({ required: true })
   set evidenceCoveragePercent(value: number) {
     this.evidenceCoveragePercentSignal.set(value);
-  }
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
   }
 }

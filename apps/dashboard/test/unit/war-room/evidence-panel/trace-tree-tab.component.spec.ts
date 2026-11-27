@@ -3,14 +3,15 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
-import { I18nService } from '../src/app/core/i18n/i18n.service.js';
-import { TraceTreeTabComponent } from '../src/app/war-room/evidence-panel/trace-tree-tab/trace-tree-tab.component.js';
+import { MOCK_INCIDENT } from '../../../../mock-server/mock-data.js';
+import { I18nService } from '../../../../src/app/core/i18n/i18n.service.js';
+import { TraceTreeTabComponent } from '../../../../src/app/war-room/evidence-panel/trace-tree-tab/trace-tree-tab.component.js';
+import { createWithInjector } from '../../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TRACE_TREE_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/evidence-panel/trace-tree-tab/trace-tree-tab.component.html'
+  '../../../../src/app/war-room/evidence-panel/trace-tree-tab/trace-tree-tab.component.html'
 );
 
 describe('TraceTreeTabComponent', () => {
@@ -19,7 +20,9 @@ describe('TraceTreeTabComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new TraceTreeTabComponent(i18n);
+    component = createWithInjector(TraceTreeTabComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
     component.signalsRatio = '4/4';
     component.evidenceCoveragePercent = 100;
   });

@@ -4,11 +4,12 @@ import {
   EventEmitter,
   Input,
   Output,
+  ViewChild,
   computed,
   inject,
   signal
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, type NgModel } from '@angular/forms';
 import { isNonEmptyString, isString } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { Drawer } from 'primeng/drawer';
@@ -34,7 +35,7 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DemoSettingsComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly executionMode = IncidentExecutionMode;
 
   readonly isDrawerOpenSignal = signal<boolean>(false);
@@ -165,9 +166,15 @@ export class DemoSettingsComponent {
     this.healthyTrafficActiveSignal.set(value);
   }
 
+  @ViewChild('healthyTrafficModel') healthyTrafficModel?: NgModel;
+
   @Input({ required: true })
   set isTogglingTraffic(value: boolean) {
+    const wasToggling = this.isTogglingTrafficSignal();
     this.isTogglingTrafficSignal.set(value);
+    if (wasToggling && !value) {
+      this.syncHealthyTrafficSwitchControl();
+    }
   }
 
   @Input({ required: true })
@@ -185,11 +192,6 @@ export class DemoSettingsComponent {
   @Output() readonly toggleHealthyTraffic = new EventEmitter<void>();
   @Output() readonly triggerChaos = new EventEmitter<void>();
   @Output() readonly resetService = new EventEmitter<void>();
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 
   /**
    * Opens the demo controls drawer.
@@ -246,9 +248,16 @@ export class DemoSettingsComponent {
    */
   onHealthyTrafficToggle(enabled: boolean): void {
     if (this.isHealthyTrafficToggleDisabled() || enabled === this.healthyTrafficActiveSignal()) {
+      this.syncHealthyTrafficSwitchControl();
       return;
     }
     this.toggleHealthyTraffic.emit();
+  }
+
+  private syncHealthyTrafficSwitchControl(): void {
+    this.healthyTrafficModel?.control.setValue(this.healthyTrafficActiveSignal(), {
+      emitEvent: false
+    });
   }
 
   /**

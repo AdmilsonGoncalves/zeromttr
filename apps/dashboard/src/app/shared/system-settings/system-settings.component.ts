@@ -43,8 +43,8 @@ const SETTINGS_ADMIN_TOKEN_STORAGE_KEY = 'zeromttr_settings_admin_token';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SystemSettingsComponent {
-  readonly i18n: I18nService;
-  readonly settingsService: SystemSettingsService;
+  readonly i18n = inject(I18nService);
+  readonly settingsService = inject(SystemSettingsService);
   readonly logLevels: readonly SystemLogLevel[] = Object.values(SystemLogLevel);
 
   readonly isDrawerOpenSignal = signal<boolean>(false);
@@ -96,11 +96,7 @@ export class SystemSettingsComponent {
     return true;
   });
 
-  constructor(...args: [I18nService?, SystemSettingsService?]) {
-    const [i18n, settingsService] = args;
-    this.i18n = i18n ?? inject(I18nService);
-    this.settingsService = settingsService ?? inject(SystemSettingsService);
-
+  constructor() {
     try {
       const savedToken = globalThis.sessionStorage?.getItem(SETTINGS_ADMIN_TOKEN_STORAGE_KEY);
       if (isNonEmptyString(savedToken)) {
@@ -165,6 +161,14 @@ export class SystemSettingsComponent {
     const loaded = this.settingsService.settings();
     if (ok && loaded) {
       this.draftSignal.set({ ...loaded });
+      this.feedbackSignal.set(null);
+      return;
+    }
+    if (!ok && this.draftSignal()) {
+      this.feedbackSignal.set({
+        type: 'error',
+        message: this.i18n.t('settingsLoadError')
+      });
     }
   }
 
@@ -208,12 +212,23 @@ export class SystemSettingsComponent {
       return;
     }
 
+    const currentDraftBeforeSave = this.draftSignal();
+    const submittedDraft = currentDraftBeforeSave ? { ...currentDraftBeforeSave } : null;
     const patch = this.pendingPatch();
     const result = await this.settingsService.saveSettings(patch, this.adminTokenSignal());
     if (result.ok) {
       const updated = this.settingsService.settings();
       if (updated) {
-        this.draftSignal.set({ ...updated });
+        const mergedDraft: SystemSettings = { ...updated };
+        const latestDraft = this.draftSignal();
+        if (submittedDraft && latestDraft) {
+          for (const key of Object.keys(updated) as Array<keyof SystemSettings>) {
+            if (latestDraft[key] !== submittedDraft[key]) {
+              (mergedDraft as Record<string, unknown>)[key] = latestDraft[key];
+            }
+          }
+        }
+        this.draftSignal.set(mergedDraft);
       }
       this.feedbackSignal.set({
         type: 'success',

@@ -156,4 +156,43 @@ describe('HandleAlert Use Case', () => {
     expect(result.incident?.state).toBe(IncidentState.RECEIVED);
     expect(existingExpiredIncident.state).toBe(IncidentState.FAILED);
   });
+
+  it('should_keep_NOTIFIED_incident_open_until_issued_decisionExpiresAt_even_if_decisionTtlSeconds_was_lowered', async () => {
+    const repo = createMockRepo();
+    const broadcaster = createMockBroadcaster();
+    const useCase = new HandleAlert(repo, broadcaster, () => ({
+      rejectionCooldownSeconds: 0,
+      repeatSuppressionSeconds: 0,
+      decisionTtlSeconds: 60
+    }));
+
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const tenMinutesFromNow = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const notifiedIncident = new Incident({
+      id: 'inc-notified-001',
+      service: 'api-pagamentos-core',
+      severity: 'critical',
+      fingerprint: 'PaymentServicePoolExhaustion:api-pagamentos-core',
+      state: IncidentState.NOTIFIED,
+      startedAt: fiveMinutesAgo,
+      notification: {
+        emailId: 'email-001',
+        decisionExpiresAt: tenMinutesFromNow
+      },
+      transitions: [
+        {
+          from: IncidentState.AWAITING_PR,
+          to: IncidentState.NOTIFIED,
+          at: fiveMinutesAgo,
+          reason: 'Notification dispatched'
+        }
+      ]
+    });
+    await repo.save(notifiedIncident);
+
+    const result = await useCase.execute(validPayload);
+    expect(result.isDuplicate).toBe(true);
+    expect(result.incident?.id).toBe('inc-notified-001');
+    expect(notifiedIncident.state).toBe(IncidentState.NOTIFIED);
+  });
 });

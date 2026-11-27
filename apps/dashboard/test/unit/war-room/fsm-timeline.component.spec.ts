@@ -1,7 +1,8 @@
 import '@angular/compiler';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { FsmTimelineComponent } from '../src/app/war-room/fsm-timeline/fsm-timeline.component.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
+import { FsmTimelineComponent } from '../../../src/app/war-room/fsm-timeline/fsm-timeline.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 describe('FsmTimelineComponent', () => {
   let i18n: I18nService;
@@ -9,7 +10,9 @@ describe('FsmTimelineComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new FsmTimelineComponent(i18n);
+    component = createWithInjector(FsmTimelineComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
     component.stages = [];
     component.hintKey = 'fsmHintAwaitingAlert';
     component.liveWaitSeconds = 17;

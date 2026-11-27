@@ -21,7 +21,7 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TargetTelemetryComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly healthLevel = TelemetryHealthLevel;
 
   readonly metricsSignal = signal<TargetLiveMetrics | null>(null);
@@ -101,11 +101,17 @@ export class TargetTelemetryComponent {
 
   readonly poolLevel = computed<TelemetryHealthLevel>(() => {
     const sat = this.saturationSignal();
-    if (!sat || sat.max <= 0) {
+    if (!sat) {
+      return TelemetryHealthLevel.HEALTHY;
+    }
+    if (sat.waiting > 0) {
+      return TelemetryHealthLevel.CRITICAL;
+    }
+    if (sat.max <= 0) {
       return TelemetryHealthLevel.HEALTHY;
     }
     const ratio = sat.active / sat.max;
-    if (sat.waiting > 0 || ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_CRITICAL_RATIO) {
+    if (ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_CRITICAL_RATIO) {
       return TelemetryHealthLevel.CRITICAL;
     }
     if (ratio >= TARGET_TELEMETRY_THRESHOLDS.POOL_USAGE_WARN_RATIO) {
@@ -161,9 +167,4 @@ export class TargetTelemetryComponent {
     }
     return items;
   });
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 }
