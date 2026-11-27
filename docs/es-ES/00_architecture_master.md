@@ -112,7 +112,7 @@ Para evitar comparaciones sesgadas con procesos que incluyen despliegue completo
 | Almacenamiento | Prometheus (exemplars), Loki, Tempo | Stack LGTM |
 | Visualización / Disparo | Grafana 11.2+ (Alerting) | Webhook de incidentes y API de anotaciones (`POST /api/annotations`) |
 | Protocolo de Agente | **MCP** (`@modelcontextprotocol/sdk`) | Interfaz abierta estandarizada de 8 herramientas AIOps |
-| LLM del Agente | Google Gemini API (`ReasoningPort`, modelo configurable vía `LLM_MODEL`, predeterminado `gemini-3.5-flash`) | Síntesis de RCA y generación de parche (con `reasoningSource: 'llm' \| 'fallback'` explícito) |
+| LLM del Agente | Multi-proveedor (`ReasoningPort` vía `LLM_PROVIDER`: `gemini`, `openai`, `openai-compatible`, `openrouter`, `groq`, `deepseek`, `ollama`, `vllm`, `anthropic`; predeterminado `gemini` / `gemini-3.5-flash`) | Síntesis de RCA y generación de parche (con `reasoningSource: 'llm' \| 'fallback'` explícito) |
 | **Inspección de Despliegue y Auto-Remediación** | **GitHub REST API (Octokit)** sobre `apps/target-app-demo` en el repositorio `zeromttr` | Comparación real entre tags `v2.14.7...v2.14.8`, lectura de código, creación de rama `hotfix/zeromttr-*` y Pull Request apuntando a `release/target-v2.14.8` |
 | **Notificación y Gobernanza** | **Resend** | Envío de Post-Mortem HTML (`sre@zeromttr.agjworks.com`) conteniendo exclusivamente enlaces de decisión firmados con HMAC |
 | Pruebas | Vitest, Supertest, `nock`/MSW + **Helpers de Prueba (`test/helpers/`)** | **Testing Trophy (prioridad Integración y E2E)** ejercitando rutas HTTP, MCP y `PiiPromptGuard` de extremo a extremo (Happy y Unhappy Paths); pruebas unitarias restringidas a funciones puras auxiliares |

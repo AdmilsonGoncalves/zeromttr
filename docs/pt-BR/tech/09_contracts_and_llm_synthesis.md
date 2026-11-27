@@ -267,10 +267,11 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 ```
 
 ### 2.4 Parâmetros de Execução do LLM
-- **Modelo:** `${LLM_MODEL}` (padrão: `gemini-3.5-flash`, com fallback operacional para `gemini-3.5-flash-lite`).
+- **Provedor:** `${LLM_PROVIDER}` (padrão: `gemini`; suporta `openai`, `openai-compatible`, `openrouter`, `groq`, `deepseek`, `ollama`, `vllm` com `LLM_BASE_URL` opcional e `anthropic`).
+- **Modelo:** `${LLM_MODEL}` (padrão: `gemini-3.5-flash`, com fallback operacional para `gemini-3.5-flash-lite` ou padrão do provedor selecionado).
 - **Temperature:** `0.1` (baixa variabilidade para garantir previsibilidade e patches determinísticos).
 - **MaxOutputTokens:** `8192`.
-- **Timeout:** 25.000 ms (25 s), com no máximo 1 retentativa automática com backoff exponencial de 1 s.
+- **Timeout:** `${LLM_TIMEOUT_MS}` (fallback legado: `${GEMINI_TIMEOUT_MS}`, padrão: 25.000 ms / 25 s), com no máximo 1 retentativa automática com backoff exponencial de 1 s.
 - **Teto do Arquivo Suspeito:** até `24.000` caracteres retornados por `inspect_git_deploy_diff` (`MAX_SUSPECT_FILE_CHARS`).
 
 ### 2.5 Validação Defensiva do Patch Pré-PR

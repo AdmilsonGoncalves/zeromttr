@@ -28,7 +28,7 @@ Changes are persisted in local SQLite storage and take effect **immediately** wi
 
 ### 3. AI & Observability
 
-- **Primary and fallback LLM models:** models used to synthesize RCA and remediation patches.
+- **Primary and fallback LLM models:** models used by the active provider (`LLM_PROVIDER`: Gemini, OpenAI, `openai-compatible`, OpenRouter, Groq, DeepSeek, Ollama, vLLM, or Anthropic) to synthesize RCA and remediation patches, supporting namespaced model IDs (e.g., `openai/gpt-4o-mini`).
 - **On-call email:** always displayed in masked form (`on***@example.com`) to prevent PII exposure in the UI.
 - **Orchestrator log level:** adjustable live (`debug`, `info`, `warn`, `error`).
 

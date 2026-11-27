@@ -5,6 +5,7 @@ import {
   isNonEmptyString,
   isSafeRelativePath,
   isString,
+  resolveFirstNonEmpty,
   sanitizeWhitespace,
   stripUnsafeHtml,
   truncate
@@ -185,6 +186,20 @@ describe('string.utils', () => {
       expect(isSafeRelativePath('C:\\Windows\\system32')).toBe(false);
       expect(isSafeRelativePath('')).toBe(false);
       expect(isSafeRelativePath('   ')).toBe(false);
+    });
+  });
+
+  describe('resolveFirstNonEmpty', () => {
+    it('should_return_first_trimmed_non_empty_candidate_skipping_nullish_and_whitespace', () => {
+      expect(
+        resolveFirstNonEmpty(undefined, null, '', '   ', '\t\n', '  value-1  ', 'value-2')
+      ).toBe('value-1');
+      expect(resolveFirstNonEmpty('primary', 'fallback')).toBe('primary');
+    });
+
+    it('should_return_empty_string_when_all_candidates_are_empty_or_whitespace', () => {
+      expect(resolveFirstNonEmpty()).toBe('');
+      expect(resolveFirstNonEmpty(undefined, null, '', '   ')).toBe('');
     });
   });
 });

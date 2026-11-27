@@ -226,4 +226,30 @@ describe('createApp composition and rate-limit wiring', () => {
       }
     }
   });
+
+  it('should_fail_fast_in_bootstrap_when_LLM_PROVIDER_is_unsupported_before_opening_SQLite', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zeromttr-bootstrap-llm-'));
+    const dbPath = path.join(tempDir, 'should-not-exist.sqlite');
+    const prevProvider = process.env.LLM_PROVIDER;
+    const prevDbPath = process.env.SETTINGS_DB_PATH;
+    process.env.LLM_PROVIDER = 'unsupported-vendor-xyz';
+    process.env.SETTINGS_DB_PATH = dbPath;
+
+    try {
+      expect(() => bootstrap(0)).toThrow(/Unsupported LLM_PROVIDER 'unsupported-vendor-xyz'/);
+      expect(fs.existsSync(dbPath)).toBe(false);
+    } finally {
+      if (prevProvider === undefined) {
+        delete process.env.LLM_PROVIDER;
+      } else {
+        process.env.LLM_PROVIDER = prevProvider;
+      }
+      if (prevDbPath === undefined) {
+        delete process.env.SETTINGS_DB_PATH;
+      } else {
+        process.env.SETTINGS_DB_PATH = prevDbPath;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

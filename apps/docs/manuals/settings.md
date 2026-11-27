@@ -28,7 +28,7 @@ As alterações são salvas localmente com persistência em banco SQLite e passa
 
 ### 3. IA e Observabilidade
 
-- **Modelo LLM principal e de fallback:** modelos utilizados na síntese de diagnóstico e patch.
+- **Modelo LLM principal e de fallback:** modelos utilizados pelo provedor ativo (`LLM_PROVIDER`: Gemini, OpenAI, `openai-compatible`, OpenRouter, Groq, DeepSeek, Ollama, vLLM ou Anthropic) na síntese de diagnóstico e patch, com suporte a identificadores com namespace (ex.: `openai/gpt-4o-mini`).
 - **E-mail do plantonista:** exibido sempre de forma mascarada (`on***@example.com`) para evitar exposição de PII na tela.
 - **Nível de log do orquestrador:** ajustável em tempo real (`debug`, `info`, `warn`, `error`).
 

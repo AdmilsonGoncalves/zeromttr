@@ -157,4 +157,38 @@ describe('SqliteSettingsRepository', () => {
     expect(maskEmailForDisplay('a@example.com')).toBe('***@example.com');
     expect(maskEmailForDisplay('')).toBe('');
   });
+
+  it('should_resolve_new_provider_defaults_on_existing_sqlite_db_while_preserving_intentional_overrides', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zeromttr-settings-'));
+    tempDirs.push(dir);
+    const dbPath = path.join(dir, 'provider-switch.sqlite');
+
+    // 1. Initial boot with Gemini + unrelated setting change (does not persist default llmModel)
+    const geminiRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'gemini' })
+    );
+    geminiRepo.update({ repeatSuppressionSeconds: 120 }, 'operator');
+    geminiRepo.close();
+
+    // 2. Restart with OpenAI and unset LLM_MODEL -> picks OpenAI defaults without Gemini leakage
+    const openAiRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'openai' })
+    );
+    expect(openAiRepo.get().llmModel).toBe('gpt-4o-mini');
+    expect(openAiRepo.get().llmFallbackModel).toBe('gpt-4o-mini');
+    expect(openAiRepo.get().repeatSuppressionSeconds).toBe(120);
+
+    // 3. Intentional override in Settings persists across restarts
+    openAiRepo.update({ llmModel: 'gpt-4o' }, 'operator');
+    openAiRepo.close();
+
+    const reloadedRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'openai' })
+    );
+    expect(reloadedRepo.get().llmModel).toBe('gpt-4o');
+    reloadedRepo.close();
+  });
 });

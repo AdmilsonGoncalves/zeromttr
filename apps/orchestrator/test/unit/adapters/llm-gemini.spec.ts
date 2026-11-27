@@ -46,6 +46,7 @@ describe('GeminiReasoningAdapter', () => {
   afterEach(() => {
     vi.resetAllMocks();
     vi.useRealTimers();
+    delete process.env.LLM_TIMEOUT_MS;
     delete process.env.GEMINI_TIMEOUT_MS;
     delete process.env.LLM_API_KEY;
     delete process.env.GEMINI_API_KEY;
@@ -204,6 +205,35 @@ describe('GeminiReasoningAdapter', () => {
     });
     await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
       'Gemini generateContent timed out after 20ms'
+    );
+  });
+
+  it('should_prioritize_LLM_TIMEOUT_MS_over_legacy_GEMINI_TIMEOUT_MS_and_enforce_fail_closed_PII_guard', async () => {
+    process.env.LLM_TIMEOUT_MS = '15';
+    process.env.GEMINI_TIMEOUT_MS = '500';
+    mockGenerateContent.mockImplementation(
+      () =>
+        new Promise(() => {
+          // Intentionally never resolves to simulate hung upstream call
+        })
+    );
+
+    const adapter = new GeminiReasoningAdapter('real-looking-test-key', 'gemini-3.5-flash', {
+      retryDelayMs: 0,
+      maxRetries: 0,
+      fallbackModelName: ''
+    });
+
+    await expect(
+      adapter.synthesizeRcaAndPatch({
+        ...sampleEvidence,
+        logSample: 'User email leaked: real-person@example.org'
+      })
+    ).rejects.toThrow(/Fail-closed PII guard blocked LLM prompt dispatch/);
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+
+    await expect(adapter.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
+      'Gemini generateContent timed out after 15ms'
     );
   });
 });

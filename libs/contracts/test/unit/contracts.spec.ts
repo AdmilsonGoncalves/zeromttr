@@ -15,6 +15,7 @@ import {
   ReplaySnapshotSchema,
   SearchTracesByTraceqlInputSchema,
   SendPostMortemResendInputSchema,
+  SystemSettingsPatchSchema,
   TargetHealthStatus,
   TargetSaturationSchema,
   TargetStatusResponseSchema
@@ -417,5 +418,18 @@ describe('@zeromttr/contracts Zod schemas', () => {
     }
   ])('should reject invalid target saturation when $label', ({ payload }) => {
     expect(TargetSaturationSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('should_accept_namespaced_multi_llm_model_identifiers_and_reject_unsafe_paths', () => {
+    expect(
+      SystemSettingsPatchSchema.safeParse({
+        llmModel: 'openai/gpt-4o-mini',
+        llmFallbackModel: 'Qwen/Qwen2.5-Coder-7B-Instruct'
+      }).success
+    ).toBe(true);
+
+    expect(SystemSettingsPatchSchema.safeParse({ llmModel: '../evil/model' }).success).toBe(false);
+    expect(SystemSettingsPatchSchema.safeParse({ llmModel: 'openai//gpt-4o' }).success).toBe(false);
+    expect(SystemSettingsPatchSchema.safeParse({ llmModel: 'openai/' }).success).toBe(false);
   });
 });

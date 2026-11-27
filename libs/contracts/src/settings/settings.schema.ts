@@ -16,9 +16,20 @@ export type SettingsPersistenceEngine =
   (typeof SettingsPersistenceEngine)[keyof typeof SettingsPersistenceEngine];
 
 const SAFE_GIT_REF_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._/~^-]*$/;
-const SAFE_MODEL_NAME_PATTERN = /^[A-Za-z0-9._:-]+$/;
+const SAFE_MODEL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
 const MASKED_EMAIL_PATTERN = /^[^@\s]{0,2}\*{3}@[^@\s]+\.[^@\s]+$/;
 const WINDOWS_DRIVE_PREFIX_PATTERN = /^[A-Za-z]:/;
+
+function isSafeModelName(value: string): boolean {
+  const trimmed = value.trim();
+  if (!SAFE_MODEL_NAME_PATTERN.test(trimmed)) {
+    return false;
+  }
+  if (trimmed.includes('..') || trimmed.includes('//') || trimmed.endsWith('/')) {
+    return false;
+  }
+  return true;
+}
 
 function isSafeGitRef(value: string): boolean {
   const trimmed = value.trim();
@@ -82,13 +93,13 @@ export const SystemSettingsSchema = z.object({
     .trim()
     .min(1)
     .max(100)
-    .regex(SAFE_MODEL_NAME_PATTERN, 'llmModel contains invalid characters'),
+    .refine(isSafeModelName, 'llmModel contains invalid characters'),
   llmFallbackModel: z
     .string()
     .trim()
     .min(1)
     .max(100)
-    .regex(SAFE_MODEL_NAME_PATTERN, 'llmFallbackModel contains invalid characters'),
+    .refine(isSafeModelName, 'llmFallbackModel contains invalid characters'),
   onCallEmail: z.union([z.literal(''), z.string().trim().email().max(160)]),
   logLevel: SystemLogLevelSchema
 });

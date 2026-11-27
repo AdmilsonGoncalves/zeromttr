@@ -8,7 +8,7 @@ import { SqliteSettingsRepository } from './adapters/settings.sqlite.js';
 import { createTargetStatusPort } from './adapters/target-status.prometheus.js';
 import { McpClientAdapter } from './adapters/mcp.client.js';
 import { DeterministicFallbackReasoningAdapter } from './adapters/llm.fallback.js';
-import { GeminiReasoningAdapter } from './adapters/llm.gemini.js';
+import { createReasoningAdapter } from './adapters/llm.factory.js';
 import { TypeScriptPatchSyntaxValidator } from './adapters/patch-syntax-validator.js';
 import { createInitialIncident } from './application/create-initial-incident.js';
 import { HandleAlert } from './application/handle-alert.js';
@@ -24,6 +24,7 @@ import { ReplayRunner } from './demo/replay-runner.js';
 import { SimulateDemoDecision } from './demo/simulate-demo-decision.js';
 import { createDemoRouterFactory, createDemoSessionLifecycle } from './demo/demo.controller.js';
 import { OrchestratorLogEvent } from './domain/log-enums.js';
+import { SUPPORTED_LLM_PROVIDERS, resolveLlmProvider } from './domain/llm-provider.js';
 import { resolveDefaultSystemSettings } from './domain/system-settings.js';
 import { resolveTargetRepoUrl } from './domain/target-repo-url.js';
 import { SystemClock } from './ports/clock.port.js';
@@ -95,7 +96,7 @@ function createCoreAdapters(
     }
   });
   const fallbackAdapter = new DeterministicFallbackReasoningAdapter();
-  const llmAdapter = new GeminiReasoningAdapter(undefined, undefined, {
+  const llmAdapter = createReasoningAdapter({
     getModels: () => {
       const current = getSettings();
       return {
@@ -262,12 +263,19 @@ function attachGracefulShutdown(
   });
 }
 
+export { createReasoningAdapter } from './adapters/llm.factory.js';
+
 /**
  * Instantiates orchestrator adapters, use cases, Express app, and starts the HTTP server.
  */
 export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
   const isTest = process.env.NODE_ENV === 'test';
   const credentials = validateAndResolveBootCredentials(isTest);
+  if (!resolveLlmProvider(process.env.LLM_PROVIDER)) {
+    throw new Error(
+      `Unsupported LLM_PROVIDER '${process.env.LLM_PROVIDER}'. Supported providers: ${SUPPORTED_LLM_PROVIDERS.join(', ')}`
+    );
+  }
   const { settingsRepository, getSettings, logger } = initializeSettingsAndLogger(isTest);
   const adapters = createCoreAdapters(getSettings, logger);
   const { demoEnabled, demoLifecycle, demoRouter, replayRunner } = createDemoWiring({

@@ -2,14 +2,13 @@ import type { z } from 'zod';
 import { SystemLogLevel, SystemSettingsSchema, type SystemSettings } from '@zeromttr/contracts';
 import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
 import { OrchestratorDefault } from './incident-enums.js';
+import { resolveDefaultLlmModels } from './llm-provider.js';
 
 const DEFAULT_REJECTION_COOLDOWN_SECONDS = 900;
 const DEFAULT_REPEAT_SUPPRESSION_SECONDS = 60;
 const DEFAULT_DECISION_TTL_SECONDS = 900;
 const DEFAULT_ERROR_RATE_THRESHOLD_PERCENT = 5;
 const DEFAULT_SERVICE_PATH = 'apps/target-app-demo';
-const DEFAULT_LLM_MODEL = 'gemini-3.5-flash';
-const DEFAULT_LLM_FALLBACK_MODEL = 'gemini-3.5-flash-lite';
 
 function parseOptionalBoolean(raw: string | undefined, fallback: boolean): boolean {
   if (!isNonEmptyString(raw)) {
@@ -52,6 +51,7 @@ export function resolveDefaultSystemSettings(
 ): SystemSettings {
   const demoEnabled = parseOptionalBoolean(env.ENABLE_DEMO_MODE, true);
   const rawEmail = (env.ON_CALL_ENGINEER_EMAIL || env.ONCALL_TO_EMAIL || '').trim();
+  const defaultModels = resolveDefaultLlmModels(env.LLM_PROVIDER);
   const shape = SystemSettingsSchema.shape;
 
   const candidate: SystemSettings = {
@@ -121,13 +121,13 @@ export function resolveDefaultSystemSettings(
     ),
     llmModel: resolveSchemaField(
       shape.llmModel,
-      (env.LLM_MODEL || DEFAULT_LLM_MODEL).trim(),
-      DEFAULT_LLM_MODEL
+      (env.LLM_MODEL || defaultModels.primaryModel).trim(),
+      defaultModels.primaryModel
     ),
     llmFallbackModel: resolveSchemaField(
       shape.llmFallbackModel,
-      (env.LLM_FALLBACK_MODEL || DEFAULT_LLM_FALLBACK_MODEL).trim(),
-      DEFAULT_LLM_FALLBACK_MODEL
+      (env.LLM_FALLBACK_MODEL || defaultModels.fallbackModel).trim(),
+      defaultModels.fallbackModel
     ),
     onCallEmail: resolveSchemaField(shape.onCallEmail, rawEmail, ''),
     logLevel: resolveLogLevel(env.LOG_LEVEL)
