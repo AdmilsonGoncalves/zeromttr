@@ -339,8 +339,9 @@ export function createDemoSimulateDecisionHandler(
         existingIncident = deps.repository ? await deps.repository.findById(incidentId) : null;
 
         const isLiveSessionActive =
-          deps.lifecycle.getLastChaosTimestamp() > 0 &&
-          deps.lifecycle.getLastChaosMode() === IncidentExecutionMode.LIVE;
+          (deps.lifecycle.getLastChaosTimestamp() > 0 &&
+            deps.lifecycle.getLastChaosMode() === IncidentExecutionMode.LIVE) ||
+          deps.lifecycle.hasPendingLiveReset();
         const requiresLiveAuth =
           (existingIncident !== null && existingIncident.mode === IncidentExecutionMode.LIVE) ||
           (action === DecisionAction.APPROVE && isLiveSessionActive);

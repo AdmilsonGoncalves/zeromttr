@@ -213,8 +213,13 @@ export function createDemoSessionLifecycle(
           return false;
         }
 
+        const shouldResetTarget = await canResetTarget();
+        if (!shouldResetTarget) {
+          return false;
+        }
+
         pendingLiveReset = true;
-        await completeApprovalReset(incident.id);
+        await completeApprovalReset(incident.id, { skipCapabilityCheck: true });
         return true;
       });
     }

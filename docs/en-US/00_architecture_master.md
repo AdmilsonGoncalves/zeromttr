@@ -265,7 +265,7 @@ stateDiagram-v2
 ### 6.3 Other Rules
 - **Clean Code / DRY / YAGNI / KISS**; small functions, no `any` outside boundaries (use `zod` to validate external inputs).
 - **Language:** code, tools, logs, and commits in en-US; main documentation and README in en-US, pt-BR, and es-ES.
-- **Security by default:** strictly segregated tokens (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`, and `SETTINGS_ADMIN_TOKEN` for `PATCH /api/settings`), `decisionToken` restricted to email, `onCallEmail` always masked in settings/audit reads, HTML escaping in templates, edge OTTL redaction + pre-LLM `PiiPromptGuard`.
+- **Security by default:** strictly segregated tokens (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`, and `SETTINGS_ADMIN_TOKEN` for `PATCH /api/settings` when configured; in private deployments with `ENABLE_DEMO_MODE=false` and without `SETTINGS_ADMIN_TOKEN`, `PATCH /api/settings` remains editable by operators authenticated with `DASHBOARD_API_TOKEN`), `decisionToken` restricted to email, `onCallEmail` always masked in settings/audit reads, HTML escaping in templates, edge OTTL redaction + pre-LLM `PiiPromptGuard`.
 
 ---
 

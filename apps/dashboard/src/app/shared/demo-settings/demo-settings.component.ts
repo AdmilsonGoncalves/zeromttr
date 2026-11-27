@@ -4,11 +4,12 @@ import {
   EventEmitter,
   Input,
   Output,
+  ViewChild,
   computed,
   inject,
   signal
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, type NgModel } from '@angular/forms';
 import { isNonEmptyString, isString } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { Drawer } from 'primeng/drawer';
@@ -165,9 +166,15 @@ export class DemoSettingsComponent {
     this.healthyTrafficActiveSignal.set(value);
   }
 
+  @ViewChild('healthyTrafficModel') healthyTrafficModel?: NgModel;
+
   @Input({ required: true })
   set isTogglingTraffic(value: boolean) {
+    const wasToggling = this.isTogglingTrafficSignal();
     this.isTogglingTrafficSignal.set(value);
+    if (wasToggling && !value) {
+      this.syncHealthyTrafficSwitchControl();
+    }
   }
 
   @Input({ required: true })
@@ -241,9 +248,16 @@ export class DemoSettingsComponent {
    */
   onHealthyTrafficToggle(enabled: boolean): void {
     if (this.isHealthyTrafficToggleDisabled() || enabled === this.healthyTrafficActiveSignal()) {
+      this.syncHealthyTrafficSwitchControl();
       return;
     }
     this.toggleHealthyTraffic.emit();
+  }
+
+  private syncHealthyTrafficSwitchControl(): void {
+    this.healthyTrafficModel?.control.setValue(this.healthyTrafficActiveSignal(), {
+      emitEvent: false
+    });
   }
 
   /**

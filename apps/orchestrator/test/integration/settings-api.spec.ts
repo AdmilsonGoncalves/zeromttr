@@ -32,6 +32,12 @@ function createTestServer(options: { editable?: boolean; requiresAuthKey?: boole
     })
   );
   const onSettingsUpdated = vi.fn();
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn()
+  };
   const app = express();
   app.use(express.json());
   app.use(
@@ -43,10 +49,11 @@ function createTestServer(options: { editable?: boolean; requiresAuthKey?: boole
       editable: options.editable ?? true,
       requiresAuthKey: options.requiresAuthKey ?? false,
       adminToken: SETTINGS_ADMIN_TOKEN,
-      onSettingsUpdated
+      onSettingsUpdated,
+      logger
     })
   );
-  return { app, settingsRepository, onSettingsUpdated };
+  return { app, settingsRepository, onSettingsUpdated, logger };
 }
 
 describe('System Settings REST API (/api/settings)', () => {
@@ -153,7 +160,7 @@ describe('System Settings REST API (/api/settings)', () => {
   });
 
   it('should_return_structured_JSON_500_when_settings_repository_throws_SQLite_error', async () => {
-    const { app, settingsRepository } = createTestServer();
+    const { app, settingsRepository, logger } = createTestServer();
     vi.spyOn(settingsRepository, 'get').mockImplementationOnce(() => {
       throw new Error('SQLITE_BUSY: database is locked');
     });
@@ -163,7 +170,14 @@ describe('System Settings REST API (/api/settings)', () => {
       .set(HTTP_HEADERS.AUTHORIZATION, `Bearer ${DASHBOARD_TOKEN}`);
     expect(getRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
     expect(getRes.headers['content-type']).toContain('application/json');
-    expect(getRes.body.error).toContain('SQLITE_BUSY');
+    expect(getRes.body.error).toBe('Failed to read system settings');
+    expect(getRes.body.error).not.toContain('SQLITE_BUSY');
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'settings_read_failed',
+        message: 'SQLITE_BUSY: database is locked'
+      })
+    );
 
     vi.spyOn(settingsRepository, 'update').mockImplementationOnce(() => {
       throw new Error('SQLITE_READONLY: attempt to write a readonly database');
@@ -175,7 +189,14 @@ describe('System Settings REST API (/api/settings)', () => {
       .send({ rejectionCooldownSeconds: 1200 });
     expect(patchRes.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
     expect(patchRes.headers['content-type']).toContain('application/json');
-    expect(patchRes.body.error).toContain('SQLITE_READONLY');
+    expect(patchRes.body.error).toBe('Failed to persist system settings');
+    expect(patchRes.body.error).not.toContain('SQLITE_READONLY');
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'settings_persist_failed',
+        message: 'SQLITE_READONLY: attempt to write a readonly database'
+      })
+    );
     settingsRepository.close();
   });
 });

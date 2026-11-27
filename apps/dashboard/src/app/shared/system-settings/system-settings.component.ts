@@ -161,6 +161,14 @@ export class SystemSettingsComponent {
     const loaded = this.settingsService.settings();
     if (ok && loaded) {
       this.draftSignal.set({ ...loaded });
+      this.feedbackSignal.set(null);
+      return;
+    }
+    if (!ok && this.draftSignal()) {
+      this.feedbackSignal.set({
+        type: 'error',
+        message: this.i18n.t('settingsLoadError')
+      });
     }
   }
 
@@ -204,12 +212,23 @@ export class SystemSettingsComponent {
       return;
     }
 
+    const currentDraftBeforeSave = this.draftSignal();
+    const submittedDraft = currentDraftBeforeSave ? { ...currentDraftBeforeSave } : null;
     const patch = this.pendingPatch();
     const result = await this.settingsService.saveSettings(patch, this.adminTokenSignal());
     if (result.ok) {
       const updated = this.settingsService.settings();
       if (updated) {
-        this.draftSignal.set({ ...updated });
+        const mergedDraft: SystemSettings = { ...updated };
+        const latestDraft = this.draftSignal();
+        if (submittedDraft && latestDraft) {
+          for (const key of Object.keys(updated) as Array<keyof SystemSettings>) {
+            if (latestDraft[key] !== submittedDraft[key]) {
+              (mergedDraft as Record<string, unknown>)[key] = latestDraft[key];
+            }
+          }
+        }
+        this.draftSignal.set(mergedDraft);
       }
       this.feedbackSignal.set({
         type: 'success',

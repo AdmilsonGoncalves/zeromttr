@@ -1149,12 +1149,14 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
     });
 
     const approvalPromise = lifecycle.handleLiveIncidentApproved(liveIncident);
+    // Attach `.then(...)` immediately so SuperTest dispatches the HTTP request before the status probe resolves
     const replayPromise = request(queuedApp)
       .post('/api/demo/chaos')
       .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
-      .send({ mode: IncidentExecutionMode.REPLAY });
+      .send({ mode: IncidentExecutionMode.REPLAY })
+      .then((res) => res);
 
-    await new Promise((resolve) => setTimeout(resolve, 15));
+    await new Promise((resolve) => setTimeout(resolve, 25));
     expect(replayRunnerStub.trigger).not.toHaveBeenCalled();
 
     resolveStatusProbe({
@@ -1369,5 +1371,75 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
 
     expect(resetMock).not.toHaveBeenCalled();
     expect(lifecycle.getLastChaosTimestamp()).toBe(newerTimestamp);
+  });
+
+  it('should_preserve_pending_approval_reset_when_retry_sees_chaosSimulation_false', async () => {
+    const resetMock = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('transient reset timeout'))
+      .mockResolvedValueOnce();
+    const statusMock = vi
+      .fn<TargetStatusPort['getStatus']>()
+      .mockResolvedValueOnce({
+        status: TargetHealthStatus.DEGRADED,
+        service: 'api-pagamentos-core',
+        version: 'v2.14.8',
+        previousHealthyVersion: 'v2.14.7',
+        targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+        suspectFilePath: '',
+        capabilities: { chaosSimulation: true, healthyTrafficToggle: true },
+        rawEdgeLogPreCollector: ''
+      })
+      .mockResolvedValueOnce({
+        status: TargetHealthStatus.DEGRADED,
+        service: 'api-pagamentos-core',
+        version: 'v2.14.8',
+        previousHealthyVersion: 'v2.14.7',
+        targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+        suspectFilePath: '',
+        capabilities: { chaosSimulation: false, healthyTrafficToggle: false },
+        rawEdgeLogPreCollector: ''
+      })
+      .mockResolvedValueOnce({
+        status: TargetHealthStatus.DEGRADED,
+        service: 'api-pagamentos-core',
+        version: 'v2.14.8',
+        previousHealthyVersion: 'v2.14.7',
+        targetRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
+        suspectFilePath: '',
+        capabilities: { chaosSimulation: true, healthyTrafficToggle: true },
+        rawEdgeLogPreCollector: ''
+      });
+
+    const lifecycle = createDemoSessionLifecycle(
+      { triggerChaos: vi.fn(), toggleHealthyTraffic: vi.fn(), reset: resetMock },
+      undefined,
+      { getStatus: statusMock }
+    );
+    const incident = new Incident({
+      id: 'inc-pending-cap-retry-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:pending-cap-retry',
+      state: IncidentState.RESOLVED,
+      mode: IncidentExecutionMode.LIVE
+    });
+
+    await expect(lifecycle.handleLiveIncidentApproved(incident)).rejects.toThrow(
+      'transient reset timeout'
+    );
+    expect(lifecycle.hasPendingTargetReset(incident.id)).toBe(true);
+
+    // Capability temporarily reports false: retry must return false AND keep pending entry
+    const skipped = await lifecycle.retryPendingApprovalReset(incident);
+    expect(skipped).toBe(false);
+    expect(lifecycle.hasPendingTargetReset(incident.id)).toBe(true);
+    expect(resetMock).toHaveBeenCalledTimes(1);
+
+    // Once capability returns true, retry executes reset and clears pending entry
+    const recovered = await lifecycle.retryPendingApprovalReset(incident);
+    expect(recovered).toBe(true);
+    expect(lifecycle.hasPendingTargetReset(incident.id)).toBe(false);
+    expect(resetMock).toHaveBeenCalledTimes(2);
   });
 });

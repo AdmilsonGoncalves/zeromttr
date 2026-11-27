@@ -132,6 +132,7 @@ export class NotifyOnCall {
     incident.notification = {
       emailId: resendResult.emailId,
       status: notificationStatus,
+      decisionExpiresAt: new Date(exp * 1000).toISOString(),
       htmlPreview: isDegraded
         ? `Warning: Resend delivery failed (${failureReason}). Notification in degraded mode.`
         : 'Post-mortem notification dispatched to on-call engineer via Resend'

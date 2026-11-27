@@ -80,6 +80,13 @@ describe('GeminiReasoningAdapter', () => {
     await expect(adapterPlaceholder.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
       'Gemini API key is not configured'
     );
+
+    const adapterTemplatePlaceholder = new GeminiReasoningAdapter(
+      'replace_with_your_gemini_api_key'
+    );
+    await expect(adapterTemplatePlaceholder.synthesizeRcaAndPatch(sampleEvidence)).rejects.toThrow(
+      'Gemini API key is not configured'
+    );
   });
 
   it('should synthesize structured RCA and patch when Gemini returns valid JSON', async () => {

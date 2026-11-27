@@ -37,6 +37,7 @@ export interface IncidentNotification {
   emailId: string;
   htmlPreview?: string;
   status?: NotificationStatus | `${NotificationStatus}`;
+  decisionExpiresAt?: string;
 }
 
 export interface IncidentProps {
