@@ -3,12 +3,13 @@
   class="min-h-dvh lg:h-full lg:max-h-full bg-slate-950 text-slate-100 font-sans p-2 sm:p-2.5 flex flex-col gap-2 lg:overflow-hidden"
 >
   <app-war-room-header
+    [demoModeEnabled]="incidentService.demoModeEnabled()"
     [sseConnected]="incidentService.sseConnected()"
     [targetStatus]="incidentService.targetStatus()"
     [activeMode]="incidentService.activeMode()"
     [isWorkflowRunning]="incidentService.isWorkflowRunning()"
     [liveDemoKey]="incidentService.liveDemoKey()"
-    [publicLiveDemo]="incidentService.publicLiveDemo()"
+    [requireDemoKey]="incidentService.requireDemoKey()"
     [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"
     [healthyTrafficActive]="incidentService.targetMetrics()?.healthyTrafficActive ?? false"
     [isTogglingTraffic]="incidentService.isTogglingTraffic()"
@@ -23,6 +24,7 @@
   />
 
   <app-war-room-notices
+    [demoModeEnabled]="incidentService.demoModeEnabled()"
     [activeMode]="incidentService.activeMode()"
     [turnstileSiteKey]="incidentService.turnstileSiteKey()"
     [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"
@@ -36,7 +38,10 @@
     [liveWaitSeconds]="incidentService.liveWaitSeconds()"
   />
 
-  <app-target-telemetry [metrics]="incidentService.targetMetrics()" />
+  <app-target-telemetry
+    [metrics]="incidentService.targetMetrics()"
+    [serviceName]="incidentService.targetServiceName()"
+  />
 
   <app-war-room-kpis
     [ttdDisplay]="incidentService.ttdDisplay()"
@@ -64,6 +69,7 @@
 
     <app-remediation-panel
       class="lg:col-span-4 flex flex-col min-h-[280px] lg:min-h-0"
+      [demoModeEnabled]="incidentService.demoModeEnabled()"
       [incident]="incidentService.currentIncident()"
       [displayedFsmState]="incidentService.displayedFsmState()"
       [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"

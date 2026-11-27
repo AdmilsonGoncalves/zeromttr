@@ -162,14 +162,16 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const detailKey = nextEnable
+      ? 'toastHealthyTrafficStartedDetail'
+      : 'toastHealthyTrafficStoppedDetail';
+    const service = this.incidentService.targetServiceName() || this.i18n.t('serviceStatusLabel');
     this.messageService.add({
       severity: 'info',
       summary: this.i18n.t(
         nextEnable ? 'toastHealthyTrafficStartedSummary' : 'toastHealthyTrafficStoppedSummary'
       ),
-      detail: this.i18n.t(
-        nextEnable ? 'toastHealthyTrafficStartedDetail' : 'toastHealthyTrafficStoppedDetail'
-      ),
+      detail: this.i18n.t(detailKey, { service }),
       life: 4000
     });
   }

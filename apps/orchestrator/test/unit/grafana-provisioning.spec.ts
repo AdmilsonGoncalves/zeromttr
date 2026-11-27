@@ -9,19 +9,30 @@ const DASHBOARD_PROVISIONING_YAML = path.join(
 );
 const GRAFANA_DASHBOARD_JSON = path.join(
   REPO_ROOT,
+  'infra/grafana/provisioning/dashboards/zeromttr-target-workload.json'
+);
+const LEGACY_GRAFANA_DASHBOARD_JSON = path.join(
+  REPO_ROOT,
   'infra/grafana/provisioning/dashboards/zeromttr-api-pagamentos-core.json'
 );
 
 describe('Grafana dashboard provisioning', () => {
-  it('should_provision_valid_zeromttr_grafana_dashboard_referencing_prometheus_and_incident_annotations', () => {
+  it('should provision valid agnostic zeromttr grafana dashboard with service template variable', () => {
     expect(fs.existsSync(DASHBOARD_PROVISIONING_YAML)).toBe(true);
     const yamlContent = fs.readFileSync(DASHBOARD_PROVISIONING_YAML, 'utf8');
     expect(yamlContent).toContain('/etc/grafana/provisioning/dashboards');
 
+    expect(fs.existsSync(LEGACY_GRAFANA_DASHBOARD_JSON)).toBe(false);
     expect(fs.existsSync(GRAFANA_DASHBOARD_JSON)).toBe(true);
-    const dashboard = JSON.parse(fs.readFileSync(GRAFANA_DASHBOARD_JSON, 'utf8')) as {
+    const rawDashboard = fs.readFileSync(GRAFANA_DASHBOARD_JSON, 'utf8');
+    expect(rawDashboard).not.toContain('api-pagamentos-core');
+
+    const dashboard = JSON.parse(rawDashboard) as {
       title: string;
       uid: string;
+      templating?: {
+        list?: Array<{ name: string; query?: string | { query?: string } }>;
+      };
       annotations?: { list?: Array<{ name: string; tags?: string[] }> };
       panels?: Array<{
         title: string;
@@ -30,9 +41,18 @@ describe('Grafana dashboard provisioning', () => {
       }>;
     };
 
-    expect(dashboard.uid).toBe('zeromttr-payment-core');
-    expect(dashboard.title).toContain('api-pagamentos-core');
+    expect(dashboard.uid).toBe('zeromttr-target-workload');
+    expect(dashboard.title).toBe('ZeroMTTR — $service Performance & Remediation');
     expect(dashboard.panels && dashboard.panels.length).toBeGreaterThanOrEqual(6);
+
+    const serviceVar = dashboard.templating?.list?.find((v) => v.name === 'service');
+    expect(serviceVar).toBeDefined();
+    const serviceQuery =
+      typeof serviceVar?.query === 'string' ? serviceVar.query : (serviceVar?.query?.query ?? '');
+    expect(serviceQuery).toContain('label_values(http_request_duration_seconds_count, service)');
+
+    const panelTitles = dashboard.panels?.map((p) => p.title) ?? [];
+    expect(panelTitles).toContain('HTTP Throughput (req/s)');
 
     const panelTypes = new Set(dashboard.panels?.map((p) => p.type));
     expect(panelTypes.has('timeseries')).toBe(true);
@@ -47,6 +67,7 @@ describe('Grafana dashboard provisioning', () => {
 
     expect(allExprs).toContain('prometheus-datasource');
     expect(allExprs).toContain('http_request_duration_seconds_bucket');
+    expect(allExprs).toContain('{service="$service"');
     expect(allExprs).toContain('db_pool_used');
     expect(allExprs).toContain('db_pool_waiting');
 

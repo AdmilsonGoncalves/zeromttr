@@ -55,7 +55,7 @@ Crear los 3 flujos de trabajo en `.github/workflows/`:
 3. **`cd-release.yml`:** publica imágenes Docker en **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**. **Regla de estabilidad operativa:** el job `deploy-vps` **no** se ejecuta en cada push a la rama principal ni en etiquetas de comparación de carga de demo (`v2.14.*`); se ejecuta **exclusivamente cuando se publica una etiqueta de versión de la plataforma `v1.*.*` o mediante disparo manual (`workflow_dispatch`)**, manteniendo el VPS de demo congelado y estable durante los periodos de evaluación.
 
 ### T1.6 Documentación Inicial
-`README.md` (en-US) y `README.pt-BR.md` indicando la categoría (**Logística y Automatización** — automatización de flujos de trabajo e integración entre sistemas), la arquitectura abierta y agnóstica de dominio, el posicionamiento técnico de mercado, instrucciones de ejecución local y una distinción clara entre el modo `Live` y el modo `Replay`. Crear `LICENSE` (MIT), `.env.example`, `AGENTS.md` (especificación a continuación) y `GEMINI.md` (solo un puntero que instruya leer y seguir `AGENTS.md`, ya creado en la raíz).
+`README.md` (en-US) y `README.pt-BR.md` indicando la categoría (**Logística y Automatización** — automatización de flujos de trabajo e integración entre sistemas), la arquitectura abierta y agnóstica de dominio, el posicionamiento técnico de mercado, instrucciones de ejecución local y una distinción clara entre el modo `Live` y el modo `Replay`. Crear `LICENSE` (MIT), `.env.prod.template`, `AGENTS.md` (especificación a continuación) y `GEMINI.md` (solo un puntero que instruya leer y seguir `AGENTS.md`, ya creado en la raíz).
 
 #### Especificación de `AGENTS.md` (raíz del repositorio)
 Archivo breve e imperativo redactado en portugués, leído por cada agente de codificación antes de cualquier implementación. Debe contener las secciones obligatorias siguientes:
@@ -99,7 +99,7 @@ Crear `docker-compose.prod.yml`, `infra/otel-collector-config.prod.yaml` y `apps
 
 ---
 
-## 3. Variables de Entorno (`.env.example` / `.env.prod.template`)
+## 3. Variables de Entorno (`.env.prod.template`)
 > **Regla de formato:** nunca usar comentarios *en línea* en la misma línea que un valor, y envolver siempre entre comillas dobles los valores que contengan espacios o `< >`.
 
 ```dotenv
@@ -116,21 +116,26 @@ TEMPO_URL=http://tempo:3200
 GRAFANA_URL=http://grafana:3000
 GRAFANA_SA_TOKEN=
 
-# Token Segregation (Least Privilege)
+# Token Segregation, Demo Menu & Live Protection
 MCP_AUTH_TOKEN=change-me-mcp-token
 GRAFANA_WEBHOOK_TOKEN=change-me-grafana-webhook-token
 DASHBOARD_API_TOKEN=change-me-dashboard-api-token
 # Exclusively signs Approve/Reject links sent via email
 DECISION_HMAC_SECRET=change-me-hmac-secret
-# Key required on the public VPS to trigger real Live mode (protects quota against anonymous traffic)
+# true = shows app-main-menu (Replay/Live/Simulate/Restore); false = real/production mode
+ENABLE_DEMO_MODE=true
+# When ENABLE_DEMO_MODE=true: requires LIVE_DEMO_KEY for real Live API execution
+REQUIRE_DEMO_KEY=true
 LIVE_DEMO_KEY=
-SIMULATION_COOLDOWN_MS=120000
+DEMO_COOLDOWN_MS=120000
 PUBLIC_BASE_URL=http://localhost:8080
 PUBLIC_DASHBOARD_URL=http://localhost:4200
 
-# Orchestrator -> MCP & Demo Workload
+# Orchestrator -> MCP & Target Workload
 MCP_URL=http://mcp-server:8000
-TARGET_DEMO_URL=http://target-app-demo:3001
+TARGET_APP_URL=http://target-app-demo:3001
+TARGET_STATUS_PROVIDER=manifest
+TARGET_STATUS_PATH=/ops/status
 DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
 
 # External Integrations (GitHub API & Resend)
@@ -145,11 +150,11 @@ ON_CALL_ENGINEER_EMAIL=oncall-sre@example.com
 # LLM (Orchestrator ReasoningPort — Configurable Model)
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash
-LLM_API_KEY=
+GEMINI_API_KEY=
 
-# Workload Flags
+# Target Workload Simulator Flags (target-app-demo only)
 CHAOS_ENABLED=false
-DEMO_MODE=true
+CHAOS_AUTO_TRAFFIC_BURST=true
 ```
 
 ---
@@ -206,7 +211,7 @@ jobs:
     needs: quality-and-tests
     steps:
       - uses: actions/checkout@v4
-      - run: cp .env.example .env
+      - run: cp .env.prod.template .env
       - run: docker compose config -q
       - run: docker compose build
 ```

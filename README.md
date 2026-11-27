@@ -12,7 +12,7 @@
 
 In mission-critical distributed systems — such as instant payment settlement (PIX), logistics fulfillment, e-commerce checkout, or billing — the mean time from alert to reviewable fix is dominated by manual context switching across siloed metrics, traces, logs, and Git diffs.
 
-**ZeroMTTR** is an autonomous AIOps and incident remediation platform built for the **Logistics & Automation** track (automating operational workflows and integrating mission-critical systems). Its core follows **Clean / Hexagonal Architecture** and is **100% domain-agnostic**: any service emitting OpenTelemetry (OTLP) telemetry and backed by a **GitHub** repository (with other Git hosts like GitLab supported by adding an adapter for `RepoInspectorPort` / `RemediationPort`) can be diagnosed and remediated without changing a single line in `apps/orchestrator` or `apps/mcp-server`.
+**ZeroMTTR** is an autonomous AIOps and incident remediation platform built for the **Logistics & Automation** track (automating operational workflows and integrating mission-critical systems). Its core follows **Clean / Hexagonal Architecture** and is **100% domain-agnostic**: any service emitting OpenTelemetry (OTLP) telemetry and backed by a **GitHub** repository (with other Git hosts like GitLab supported by adding an adapter for `RepoInspectorPort` / `RemediationPort`) can be diagnosed and remediated without changing a single line in `apps/orchestrator` or `apps/mcp-server`. Target status inspection is also decoupled behind `TargetStatusPort`: cooperative workloads expose a neutral `GET /ops/status` manifest (`capabilities` + generic `saturation`), while external/legacy workloads can be monitored passively via `TARGET_STATUS_PROVIDER=prometheus` (MCP) with zero target-side endpoints.
 
 ### Comparative Positioning (as of November 2026)
 
@@ -33,7 +33,7 @@ When you click **"Simulate Incident"** in the War Room (`POST /api/demo/chaos`),
    - Consumes zero external API quotas (Gemini, GitHub, Resend).
 2. **Live Mode (end-to-end real execution, unlocked with `LIVE_DEMO_KEY` or local Docker):**
    1. **Chaos Injection on `api-pagamentos-core`:** The Orchestrator triggers `chaos.controller.ts`, enabling `chaosManager.setPoolSaturation(true)` (`chaos.manager.ts`). Service status switches from `healthy` (`v2.14.7`) to `degraded` (`v2.14.8`), while `payment.repository.ts` drops the pool cap to `2` connections (`degradedMaxConnections`), injects a `4600 ms` delay, and omits `client.release()`, causing connection exhaustion.
-   2. **Synthetic Traffic Burst:** With `DEMO_MODE=true`, `startSyntheticTrafficBurst()` fires waves of 6 `POST /payments` requests (at `0s, 3s, 6s, 9s, 12s, 15s`) carrying synthetic PIX PII (CPF, CNPJ, email, and `Bearer` JWT).
+   2. **Synthetic Traffic Burst:** With `CHAOS_AUTO_TRAFFIC_BURST=true`, `startSyntheticTrafficBurst()` fires waves of 6 `POST /payments` requests (at `0s, 3s, 6s, 9s, 12s, 15s`) carrying synthetic PIX PII (CPF, CNPJ, email, and `Bearer` JWT).
    3. **LGTM Observability & Alerting:** Pool exhaustion raises `KnexTimeoutError`, emits error `pg.pool.acquire` spans in **Tempo**, latency spikes in **Prometheus**, and logs masked at the edge by the OTel Collector's `transform` (OTTL) processor before reaching **Loki**. **Grafana** detects the anomaly and fires the alert webhook to the Orchestrator.
    4. **Autonomous Remediation:** The Orchestrator gathers metrics, traces, logs, and `git diff v2.14.7...v2.14.8` via the **MCP Server**, audits the prompt through fail-closed `PiiPromptGuard`, synthesizes RCA + full-file patch (via **Gemini** or deterministic fallback), opens a real GitHub PR against `release/target-v2.14.8`, and sends the **Resend** Post-Mortem email with an HMAC link in `#fragment`.
    5. **Restoration ("Restore Service" / `POST /api/demo/reset`):** Disables chaos in `ChaosManager`, cancels scheduled traffic bursts, and calls `paymentRepository.resetPool()`, returning `api-pagamentos-core` to `healthy` (`v2.14.7`).
@@ -167,7 +167,7 @@ Against the 7-step manual baseline (1. alert triage → 2. PromQL query → 3. T
 
 ```bash
 # 1. Clone and configure environment variables
-cp .env.example .env
+cp .env.prod.template .env
 
 # 2. Install dependencies with frozen lockfile
 pnpm install --frozen-lockfile

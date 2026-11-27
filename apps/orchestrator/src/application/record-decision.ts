@@ -1,5 +1,6 @@
 import { DecisionHmac } from '../domain/decision-hmac.js';
-import { DecisionSource, GrafanaAnnotationTag } from '../domain/incident-enums.js';
+import { DecisionAction, DecisionSource, GrafanaAnnotationTag } from '../domain/incident-enums.js';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
 import { Incident, type IncidentDecisionAction } from '../domain/incident.js';
 import type { Clock } from '../ports/clock.port.js';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
@@ -14,6 +15,8 @@ export {
   IncidentAlreadyResolvedError
 } from './decision-helpers.js';
 
+export type OnIncidentApprovedHook = (incident: Incident) => Promise<void> | void;
+
 /**
  * Use case verifying signed email HMAC tokens and finalizing incident approval or rejection.
  */
@@ -24,7 +27,8 @@ export class RecordDecision {
     private readonly clock: Clock,
     private readonly broadcaster: EventBroadcasterPort,
     private readonly hmacSecret: string,
-    private readonly logger?: LoggerPort
+    private readonly logger?: LoggerPort,
+    private readonly onIncidentApproved?: OnIncidentApprovedHook
   ) {}
 
   /**
@@ -43,14 +47,34 @@ export class RecordDecision {
       throw new InvalidDecisionSignatureError();
     }
 
-    return applyIncidentDecision(this.repository, this.tools, this.broadcaster, this.logger, {
-      incidentId,
-      action,
-      source: DecisionSource.EMAIL_HMAC,
-      transitionReason: `Decision executed via signed email link: ${action}`,
-      annotationText: (targetState) =>
-        `[${targetState}] Incident ${incidentId} ${targetState} via human approval`,
-      annotationTags: [GrafanaAnnotationTag.DECISION]
-    });
+    const incident = await applyIncidentDecision(
+      this.repository,
+      this.tools,
+      this.broadcaster,
+      this.logger,
+      {
+        incidentId,
+        action,
+        source: DecisionSource.EMAIL_HMAC,
+        transitionReason: `Decision executed via signed email link: ${action}`,
+        annotationText: (targetState) =>
+          `[${targetState}] Incident ${incidentId} ${targetState} via human approval`,
+        annotationTags: [GrafanaAnnotationTag.DECISION]
+      }
+    );
+
+    if (action === DecisionAction.APPROVE && this.onIncidentApproved) {
+      try {
+        await this.onIncidentApproved(incident);
+      } catch (err) {
+        this.logger?.warn({
+          event: OrchestratorLogEvent.POST_APPROVAL_HOOK_FAILED,
+          incidentId: incident.id,
+          message: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+
+    return incident;
   }
 }

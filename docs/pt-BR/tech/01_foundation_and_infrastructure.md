@@ -55,7 +55,7 @@ Criar os 3 workflows em `.github/workflows/`:
 3. **`cd-release.yml`:** publica as imagens Docker no **GitHub Container Registry (`ghcr.io/admilsongoncalves/zeromttr/*`)**. **Regra de estabilidade operacional:** o job `deploy-vps` **não** executa a cada push na branch principal nem nas tags de comparação do workload de demo (`v2.14.*`); ele roda **exclusivamente quando uma tag de release da plataforma `v1.*.*` é publicada ou por acionamento manual (`workflow_dispatch`)**, mantendo a VPS de demonstração congelada e estável durante períodos de avaliação.
 
 ### T1.6 Documentação Inicial
-`README.md` (en-US) e `README.pt-BR.md` declarando a trilha (**Logística & Automação** — automação de fluxos de trabalho e integração entre sistemas), a arquitetura aberta e agnóstica de domínio, o posicionamento técnico frente ao mercado, instruções de execução local e distinção clara entre modo `Live` e modo `Replay`. Criar `LICENSE` (MIT), `.env.example`, `AGENTS.md` (especificação abaixo) e `GEMINI.md` (apenas um ponteiro com a instrução de ler e seguir o `AGENTS.md`, já criado na raiz).
+`README.md` (en-US) e `README.pt-BR.md` declarando a trilha (**Logística & Automação** — automação de fluxos de trabalho e integração entre sistemas), a arquitetura aberta e agnóstica de domínio, o posicionamento técnico frente ao mercado, instruções de execução local e distinção clara entre modo `Live` e modo `Replay`. Criar `LICENSE` (MIT), `.env.prod.template`, `AGENTS.md` (especificação abaixo) e `GEMINI.md` (apenas um ponteiro com a instrução de ler e seguir o `AGENTS.md`, já criado na raiz).
 
 #### Especificação do `AGENTS.md` (raiz do repositório)
 Arquivo curto, imperativo e escrito em português, lido por todo agente de codificação antes de qualquer implementação. Deve conter as seções obrigatórias abaixo:
@@ -99,7 +99,7 @@ Criar `docker-compose.prod.yml`, `infra/otel-collector-config.prod.yaml` e `apps
 
 ---
 
-## 3. Variáveis de Ambiente (`.env.example` / `.env.prod.template`)
+## 3. Variáveis de Ambiente (`.env.prod.template`)
 > **Regra de formatação:** nunca usar comentários *inline* na mesma linha do valor e sempre envolver valores com espaços ou `< >` em aspas duplas.
 
 ```dotenv
@@ -116,21 +116,26 @@ TEMPO_URL=http://tempo:3200
 GRAFANA_URL=http://grafana:3000
 GRAFANA_SA_TOKEN=
 
-# Segregação de Tokens (Menor Privilégio)
+# Segregação de Tokens, Menu Demo e Proteção de Cota
 MCP_AUTH_TOKEN=change-me-mcp-token
 GRAFANA_WEBHOOK_TOKEN=change-me-grafana-webhook-token
 DASHBOARD_API_TOKEN=change-me-dashboard-api-token
 # Assina exclusivamente os links de Aprovar/Rejeitar enviados por e-mail
 DECISION_HMAC_SECRET=change-me-hmac-secret
-# Chave exigida na VPS pública para acionar modo Live real (protege cota contra tráfego anônimo)
+# true = exibe app-main-menu (Replay/Live/Simular/Restaurar); false = uso real/produção
+ENABLE_DEMO_MODE=true
+# Quando ENABLE_DEMO_MODE=true: exige LIVE_DEMO_KEY para acionar o modo Live real
+REQUIRE_DEMO_KEY=true
 LIVE_DEMO_KEY=
-SIMULATION_COOLDOWN_MS=120000
+DEMO_COOLDOWN_MS=120000
 PUBLIC_BASE_URL=http://localhost:8080
 PUBLIC_DASHBOARD_URL=http://localhost:4200
 
-# Orchestrator -> MCP & Demo Workload
+# Orchestrator -> MCP & Target Workload
 MCP_URL=http://mcp-server:8000
-TARGET_DEMO_URL=http://target-app-demo:3001
+TARGET_APP_URL=http://target-app-demo:3001
+TARGET_STATUS_PROVIDER=manifest
+TARGET_STATUS_PATH=/ops/status
 DATABASE_URL=postgres://zeromttr:zeromttr@postgres:5432/payments
 
 # External Integrations (GitHub API & Resend)
@@ -145,11 +150,11 @@ ON_CALL_ENGINEER_EMAIL=oncall-sre@example.com
 # LLM (Orchestrator ReasoningPort — Modelo Parametrizável)
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash
-LLM_API_KEY=
+GEMINI_API_KEY=
 
-# Flags do Workload
+# Flags do Simulador no Workload Alvo (target-app-demo apenas)
 CHAOS_ENABLED=false
-DEMO_MODE=true
+CHAOS_AUTO_TRAFFIC_BURST=true
 ```
 
 ---
@@ -206,7 +211,7 @@ jobs:
     needs: quality-and-tests
     steps:
       - uses: actions/checkout@v4
-      - run: cp .env.example .env
+      - run: cp .env.prod.template .env
       - run: docker compose config -q
       - run: docker compose build
 ```

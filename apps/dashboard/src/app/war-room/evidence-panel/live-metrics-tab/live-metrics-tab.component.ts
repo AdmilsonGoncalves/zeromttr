@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
+import { isNonEmptyString } from '@zeromttr/utils';
 import type { TelemetryHistoryPoint } from '../../../core/incident.service.js';
 import { I18nService } from '../../../core/i18n/i18n.service.js';
 import {
@@ -95,6 +96,38 @@ export class LiveMetricsTabComponent {
       return 0;
     }
     return latest.poolActive + latest.poolWaiting;
+  });
+
+  readonly hasSaturationSeries = computed<boolean>(() =>
+    this.telemetryHistorySignal().some(
+      (pt) =>
+        isNonEmptyString(pt.saturationResourceLabel) ||
+        pt.poolActive > 0 ||
+        pt.poolWaiting > 0 ||
+        pt.poolMax > 0
+    )
+  );
+
+  readonly saturationResourceLabel = computed<string | null>(() => {
+    if (!this.hasSaturationSeries()) {
+      return null;
+    }
+    const pts = this.telemetryHistorySignal();
+    for (let i = pts.length - 1; i >= 0; i -= 1) {
+      const candidate = pts[i]?.saturationResourceLabel;
+      if (isNonEmptyString(candidate)) {
+        return candidate;
+      }
+    }
+    return this.i18n.t('targetPoolLabel');
+  });
+
+  readonly throughputChartTitle = computed<string>(() => {
+    const resource = this.saturationResourceLabel();
+    if (resource) {
+      return this.i18n.t('chartThroughputPoolTitle', { resource });
+    }
+    return this.i18n.t('chartThroughputTitle');
   });
 
   constructor(...args: [I18nService?]) {

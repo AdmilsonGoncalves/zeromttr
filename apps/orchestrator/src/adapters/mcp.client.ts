@@ -265,6 +265,7 @@ export class McpClientAdapter implements ToolsPort {
 
     const summarizedSeries = rawSeries.map((s) => ({
       metric: toStringRecord(s.metric),
+      latest: isNumber(s.latest) ? s.latest : undefined,
       p50: isNumber(s.p50) ? s.p50 : isNumber(s.avg) ? s.avg : undefined,
       p95: isNumber(s.p95) ? s.p95 : undefined,
       max: isNumber(s.max) ? s.max : undefined,

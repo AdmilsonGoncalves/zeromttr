@@ -159,6 +159,47 @@ export const AnnotateGrafanaIncidentOutputSchema = z.object({
 });
 ```
 
+### 1.2 Contrato Neutro de Estado del Workload Objetivo (`incident/incident.schema.ts`)
+```ts
+export const TargetCapabilitiesSchema = z.object({
+  chaosSimulation: z.boolean().default(false),
+  healthyTrafficToggle: z.boolean().default(false)
+});
+
+export const TargetSaturationSchema = z.object({
+  resourceLabel: z.string().min(1),
+  active: z.number().int().nonnegative(),
+  waiting: z.number().int().nonnegative(),
+  max: z.number().int().nonnegative()
+});
+
+export const TargetLiveMetricsSchema = z.object({
+  requestsPerSecond: z.number().nonnegative(),
+  errorRate5xxPercent: z.number().min(0).max(100),
+  p95LatencyMs: z.number().nonnegative(),
+  healthyTrafficActive: z.boolean().default(false),
+  saturation: TargetSaturationSchema.optional(),
+  poolActive: z.number().int().nonnegative().optional(),
+  poolWaiting: z.number().int().nonnegative().optional(),
+  poolMax: z.number().int().nonnegative().optional()
+});
+
+export const TargetStatusResponseSchema = z.object({
+  status: TargetHealthStatusSchema,
+  service: z.string(),
+  version: z.string(),
+  previousHealthyVersion: z.string(),
+  targetRepo: z.string().optional(),
+  suspectFilePath: z.string().optional(),
+  capabilities: TargetCapabilitiesSchema.default({
+    chaosSimulation: false,
+    healthyTrafficToggle: false
+  }),
+  rawEdgeLogPreCollector: z.string().optional(),
+  metrics: TargetLiveMetricsSchema.optional()
+});
+```
+
 ---
 
 ## 2. Contrato de síntesis LLM (`ReasoningPort`)

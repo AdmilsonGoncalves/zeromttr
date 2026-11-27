@@ -289,8 +289,7 @@ zeromttr/
 │   ├── ci.yml                    # Lint, typecheck, Gitleaks, Vitest (≥80%), Compose smoke (vía pnpm + Nx)
 │   ├── hotfix-verify.yml         # Puerta automatizada en PRs hotfix/zeromttr-* abiertos contra release/target-v2.14.8
 │   └── cd-release.yml            # Push GHCR en main/tags; despliegue VPS congelado SOLO para tags v* o workflow_dispatch
-├── .env.example                  # Plantilla local (dev)
-├── .env.prod.template            # Plantilla producción VPS (ej., /path/to/secrets/.env)
+├── .env.prod.template            # Plantilla de entorno (.env local dev y secretos en VPS)
 ├── infra/
 │   ├── otel-collector-config.yaml
 │   ├── otel-collector-config.prod.yaml
@@ -325,12 +324,12 @@ zeromttr/
 │   │   │   ├── domain/           # Incident, IncidentState (FSM), RcaReport, EvidenceCoverage, DecisionHmac, PiiPromptGuard
 │   │   │   ├── application/      # HandleAlert, InvestigateIncident, EnrichWithDeployDiff, DispatchRemediation, NotifyOnCall, RecordDecision
 │   │   │   ├── ports/            # ReasoningPort, ToolsPort (cliente MCP), IncidentRepository, TargetStatusPort, Clock
-│   │   │   ├── adapters/         # llm.gemini (con PiiPromptGuard), mcp.client, repo.file, target-status.http
+│   │   │   ├── adapters/         # llm.gemini (con PiiPromptGuard), mcp.client, repo.file, target-status.http, target-status.prometheus
 │   │   │   ├── http/             # Webhook Grafana (GRAFANA_WEBHOOK_TOKEN), API REST (DASHBOARD_API_TOKEN), decisiones HMAC, SSE
 │   │   │   └── main.ts
 │   │   └── test/
-│   ├── target-app-demo/          # MVC en Capas (api-pagamentos-core — emisor local OTel)
-│   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/
+│   ├── target-app-demo/          # MVC en Capas (api-pagamentos-core — emisor local OTel + /ops/status neutro)
+│   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/ # incluye ops.routes.ts y ops-status.controller.ts
 │   │   └── test/
 │   └── dashboard/                # War Room compacto Angular + PrimeNG (Aura Dark), Fase 4b
 ├── scripts/                      # demo.sh, chaos.sh, reset.sh, measure-mttr.sh, smoke-integrations.sh

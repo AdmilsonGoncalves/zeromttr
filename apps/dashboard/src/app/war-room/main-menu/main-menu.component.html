@@ -1,0 +1,117 @@
+@if (demoModeEnabledSignal()) {
+  <div
+    class="flex flex-wrap items-center gap-2 bg-slate-950/80 border border-slate-800/90 rounded-lg p-1 shadow-inner"
+  >
+    <!-- Mode Selector & Optional Live Key Pill -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      <p-selectbutton
+        [options]="modeOptions()"
+        [ngModel]="activeModeSignal()"
+        (ngModelChange)="onModeSelect($event)"
+        [disabled]="isWorkflowRunningSignal()"
+        optionLabel="label"
+        optionValue="value"
+        [pTooltip]="i18n.t('tooltipModeSelector')"
+        tooltipPosition="bottom"
+        styleClass="text-[11px]"
+      />
+
+      @if (activeModeSignal() === executionMode.LIVE && requireDemoKeySignal()) {
+        <form
+          (submit)="$event.preventDefault()"
+          class="inline-flex items-center gap-1.5 m-0 pl-2 border-l border-slate-800"
+        >
+          <input
+            type="text"
+            autocomplete="username"
+            value="zeromttr-live-demo"
+            readonly
+            tabindex="-1"
+            aria-hidden="true"
+            class="sr-only"
+          />
+          <i class="pi pi-key text-[11px] text-cyan-400" aria-hidden="true"></i>
+          <input
+            type="password"
+            autocomplete="current-password"
+            [placeholder]="i18n.t('liveKeyPlaceholder')"
+            [value]="liveDemoKeySignal()"
+            [disabled]="isWorkflowRunningSignal()"
+            (input)="onLiveKeyInput($event)"
+            [pTooltip]="i18n.t('tooltipLiveKeyInput')"
+            tooltipPosition="bottom"
+            class="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 w-36 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          />
+        </form>
+      }
+    </div>
+
+    <span class="hidden sm:block h-5 w-px bg-slate-800" aria-hidden="true"></span>
+
+    <!-- Simulation & Workload Control Actions -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      @if (canToggleHealthyTraffic()) {
+        <p-button
+          [label]="
+            healthyTrafficActiveSignal()
+              ? i18n.t('healthyTrafficStopBtn')
+              : i18n.t('healthyTrafficStartBtn')
+          "
+          [severity]="healthyTrafficActiveSignal() ? 'warn' : 'success'"
+          size="small"
+          [disabled]="
+            isTogglingTrafficSignal() ||
+            simulationLockedByTurnstileSignal() ||
+            isHealthyTrafficStartBlockedSignal()
+          "
+          (onClick)="toggleHealthyTraffic.emit()"
+          [pTooltip]="
+            simulationLockedByTurnstileSignal()
+              ? i18n.t('tooltipTurnstilePending')
+              : isHealthyTrafficStartBlockedSignal()
+                ? i18n.t('tooltipHealthyTrafficRequiresRestore')
+                : i18n.t('tooltipHealthyTraffic', {
+                    service: targetStatusSignal()?.service || i18n.t('serviceStatusLabel')
+                  })
+          "
+          tooltipPosition="bottom"
+          styleClass="text-xs py-1 whitespace-nowrap"
+        />
+      }
+
+      @if (canSimulateChaos()) {
+        <p-button
+          [label]="i18n.t('simulateIncident')"
+          severity="danger"
+          size="small"
+          [disabled]="isWorkflowRunningSignal() || simulationLockedByTurnstileSignal()"
+          (onClick)="triggerChaos.emit()"
+          [pTooltip]="
+            simulationLockedByTurnstileSignal()
+              ? i18n.t('tooltipTurnstilePending')
+              : i18n.t('tooltipSimulateIncident')
+          "
+          tooltipPosition="bottom"
+          styleClass="text-xs py-1 whitespace-nowrap"
+        />
+
+        <p-button
+          [label]="i18n.t('restoreService')"
+          severity="secondary"
+          size="small"
+          [disabled]="
+            isResettingSignal() || isSimulatingSignal() || simulationLockedByTurnstileSignal()
+          "
+          (onClick)="resetService.emit()"
+          [pTooltip]="
+            simulationLockedByTurnstileSignal()
+              ? i18n.t('tooltipTurnstilePending')
+              : i18n.t('tooltipRestoreService')
+          "
+          tooltipPosition="bottom"
+          styleClass="text-xs py-1 whitespace-nowrap"
+        />
+      }
+    </div>
+  </div>
+}

@@ -101,6 +101,12 @@ export async function getChaosStatus(server: http.Server) {
   });
 }
 
+export async function getOpsStatus(server: http.Server) {
+  return makeRequest(server, '/ops/status', {
+    method: 'GET'
+  });
+}
+
 export async function getHealth(server: http.Server) {
   return makeRequest(server, '/health', {
     method: 'GET'

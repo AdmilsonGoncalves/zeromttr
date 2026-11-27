@@ -5,15 +5,53 @@ export const INITIAL_TARGET_STATUS: TargetStatusResponse = {
   service: 'api-pagamentos-core',
   version: 'v2.14.8',
   previousHealthyVersion: 'v2.14.7',
+  capabilities: {
+    chaosSimulation: true,
+    healthyTrafficToggle: true
+  },
   rawEdgeLogPreCollector:
-    '2026-11-10T16:20:00.123Z [ERROR] [api-pagamentos-core] [trace_id=4bf92f3577b34da6a3ce929d0e0e4736] Payment failed for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 phone 11987654321 Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-z: pool connection acquire timeout after 4710ms'
+    '2026-11-10T16:20:00.123Z [ERROR] [api-pagamentos-core] [trace_id=4bf92f3577b34da6a3ce929d0e0e4736] Payment failed for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 phone 11987654321 Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-z: pool connection acquire timeout after 4710ms',
+  metrics: {
+    requestsPerSecond: 14.2,
+    errorRate5xxPercent: 82.5,
+    p95LatencyMs: 4710,
+    healthyTrafficActive: false,
+    saturation: {
+      resourceLabel: 'DB Pool',
+      active: 2,
+      waiting: 8,
+      max: 2
+    },
+    poolActive: 2,
+    poolWaiting: 8,
+    poolMax: 2
+  }
 };
 
 export const HEALTHY_TARGET_STATUS: TargetStatusResponse = {
   status: 'healthy',
   service: 'api-pagamentos-core',
   version: 'v2.14.7',
-  previousHealthyVersion: 'v2.14.7'
+  previousHealthyVersion: 'v2.14.7',
+  capabilities: {
+    chaosSimulation: true,
+    healthyTrafficToggle: true
+  },
+  metrics: {
+    requestsPerSecond: 4.5,
+    errorRate5xxPercent: 0,
+    p95LatencyMs: 24,
+    healthyTrafficActive: false,
+    saturation: {
+      resourceLabel: 'DB Pool',
+      active: 1,
+      waiting: 0,
+      max: 10
+    },
+    poolActive: 1,
+    poolWaiting: 0,
+    poolMax: 10
+  }
 };
 
 export const MOCK_INCIDENT: IncidentDetail = {

@@ -44,6 +44,6 @@ jobs:
     needs: quality-and-tests
     steps:
       - uses: actions/checkout@v4
-      - run: cp .env.example .env
+      - run: cp .env.prod.template .env
       - run: docker compose config -q
       - run: docker compose build

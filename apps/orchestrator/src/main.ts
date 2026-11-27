@@ -2,7 +2,7 @@ import http from 'node:http';
 import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
 import { ConsoleJsonLogger } from './adapters/logger.console.js';
 import { FileIncidentRepository } from './adapters/repo.file.js';
-import { HttpTargetStatusAdapter } from './adapters/target-status.http.js';
+import { createTargetStatusPort } from './adapters/target-status.prometheus.js';
 import { McpClientAdapter } from './adapters/mcp.client.js';
 import { DeterministicFallbackReasoningAdapter } from './adapters/llm.fallback.js';
 import { GeminiReasoningAdapter } from './adapters/llm.gemini.js';
@@ -16,9 +16,10 @@ import { NotifyOnCall } from './application/notify-on-call.js';
 import { RecordDecision } from './application/record-decision.js';
 import { OrchestratorWorkflow } from './application/orchestrator-workflow.js';
 import { HttpDemoControlAdapter } from './demo/demo-control.http.js';
+import { resolveDemoConfig } from './demo/demo-config.js';
 import { ReplayRunner } from './demo/replay-runner.js';
 import { SimulateDemoDecision } from './demo/simulate-demo-decision.js';
-import { createDemoRouterFactory } from './demo/demo.controller.js';
+import { createDemoRouterFactory, createDemoSessionLifecycle } from './demo/demo.controller.js';
 import { OrchestratorLogEvent } from './domain/log-enums.js';
 import { SystemClock } from './ports/clock.port.js';
 import { createApp } from './http/app.js';
@@ -30,8 +31,8 @@ import { SseEventBroadcaster } from './http/events.sse.js';
 export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): http.Server {
   const logger = new ConsoleJsonLogger();
   const repository = new FileIncidentRepository(process.env.INCIDENT_STORE_PATH, logger);
-  const targetStatusPort = new HttpTargetStatusAdapter();
   const toolsPort = new McpClientAdapter();
+  const targetStatusPort = createTargetStatusPort(toolsPort);
   const fallbackAdapter = new DeterministicFallbackReasoningAdapter();
   const llmAdapter = new GeminiReasoningAdapter();
   const clock = new SystemClock();
@@ -86,13 +87,25 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     logger,
     onCallEmail
   );
+  const demoConfig = resolveDemoConfig(process.env);
+  const demoEnabled = demoConfig.demoModeEnabled;
+  const demoControlPort = demoEnabled ? new HttpDemoControlAdapter() : undefined;
+  const replayRunner = demoEnabled
+    ? new ReplayRunner(repository, broadcaster, {}, logger)
+    : undefined;
+  const demoLifecycle =
+    demoEnabled && demoControlPort
+      ? createDemoSessionLifecycle(demoControlPort, replayRunner, targetStatusPort)
+      : undefined;
+
   const recordDecision = new RecordDecision(
     repository,
     toolsPort,
     clock,
     broadcaster,
     hmacSecret,
-    logger
+    logger,
+    demoLifecycle ? (incident) => demoLifecycle.handleLiveIncidentApproved(incident) : undefined
   );
   const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster, logger);
 
@@ -111,21 +124,23 @@ export function bootstrap(port: number = parseNumber(process.env.PORT, 8080)): h
     ? parseNumber(rawCooldown, 120_000)
     : undefined;
 
-  const replayRunner = new ReplayRunner(repository, broadcaster, {}, logger);
   const demoRouter =
-    process.env.ENABLE_DEMO_MODE === 'false'
-      ? undefined
-      : createDemoRouterFactory({
+    demoEnabled && demoControlPort && demoLifecycle
+      ? createDemoRouterFactory({
           repository,
-          demoControlPort: new HttpDemoControlAdapter(),
+          targetStatusPort,
+          demoControlPort,
           simulateDemoDecision,
           replayRunner,
+          lifecycle: demoLifecycle,
           liveDemoKey: process.env.LIVE_DEMO_KEY,
-          publicLiveDemo: process.env.PUBLIC_LIVE_DEMO === 'true',
+          requireDemoKey: demoConfig.requireDemoKey,
+          publicLiveDemo: demoConfig.publicLiveDemo,
           turnstileSiteKey: process.env.TURNSTILE_SITE_KEY,
           turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY,
           cooldownMs: demoCooldownMs
-        });
+        })
+      : undefined;
 
   const app = createApp({
     repository,

@@ -629,4 +629,107 @@ describe('Incident API Security & HMAC Decision Isolation (Acceptance Criterion 
       process.env.NODE_ENV = prevEnv;
     }
   });
+
+  it('should invoke onIncidentApproved hook for live email approval without coupling record decision', async () => {
+    const liveIncident = new Incident({
+      id: 'inc-live-email-001',
+      service: 'api-pagamentos-core',
+      severity: AlertSeverity.CRITICAL,
+      fingerprint: 'alert:live-email',
+      state: IncidentState.NOTIFIED,
+      mode: IncidentExecutionMode.LIVE
+    });
+    const localRepo: IncidentRepository = {
+      findById: vi.fn(async (id: string) => (id === liveIncident.id ? liveIncident : null)),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [liveIncident]),
+      save: vi.fn(async () => {})
+    };
+    const localReset = vi.fn(async () => {});
+    const onIncidentApproved = vi.fn(async (approved: Incident) => {
+      if (approved.mode === IncidentExecutionMode.LIVE) {
+        await localReset();
+      }
+    });
+    const localRecordDecision = new RecordDecision(
+      localRepo,
+      toolsPort,
+      clock,
+      broadcaster,
+      HMAC_SECRET,
+      undefined,
+      onIncidentApproved
+    );
+    const hookApp = createApp({
+      repository: localRepo,
+      targetStatusPort,
+      handleAlert: createStubHandleAlert(localRepo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision: localRecordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN
+    });
+
+    const sig = DecisionHmac.sign(liveIncident.id, DecisionAction.APPROVE, exp, HMAC_SECRET);
+    const res = await request(hookApp)
+      .post(`/api/incidents/${liveIncident.id}/decision`)
+      .send({ action: DecisionAction.APPROVE, sig, exp });
+
+    expect(res.status).toBe(HTTP_STATUS.OK);
+    expect(res.body.state).toBe(IncidentState.RESOLVED);
+    expect(onIncidentApproved).toHaveBeenCalledWith(liveIncident);
+    expect(localReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('should reject live chaos and healthy traffic when target reports false capabilities', async () => {
+    const triggerChaos = vi.fn(async () => {});
+    const toggleHealthyTraffic = vi.fn(async () => {});
+    const passiveTargetPort: TargetStatusPort = {
+      getStatus: vi.fn(async () => ({
+        status: TargetHealthStatus.HEALTHY,
+        service: 'external-orders-api',
+        version: 'v1.0.0',
+        previousHealthyVersion: 'v0.9.9',
+        targetRepo: 'https://github.com/org/external-orders-api',
+        suspectFilePath: '',
+        capabilities: {
+          chaosSimulation: false,
+          healthyTrafficToggle: false
+        },
+        rawEdgeLogPreCollector: ''
+      }))
+    };
+
+    const passiveApp = createApp({
+      repository: repo,
+      targetStatusPort: passiveTargetPort,
+      handleAlert: createStubHandleAlert(repo),
+      orchestratorWorkflow: createStubWorkflow(),
+      recordDecision,
+      broadcaster,
+      dashboardApiToken: DASHBOARD_TOKEN,
+      demoRouter: createDemoRouterFactory({
+        repository: repo,
+        targetStatusPort: passiveTargetPort,
+        demoControlPort: { triggerChaos, toggleHealthyTraffic, reset: vi.fn() },
+        simulateDemoDecision
+      })
+    });
+
+    const chaosRes = await request(passiveApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(chaosRes.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(chaosRes.body.code).toBe('CAPABILITY_NOT_SUPPORTED');
+    expect(triggerChaos).not.toHaveBeenCalled();
+
+    const trafficRes = await request(passiveApp)
+      .post('/api/demo/healthy-traffic')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ enable: true });
+    expect(trafficRes.status).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(trafficRes.body.code).toBe('CAPABILITY_NOT_SUPPORTED');
+    expect(toggleHealthyTraffic).not.toHaveBeenCalled();
+  });
 });

@@ -15,7 +15,9 @@ import {
   ReplaySnapshotSchema,
   SearchTracesByTraceqlInputSchema,
   SendPostMortemResendInputSchema,
-  TargetHealthStatus
+  TargetHealthStatus,
+  TargetSaturationSchema,
+  TargetStatusResponseSchema
 } from '../../src/index.js';
 
 describe('@zeromttr/contracts Zod schemas', () => {
@@ -324,5 +326,96 @@ describe('@zeromttr/contracts Zod schemas', () => {
       eventsTimeline: [{ event: 'incident.transition', delayMs: 500 }]
     });
     expect(missingTransitionState.success).toBe(false);
+  });
+
+  it('should validate neutral target status with capabilities and saturation without legacy pool fields', () => {
+    const parsed = TargetStatusResponseSchema.safeParse({
+      status: TargetHealthStatus.HEALTHY,
+      service: 'checkout-worker',
+      version: 'v1.4.2',
+      previousHealthyVersion: 'v1.4.1',
+      targetRepo: 'https://github.com/org/checkout-worker',
+      suspectFilePath: 'src/queue.ts',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: false
+      },
+      metrics: {
+        requestsPerSecond: 18.5,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 42.3,
+        healthyTrafficActive: false,
+        saturation: {
+          resourceLabel: 'Worker Queue',
+          active: 3,
+          waiting: 0,
+          max: 16
+        }
+      }
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.capabilities).toEqual({
+        chaosSimulation: true,
+        healthyTrafficToggle: false
+      });
+      expect(parsed.data.metrics?.saturation).toEqual({
+        resourceLabel: 'Worker Queue',
+        active: 3,
+        waiting: 0,
+        max: 16
+      });
+      expect(parsed.data.metrics?.poolActive).toBeUndefined();
+    }
+  });
+
+  it('should validate external target status without saturation and apply safe capability defaults', () => {
+    const parsed = TargetStatusResponseSchema.safeParse({
+      status: TargetHealthStatus.DEGRADED,
+      service: 'orders-gateway',
+      version: 'v3.0.1',
+      previousHealthyVersion: 'v3.0.0',
+      metrics: {
+        requestsPerSecond: 120,
+        errorRate5xxPercent: 14.2,
+        p95LatencyMs: 910
+      }
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.capabilities).toEqual({
+        chaosSimulation: false,
+        healthyTrafficToggle: false
+      });
+      expect(parsed.data.metrics?.healthyTrafficActive).toBe(false);
+      expect(parsed.data.metrics?.saturation).toBeUndefined();
+    }
+  });
+
+  it.each([
+    {
+      label: 'empty resourceLabel',
+      payload: { resourceLabel: '', active: 1, waiting: 0, max: 10 }
+    },
+    {
+      label: 'negative active',
+      payload: { resourceLabel: 'DB Pool', active: -1, waiting: 0, max: 10 }
+    },
+    {
+      label: 'negative waiting',
+      payload: { resourceLabel: 'DB Pool', active: 1, waiting: -2, max: 10 }
+    },
+    {
+      label: 'negative max',
+      payload: { resourceLabel: 'DB Pool', active: 1, waiting: 0, max: -5 }
+    },
+    {
+      label: 'non-integer active',
+      payload: { resourceLabel: 'DB Pool', active: 1.5, waiting: 0, max: 10 }
+    }
+  ])('should reject invalid target saturation when $label', ({ payload }) => {
+    expect(TargetSaturationSchema.safeParse(payload).success).toBe(false);
   });
 });

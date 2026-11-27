@@ -11,7 +11,7 @@ Si tanto `apps/orchestrator` como `apps/mcp-server` mantuvieran sus propios clie
 
 Establecer que **todos los adaptadores HTTP para sistemas externos de observabilidad, código y notificaciones residen exclusivamente en `apps/mcp-server/src/adapters/`**, expuestos a través de las 8 herramientas MCP. `apps/orchestrator` interactúa con estos sistemas únicamente a través del puerto **`ToolsPort`**, implementado por `McpToolsClientAdapter` (`apps/orchestrator/src/adapters/mcp.client.ts`).
 
-Las únicas comunicaciones HTTP directas desde `orchestrator` fuera de MCP son el LLM (`ReasoningPort`) y la verificación/control de demostración del servicio objetivo (`TargetStatusPort` / `DemoControlPort`).
+Las únicas comunicaciones HTTP directas desde `orchestrator` fuera de MCP son el LLM (`ReasoningPort`) y el manifiesto/control de demostración del servicio objetivo (`HttpTargetStatusAdapter` consultando `GET /ops/status` cuando `TARGET_STATUS_PROVIDER=manifest`, además de `DemoControlPort` opcional). Cuando `TARGET_STATUS_PROVIDER=prometheus`, incluso la consulta de estado del objetivo (`PrometheusTargetStatusAdapter`) pasa exclusivamente por `ToolsPort` de MCP (`execute_promql_range`), sin eludir el servidor MCP.
 
 ## Consecuencias
 

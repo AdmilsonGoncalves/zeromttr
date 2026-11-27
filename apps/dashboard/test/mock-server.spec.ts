@@ -16,6 +16,25 @@ describe('Dashboard Mock Server', () => {
     await server.stop();
   });
 
+  it('should respond to GET /api/demo/config with demoModeEnabled and requireDemoKey flags', async () => {
+    const res = await fetch(`${baseUrl}/api/demo/config`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      demoModeEnabled: boolean;
+      requireDemoKey: boolean;
+      publicLiveDemo: boolean;
+      turnstileSiteKey: string | null;
+      turnstileRequired: boolean;
+    };
+    expect(body).toEqual({
+      demoModeEnabled: true,
+      requireDemoKey: false,
+      publicLiveDemo: true,
+      turnstileSiteKey: null,
+      turnstileRequired: false
+    });
+  });
+
   it('should respond to GET /api/target/status', async () => {
     const res = await fetch(`${baseUrl}/api/target/status`);
     expect(res.status).toBe(200);
@@ -23,6 +42,13 @@ describe('Dashboard Mock Server', () => {
     expect(body.service).toBe('api-pagamentos-core');
     expect(body.status).toBe('degraded');
     expect(body.version).toBe('v2.14.8');
+    expect(body.capabilities).toEqual({
+      chaosSimulation: true,
+      healthyTrafficToggle: true
+    });
+    expect(body.metrics?.saturation).toMatchObject({
+      resourceLabel: 'DB Pool'
+    });
   });
 
   it('should respond to GET /api/incidents', async () => {

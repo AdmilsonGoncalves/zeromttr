@@ -13,8 +13,8 @@ Para la demostración práctica se utiliza el servicio **`api-pagamentos-core`**
 ## 2. Patrón MVC en Capas (`apps/target-app-demo/src/`)
 ```text
 apps/target-app-demo/src/
-  routes/        payments.routes.ts, chaos.routes.ts, health.routes.ts
-  controllers/   PaymentsController, ChaosController
+  routes/        payments.routes.ts, ops.routes.ts, chaos.routes.ts, health.routes.ts
+  controllers/   PaymentsController, OpsStatusController, ChaosController
   services/      PaymentService
   repositories/  payment.repository.ts (Knex / pg)
   models/        payment.ts
@@ -25,8 +25,8 @@ apps/target-app-demo/src/
 
 ## 3. Requisitos Funcionales del Contenedor Local
 - `POST /payments` (procesa una transacción PIX), `GET /payments/:id`, `GET /health`.
-- `POST /chaos/pool-saturation?enable=true|false` alterna el modo de operación de `PaymentRepository` entre el comportamiento saludable de la versión `v2.14.7` y el comportamiento con regresión de la versión `v2.14.8` (solo cuando `CHAOS_ENABLED=true`).
-- `GET /chaos/status` devuelve:
+- `POST /chaos/pool-saturation?enable=true|false` alterna el modo de operación de `PaymentRepository` entre el comportamiento saludable de la versión `v2.14.7` y el comportamiento con regresión de la versión `v2.14.8` (cuando `CHAOS_AUTO_TRAFFIC_BURST=true`, dispara también oleadas sintéticas de tráfico).
+- `GET /ops/status` (con retrocompatibilidad en `GET /chaos/status` delegando al mismo constructor) devuelve el manifiesto operacional neutro con `capabilities` y `saturation` genérico:
   ```json
   {
     "status": "degraded",
@@ -35,7 +35,23 @@ apps/target-app-demo/src/
     "previousHealthyVersion": "v2.14.7",
     "targetRepo": "https://github.com/AdmilsonGoncalves/zeromttr",
     "suspectFilePath": "apps/target-app-demo/src/repositories/payment.repository.ts",
-    "rawEdgeLogPreCollector": "ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig"
+    "capabilities": {
+      "chaosSimulation": true,
+      "healthyTrafficToggle": true
+    },
+    "rawEdgeLogPreCollector": "ERROR [api-pagamentos-core] Pool exhausted processing PIX transaction #TX-9042 for payer CPF 123.456.789-00 merchant CNPJ 12.345.678/0001-99 pixKey cliente.silva@exemplo.com.br auth Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig",
+    "metrics": {
+      "requestsPerSecond": 12.4,
+      "errorRate5xxPercent": 80,
+      "p95LatencyMs": 4610,
+      "healthyTrafficActive": false,
+      "saturation": {
+        "resourceLabel": "DB Pool",
+        "active": 2,
+        "waiting": 8,
+        "max": 2
+      }
+    }
   }
   ```
 
@@ -44,7 +60,7 @@ apps/target-app-demo/src/
 - Métricas exportadas mediante OTLP: `http_server_duration` (histograma con ejemplares que contienen `trace_id`), `db_pool_waiting`, `db_pool_used`.
 - Spans de error (`SpanStatusCode.ERROR`) en la operación `pg.pool.acquire` / `PaymentRepository.createPayment`.
 - Logs estructurados enviados mediante OTLP/HTTP (`http://otel-collector:4318`) que contienen `trace_id`, `span_id` y datos brasileños sintéticos en `body` (CPF, CNPJ, clave PIX de correo electrónico y token Bearer JWT).
-- El campo `rawEdgeLogPreCollector` devuelto por `GET /chaos/status` es una muestra reportada por la aplicación del log exacto emitido antes de la transmisión OTLP al Collector (etiquetado claramente en la interfaz de usuario como *"App-Reported Pre-Collector Log"*), lo que permite la comparación visual entre la cadena emitida por la aplicación y el log persistido en Loki tras el procesador **`transform/pii_logs` (OTTL `replace_pattern`)**.
+- El campo `rawEdgeLogPreCollector` devuelto por `GET /ops/status` (y el legado `GET /chaos/status`) es una muestra reportada por la aplicación del log exacto emitido antes de la transmisión OTLP al Collector (etiquetado claramente en la interfaz de usuario como *"App-Reported Pre-Collector Log"*), lo que permite la comparación visual entre la cadena emitida por la aplicación y el log persistido en Loki tras el procesador **`transform/pii_logs` (OTTL `replace_pattern`)**.
 
 ## 5. Estrategia de Etiquetas Reales (`v2.14.7` y `v2.14.8`), Orden de Creación y Protección de Ramas/Etiquetas (ADR-001)
 Para mantener todo dentro del repositorio único **`https://github.com/AdmilsonGoncalves/zeromttr`** sin romper la CI en `master` y garantizando que `.github/workflows/hotfix-verify.yml` se active siempre:

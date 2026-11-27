@@ -37,11 +37,15 @@ export type {
   ReasoningSource,
   SimulateDecisionPayload,
   SpanNode,
+  TargetCapabilities,
   TargetLiveMetrics,
+  TargetSaturation,
   TargetStatusResponse
 } from '@zeromttr/contracts';
 
 export interface DemoConfigResponse {
+  demoModeEnabled?: boolean;
+  requireDemoKey?: boolean;
   publicLiveDemo: boolean;
   turnstileSiteKey: string | null;
   turnstileRequired: boolean;

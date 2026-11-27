@@ -1,3 +1,6 @@
+# Workload-specific Grafana Unified Alerting preset (reference demo: api-pagamentos-core).
+# Grafana Unified Alerting does not interpolate dashboard variables ($service) in rule expressions;
+# duplicate or customize this preset per monitored workload while keeping datasources/contact-points/policies agnostic.
 apiVersion: 1
 
 groups:

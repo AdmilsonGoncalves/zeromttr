@@ -434,6 +434,8 @@ describe('IncidentService', () => {
       );
 
     await service.fetchDemoConfig('http://localhost:8080');
+    expect(service.demoModeEnabled()).toBe(true);
+    expect(service.requireDemoKey()).toBe(false);
     expect(service.publicLiveDemo()).toBe(true);
     expect(service.turnstileSiteKey()).toBe('0x4AAAAAAATestKey');
     expect(service.turnstileRequired()).toBe(true);
@@ -538,6 +540,8 @@ describe('IncidentService', () => {
 
     await service.fetchDemoConfig('http://localhost:8080', 3, 1);
     expect(configCalls).toHaveLength(1);
+    expect(service.demoModeEnabled()).toBe(false);
+    expect(service.requireDemoKey()).toBe(true);
     expect(service.publicLiveDemo()).toBe(false);
     expect(service.turnstileSiteKey()).toBeNull();
 
@@ -630,5 +634,133 @@ describe('IncidentService', () => {
     expect(history[history.length - 1]?.p95LatencyMs).toBe(22);
 
     fetchSpy.mockRestore();
+  });
+
+  it('should expose targetServiceName targetCapabilities and targetSaturation signals', async () => {
+    const service = new IncidentService();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.HEALTHY,
+          service: 'billing-worker',
+          version: 'v2.0.0',
+          previousHealthyVersion: 'v1.9.9',
+          capabilities: {
+            chaosSimulation: false,
+            healthyTrafficToggle: true
+          },
+          metrics: {
+            requestsPerSecond: 19,
+            errorRate5xxPercent: 0,
+            p95LatencyMs: 32,
+            healthyTrafficActive: false,
+            saturation: {
+              resourceLabel: 'Worker Queue',
+              active: 5,
+              waiting: 1,
+              max: 16
+            }
+          }
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    await service.fetchTargetStatus('http://localhost:8080');
+
+    expect(service.targetServiceName()).toBe('billing-worker');
+    expect(service.targetCapabilities()).toEqual({
+      chaosSimulation: false,
+      healthyTrafficToggle: true
+    });
+    expect(service.targetSaturation()).toEqual({
+      resourceLabel: 'Worker Queue',
+      active: 5,
+      waiting: 1,
+      max: 16
+    });
+    expect(service.telemetryHistory()[0]?.saturationResourceLabel).toBe('Worker Queue');
+
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.HEALTHY,
+          service: 'stateless-api',
+          version: 'v1.0.0',
+          previousHealthyVersion: 'v1.0.0',
+          capabilities: {
+            chaosSimulation: false,
+            healthyTrafficToggle: false
+          },
+          metrics: {
+            requestsPerSecond: 40,
+            errorRate5xxPercent: 0,
+            p95LatencyMs: 12,
+            healthyTrafficActive: false
+          }
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    await service.fetchTargetStatus('http://localhost:8080');
+    expect(service.targetSaturation()).toBeNull();
+    expect(service.telemetryHistory()[1]?.saturationResourceLabel).toBeUndefined();
+
+    fetchSpy.mockRestore();
+  });
+
+  it('should persist activeMode live across tabs only when authorized and default anonymous to replay', async () => {
+    const store = new Map<string, string>();
+    const mockStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      }
+    } as unknown as Storage;
+    const originalStorage = globalThis.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: mockStorage,
+      configurable: true
+    });
+
+    try {
+      // 1. Authorized via liveDemoKey -> restores LIVE across new instance/tab
+      const authorizedService = new IncidentService();
+      authorizedService.setLiveDemoKey('valid-live-key');
+      authorizedService.setActiveMode(IncidentExecutionMode.LIVE);
+      expect(store.get('zeromttr_active_mode')).toBe(IncidentExecutionMode.LIVE);
+
+      const newTabWithKey = new IncidentService();
+      expect(newTabWithKey.activeMode()).toBe(IncidentExecutionMode.LIVE);
+
+      // 2. Anonymous visitor without liveDemoKey and publicLiveDemo=false -> falls back safely to REPLAY
+      store.delete('zeromttr_live_demo_key');
+      const anonymousTab = new IncidentService();
+      expect(anonymousTab.activeMode()).toBe(IncidentExecutionMode.REPLAY);
+
+      // 3. Public live demo enabled -> restores LIVE once demo config confirms publicLiveDemo=true
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            publicLiveDemo: true,
+            turnstileSiteKey: null,
+            turnstileRequired: false
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      await anonymousTab.fetchDemoConfig('http://localhost:8080');
+      expect(anonymousTab.activeMode()).toBe(IncidentExecutionMode.LIVE);
+      fetchSpy.mockRestore();
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: originalStorage,
+        configurable: true
+      });
+    }
   });
 });

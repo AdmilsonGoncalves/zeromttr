@@ -288,8 +288,7 @@ zeromttr/
 │   ├── ci.yml                    # Lint, typecheck, Gitleaks, Vitest (≥80%), Compose smoke (via pnpm + Nx)
 │   ├── hotfix-verify.yml         # Gate automático nos PRs hotfix/zeromttr-* abertos contra release/target-v2.14.8
 │   └── cd-release.yml            # Push GHCR em main/tags; deploy na VPS congelado APENAS para tags v* ou workflow_dispatch
-├── .env.example                  # Template local (dev)
-├── .env.prod.template            # Template de produção na VPS (ex.: /path/to/secrets/.env)
+├── .env.prod.template            # Template de ambiente (.env local dev e segredos na VPS)
 ├── infra/
 │   ├── otel-collector-config.yaml
 │   ├── otel-collector-config.prod.yaml
@@ -324,12 +323,12 @@ zeromttr/
 │   │   │   ├── domain/           # Incident, IncidentState (FSM), RcaReport, EvidenceCoverage, DecisionHmac, PiiPromptGuard
 │   │   │   ├── application/      # HandleAlert, InvestigateIncident, EnrichWithDeployDiff, DispatchRemediation, NotifyOnCall, RecordDecision
 │   │   │   ├── ports/            # ReasoningPort, ToolsPort (MCP client), IncidentRepository, TargetStatusPort, Clock
-│   │   │   ├── adapters/         # llm.gemini (com PiiPromptGuard), mcp.client, repo.file, target-status.http
+│   │   │   ├── adapters/         # llm.gemini (com PiiPromptGuard), mcp.client, repo.file, target-status.http, target-status.prometheus
 │   │   │   ├── http/             # webhook Grafana (GRAFANA_WEBHOOK_TOKEN), API REST (DASHBOARD_API_TOKEN), decisões HMAC, SSE
 │   │   │   └── main.ts
 │   │   └── test/
-│   ├── target-app-demo/          # MVC em camadas (api-pagamentos-core — emissor OTel local)
-│   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/
+│   ├── target-app-demo/          # MVC em camadas (api-pagamentos-core — emissor OTel local + /ops/status neutro)
+│   │   ├── src/{routes,controllers,services,repositories,models,telemetry,chaos}/ # inclui ops.routes.ts e ops-status.controller.ts
 │   │   └── test/
 │   └── dashboard/                # Angular + PrimeNG (Aura Dark) War Room enxuto, Fase 4b
 ├── scripts/                      # demo.sh, chaos.sh, reset.sh, measure-mttr.sh, smoke-integrations.sh

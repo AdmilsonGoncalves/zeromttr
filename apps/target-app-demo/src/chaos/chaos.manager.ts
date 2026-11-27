@@ -1,8 +1,12 @@
 import { clamp, isNumber } from '@zeromttr/utils';
-import { TargetReleaseVersion, TargetServiceIdentity } from './target-metadata-enums.js';
+import {
+  TargetOpsStatus,
+  TargetReleaseVersion,
+  TargetServiceIdentity
+} from './target-metadata-enums.js';
 
 export interface ChaosStatus {
-  status: 'healthy' | 'degraded';
+  status: TargetOpsStatus;
   service: string;
   version: string;
   previousHealthyVersion: string;
@@ -60,7 +64,7 @@ export class ChaosManager {
   public getStatus(): ChaosStatus {
     const isDegraded = this.poolSaturation;
     return {
-      status: isDegraded ? 'degraded' : 'healthy',
+      status: isDegraded ? TargetOpsStatus.DEGRADED : TargetOpsStatus.HEALTHY,
       service: TargetServiceIdentity.SERVICE_NAME,
       version: isDegraded ? TargetReleaseVersion.DEGRADED : TargetReleaseVersion.HEALTHY,
       previousHealthyVersion: TargetReleaseVersion.HEALTHY,

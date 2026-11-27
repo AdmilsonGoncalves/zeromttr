@@ -33,11 +33,18 @@ export interface PrBadgeConfig {
 })
 export class RemediationPanelComponent {
   readonly i18n: I18nService;
+  readonly incidentState = IncidentState;
   private readonly sanitizer: DomSanitizer | null;
 
+  readonly demoModeEnabledSignal = signal<boolean>(true);
   readonly incidentSignal = signal<IncidentDetail | null>(null);
   readonly displayedFsmStateSignal = signal<IncidentState | undefined>(undefined);
   readonly simulationLockedByTurnstileSignal = signal<boolean>(false);
+
+  @Input()
+  set demoModeEnabled(value: boolean) {
+    this.demoModeEnabledSignal.set(value);
+  }
 
   @Input()
   set incident(value: IncidentDetail | null) {

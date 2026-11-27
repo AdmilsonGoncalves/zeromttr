@@ -73,12 +73,12 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   fsmRejectedLabel: '7. Rejeitado',
   fsmRejectedTip: 'Decisão de rejeição registrada pelo operador.',
   fsmFailedLabel: 'Falhou',
-  fsmHintIdle: 'Pronto — escolha o modo acima e clique em "Simular Incidente" para iniciar.',
+  fsmHintIdle: 'Pronto — monitorando telemetria e aguardando incidentes ou execução sob demanda.',
   fsmHintAwaitingAlert:
     'Serviço degradado — gerando tráfego PIX e aguardando Prometheus/Grafana disparar o alerta ({N}s)...',
   fsmHintActive: 'Pipeline autônomo em execução — acompanhando transições da FSM em tempo real.',
   fsmHintNotified: 'Aguardando decisão humana via link HMAC no e-mail (ou simulação no painel).',
-  fsmHintResolved: 'Incidente resolvido e aprovado. Use "Restaurar Serviço" para limpar o alvo.',
+  fsmHintResolved: 'Incidente resolvido e aprovado. O serviço alvo foi restaurado automaticamente.',
   fsmHintRejected: 'Hotfix rejeitado pelo plantonista. O PR permanece sem merge.',
   fsmHintFailed: 'Pipeline interrompido por falha — verifique os logs do orquestrador.',
 
@@ -99,8 +99,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
     'Fail-Closed Triggered ({N} Leaked Patterns Blocked — Routed to Local Fallback)',
   piiLogWithheldMessage: '[RETIDO POR VIOLAÇÃO PII: {TYPES}]',
   gitDiffTitle: 'Git Deploy Diff (v2.14.7...v2.14.8)',
-  gitDiffIdleBody:
-    'Nenhum diff de regressão em análise — serviço saudável. Inicie uma simulação para inspecionar o diff v2.14.7...v2.14.8 e a redução FinOps.',
+  gitDiffIdleBody: 'Nenhum diff de regressão em análise — serviço saudável.',
   githubPrTitle: 'Pull Request Aberto no GitHub',
   githubPrViewBtn: 'Ver PR no GitHub ↗',
   githubPrIdleStatus: 'Nenhum',
@@ -109,19 +108,17 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   githubPrRejectedStatus: 'Rejeitado',
   githubPrClosedStatus: 'Fechado',
   githubPrIdleBody: 'Nenhum Pull Request ativo — aguardando etapa de remediação.',
-  traceTreeIdleBody:
-    'Nenhum trace ativo — inicie uma simulação para inspecionar a árvore de spans do Tempo.',
+  traceTreeIdleBody: 'Nenhum trace ativo — aguardando coleta de spans no Tempo.',
   traceTreeAwaitingBody: 'Coletando spans distribuídos no Tempo...',
   awaitingAuditBadge: 'Aguardando auditoria...',
-  piiIdleBadge: 'Nenhum incidente ativo — aguardando simulação',
+  piiIdleBadge: 'Nenhum incidente ativo',
   piiIdlePreCollectorLog: 'Nenhum evento de falha ativo no coletor de borda.',
-  piiIdlePostOttlLog:
-    'Nenhum log mascarado coletado no Loki. Inicie uma simulação para inspecionar a redação OTTL.',
+  piiIdlePostOttlLog: 'Nenhum log mascarado coletado no Loki no momento.',
 
   // === Resend Post-Mortem & Human Decision / HMAC ===
   resendPreviewTitle: 'Post-Mortem Resend (Preview Sanitizado)',
   resendIdleBody:
-    'Nenhum incidente ativo no momento. Inicie uma simulação para visualizar o Post-Mortem sanitizado enviado via Resend.',
+    'Nenhum incidente ativo no momento — o Post-Mortem sanitizado será exibido aqui após a notificação.',
   resendDefaultBody: 'Aguardando aprovação do plantonista via link seguro exclusivo.',
   resendDispatchedBadge: 'E-mail Post-Mortem enviado ao plantonista via Resend',
   resendDispatchedBody:
@@ -167,13 +164,14 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
   targetSlaErrorOk: 'SLA Saudável',
   targetSlaErrorBreach: 'Falhas 5xx Ativas',
   tooltipHealthyTraffic:
-    'Inicia ou interrompe fluxo contínuo de requisições saudáveis em api-pagamentos-core para demonstrar Antes → Durante → Depois.',
+    'Inicia ou interrompe fluxo contínuo de requisições saudáveis em {{service}} para demonstrar Antes → Durante → Depois.',
   tooltipHealthyTrafficRequiresRestore:
     'Serviço alvo degradado (v2.14.8). Use "Restaurar Serviço" antes de iniciar o tráfego saudável.',
 
   // === Charts ===
   chartLatencyErrorTitle: 'Latência p95 (ms) & Taxa de Erro 5xx (%)',
-  chartThroughputPoolTitle: 'Throughput (req/s) & Uso do Pool DB',
+  chartThroughputTitle: 'Throughput (req/s)',
+  chartThroughputPoolTitle: 'Throughput (req/s) & {{resource}}',
   chartFinopsBarsTitle: 'Payload LLM (Bruto vs Compactado)',
   chartAwaitingSamples: 'Aguardando amostras ao vivo do serviço alvo (polling 2s)...',
 
@@ -224,7 +222,7 @@ export const PT_TRANSLATIONS: TranslationDictionary = {
     'Incidente resolvido e serviço alvo restaurado! Os dados permanecem na tela para inspeção.',
   toastHealthyTrafficStartedSummary: 'Tráfego saudável ativado',
   toastHealthyTrafficStartedDetail:
-    'Requisições PIX contínuas sendo enviadas para api-pagamentos-core.',
+    'Requisições saudáveis contínuas sendo enviadas para {{service}}.',
   toastHealthyTrafficStoppedSummary: 'Tráfego saudável interrompido',
   toastHealthyTrafficStoppedDetail: 'Fluxo contínuo de requisições encerrado.'
 };

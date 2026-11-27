@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Request } from 'express';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { FileIncidentRepository } from '../../src/adapters/repo.file.js';
+import { resolveDemoConfig } from '../../src/demo/demo-config.js';
 import { createDemoRouterFactory } from '../../src/demo/demo.controller.js';
 import { SimulateDemoDecision } from '../../src/demo/simulate-demo-decision.js';
 import {
@@ -49,6 +50,8 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
 
   function buildTestApp(options: {
     publicLiveDemo?: boolean;
+    requireDemoKey?: boolean;
+    disableDemoRouter?: boolean;
     liveDemoKey?: string;
     turnstileSiteKey?: string;
     turnstileSecretKey?: string;
@@ -59,16 +62,19 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
     const demoControlPort = createMockDemoControlPort();
     const simulateDemoDecision = new SimulateDemoDecision(repository, toolsPort, broadcaster);
 
-    const demoRouter = createDemoRouterFactory({
-      repository,
-      demoControlPort,
-      simulateDemoDecision,
-      liveDemoKey: options.liveDemoKey,
-      publicLiveDemo: options.publicLiveDemo,
-      turnstileSiteKey: options.turnstileSiteKey,
-      turnstileSecretKey: options.turnstileSecretKey,
-      cooldownMs: 0
-    });
+    const demoRouter = options.disableDemoRouter
+      ? undefined
+      : createDemoRouterFactory({
+          repository,
+          demoControlPort,
+          simulateDemoDecision,
+          liveDemoKey: options.liveDemoKey,
+          publicLiveDemo: options.publicLiveDemo,
+          requireDemoKey: options.requireDemoKey,
+          turnstileSiteKey: options.turnstileSiteKey,
+          turnstileSecretKey: options.turnstileSecretKey,
+          cooldownMs: 0
+        });
 
     return createApp({
       repository,
@@ -84,7 +90,7 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
     });
   }
 
-  it('should expose publicLiveDemo and turnstileSiteKey via GET /api/demo/config', async () => {
+  it('should expose demoModeEnabled, requireDemoKey, publicLiveDemo and turnstileSiteKey via GET /api/demo/config', async () => {
     const app = buildTestApp({
       publicLiveDemo: true,
       liveDemoKey: 'secret-key-ignored-when-public',
@@ -98,10 +104,75 @@ describe('Public Live Demo, IP Rate Limiting & Cloudflare Turnstile Gate', () =>
 
     expect(res.status).toBe(HTTP_STATUS.OK);
     expect(res.body).toEqual({
+      demoModeEnabled: true,
+      requireDemoKey: false,
       publicLiveDemo: true,
       turnstileSiteKey: '0x4AAAAAAATestSiteKey',
       turnstileRequired: true
     });
+  });
+
+  it('should resolve ENABLE_DEMO_MODE and REQUIRE_DEMO_KEY with backward-compatible PUBLIC_LIVE_DEMO fallback', () => {
+    expect(resolveDemoConfig({})).toEqual({
+      demoModeEnabled: true,
+      requireDemoKey: true,
+      publicLiveDemo: false
+    });
+    expect(resolveDemoConfig({ ENABLE_DEMO_MODE: 'false' })).toEqual({
+      demoModeEnabled: false,
+      requireDemoKey: true,
+      publicLiveDemo: false
+    });
+    expect(resolveDemoConfig({ PUBLIC_LIVE_DEMO: 'true' })).toEqual({
+      demoModeEnabled: true,
+      requireDemoKey: false,
+      publicLiveDemo: true
+    });
+    expect(resolveDemoConfig({ PUBLIC_LIVE_DEMO: 'true', REQUIRE_DEMO_KEY: 'true' })).toEqual({
+      demoModeEnabled: true,
+      requireDemoKey: true,
+      publicLiveDemo: false
+    });
+    expect(resolveDemoConfig({ PUBLIC_LIVE_DEMO: 'false', REQUIRE_DEMO_KEY: 'false' })).toEqual({
+      demoModeEnabled: true,
+      requireDemoKey: false,
+      publicLiveDemo: true
+    });
+  });
+
+  it('should enforce X-Live-Demo-Key when requireDemoKey is true and return 404 on demo routes when disabled', async () => {
+    const keyRequiredApp = buildTestApp({
+      requireDemoKey: true,
+      liveDemoKey: 'strict-demo-key'
+    });
+
+    const configRes = await request(keyRequiredApp)
+      .get('/api/demo/config')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(configRes.status).toBe(HTTP_STATUS.OK);
+    expect(configRes.body).toMatchObject({
+      demoModeEnabled: true,
+      requireDemoKey: true,
+      publicLiveDemo: false
+    });
+
+    const rejectedRes = await request(keyRequiredApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.LIVE });
+    expect(rejectedRes.status).toBe(HTTP_STATUS.FORBIDDEN);
+
+    const disabledApp = buildTestApp({ disableDemoRouter: true });
+    const disabledConfigRes = await request(disabledApp)
+      .get('/api/demo/config')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`);
+    expect(disabledConfigRes.status).toBe(HTTP_STATUS.NOT_FOUND);
+
+    const disabledChaosRes = await request(disabledApp)
+      .post('/api/demo/chaos')
+      .set('Authorization', `Bearer ${DASHBOARD_TOKEN}`)
+      .send({ mode: IncidentExecutionMode.REPLAY });
+    expect(disabledChaosRes.status).toBe(HTTP_STATUS.NOT_FOUND);
   });
 
   it('should allow live chaos without X-Live-Demo-Key when PUBLIC_LIVE_DEMO=true and Turnstile passes', async () => {
