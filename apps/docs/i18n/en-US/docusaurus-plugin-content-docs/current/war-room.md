@@ -21,7 +21,7 @@ From left to right, the header shows:
   - **Demo:** opens the simulation drawer (shown only when demo mode is enabled).
   - **Settings (gear icon):** opens runtime operational policies and audit history (available in both demo and production).
   - **Manual (`?`):** opens this user guide in your active language.
-  - **Language (flag):** switches immediately between **Português**, **English**, and **Español**.
+  - **Language (flag):** switches immediately between **Português**, **English**, and **Español**, automatically persisting your preference in the browser (`localStorage`) across reloads.
 
 ## 2. Remediation Flow
 

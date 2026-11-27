@@ -112,7 +112,7 @@ To avoid skewed comparisons with processes that include full production deployme
 | Storage | Prometheus (exemplars), Loki, Tempo | LGTM stack |
 | Visualization / Trigger | Grafana 11.2+ (Alerting) | Incident webhook and annotations API (`POST /api/annotations`) |
 | Agent Protocol | **MCP** (`@modelcontextprotocol/sdk`) | Standardized open interface of 8 AIOps tools |
-| Agent LLM | Google Gemini API (`ReasoningPort`, model configurable via `LLM_MODEL`, default `gemini-3.5-flash`) | RCA synthesis and patch generation (with explicit `reasoningSource: 'llm' \| 'fallback'`) |
+| Agent LLM | Multi-provider (`ReasoningPort` via `LLM_PROVIDER`: `gemini`, `openai`, `openai-compatible`, `openrouter`, `groq`, `deepseek`, `ollama`, `vllm`, `anthropic`; default `gemini` / `gemini-3.5-flash`) | RCA synthesis and patch generation (with explicit `reasoningSource: 'llm' \| 'fallback'`) |
 | **Deploy Inspection & Auto-Remediation** | **GitHub REST API (Octokit)** on `apps/target-app-demo` in the `zeromttr` repository | Real comparison between tags `v2.14.7...v2.14.8`, code reading, `hotfix/zeromttr-*` branch creation, and Pull Request creation targeting `release/target-v2.14.8` |
 | **Notification & Governance** | **Resend** | HTML Post-Mortem delivery (`sre@zeromttr.agjworks.com`) exclusively containing HMAC-signed decision links |
 | Testing | Vitest, Supertest, `nock`/MSW + **Test Helpers (`test/helpers/`)** | **Testing Trophy (Integration & E2E priority)** exercising HTTP routes, MCP, and `PiiPromptGuard` end-to-end (Happy & Unhappy Paths); unit tests restricted to pure helper functions |

@@ -157,4 +157,86 @@ describe('SqliteSettingsRepository', () => {
     expect(maskEmailForDisplay('a@example.com')).toBe('***@example.com');
     expect(maskEmailForDisplay('')).toBe('');
   });
+
+  it('should_resolve_new_provider_defaults_on_existing_sqlite_db_while_preserving_intentional_overrides', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zeromttr-settings-'));
+    tempDirs.push(dir);
+    const dbPath = path.join(dir, 'provider-switch.sqlite');
+
+    // 1. Initial boot with Gemini + explicit Gemini model override + unrelated setting
+    const geminiRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'gemini' }),
+      undefined,
+      'gemini'
+    );
+    geminiRepo.update(
+      {
+        repeatSuppressionSeconds: 120,
+        llmModel: 'gemini-3.5-pro',
+        llmFallbackModel: 'gemini-3.5-flash'
+      },
+      'operator'
+    );
+    geminiRepo.close();
+
+    // 2. Restart on same provider preserves intentional Gemini overrides
+    const geminiReloaded = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'gemini' }),
+      undefined,
+      'gemini'
+    );
+    expect(geminiReloaded.get().llmModel).toBe('gemini-3.5-pro');
+    expect(geminiReloaded.get().llmFallbackModel).toBe('gemini-3.5-flash');
+    geminiReloaded.close();
+
+    // 3. Switch provider to OpenAI -> stale Gemini model rows are cleared and OpenAI defaults apply
+    const openAiRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'openai' }),
+      undefined,
+      'openai'
+    );
+    expect(openAiRepo.get().llmModel).toBe('gpt-4o-mini');
+    expect(openAiRepo.get().llmFallbackModel).toBe('gpt-4o-mini');
+    expect(openAiRepo.get().repeatSuppressionSeconds).toBe(120);
+    expect(openAiRepo.listAuditLog()[0]?.actor).toBe('system_provider_switch');
+
+    // 4. Intentional override on the active provider persists across restarts
+    openAiRepo.update({ llmModel: 'gpt-4o' }, 'operator');
+    openAiRepo.close();
+
+    const reloadedRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'openai' }),
+      undefined,
+      'openai'
+    );
+    expect(reloadedRepo.get().llmModel).toBe('gpt-4o');
+    reloadedRepo.close();
+  });
+
+  it('should_clear_legacy_gemini_models_when_existing_db_without_provider_metadata_switches_to_non_gemini', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zeromttr-settings-legacy-'));
+    tempDirs.push(dir);
+    const dbPath = path.join(dir, 'legacy.sqlite');
+
+    // Simulate legacy database created before _llmProvider metadata existed
+    const legacyRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'gemini' })
+    );
+    legacyRepo.update({ llmModel: 'gemini-3.5-pro' }, 'operator');
+    legacyRepo.close();
+
+    const upgradedOpenAiRepo = new SqliteSettingsRepository(
+      dbPath,
+      resolveDefaultSystemSettings({ LLM_PROVIDER: 'openai' }),
+      undefined,
+      'openai'
+    );
+    expect(upgradedOpenAiRepo.get().llmModel).toBe('gpt-4o-mini');
+    upgradedOpenAiRepo.close();
+  });
 });

@@ -217,7 +217,7 @@ Sua missão:
 
 Regras estritas de segurança e código:
 - O código corrigido em patchedContent deve conter o arquivo COMPLETO (não use reticências, nem trechos parciais).
-- No serviço de pagamentos (payment.repository.ts), garanta impreterivelmente que conexões adquiridas do pool sejam liberadas em um bloco 'finally { client.release(); }' e que o tamanho do pool seja restaurado para safe defaults (max: 10).
+- Preserve o suspectFilePath identificado no deploy diff e corrija a causa raiz da regressão (como vazamentos de recursos, limpeza ausente em blocos finally ou configurações degradadas de pool/timeout), restaurando o comportamento saudável de baseline.
 - Nunca invente dependências ou altere assinaturas de métodos públicos.
 - Responda obrigatoriamente no formato JSON estruturado conforme o schema solicitado.
 ```
@@ -267,10 +267,11 @@ export type RcaAndPatchSynthesis = z.infer<typeof RcaAndPatchSynthesisSchema>;
 ```
 
 ### 2.4 Parâmetros de Execução do LLM
-- **Modelo:** `${LLM_MODEL}` (padrão: `gemini-3.5-flash`, com fallback operacional para `gemini-3.5-flash-lite`).
+- **Provedor:** `${LLM_PROVIDER}` (padrão: `gemini`; suporta `openai`, `openai-compatible`, `openrouter`, `groq`, `deepseek`, `ollama`, `vllm` com `LLM_BASE_URL` opcional e `anthropic`).
+- **Modelo:** `${LLM_MODEL}` (padrão: `gemini-3.5-flash`, com fallback operacional para `gemini-3.5-flash-lite` ou padrão do provedor selecionado).
 - **Temperature:** `0.1` (baixa variabilidade para garantir previsibilidade e patches determinísticos).
 - **MaxOutputTokens:** `8192`.
-- **Timeout:** 25.000 ms (25 s), com no máximo 1 retentativa automática com backoff exponencial de 1 s.
+- **Timeout:** `${LLM_TIMEOUT_MS}` por tentativa (fallback legado: `${GEMINI_TIMEOUT_MS}`, padrão: 25.000 ms / 25 s), com no máximo 1 retentativa automática no modelo principal com backoff exponencial de 1 s; se ambas falharem e houver um modelo de fallback distinto configurado, é realizada uma terceira chamada independente no modelo de fallback (também sujeita ao mesmo timeout por tentativa).
 - **Teto do Arquivo Suspeito:** até `24.000` caracteres retornados por `inspect_git_deploy_diff` (`MAX_SUSPECT_FILE_CHARS`).
 
 ### 2.5 Validação Defensiva do Patch Pré-PR

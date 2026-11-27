@@ -21,7 +21,7 @@ Da esquerda para a direita, o cabeçalho exibe:
   - **Demonstração:** abre o menu lateral de simulação (visível apenas quando o modo de demonstração está habilitado).
   - **Configurações (ícone de engrenagem):** abre o painel de políticas operacionais e auditoria (disponível em demonstração e produção).
   - **Manual (`?`):** abre este guia já no idioma selecionado.
-  - **Idioma (bandeira):** alterna instantaneamente entre **Português**, **English** e **Español**.
+  - **Idioma (bandeira):** alterna instantaneamente entre **Português**, **English** e **Español**, salvando automaticamente a preferência no navegador (`localStorage`) entre recarregamentos.
 
 ## 2. Fluxo de Remediação
 

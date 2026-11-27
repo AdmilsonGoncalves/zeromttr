@@ -4,6 +4,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    env: {
+      SETTINGS_DB_PATH: ':memory:'
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

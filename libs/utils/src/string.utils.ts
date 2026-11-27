@@ -13,6 +13,18 @@ export function isNonEmptyString(value: unknown): value is string {
 }
 
 /**
+ * Returns the first trimmed non-empty string among candidates, or `''` if all are empty/whitespace.
+ */
+export function resolveFirstNonEmpty(...candidates: Array<string | null | undefined>): string {
+  for (const candidate of candidates) {
+    if (isNonEmptyString(candidate)) {
+      return candidate.trim();
+    }
+  }
+  return '';
+}
+
+/**
  * Capitalizes the first character of a string and lowercases the remainder.
  */
 export function capitalize(str: string): string {

@@ -150,10 +150,13 @@ RESEND_API_KEY=
 RESEND_FROM="ZeroMTTR - AGJ Works <sre@zeromttr.agjworks.com>"
 ON_CALL_ENGINEER_EMAIL=oncall-sre@example.com
 
-# LLM (Orchestrator ReasoningPort — Modelo Parametrizável)
+# LLM (Orchestrator ReasoningPort — Multi-provedor e Modelo Parametrizável)
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash
+LLM_FALLBACK_MODEL=gemini-3.5-flash-lite
 LLM_API_KEY=
+LLM_BASE_URL=
+LLM_TIMEOUT_MS=25000
 
 # Flags do Simulador no Workload Alvo (target-app-demo apenas)
 CHAOS_ENABLED=false

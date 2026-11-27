@@ -28,7 +28,7 @@ Los cambios se guardan en almacenamiento SQLite local y se aplican **de inmediat
 
 ### 3. IA y Observabilidad
 
-- **Modelos LLM principal y de fallback:** modelos usados para sintetizar RCA y parches.
+- **Modelos LLM principal y de fallback:** modelos usados por el proveedor activo (`LLM_PROVIDER`: Gemini, OpenAI, `openai-compatible`, OpenRouter, Groq, DeepSeek, Ollama, vLLM o Anthropic) para sintetizar RCA y parches, con soporte para identificadores con namespace (p. ej., `openai/gpt-4o-mini`).
 - **Correo del ingeniero de guardia:** se muestra siempre enmascarado (`on***@example.com`) para evitar exposición de PII en pantalla.
 - **Nivel de log del orquestador:** ajustable en vivo (`debug`, `info`, `warn`, `error`).
 

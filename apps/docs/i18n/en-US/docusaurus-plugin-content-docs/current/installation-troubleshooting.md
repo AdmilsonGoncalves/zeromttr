@@ -19,10 +19,19 @@ slug: /installation-troubleshooting
 cp .env.prod.template .env
 
 # 2. (Optional for Replay Mode; required for Live Mode)
-# Edit .env with your real credentials:
-# LLM_API_KEY, GITHUB_TOKEN, RESEND_API_KEY, ON_CALL_ENGINEER_EMAIL
-# and replace placeholder security tokens (MCP_AUTH_TOKEN, GRAFANA_WEBHOOK_TOKEN,
-# DASHBOARD_API_TOKEN, SETTINGS_ADMIN_TOKEN, and DECISION_HMAC_SECRET)
+# Edit .env to select your AI provider (LLM_PROVIDER: gemini, openai,
+# openai-compatible, openrouter, groq, deepseek, ollama, vllm, or anthropic),
+# set real credentials (LLM_API_KEY, GITHUB_TOKEN, RESEND_API_KEY,
+# ON_CALL_ENGINEER_EMAIL), and replace placeholder security tokens
+# (MCP_AUTH_TOKEN, GRAFANA_WEBHOOK_TOKEN, DASHBOARD_API_TOKEN,
+# SETTINGS_ADMIN_TOKEN, and DECISION_HMAC_SECRET). Leave LLM_MODEL and
+# LLM_FALLBACK_MODEL blank to use the selected provider's defaults (or set
+# provider-compatible models; switching LLM_PROVIDER automatically resets
+# stale model overrides saved in SQLite for the previous provider). For custom
+# gateways or Ollama/vLLM with Docker, set a container-reachable LLM_BASE_URL
+# (e.g., http://ollama:11434/v1 as a Compose service or a reachable host IP;
+# host.docker.internal is Docker Desktop-specific unless Linux Docker Engine
+# is configured with extra_hosts mapping host.docker.internal to host-gateway).
 
 # 3. Install workspace dependencies
 pnpm install --frozen-lockfile
