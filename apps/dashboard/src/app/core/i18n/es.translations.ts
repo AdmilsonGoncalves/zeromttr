@@ -271,7 +271,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
     'No se pudo cargar la configuración. Haga clic en Recargar para intentarlo nuevamente.',
   settingsReadonlyNotice:
     'Modo solo lectura — configure SETTINGS_ADMIN_TOKEN en el servidor para habilitar cambios.',
-  settingsAdminTokenLabel: 'Token administrativo (X-Settings-Admin-Token)',
+  settingsAdminTokenLabel: 'Token administrativo',
   settingsAdminTokenPlaceholder: 'Ingrese SETTINGS_ADMIN_TOKEN...',
   settingsTabAlerts: 'Alertas',
   settingsTabTarget: 'Objetivo & Diff',
@@ -305,7 +305,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   settingsAuditEmpty: 'Aún no hay cambios de configuración registrados.',
   settingsReloadBtn: 'Recargar',
   settingsSaveBtn: 'Guardar Configuración',
-  settingsSavedSuccess: '¡Configuración guardada y aplicada en tiempo real!',
+  settingsSavedSuccess: 'Configuración guardada',
   settingsSaveError: 'No se pudo guardar la configuración.',
   settingsInvalidAdminTokenError:
     'Token administrativo inválido o ausente. Verifique el SETTINGS_ADMIN_TOKEN ingresado.',

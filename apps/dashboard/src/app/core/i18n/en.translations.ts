@@ -259,7 +259,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   settingsLoadError: 'Could not load settings. Click Reload to try again.',
   settingsReadonlyNotice:
     'Read-only mode — configure SETTINGS_ADMIN_TOKEN on the server to enable edits.',
-  settingsAdminTokenLabel: 'Admin token (X-Settings-Admin-Token)',
+  settingsAdminTokenLabel: 'Admin token',
   settingsAdminTokenPlaceholder: 'Enter SETTINGS_ADMIN_TOKEN...',
   settingsTabAlerts: 'Alerts',
   settingsTabTarget: 'Target & Diff',
@@ -293,7 +293,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   settingsAuditEmpty: 'No configuration changes recorded yet.',
   settingsReloadBtn: 'Reload',
   settingsSaveBtn: 'Save Settings',
-  settingsSavedSuccess: 'Settings saved and applied in real time!',
+  settingsSavedSuccess: 'Settings saved',
   settingsSaveError: 'Failed to save settings.',
   settingsInvalidAdminTokenError:
     'Invalid or missing admin token. Check the SETTINGS_ADMIN_TOKEN provided.',
