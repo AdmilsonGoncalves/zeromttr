@@ -298,6 +298,7 @@ services:
           memory: 128M
     environment:
       - DASHBOARD_API_TOKEN=${DASHBOARD_API_TOKEN}
+      - ZEROMTTR_DOCS_DOMAIN=${ZEROMTTR_DOCS_DOMAIN:-}
     depends_on:
       - orchestrator
     labels:

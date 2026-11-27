@@ -65,11 +65,11 @@ Do **not** add `export TARGET_APP_URL=http://127.0.0.1:3001` to `~/.zshrc` or `~
 
 ## Common Troubleshooting
 
-| Symptom                                        | Likely Cause                                                | How to Fix                                                                                |
-| :--------------------------------------------- | :---------------------------------------------------------- | :---------------------------------------------------------------------------------------- |
-| **SSE Offline** in War Room header             | Orchestrator still starting or stopped.                     | Check `docker compose ps` and `docker compose logs orchestrator`.                         |
-| **HTTP 403** when triggering Live Mode         | Missing/invalid `LIVE_DEMO_KEY` or expired Turnstile token. | Enter the key in the **Demo** drawer or complete Turnstile again.                         |
-| **HTTP 429** when simulating an incident       | Global cooldown (2 min) or rate limit active.               | Wait the number of seconds shown in the toast notification.                               |
-| **Settings in read-only mode**                 | `SETTINGS_ADMIN_TOKEN` not set in a demo environment.       | Set `SETTINGS_ADMIN_TOKEN` in `.env`, restart orchestrator, and enter it in **Settings**. |
-| **Target status `Unreachable`**                | Target offline or no recent metrics in Prometheus.          | Confirm the service is healthy (`GET /health`) and exporting OTLP telemetry.              |
-| **Expired link or `409 Conflict` on decision** | Link TTL expired or incident already approved/rejected.     | Each incident accepts a single final decision within its TTL (default 15 min).            |
+| Symptom                                        | Likely Cause                                                | How to Fix                                                                                                                                       |
+| :--------------------------------------------- | :---------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SSE Offline** in War Room header             | Orchestrator still starting or stopped.                     | Check `docker compose ps` and `docker compose logs orchestrator`.                                                                                |
+| **HTTP 403** when triggering Live Mode         | Missing/invalid `LIVE_DEMO_KEY` or expired Turnstile token. | Enter the key in the **Demo** drawer or complete Turnstile again.                                                                                |
+| **HTTP 429** when simulating an incident       | Global cooldown (2 min) or rate limit active.               | Wait the number of seconds shown in the toast notification.                                                                                      |
+| **Settings in read-only mode**                 | `SETTINGS_ADMIN_TOKEN` not set in a demo environment.       | Set `SETTINGS_ADMIN_TOKEN` in `.env`, recreate the service (`docker compose up -d --force-recreate orchestrator`), and enter it in **Settings**. |
+| **Target status `Unreachable`**                | Target offline or no recent metrics in Prometheus.          | Confirm the service is healthy (`GET /health`) and exporting OTLP telemetry.                                                                     |
+| **Expired link or `409 Conflict` on decision** | Link TTL expired or incident already approved/rejected.     | Each incident accepts a single final decision within its TTL (default 15 min).                                                                   |

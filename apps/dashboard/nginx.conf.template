@@ -39,6 +39,12 @@ server {
         add_header Cache-Control "no-cache, no-transform" always;
     }
 
+    location = /index.html {
+        sub_filter '__ZEROMTTR_DOCS_DOMAIN__' '${ZEROMTTR_DOCS_DOMAIN}';
+        sub_filter_once on;
+        add_header Cache-Control "no-cache" always;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }

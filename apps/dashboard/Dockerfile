@@ -17,7 +17,8 @@ RUN pnpm --filter @zeromttr/dashboard exec vite build
 
 FROM nginx:alpine
 
-ENV NGINX_ENVSUBST_FILTER=^DASHBOARD_API_TOKEN$
+ENV ZEROMTTR_DOCS_DOMAIN=""
+ENV NGINX_ENVSUBST_FILTER=^(DASHBOARD_API_TOKEN|ZEROMTTR_DOCS_DOMAIN)$
 
 COPY apps/dashboard/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/apps/dashboard/dist /usr/share/nginx/html

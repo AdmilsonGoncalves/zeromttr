@@ -64,8 +64,8 @@ stateDiagram-v2
     INVESTIGATING --> ENRICHING: OTel collection finished (PromQL + Tempo + Loki)
     INVESTIGATING --> FAILED: No evidence / critical error
     ENRICHING --> REMEDIATING: Real diff healthy-version...buggy-version inspected in target repo
-    REMEDIATING --> AWAITING_PR: Patch verified by PiiPromptGuard & hotfix/* branch created
-    AWAITING_PR --> NOTIFIED: Pull Request opened in target repo
+    REMEDIATING --> AWAITING_PR: Patch verified by PiiPromptGuard & hotfix/* PR opened
+    AWAITING_PR --> NOTIFIED: Notification step completed (email sent or DEGRADED fallback)
     AWAITING_PR --> FAILED: GitHub API timeout / error
     NOTIFIED --> RESOLVED: Human approval (exclusive email HMAC or authorized simulation)
     NOTIFIED --> REJECTED: Human rejection (exclusive email HMAC or authorized simulation)
@@ -76,17 +76,17 @@ stateDiagram-v2
 
 ### State Summary
 
-| State           | What is happening                                                                                           |
-| :-------------- | :---------------------------------------------------------------------------------------------------------- |
-| `RECEIVED`      | Alert received via Grafana webhook and accepted after token verification and deduplication/cooldown checks. |
-| `INVESTIGATING` | Correlated collection of metrics (Prometheus), error traces (Tempo), and masked logs (Loki) via MCP Server. |
-| `ENRICHING`     | Code diff inspection between the previous healthy release and the current version in the target Git repo.   |
-| `REMEDIATING`   | _Fail-closed_ privacy audit (`PiiPromptGuard`), RCA synthesis, and patch generation by the AI.              |
-| `AWAITING_PR`   | Creation of the `hotfix/zeromttr-*` branch, patch commit, and Pull Request submission on GitHub.            |
-| `NOTIFIED`      | Pull Request opened and Post-Mortem email delivered to the on-call engineer awaiting signed human decision. |
-| `RESOLVED`      | Fix approved by the on-call engineer and incident closed successfully.                                      |
-| `REJECTED`      | Fix rejected by the on-call engineer (activates the _Human Takeover_ post-rejection cooldown window).       |
-| `FAILED`        | Critical failure during investigation or external integration, recorded for inspection in the War Room.     |
+| State           | What is happening                                                                                                                                                          |
+| :-------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RECEIVED`      | Alert received via Grafana webhook and accepted after token verification and deduplication/cooldown checks.                                                                |
+| `INVESTIGATING` | Correlated collection of metrics (Prometheus), error traces (Tempo), and masked logs (Loki) via MCP Server.                                                                |
+| `ENRICHING`     | Code diff inspection between the previous healthy release and the current version in the target Git repo.                                                                  |
+| `REMEDIATING`   | _Fail-closed_ privacy audit (`PiiPromptGuard`), RCA synthesis, and patch generation by the AI.                                                                             |
+| `AWAITING_PR`   | Creation of the `hotfix/zeromttr-*` branch, patch commit, and Pull Request submission on GitHub.                                                                           |
+| `NOTIFIED`      | Pull Request opened and notification step completed (Post-Mortem email sent, or recorded with `DEGRADED` status if email delivery failed), awaiting signed human decision. |
+| `RESOLVED`      | Fix approved by the on-call engineer and incident closed successfully.                                                                                                     |
+| `REJECTED`      | Fix rejected by the on-call engineer (activates the _Human Takeover_ post-rejection cooldown window).                                                                      |
+| `FAILED`        | Critical failure during investigation or external integration, recorded for inspection in the War Room.                                                                    |
 
 :::info Engineering Deep Dive
 For container diagrams (C4 Level 2), end-to-end sequence diagrams, hexagonal class diagrams, VPS network topology, and full ADRs, see the [Engineering Documentation on GitHub](https://github.com/AdmilsonGoncalves/zeromttr/tree/master/docs).

@@ -213,7 +213,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   tooltipSimulateIncident:
     'Starts the incident: degrades the target service (v2.14.8) in Live Mode or plays the recorded run in Replay Mode.',
   tooltipRestoreService: 'Clears pool saturation chaos and restores the target service to healthy.',
-  tooltipLanguageSelector: 'Switch UI language between Portuguese, English, and Spanish.',
+  tooltipLanguageSelector: 'UI language.',
   userManualAriaLabel: 'Open user manual',
   tooltipUserManual: 'User manual',
   tooltipViewPr: 'Open the autonomously generated hotfix Pull Request on GitHub.',

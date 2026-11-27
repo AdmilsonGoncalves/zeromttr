@@ -212,6 +212,12 @@ describe('DemoSettingsComponent', () => {
     expect(component.showHealthyTrafficControl()).toBe(true);
     expect(component.isHealthyTrafficToggleDisabled()).toBe(true);
 
+    // If healthy traffic remained active in Replay mode, keep the toggle enabled so it can be turned off
+    component.healthyTrafficActive = true;
+    expect(component.canToggleHealthyTraffic()).toBe(true);
+    expect(component.isHealthyTrafficToggleDisabled()).toBe(false);
+
+    component.healthyTrafficActive = false;
     component.demoModeEnabled = false;
     expect(component.canSimulateChaos()).toBe(false);
     expect(component.showHealthyTrafficControl()).toBe(false);

@@ -105,6 +105,18 @@ describe('WarRoomHeaderComponent', () => {
         configuredBaseUrl: 'https://docs.example.com///'
       })
     ).toBe('https://docs.example.com/en-US/');
+    expect(
+      resolveDocsManualUrl(Language.PT_BR, {
+        runtimeDocsDomain: 'manual.example.test',
+        hostname: 'ops.example.test'
+      })
+    ).toBe('https://manual.example.test/');
+    expect(
+      resolveDocsManualUrl(Language.ES_ES, {
+        runtimeDocsDomain: '__ZEROMTTR_DOCS_DOMAIN__',
+        hostname: 'ops.example.test'
+      })
+    ).toBe('https://docs.ops.example.test/es-ES/');
   });
 
   it('should_update_docs_manual_url_signal_when_ui_language_changes_and_render_external_link', () => {

@@ -31,7 +31,7 @@ The repository root includes a ready-to-use `.mcp.json` configuration:
 Because `.env` is not automatically loaded into the MCP client's process environment, export `MCP_AUTH_TOKEN` in your shell before launching **Claude Code** (or another compatible client) so `${MCP_AUTH_TOKEN}` expands in the request header:
 
 ```bash
-export MCP_AUTH_TOKEN="$(grep '^MCP_AUTH_TOKEN=' .env | cut -d= -f2-)"
+export MCP_AUTH_TOKEN="${MCP_AUTH_TOKEN:-$(node --env-file-if-exists=.env -p "process.env.MCP_AUTH_TOKEN ?? ''")}"
 claude
 ```
 
@@ -44,7 +44,7 @@ Cursor reads project MCP configs from `.cursor/mcp.json` and uses `${env:MCP_AUT
 With the local stack running:
 
 ```bash
-export MCP_AUTH_TOKEN="$(grep '^MCP_AUTH_TOKEN=' .env | cut -d= -f2-)"
+export MCP_AUTH_TOKEN="${MCP_AUTH_TOKEN:-$(node --env-file-if-exists=.env -p "process.env.MCP_AUTH_TOKEN ?? ''")}"
 npx @modelcontextprotocol/inspector
 ```
 

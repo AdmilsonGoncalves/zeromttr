@@ -65,11 +65,11 @@ TARGET_APP_URL=http://127.0.0.1:3001 ./scripts/reset.sh
 
 ## Solución de problemas frecuentes
 
-| Síntoma                              | Causa probable                                                   | Cómo resolverlo                                                                                      |
-| :----------------------------------- | :--------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------- |
-| **SSE Offline** en el War Room       | El orquestador aún arranca o está detenido.                      | Revisa `docker compose ps` y `docker compose logs orchestrator`.                                     |
-| **HTTP 403** al activar Modo Live    | Falta/invalidez de `LIVE_DEMO_KEY` o desafío Turnstile caducado. | Introduce la clave en **Demostración** o completa Turnstile de nuevo.                                |
-| **HTTP 429** al simular incidente    | Cooldown global (2 min) o límite de tasa activo.                 | Espera los segundos indicados en el aviso antes de reintentar.                                       |
-| **Configuración en solo lectura**    | `SETTINGS_ADMIN_TOKEN` no definido en entorno demo.              | Define `SETTINGS_ADMIN_TOKEN` en `.env`, reinicia el orquestador e introdúcelo en **Configuración**. |
-| **Servicio objetivo `Inalcanzable`** | Servicio caído o sin métricas recientes en Prometheus.           | Verifica que el servicio responda `GET /health` y envíe telemetría OTLP.                             |
-| **Enlace caducado o `409 Conflict`** | TTL expirado o incidente ya aprobado/rechazado.                  | Cada incidente acepta una sola decisión final dentro del TTL (por defecto 15 min).                   |
+| Síntoma                              | Causa probable                                                   | Cómo resolverlo                                                                                                                                        |
+| :----------------------------------- | :--------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SSE Offline** en el War Room       | El orquestador aún arranca o está detenido.                      | Revisa `docker compose ps` y `docker compose logs orchestrator`.                                                                                       |
+| **HTTP 403** al activar Modo Live    | Falta/invalidez de `LIVE_DEMO_KEY` o desafío Turnstile caducado. | Introduce la clave en **Demostración** o completa Turnstile de nuevo.                                                                                  |
+| **HTTP 429** al simular incidente    | Cooldown global (2 min) o límite de tasa activo.                 | Espera los segundos indicados en el aviso antes de reintentar.                                                                                         |
+| **Configuración en solo lectura**    | `SETTINGS_ADMIN_TOKEN` no definido en entorno demo.              | Define `SETTINGS_ADMIN_TOKEN` en `.env`, recrea el servicio (`docker compose up -d --force-recreate orchestrator`) e introdúcelo en **Configuración**. |
+| **Servicio objetivo `Inalcanzable`** | Servicio caído o sin métricas recientes en Prometheus.           | Verifica que el servicio responda `GET /health` y envíe telemetría OTLP.                                                                               |
+| **Enlace caducado o `409 Conflict`** | TTL expirado o incidente ya aprobado/rechazado.                  | Cada incidente acepta una sola decisión final dentro del TTL (por defecto 15 min).                                                                     |

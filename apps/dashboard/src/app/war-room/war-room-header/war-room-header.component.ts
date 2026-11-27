@@ -24,11 +24,41 @@ import { SystemSettingsComponent } from '../../shared/system-settings/system-set
 
 const DEFAULT_PROD_DOCS_URL = 'https://docs.zeromttr.agjworks.com';
 const DEFAULT_LOCAL_DOCS_URL = 'http://localhost:4300';
+const RUNTIME_DOCS_DOMAIN_PLACEHOLDER = '__ZEROMTTR_DOCS_DOMAIN__';
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 const IPV4_HOSTNAME_PATTERN = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+const SAFE_DOCS_DOMAIN_PATTERN =
+  /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?::\d{1,5})?$/i;
 
 function isCustomPublicDomain(hostname: string): boolean {
   return hostname.includes('.') && !IPV4_HOSTNAME_PATTERN.test(hostname) && !hostname.includes(':');
+}
+
+function normalizeRuntimeDocsDomain(raw?: string | null): string | null {
+  if (!isNonEmptyString(raw)) {
+    return null;
+  }
+  const trimmed = raw.trim().replace(/\/+$/, '');
+  if (trimmed === RUNTIME_DOCS_DOMAIN_PLACEHOLDER || trimmed.includes('${')) {
+    return null;
+  }
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (SAFE_DOCS_DOMAIN_PATTERN.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return null;
+}
+
+function readRuntimeDocsDomainMeta(): string | undefined {
+  if (typeof document === 'undefined') {
+    return undefined;
+  }
+  return (
+    document.querySelector('meta[name="zeromttr-docs-domain"]')?.getAttribute('content') ??
+    undefined
+  );
 }
 
 /**
@@ -36,13 +66,16 @@ function isCustomPublicDomain(hostname: string): boolean {
  */
 export function resolveDocsManualUrl(
   lang: Language,
-  options?: { configuredBaseUrl?: string; hostname?: string }
+  options?: { configuredBaseUrl?: string; runtimeDocsDomain?: string; hostname?: string }
 ): string {
   let baseUrl = DEFAULT_PROD_DOCS_URL;
   const normalizedHost = options?.hostname?.trim().toLowerCase();
+  const runtimeBaseUrl = normalizeRuntimeDocsDomain(options?.runtimeDocsDomain);
 
   if (isNonEmptyString(options?.configuredBaseUrl)) {
     baseUrl = options.configuredBaseUrl.trim().replace(/\/+$/, '');
+  } else if (runtimeBaseUrl) {
+    baseUrl = runtimeBaseUrl;
   } else if (isNonEmptyString(normalizedHost) && LOCAL_HOSTNAMES.has(normalizedHost)) {
     baseUrl = DEFAULT_LOCAL_DOCS_URL;
   } else if (isNonEmptyString(normalizedHost) && isCustomPublicDomain(normalizedHost)) {
@@ -76,8 +109,13 @@ export class WarRoomHeaderComponent {
 
   readonly docsManualUrl = computed<string>(() => {
     const configuredBaseUrl = import.meta.env?.VITE_DOCS_URL;
+    const runtimeDocsDomain = readRuntimeDocsDomainMeta();
     const hostname = typeof window !== 'undefined' ? window.location.hostname : undefined;
-    return resolveDocsManualUrl(this.i18n.currentLang(), { configuredBaseUrl, hostname });
+    return resolveDocsManualUrl(this.i18n.currentLang(), {
+      configuredBaseUrl,
+      runtimeDocsDomain,
+      hostname
+    });
   });
 
   readonly demoModeEnabledSignal = signal<boolean>(false);

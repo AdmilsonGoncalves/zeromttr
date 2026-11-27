@@ -222,7 +222,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
     'Inicia el incidente: degrada el servicio objetivo (v2.14.8) en Modo Live o reproduce la grabación en Modo Replay.',
   tooltipRestoreService:
     'Elimina la saturación del pool y restaura el servicio objetivo al estado saludable.',
-  tooltipLanguageSelector: 'Cambia el idioma de la interfaz (Portugués, Inglés o Español).',
+  tooltipLanguageSelector: 'Idioma de la interfaz.',
   userManualAriaLabel: 'Abrir manual de instrucciones',
   tooltipUserManual: 'Manual de instrucciones',
   tooltipViewPr: 'Abre en GitHub el Pull Request de hotfix generado automáticamente.',

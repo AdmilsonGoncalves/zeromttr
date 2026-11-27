@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WarRoomComponent } from '../../../src/app/war-room/war-room.component.js';
+import { TargetHealthStatus } from '../../../src/app/core/contract.js';
 import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
 import { IncidentService } from '../../../src/app/core/incident.service.js';
 import { MOCK_INCIDENT } from '../../../mock-server/mock-data.js';
@@ -59,12 +60,52 @@ describe('WarRoomComponent', () => {
     expect(incidentService.disconnectSse).toHaveBeenCalled();
   });
 
-  it('should toggle active mode between live and replay', () => {
+  it('should toggle active mode between live and replay and force-stop active healthy traffic when leaving live mode', async () => {
+    const toggleSpy = vi
+      .spyOn(incidentService, 'toggleHealthyTraffic')
+      .mockResolvedValue({ ok: true, status: 200 });
+    const toastSpy = vi.spyOn(component.messageService, 'add');
+
     expect(incidentService.activeMode()).toBe('replay');
     component.onModeChange('live');
     expect(incidentService.activeMode()).toBe('live');
+    expect(toggleSpy).not.toHaveBeenCalled();
+
+    // Without active healthy traffic, returning to replay should not invoke the toggle endpoint
     component.onModeChange('replay');
     expect(incidentService.activeMode()).toBe('replay');
+    expect(toggleSpy).not.toHaveBeenCalled();
+
+    // With active healthy traffic, disabling live mode must immediately force-stop healthy traffic
+    component.onModeChange('live');
+    incidentService.targetStatus.set({
+      status: TargetHealthStatus.HEALTHY,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.7',
+      previousHealthyVersion: 'v2.14.7',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: true
+      },
+      metrics: {
+        requestsPerSecond: 12,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 25,
+        healthyTrafficActive: true
+      }
+    });
+
+    component.onModeChange('replay');
+    expect(incidentService.activeMode()).toBe('replay');
+    await vi.waitFor(() => {
+      expect(toggleSpy).toHaveBeenCalledWith(false);
+    });
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'info',
+        summary: i18n.t('toastHealthyTrafficStoppedSummary')
+      })
+    );
   });
 
   it('should update live demo key when onLiveKeyChange is called', () => {
@@ -194,7 +235,9 @@ describe('WarRoomComponent', () => {
 
   it('should compose pure header, notices, timeline, telemetry, and KPIs as decoupled siblings', () => {
     const html = readFileSync(WAR_ROOM_TEMPLATE_PATH, 'utf8');
+    expect(html).toContain('<p-toast position="bottom-center" class="war-room-toast" />');
     expect(html).toContain('<app-war-room-header');
+    expect(html).toContain('sticky top-0');
     expect(html).toContain('<app-war-room-notices');
     expect(html).toContain('<app-war-room-kpis');
     expect(html).not.toContain('</app-war-room-header>');

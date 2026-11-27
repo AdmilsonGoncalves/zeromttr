@@ -64,8 +64,8 @@ stateDiagram-v2
     INVESTIGATING --> ENRICHING: Recolección OTel finalizada (PromQL + Tempo + Loki)
     INVESTIGATING --> FAILED: Sin evidencias / error crítico
     ENRICHING --> REMEDIATING: Diff real version-saludable...version-con-bug inspeccionado en el repo objetivo
-    REMEDIATING --> AWAITING_PR: Parche validado por PiiPromptGuard y rama hotfix/* creada
-    AWAITING_PR --> NOTIFIED: Pull Request abierto en el repo objetivo
+    REMEDIATING --> AWAITING_PR: Parche validado por PiiPromptGuard y PR hotfix/* abierto
+    AWAITING_PR --> NOTIFIED: Etapa de notificación completada (correo enviado o fallback DEGRADED)
     AWAITING_PR --> FAILED: Timeout / error en la API de GitHub
     NOTIFIED --> RESOLVED: Aprobación humana (HMAC exclusivo del correo o simulación autorizada)
     NOTIFIED --> REJECTED: Rechazo humano (HMAC exclusivo del correo o simulación autorizada)
@@ -76,17 +76,17 @@ stateDiagram-v2
 
 ### Resumen de Estados
 
-| Estado          | Qué está ocurriendo                                                                                                   |
-| :-------------- | :-------------------------------------------------------------------------------------------------------------------- |
-| `RECEIVED`      | Alerta recibida vía webhook de Grafana y aceptada tras validar el token y comprobar deduplicación/cooldown.           |
-| `INVESTIGATING` | Recolección correlacionada de métricas (Prometheus), trazas con error (Tempo) y logs enmascarados (Loki) vía MCP.     |
-| `ENRICHING`     | Inspección del diff de código entre la versión saludable anterior y la versión actual en el repositorio Git objetivo. |
-| `REMEDIATING`   | Auditoría _fail-closed_ de privacidad (`PiiPromptGuard`), síntesis de RCA y generación del parche por la IA.          |
-| `AWAITING_PR`   | Creación de la rama `hotfix/zeromttr-*`, aplicación del commit correctivo y apertura del Pull Request en GitHub.      |
-| `NOTIFIED`      | Pull Request abierto y correo Post-Mortem enviado al ingeniero de guardia a la espera de decisión humana firmada.     |
-| `RESOLVED`      | Corrección aprobada por el ingeniero de guardia e incidente cerrado con éxito.                                        |
-| `REJECTED`      | Corrección rechazada por el ingeniero de guardia (activa la ventana de _Human Takeover_ / cooldown post-rechazo).     |
-| `FAILED`        | Fallo crítico durante la investigación o integración externa, registrado para inspección en el War Room.              |
+| Estado          | Qué está ocurriendo                                                                                                                                                                  |
+| :-------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RECEIVED`      | Alerta recibida vía webhook de Grafana y aceptada tras validar el token y comprobar deduplicación/cooldown.                                                                          |
+| `INVESTIGATING` | Recolección correlacionada de métricas (Prometheus), trazas con error (Tempo) y logs enmascarados (Loki) vía MCP.                                                                    |
+| `ENRICHING`     | Inspección del diff de código entre la versión saludable anterior y la versión actual en el repositorio Git objetivo.                                                                |
+| `REMEDIATING`   | Auditoría _fail-closed_ de privacidad (`PiiPromptGuard`), síntesis de RCA y generación del parche por la IA.                                                                         |
+| `AWAITING_PR`   | Creación de la rama `hotfix/zeromttr-*`, aplicación del commit correctivo y apertura del Pull Request en GitHub.                                                                     |
+| `NOTIFIED`      | Pull Request abierto y etapa de notificación completada (correo Post-Mortem enviado o registrado con estado `DEGRADED` si falla la entrega), a la espera de decisión humana firmada. |
+| `RESOLVED`      | Corrección aprobada por el ingeniero de guardia e incidente cerrado con éxito.                                                                                                       |
+| `REJECTED`      | Corrección rechazada por el ingeniero de guardia (activa la ventana de _Human Takeover_ / cooldown post-rechazo).                                                                    |
+| `FAILED`        | Fallo crítico durante la investigación o integración externa, registrado para inspección en el War Room.                                                                             |
 
 :::info Profundización de Ingeniería
 Para diagramas de contenedores (C4 Nivel 2), secuencia de extremo a extremo, clases hexagonales, topología de red en VPS y ADRs completos, consulta la [Documentación de Ingeniería en GitHub](https://github.com/AdmilsonGoncalves/zeromttr/tree/master/docs).
