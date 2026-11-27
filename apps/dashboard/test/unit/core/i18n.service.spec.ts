@@ -1,7 +1,72 @@
-import { describe, it, expect } from 'vitest';
-import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  I18nService,
+  LOCALE_STORAGE_KEY,
+  Language
+} from '../../../src/app/core/i18n/i18n.service.js';
+
+function createMemoryStorage(initial: Record<string, string> = {}): Storage {
+  const store = new Map<string, string>(Object.entries(initial));
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    }
+  };
+}
 
 describe('I18nService', () => {
+  const originalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+
+  function stubLocalStorage(value: unknown): void {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      writable: true,
+      value
+    });
+  }
+
+  function stubDocumentLang(initialLang = 'pt-BR'): { documentElement: { lang: string } } {
+    const fakeDocument = { documentElement: { lang: initialLang } };
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: fakeDocument
+    });
+    return fakeDocument;
+  }
+
+  afterEach(() => {
+    if (originalStorageDescriptor) {
+      Object.defineProperty(globalThis, 'localStorage', originalStorageDescriptor);
+    } else {
+      delete (globalThis as { localStorage?: unknown }).localStorage;
+    }
+
+    if (originalDocumentDescriptor) {
+      Object.defineProperty(globalThis, 'document', originalDocumentDescriptor);
+    } else {
+      delete (globalThis as { document?: unknown }).document;
+    }
+
+    vi.restoreAllMocks();
+  });
+
   it('should default to Portuguese translations', () => {
     const service = new I18nService();
     expect(service.currentLang()).toBe(Language.PT_BR);
@@ -112,5 +177,81 @@ describe('I18nService', () => {
       expect(service.t('fsmHintResolved').toLowerCase()).not.toMatch(/restaur|restor/);
       expect(service.t('toastDecisionApprovedDetail').toLowerCase()).not.toMatch(/restaur|restor/);
     }
+  });
+
+  it('should_persist_selected_locale_in_localStorage_and_sync_html_lang', () => {
+    const storage = createMemoryStorage();
+    stubLocalStorage(storage);
+    const fakeDocument = stubDocumentLang('pt-BR');
+
+    const service = new I18nService();
+    expect(service.currentLang()).toBe(Language.PT_BR);
+    expect(fakeDocument.documentElement.lang).toBe(Language.PT_BR);
+
+    service.setLang(Language.EN_US);
+    expect(storage.getItem(LOCALE_STORAGE_KEY)).toBe(Language.EN_US);
+    expect(fakeDocument.documentElement.lang).toBe(Language.EN_US);
+
+    service.setLang(Language.ES_ES);
+    expect(storage.getItem(LOCALE_STORAGE_KEY)).toBe(Language.ES_ES);
+    expect(fakeDocument.documentElement.lang).toBe(Language.ES_ES);
+  });
+
+  it.each([Language.PT_BR, Language.EN_US, Language.ES_ES])(
+    'should_restore_persisted_locale_%s_on_construction_and_sync_html_lang',
+    (savedLang) => {
+      stubLocalStorage(createMemoryStorage({ [LOCALE_STORAGE_KEY]: savedLang }));
+      const fakeDocument = stubDocumentLang('pt-BR');
+
+      const service = new I18nService();
+      expect(service.currentLang()).toBe(savedLang);
+      expect(fakeDocument.documentElement.lang).toBe(savedLang);
+    }
+  );
+
+  it.each(['fr-FR', 'pt', '', '   ', 'invalid-locale'])(
+    'should_fallback_safely_to_pt_BR_when_persisted_locale_%j_is_invalid',
+    (invalidLocale) => {
+      stubLocalStorage(createMemoryStorage({ [LOCALE_STORAGE_KEY]: invalidLocale }));
+      const fakeDocument = stubDocumentLang('en-US');
+
+      const service = new I18nService();
+      expect(service.currentLang()).toBe(Language.PT_BR);
+      expect(fakeDocument.documentElement.lang).toBe(Language.PT_BR);
+    }
+  );
+
+  it('should_ignore_unsupported_values_passed_to_setLang_without_mutating_storage', () => {
+    const storage = createMemoryStorage({ [LOCALE_STORAGE_KEY]: Language.EN_US });
+    stubLocalStorage(storage);
+    const fakeDocument = stubDocumentLang(Language.EN_US);
+
+    const service = new I18nService();
+    service.setLang('fr-FR' as Language);
+
+    expect(service.currentLang()).toBe(Language.EN_US);
+    expect(storage.getItem(LOCALE_STORAGE_KEY)).toBe(Language.EN_US);
+    expect(fakeDocument.documentElement.lang).toBe(Language.EN_US);
+  });
+
+  it('should_degrade_gracefully_when_localStorage_is_unavailable_or_throws', () => {
+    stubLocalStorage(undefined);
+    const withoutStorage = new I18nService();
+    expect(withoutStorage.currentLang()).toBe(Language.PT_BR);
+    expect(() => withoutStorage.setLang(Language.ES_ES)).not.toThrow();
+    expect(withoutStorage.currentLang()).toBe(Language.ES_ES);
+
+    stubLocalStorage({
+      getItem: () => {
+        throw new Error('SecurityError: storage disabled');
+      },
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      }
+    });
+    const throwingStorage = new I18nService();
+    expect(throwingStorage.currentLang()).toBe(Language.PT_BR);
+    expect(() => throwingStorage.setLang(Language.EN_US)).not.toThrow();
+    expect(throwingStorage.currentLang()).toBe(Language.EN_US);
   });
 });

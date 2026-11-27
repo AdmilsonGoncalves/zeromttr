@@ -21,7 +21,7 @@ De izquierda a derecha, el encabezado muestra:
   - **Demostración:** abre el panel lateral de simulación (visible solo cuando el modo demo está habilitado).
   - **Configuración (icono de engranaje):** abre las políticas operativas en tiempo real y el historial de auditoría (disponible en demo y producción).
   - **Manual (`?`):** abre esta guía en el idioma activo.
-  - **Idioma (bandera):** cambia al instante entre **Português**, **English** y **Español**.
+  - **Idioma (bandera):** cambia al instante entre **Português**, **English** y **Español**, guardando automáticamente la preferencia en el navegador (`localStorage`) entre recargas.
 
 ## 2. Flujo de Remediación
 
