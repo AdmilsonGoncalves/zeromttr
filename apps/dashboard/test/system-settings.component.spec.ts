@@ -56,7 +56,7 @@ describe('SystemSettingsComponent', () => {
     component = new SystemSettingsComponent(i18n, service);
   });
 
-  it('should require admin token when requiresAuthKey is true and send only modified fields on save', async () => {
+  it('should_require_admin_token_when_requiresAuthKey_is_true_and_send_only_modified_fields_on_save', async () => {
     vi.spyOn(service, 'fetchSettings').mockImplementation(async () => {
       service.settings.set({ ...MOCK_RESPONSE.settings });
       service.readonlyInfo.set({ ...MOCK_RESPONSE.readonlyInfo });
@@ -96,7 +96,7 @@ describe('SystemSettingsComponent', () => {
     expect(component.feedbackSignal()?.type).toBe('success');
   });
 
-  it('should block saving when settings are read-only', async () => {
+  it('should_block_saving_when_settings_are_read_only', async () => {
     vi.spyOn(service, 'fetchSettings').mockImplementation(async () => {
       service.settings.set({ ...MOCK_RESPONSE.settings });
       service.readonlyInfo.set({ ...MOCK_RESPONSE.readonlyInfo });
@@ -113,7 +113,7 @@ describe('SystemSettingsComponent', () => {
     expect(component.canSave()).toBe(false);
   });
 
-  it('should display localized error messages for invalid token, read-only, validation, and rate limit responses', async () => {
+  it('should_display_localized_error_messages_for_invalid_token_read_only_validation_and_rate_limit', async () => {
     vi.spyOn(service, 'fetchSettings').mockImplementation(async () => {
       service.settings.set({ ...MOCK_RESPONSE.settings });
       service.readonlyInfo.set({ ...MOCK_RESPONSE.readonlyInfo });
@@ -175,23 +175,38 @@ describe('SystemSettingsComponent', () => {
     });
   });
 
-  it('should format duration labels concisely across seconds, minutes, and hours', () => {
+  it('should_format_duration_labels_concisely_across_seconds_minutes_and_hours', () => {
     expect(component.formatDurationSeconds(0)).toBe(i18n.t('settingsDisabledValue'));
     expect(component.formatDurationSeconds(45)).toBe('45s');
     expect(component.formatDurationSeconds(900)).toBe('15m');
     expect(component.formatDurationSeconds(5400)).toBe('1h 30m');
   });
 
-  it('should render gear trigger, admin token input, tabbed drawer, and clean copy without SQLite jargon', () => {
+  it('should_render_gear_trigger_admin_token_input_tabbed_drawer_and_error_fallback_without_SQLite_jargon', () => {
     const html = readFileSync(SETTINGS_TEMPLATE_PATH, 'utf8');
     expect(html).toContain('pi-cog');
     expect(html).toContain('<p-drawer');
     expect(html).toContain('<p-tabs');
     expect(html).toContain('settings-admin-token-input');
     expect(html).toContain('settingsReadonlyNotice');
+    expect(html).toContain('@else {');
+    expect(html).toContain('settingsService.lastError()');
     expect(html).not.toContain('SQLite');
     expect(i18n.t('tooltipSystemSettings')).toBe('Configurações');
     expect(i18n.t('settingsDrawerTitle')).toBe('Configurações');
     expect(i18n.t('settingsDrawerSubtitle')).not.toContain('SQLite');
+    expect(i18n.t('settingsOnCallEmailHint')).toContain('ON_CALL_ENGINEER_EMAIL');
+  });
+
+  it('should_disable_autoRestoreOnApprove_control_when_demoModeEnabled_is_false', () => {
+    component.demoModeEnabled = false;
+    expect(component.isAutoRestoreControlDisabled()).toBe(true);
+
+    component.demoModeEnabled = true;
+    service.editable.set(true);
+    expect(component.isAutoRestoreControlDisabled()).toBe(false);
+
+    const html = readFileSync(SETTINGS_TEMPLATE_PATH, 'utf8');
+    expect(html).toContain('isAutoRestoreControlDisabled()');
   });
 });

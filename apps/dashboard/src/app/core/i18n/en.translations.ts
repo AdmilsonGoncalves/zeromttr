@@ -9,6 +9,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   sseConnected: 'SSE Connected',
   sseOffline: 'SSE Offline',
   targetStatusUnknown: 'Target: --',
+  unreachable: 'Unreachable',
   demoMenuBtn: 'Demo',
   demoMenuTitle: 'Demo',
   demoMenuSubtitle: 'Configure execution mode, synthetic traffic, and incident simulation.',
@@ -254,6 +255,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   settingsDrawerSubtitle:
     'Configure alert policies, target service, LLM model, and review change history.',
   settingsLoading: 'Loading settings...',
+  settingsLoadError: 'Could not load settings. Click Reload to try again.',
   settingsReadonlyNotice:
     'Read-only mode — configure SETTINGS_ADMIN_TOKEN on the server to enable edits.',
   settingsAdminTokenLabel: 'Admin token (X-Settings-Admin-Token)',
@@ -285,7 +287,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   settingsLlmFallbackLabel: 'Secondary LLM Model (Fallback)',
   settingsOnCallEmailLabel: 'On-Call Engineer Email (Resend)',
   settingsOnCallEmailHint:
-    'Recipient for post-mortems and HMAC links. Automatically masked for privacy.',
+    'Recipient for post-mortems and HMAC links (masked for privacy). Leaving it blank falls back to the server default ON_CALL_ENGINEER_EMAIL (.env).',
   settingsLogLevelLabel: 'Orchestrator Log Level',
   settingsAuditEmpty: 'No configuration changes recorded yet.',
   settingsReloadBtn: 'Reload',

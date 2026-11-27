@@ -15,12 +15,30 @@ export const SettingsPersistenceEngine = {
 export type SettingsPersistenceEngine =
   (typeof SettingsPersistenceEngine)[keyof typeof SettingsPersistenceEngine];
 
-const SAFE_GIT_REF_PATTERN = /^[A-Za-z0-9._/~^-]+$/;
+const SAFE_GIT_REF_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._/~^-]*$/;
 const SAFE_MODEL_NAME_PATTERN = /^[A-Za-z0-9._:-]+$/;
+const MASKED_EMAIL_PATTERN = /^[^@\s]{0,2}\*{3}@[^@\s]+\.[^@\s]+$/;
+const WINDOWS_DRIVE_PREFIX_PATTERN = /^[A-Za-z]:/;
+
+function isSafeGitRef(value: string): boolean {
+  const trimmed = value.trim();
+  if (!SAFE_GIT_REF_PATTERN.test(trimmed)) {
+    return false;
+  }
+  if (trimmed.includes('..') || trimmed.endsWith('/') || trimmed.endsWith('.lock')) {
+    return false;
+  }
+  return true;
+}
 
 function isSafeRepoRelativePath(value: string): boolean {
   const trimmed = value.trim();
-  if (trimmed.length === 0 || trimmed.startsWith('/') || trimmed.includes('\\')) {
+  if (
+    trimmed.length === 0 ||
+    trimmed.startsWith('/') ||
+    trimmed.includes('\\') ||
+    WINDOWS_DRIVE_PREFIX_PATTERN.test(trimmed)
+  ) {
     return false;
   }
   if (trimmed.includes('\0')) {
@@ -49,13 +67,13 @@ export const SystemSettingsSchema = z.object({
     .trim()
     .min(1)
     .max(120)
-    .regex(SAFE_GIT_REF_PATTERN, 'targetBaseRef contains invalid characters'),
+    .refine(isSafeGitRef, 'targetBaseRef contains invalid characters'),
   targetHeadRef: z
     .string()
     .trim()
     .min(1)
     .max(120)
-    .regex(SAFE_GIT_REF_PATTERN, 'targetHeadRef contains invalid characters'),
+    .refine(isSafeGitRef, 'targetHeadRef contains invalid characters'),
   targetErrorRateThresholdPercent: z.number().min(0.1).max(100),
 
   // LLM & Operations
@@ -98,8 +116,20 @@ export const SystemSettingsReadonlyInfoSchema = z.object({
 });
 export type SystemSettingsReadonlyInfo = z.infer<typeof SystemSettingsReadonlyInfoSchema>;
 
+export const DisplayOnCallEmailSchema = z.union([
+  z.literal(''),
+  z.literal('***'),
+  z.string().trim().email().max(160),
+  z.string().trim().max(160).regex(MASKED_EMAIL_PATTERN)
+]);
+
+export const SystemSettingsDisplaySchema = SystemSettingsSchema.extend({
+  onCallEmail: DisplayOnCallEmailSchema
+});
+export type SystemSettingsDisplay = z.infer<typeof SystemSettingsDisplaySchema>;
+
 export const SystemSettingsResponseSchema = z.object({
-  settings: SystemSettingsSchema,
+  settings: SystemSettingsDisplaySchema,
   readonlyInfo: SystemSettingsReadonlyInfoSchema,
   editable: z.boolean(),
   requiresAuthKey: z.boolean(),

@@ -20,12 +20,22 @@
               [value]="
                 ts.service +
                 ': ' +
-                (ts.status === healthStatus.HEALTHY ? i18n.t('healthy') : i18n.t('degraded')) +
+                (ts.status === healthStatus.HEALTHY
+                  ? i18n.t('healthy')
+                  : ts.status === healthStatus.UNREACHABLE
+                    ? i18n.t('unreachable')
+                    : i18n.t('degraded')) +
                 ' (' +
                 ts.version +
                 ')'
               "
-              [severity]="ts.status === healthStatus.HEALTHY ? 'success' : 'warn'"
+              [severity]="
+                ts.status === healthStatus.HEALTHY
+                  ? 'success'
+                  : ts.status === healthStatus.UNREACHABLE
+                    ? 'danger'
+                    : 'warn'
+              "
               styleClass="text-[10px] py-0 shrink-0"
             />
           } @else {
@@ -65,7 +75,7 @@
         />
       }
 
-      <app-system-settings />
+      <app-system-settings [demoModeEnabled]="demoModeEnabledSignal()" />
       <app-locale-switcher [currentLang]="i18n.currentLang()" (langChange)="onLangSelect($event)" />
     </div>
   </div>

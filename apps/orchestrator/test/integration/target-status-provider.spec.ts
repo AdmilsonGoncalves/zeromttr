@@ -22,6 +22,8 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
     'TARGET_SERVICE_NAME',
     'TARGET_VERSION',
     'TARGET_PREVIOUS_VERSION',
+    'TARGET_BASE_REF',
+    'TARGET_HEAD_REF',
     'TARGET_REPO_URL',
     'TARGET_SUSPECT_FILE_PATH'
   ] as const;
@@ -53,7 +55,7 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
   });
 
   describe('HttpTargetStatusAdapter', () => {
-    it('should fetch target manifest from configured ops status path', async () => {
+    it('should_fetch_target_manifest_from_configured_ops_status_path', async () => {
       process.env.TARGET_STATUS_PATH = '/custom/ops-manifest';
 
       nock(TEST_TARGET_APP_URL)
@@ -112,7 +114,7 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       });
     });
 
-    it('should fallback to legacy chaos status when ops status returns 404', async () => {
+    it('should_fallback_to_legacy_chaos_status_when_ops_status_returns_404', async () => {
       nock(TEST_TARGET_APP_URL)
         .get('/ops/status')
         .reply(HTTP_STATUS.NOT_FOUND, { error: 'Not Found' });
@@ -137,7 +139,7 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       });
     });
 
-    it('should normalize legacy pool fields into generic saturation descriptor', async () => {
+    it('should_normalize_legacy_pool_fields_into_generic_saturation_descriptor', async () => {
       nock(TEST_TARGET_APP_URL)
         .get('/ops/status')
         .reply(HTTP_STATUS.OK, {
@@ -167,7 +169,7 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       });
     });
 
-    it('should return unreachable with false capabilities on network failure', async () => {
+    it('should_return_unreachable_with_false_capabilities_on_network_failure', async () => {
       nock(TEST_TARGET_APP_URL).get('/ops/status').replyWithError('ECONNREFUSED');
 
       const adapter = new HttpTargetStatusAdapter(TEST_TARGET_APP_URL);
@@ -182,7 +184,7 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
   });
 
   describe('PrometheusTargetStatusAdapter', () => {
-    it('should build target status and live metrics from promql queries and env', async () => {
+    it('should_build_target_status_and_live_metrics_from_promql_queries_and_env', async () => {
       process.env.TARGET_SERVICE_NAME = 'orders-api';
       process.env.TARGET_VERSION = 'v5.0.1';
       process.env.TARGET_PREVIOUS_VERSION = 'v5.0.0';
@@ -233,7 +235,7 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       expect(status.metrics?.saturation).toBeUndefined();
     });
 
-    it('should return degraded when 5xx ratio exceeds threshold', async () => {
+    it('should_return_degraded_when_5xx_ratio_exceeds_threshold', async () => {
       process.env.TARGET_SERVICE_NAME = 'orders-api';
 
       const executePromqlRange = vi.fn(async ({ query }: { query: string }) => {
@@ -260,7 +262,7 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       expect(status.metrics?.errorRate5xxPercent).toBe(24.5);
     });
 
-    it('should report false chaos capabilities for passive prometheus targets', async () => {
+    it('should_report_false_chaos_capabilities_for_passive_prometheus_targets', async () => {
       const adapter = new PrometheusTargetStatusAdapter(createMockToolsPort());
       const status = await adapter.getStatus();
 
@@ -270,7 +272,144 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       });
     });
 
-    it('should select prometheus provider when TARGET_STATUS_PROVIDER is prometheus', () => {
+    it('should_return_unreachable_when_prometheus_returns_no_http_metric_series', async () => {
+      process.env.TARGET_SERVICE_NAME = 'missing-service';
+      const executePromqlRange = vi.fn(async () => ({
+        seriesCount: 0,
+        summarizedSeries: [],
+        finops: createMockFinOpsData()
+      }));
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange })
+      );
+      const status = await adapter.getStatus();
+
+      expect(status.status).toBe(TargetHealthStatus.UNREACHABLE);
+      expect(status.metrics).toBeUndefined();
+    });
+
+    it('should_preserve_actual_low_rps_denominator_without_clamp_min_one_in_error_ratio_query', async () => {
+      process.env.TARGET_SERVICE_NAME = 'low-rps-service';
+      const capturedQueries: string[] = [];
+      const executePromqlRange = vi.fn(async ({ query }: { query: string }) => {
+        capturedQueries.push(query);
+        if (query.includes('5..')) {
+          return {
+            seriesCount: 1,
+            summarizedSeries: [{ metric: {}, latest: 100, p95: 100, max: 100 }],
+            finops: createMockFinOpsData()
+          };
+        }
+        return {
+          seriesCount: 1,
+          summarizedSeries: [{ metric: {}, latest: 0.04, p95: 0.04, max: 0.04 }],
+          finops: createMockFinOpsData()
+        };
+      });
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange })
+      );
+      const status = await adapter.getStatus();
+
+      const errorQuery = capturedQueries.find((q) => q.includes('5..')) ?? '';
+      expect(errorQuery).not.toContain('clamp_min');
+      expect(errorQuery).toContain('> 0');
+      expect(status.status).toBe(TargetHealthStatus.DEGRADED);
+      expect(status.metrics?.errorRate5xxPercent).toBe(100);
+    });
+
+    it('should_report_HEALTHY_with_zero_error_rate_when_prometheus_has_rps_and_latency_but_no_5xx_series', async () => {
+      process.env.TARGET_SERVICE_NAME = 'healthy-orders-api';
+      const executePromqlRange = vi.fn(async ({ query }: { query: string }) => {
+        if (query.includes('5..')) {
+          return {
+            seriesCount: 0,
+            summarizedSeries: [],
+            finops: createMockFinOpsData()
+          };
+        }
+        if (query.includes('histogram_quantile')) {
+          return {
+            seriesCount: 1,
+            summarizedSeries: [{ metric: {}, latest: 42, p95: 42, max: 60 }],
+            finops: createMockFinOpsData()
+          };
+        }
+        return {
+          seriesCount: 1,
+          summarizedSeries: [{ metric: {}, latest: 1, p95: 1, max: 1 }],
+          finops: createMockFinOpsData()
+        };
+      });
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange })
+      );
+      const status = await adapter.getStatus();
+
+      expect(status.status).toBe(TargetHealthStatus.HEALTHY);
+      expect(status.metrics).toMatchObject({
+        requestsPerSecond: 1,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 42
+      });
+    });
+
+    it('should_prefer_dynamic_diff_refs_callback_over_static_env_refs', async () => {
+      process.env.TARGET_SERVICE_NAME = 'orders-api';
+      process.env.TARGET_PREVIOUS_VERSION = 'v1.0.0-env';
+      process.env.TARGET_VERSION = 'v1.0.1-env';
+
+      const executePromqlRange = vi.fn(async () => ({
+        seriesCount: 1,
+        summarizedSeries: [{ metric: {}, latest: 10, p95: 10, max: 10 }],
+        finops: createMockFinOpsData()
+      }));
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange }),
+        {
+          getDiffRefs: () => ({
+            targetBaseRef: 'v2.9.0-runtime',
+            targetHeadRef: 'v2.9.1-runtime'
+          })
+        }
+      );
+      const status = await adapter.getStatus();
+
+      expect(status.previousHealthyVersion).toBe('v2.9.0-runtime');
+      expect(status.version).toBe('v2.9.1-runtime');
+    });
+
+    it('should_escape_quotes_and_backslashes_in_service_name_for_promql_queries', async () => {
+      const capturedQueries: string[] = [];
+      const executePromqlRange = vi.fn(async ({ query }: { query: string }) => {
+        capturedQueries.push(query);
+        return {
+          seriesCount: 1,
+          summarizedSeries: [{ metric: {}, latest: 1, p95: 1, max: 1 }],
+          finops: createMockFinOpsData()
+        };
+      });
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange }),
+        {
+          serviceName: 'orders\\"api'
+        }
+      );
+      await adapter.getStatus();
+
+      expect(capturedQueries).toHaveLength(3);
+      for (const query of capturedQueries) {
+        expect(query).toContain('service_name="orders\\\\\\"api"');
+        expect(query).toContain('service="orders\\\\\\"api"');
+      }
+    });
+
+    it('should_select_prometheus_provider_when_TARGET_STATUS_PROVIDER_is_prometheus', () => {
       process.env.TARGET_STATUS_PROVIDER = 'prometheus';
       const port = createTargetStatusPort(createMockToolsPort());
       expect(port).toBeInstanceOf(PrometheusTargetStatusAdapter);

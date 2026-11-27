@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { z } from 'zod';
 import {
   SystemSettingsPatchSchema,
   SystemSettingsSchema,
@@ -9,25 +10,27 @@ import {
   type SystemSettingsPatch
 } from '@zeromttr/contracts';
 import { clamp, isNonEmptyString, nowIso, safeJsonParse } from '@zeromttr/utils';
+import { OrchestratorLogEvent } from '../domain/log-enums.js';
 import { maskEmailForDisplay, resolveDefaultSystemSettings } from '../domain/system-settings.js';
+import type { LoggerPort } from '../ports/logger.port.js';
 import type {
   SettingsRepositoryPort,
   SettingsUpdateResult
 } from '../ports/settings-repository.port.js';
 
-interface SettingRow {
-  key: string;
-  value: string;
-}
+const SettingRowSchema = z.object({
+  key: z.string(),
+  value: z.string()
+});
 
-interface AuditRow {
-  id: number;
-  setting_key: string;
-  old_value: string | null;
-  new_value: string;
-  actor: string;
-  changed_at: string;
-}
+const AuditRowSchema = z.object({
+  id: z.union([z.number(), z.bigint()]),
+  setting_key: z.string(),
+  old_value: z.string().nullable(),
+  new_value: z.string(),
+  actor: z.string(),
+  changed_at: z.string()
+});
 
 const DEFAULT_AUDIT_LIMIT = 25;
 const MAX_AUDIT_LIMIT = 200;
@@ -48,13 +51,17 @@ function formatAuditValue(
 export class SqliteSettingsRepository implements SettingsRepositoryPort {
   private readonly db: DatabaseSync;
   private readonly defaults: SystemSettings;
+  private readonly logger?: LoggerPort;
   private current: SystemSettings;
+  private closed = false;
 
   public constructor(
     dbPath: string = ':memory:',
-    defaults: SystemSettings = resolveDefaultSystemSettings(process.env)
+    defaults: SystemSettings = resolveDefaultSystemSettings(process.env),
+    logger?: LoggerPort
   ) {
     this.defaults = SystemSettingsSchema.parse(defaults);
+    this.logger = logger;
 
     const normalizedPath = dbPath.trim() || ':memory:';
     if (normalizedPath !== ':memory:') {
@@ -84,31 +91,50 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
         actor TEXT NOT NULL,
         changed_at TEXT NOT NULL
       );
-
-      CREATE INDEX IF NOT EXISTS idx_settings_audit_changed_at
-        ON settings_audit_log (id DESC);
     `);
 
     this.current = this.loadFromDatabase();
   }
 
   private loadFromDatabase(): SystemSettings {
-    const rows = this.db
-      .prepare('SELECT key, value FROM system_settings')
-      .all() as unknown as SettingRow[];
-
+    const rawRows = this.db.prepare('SELECT key, value FROM system_settings').all();
+    const shape = SystemSettingsSchema.shape;
     const merged: Record<string, unknown> = { ...this.defaults };
-    for (const row of rows) {
-      if (Object.prototype.hasOwnProperty.call(this.defaults, row.key)) {
-        const parsed = safeJsonParse<unknown>(row.value);
-        if (parsed !== null) {
-          merged[row.key] = parsed;
-        }
+
+    for (const rawRow of rawRows) {
+      const parsedRow = SettingRowSchema.safeParse(rawRow);
+      if (!parsedRow.success) {
+        continue;
+      }
+      const { key, value } = parsedRow.data;
+      if (!Object.prototype.hasOwnProperty.call(shape, key)) {
+        continue;
+      }
+      const typedKey = key as keyof SystemSettings;
+      const parsedJson = safeJsonParse<unknown>(value);
+      if (parsedJson === null) {
+        this.logger?.warn({
+          event: OrchestratorLogEvent.SETTINGS_INVALID_PERSISTED_KEY,
+          settingKey: typedKey,
+          reason: 'Malformed JSON value in SQLite'
+        });
+        continue;
+      }
+
+      const fieldSchema = shape[typedKey];
+      const fieldResult = fieldSchema.safeParse(parsedJson);
+      if (fieldResult.success) {
+        merged[typedKey] = fieldResult.data;
+      } else {
+        this.logger?.warn({
+          event: OrchestratorLogEvent.SETTINGS_INVALID_PERSISTED_KEY,
+          settingKey: typedKey,
+          reason: 'Persisted value failed schema validation; using default for this key'
+        });
       }
     }
 
-    const validated = SystemSettingsSchema.safeParse(merged);
-    return validated.success ? validated.data : { ...this.defaults };
+    return SystemSettingsSchema.parse(merged);
   }
 
   /**
@@ -191,7 +217,7 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
    */
   public listAuditLog(limit = DEFAULT_AUDIT_LIMIT): SettingsAuditEntry[] {
     const safeLimit = clamp(Math.trunc(limit), 1, MAX_AUDIT_LIMIT);
-    const rows = this.db
+    const rawRows = this.db
       .prepare(
         `
         SELECT id, setting_key, old_value, new_value, actor, changed_at
@@ -200,22 +226,33 @@ export class SqliteSettingsRepository implements SettingsRepositoryPort {
         LIMIT ?
       `
       )
-      .all(safeLimit) as unknown as AuditRow[];
+      .all(safeLimit);
 
-    return rows.map((row) => ({
-      id: Number(row.id),
-      settingKey: row.setting_key,
-      oldValue: row.old_value,
-      newValue: row.new_value,
-      actor: row.actor,
-      changedAt: row.changed_at
-    }));
+    const entries: SettingsAuditEntry[] = [];
+    for (const rawRow of rawRows) {
+      const parsed = AuditRowSchema.safeParse(rawRow);
+      if (parsed.success) {
+        entries.push({
+          id: Number(parsed.data.id),
+          settingKey: parsed.data.setting_key,
+          oldValue: parsed.data.old_value,
+          newValue: parsed.data.new_value,
+          actor: parsed.data.actor,
+          changedAt: parsed.data.changed_at
+        });
+      }
+    }
+    return entries;
   }
 
   /**
-   * Closes the underlying SQLite connection.
+   * Closes the underlying SQLite connection idempotently.
    */
   public close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
     this.db.close();
   }
 }

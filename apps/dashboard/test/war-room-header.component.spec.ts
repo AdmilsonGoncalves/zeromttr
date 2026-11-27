@@ -58,4 +58,11 @@ describe('WarRoomHeaderComponent', () => {
     expect(html).not.toContain('liveKeyPlaceholder');
     expect(html).not.toContain('langOptions');
   });
+
+  it('should_render_distinct_unreachable_status_label_and_severity_in_header', () => {
+    const html = readFileSync(HEADER_TEMPLATE_PATH, 'utf8');
+    expect(html).toContain('healthStatus.UNREACHABLE');
+    expect(html).toContain("i18n.t('unreachable')");
+    expect(i18n.t('unreachable')).toBeTruthy();
+  });
 });

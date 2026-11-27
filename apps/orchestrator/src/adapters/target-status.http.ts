@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { TargetStatusResponseSchema, type TargetStatusResponse } from '@zeromttr/contracts';
 import { isFilled } from '@zeromttr/utils';
 import { HTTP_STATUS, buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import { OrchestratorDefault, TargetHealthStatus } from '../domain/incident-enums.js';
@@ -12,51 +12,7 @@ import type {
 const DEFAULT_OPS_STATUS_PATH = '/ops/status';
 const LEGACY_CHAOS_STATUS_PATH = '/chaos/status';
 
-const TargetCapabilitiesSchema = z.object({
-  chaosSimulation: z.boolean().default(false),
-  healthyTrafficToggle: z.boolean().default(false)
-});
-
-const TargetSaturationSchema = z.object({
-  resourceLabel: z.string().min(1),
-  active: z.number().int().nonnegative(),
-  waiting: z.number().int().nonnegative(),
-  max: z.number().int().nonnegative()
-});
-
-const TargetLiveMetricsSchema = z.object({
-  requestsPerSecond: z.number().nonnegative(),
-  errorRate5xxPercent: z.number().min(0).max(100),
-  p95LatencyMs: z.number().nonnegative(),
-  healthyTrafficActive: z.boolean().default(false),
-  saturation: TargetSaturationSchema.optional(),
-  poolActive: z.number().int().nonnegative().optional(),
-  poolWaiting: z.number().int().nonnegative().optional(),
-  poolMax: z.number().int().nonnegative().optional()
-});
-
-const TargetStatusSchema = z.object({
-  status: z.enum([
-    TargetHealthStatus.HEALTHY,
-    TargetHealthStatus.DEGRADED,
-    TargetHealthStatus.UNREACHABLE
-  ]),
-  service: z.string(),
-  version: z.string(),
-  previousHealthyVersion: z.string(),
-  targetRepo: z.string().optional(),
-  suspectFilePath: z.string().optional(),
-  capabilities: TargetCapabilitiesSchema.default({
-    chaosSimulation: false,
-    healthyTrafficToggle: false
-  }),
-  rawEdgeLogPreCollector: z.string().optional(),
-  metrics: TargetLiveMetricsSchema.optional()
-});
-
-type ParsedTargetStatus = z.infer<typeof TargetStatusSchema>;
-
-function normalizeMetrics(metrics: ParsedTargetStatus['metrics']): TargetLiveMetrics | undefined {
+function normalizeMetrics(metrics: TargetStatusResponse['metrics']): TargetLiveMetrics | undefined {
   if (!metrics) {
     return undefined;
   }
@@ -106,7 +62,7 @@ export class HttpTargetStatusAdapter implements TargetStatusPort {
       return { status: response.status };
     }
 
-    const parsed = TargetStatusSchema.safeParse(await response.json());
+    const parsed = TargetStatusResponseSchema.safeParse(await response.json());
     if (!parsed.success) {
       return { status: response.status };
     }

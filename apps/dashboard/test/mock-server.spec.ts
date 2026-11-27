@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createMockServer, type MockServer } from '../mock-server/server.js';
-import type { IncidentDetail, TargetStatusResponse } from '../src/app/core/contract.js';
+import type {
+  IncidentDetail,
+  SystemSettingsResponse,
+  TargetStatusResponse
+} from '../src/app/core/contract.js';
 
 describe('Dashboard Mock Server', () => {
   let server: MockServer;
@@ -203,5 +207,31 @@ describe('Dashboard Mock Server', () => {
       expect(text).toContain('event:');
       await reader.cancel();
     }
+  });
+
+  it('should_mask_onCallEmail_and_validate_PATCH_settings_payload_with_Zod', async () => {
+    const getRes = await fetch(`${baseUrl}/api/settings`);
+    expect(getRes.status).toBe(200);
+    const getBody = (await getRes.json()) as SystemSettingsResponse;
+    expect(getBody.settings.onCallEmail).toBe('on***@example.com');
+
+    const invalidPatchRes = await fetch(`${baseUrl}/api/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetServicePath: '../etc/passwd', unknownKey: true })
+    });
+    expect(invalidPatchRes.status).toBe(400);
+
+    const validPatchRes = await fetch(`${baseUrl}/api/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ onCallEmail: 'sre-lead@example.com' })
+    });
+    expect(validPatchRes.status).toBe(200);
+    const patchBody = (await validPatchRes.json()) as SystemSettingsResponse;
+    expect(patchBody.settings.onCallEmail).toBe('sr***@example.com');
+    expect(patchBody.auditLog[0]?.settingKey).toBe('onCallEmail');
+    expect(patchBody.auditLog[0]?.oldValue).toBe('on***@example.com');
+    expect(patchBody.auditLog[0]?.newValue).toBe('sr***@example.com');
   });
 });

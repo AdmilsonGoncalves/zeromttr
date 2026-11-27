@@ -10,7 +10,7 @@
 | Framework | **Angular (latest stable)** — Standalone Components, Signals, control flow `@if/@for`, `--ssr=false` |
 | UI Components | **PrimeNG** (`primeng`, `@primeuix/themes` preset **Aura Dark**, `primeicons`) |
 | Styling | **Tailwind CSS v4** + `tailwindcss-primeui` (`slate-950` background, `border-slate-800`) with standard breakpoints centralized in `src/styles/breakpoints.css` (`@theme`) |
-| Components Used | `p-drawer`, `p-toggleswitch`, `p-inputnumber`, `p-select`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (horizontal FSM bar and responsive SVG time-series charts with Tailwind/Angular Signals) |
+| Components Used | `p-drawer`, `p-toggleswitch`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (native inputs/selects, horizontal FSM bar and responsive SVG time-series charts with Tailwind/Angular Signals) |
 | Shared Controls (`app/shared/`) | **`DemoSettingsComponent`** (`<app-demo-settings>`, Demo slide-over drawer with icon-only trigger below `lg` and hidden when `ENABLE_DEMO_MODE=false`), **`SystemSettingsComponent`** (`<app-system-settings>`, always-available gear icon opening a 4-tab drawer: Alerts, Target & Diff, LLM & Ops, Audit), and **`LocaleSwitcherComponent`** (`<app-locale-switcher>`, `🇧🇷 PT-BR \| 🇺🇸 EN-US \| 🇪🇸 ES-ES`), right-aligned (`ms-auto`) even in single-column layouts |
 | Internationalization (i18n) | **Modular Signal Service (`core/i18n/`)** with typed `Language` enum (`PT_BR`, `EN_US`, `ES_ES`) covering 100% of UI labels, drawers, and error feedback |
 | Mock Server | `apps/dashboard/mock-server/` (pure Node.js) emitting SSE and REST matching §3 contract |
@@ -35,9 +35,8 @@ The main route `/` (`WarRoomComponent`) displays the 4 quadrants powered by real
 | `GET /api/incidents` | `Incident[]` (summary, newest first) |
 | `GET /api/incidents/:id` | `IncidentDetail` (**never** includes `decisionToken` / `sig`) |
 | `GET /api/demo/config` | `{ "demoModeEnabled": boolean, "requireDemoKey": boolean, "publicLiveDemo": boolean, "turnstileSiteKey": string \| null, "turnstileRequired": boolean }` — drives `app-demo-settings` visibility (`ENABLE_DEMO_MODE`) and key input (`REQUIRE_DEMO_KEY`) |
-| `GET /api/settings` | `{ "settings": SystemSettings, "editable": boolean, "adminTokenRequired": boolean, "readonlyMeta": ... }` — powers the `app-system-settings` drawer (`onCallEmail` always masked) |
-| `PATCH /api/settings` | body `SystemSettingsPatch` (optional header `X-Settings-Admin-Token` when required) → `200` with updated settings |
-| `GET /api/settings/audit` | `{ "entries": SettingsAuditEntry[] }` — settings change history displayed in the Audit tab |
+| `GET /api/settings` | `{ "settings": SystemSettingsDisplay, "readonlyInfo": SystemSettingsReadonlyInfo, "editable": boolean, "requiresAuthKey": boolean, "auditLog": SettingsAuditEntry[] }` — powers the `app-system-settings` drawer (`onCallEmail` always masked) and Audit tab |
+| `PATCH /api/settings` | body `SystemSettingsPatch` (optional header `X-Settings-Admin-Token` when required) → `200` with updated `SystemSettingsResponse` (`settings`, `readonlyInfo`, `editable`, `requiresAuthKey`, `auditLog`) |
 | `POST /api/demo/chaos` | body `{ "mode": "live" \| "replay" }` (optional header `X-Live-Demo-Key`) → `202` |
 | `POST /api/demo/reset` | `202` — restores target service and closes demo PRs on target repository |
 | `GET /api/target/status` | `{ "status": "healthy" \| "degraded" \| "unreachable", "service": string, "version": string, "previousHealthyVersion": string, "capabilities": { "chaosSimulation": boolean, "healthyTrafficToggle": boolean }, "rawEdgeLogPreCollector"?: string, "metrics"?: { "requestsPerSecond": number, "errorRate5xxPercent": number, "p95LatencyMs": number, "healthyTrafficActive": boolean, "saturation"?: { "resourceLabel": string, "active": number, "waiting": number, "max": number } } }` |

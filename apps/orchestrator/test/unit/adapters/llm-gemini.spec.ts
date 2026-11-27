@@ -47,6 +47,27 @@ describe('GeminiReasoningAdapter', () => {
     vi.resetAllMocks();
     vi.useRealTimers();
     delete process.env.GEMINI_TIMEOUT_MS;
+    delete process.env.LLM_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  it('should_prioritize_agnostic_LLM_API_KEY_over_legacy_GEMINI_API_KEY', async () => {
+    process.env.LLM_API_KEY = 'agnostic-live-llm-key';
+    process.env.GEMINI_API_KEY = 'change-me-gemini-api-key';
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        summary: 'Pool exhausted due to max=1',
+        rootCause: 'Connection pool cap reduced from 10 to 1',
+        evidenceRefs: ['trace-abc', 'sha-123'],
+        suspectFilePath: 'src/db.ts',
+        patchedContent: 'export const max = 10;',
+        explanation: 'Restores max connections to 10'
+      })
+    });
+
+    const adapter = new GeminiReasoningAdapter(undefined, 'gemini-3.5-flash');
+    const result = await adapter.synthesizeRcaAndPatch(sampleEvidence);
+    expect(result.reasoningSource).toBe('llm');
   });
 
   it('should reject empty or placeholder Gemini API keys', async () => {

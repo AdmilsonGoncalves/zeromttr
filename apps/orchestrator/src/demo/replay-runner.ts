@@ -148,6 +148,7 @@ export class ReplayRunner {
         }
         resolve();
       }, scaledMs);
+      this.activeDelayTimer.unref();
     });
   }
 

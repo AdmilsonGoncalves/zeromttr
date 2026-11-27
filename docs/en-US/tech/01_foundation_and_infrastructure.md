@@ -153,7 +153,7 @@ ON_CALL_ENGINEER_EMAIL=oncall-sre@example.com
 # LLM (Orchestrator ReasoningPort — Configurable Model)
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-3.5-flash
-GEMINI_API_KEY=
+LLM_API_KEY=
 
 # Target Workload Simulator Flags (target-app-demo only)
 CHAOS_ENABLED=false

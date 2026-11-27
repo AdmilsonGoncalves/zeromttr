@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { isNonEmptyString, isNumber, parseNumber } from '@zeromttr/utils';
 import { HTTP_STATUS } from '@zeromttr/utils/http';
@@ -48,10 +48,20 @@ export class SystemSettingsComponent {
   readonly logLevels: readonly SystemLogLevel[] = Object.values(SystemLogLevel);
 
   readonly isDrawerOpenSignal = signal<boolean>(false);
+  readonly demoModeEnabledSignal = signal<boolean>(true);
   readonly activeTabSignal = signal<string>('0');
   readonly adminTokenSignal = signal<string>('');
   readonly draftSignal = signal<SystemSettings | null>(null);
   readonly feedbackSignal = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  @Input()
+  set demoModeEnabled(value: boolean) {
+    this.demoModeEnabledSignal.set(value);
+  }
+
+  readonly isAutoRestoreControlDisabled = computed<boolean>(
+    () => !this.settingsService.editable() || !this.demoModeEnabledSignal()
+  );
 
   readonly pendingPatch = computed<SystemSettingsPatch>(() => {
     const saved = this.settingsService.settings();

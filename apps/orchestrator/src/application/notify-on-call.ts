@@ -55,6 +55,8 @@ export class NotifyOnCall {
 
     const dynamicSettings = this.getNotificationSettings?.();
     const ttlSeconds = dynamicSettings?.decisionTtlSeconds ?? 900;
+    // Fail-safe fallback: clearing onCallEmail ("") in runtime settings removes the runtime
+    // override and falls back to the server-configured ON_CALL_ENGINEER_EMAIL env recipient.
     const resolvedRecipientEmail = isNonEmptyString(dynamicSettings?.onCallEmail)
       ? dynamicSettings.onCallEmail
       : this.recipientEmail;

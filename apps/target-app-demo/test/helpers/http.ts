@@ -95,6 +95,12 @@ export async function toggleChaos(server: http.Server, enable: boolean) {
   });
 }
 
+export async function toggleHealthyTraffic(server: http.Server, enable: boolean) {
+  return makeRequest(server, `/chaos/healthy-traffic?enable=${enable}`, {
+    method: 'POST'
+  });
+}
+
 export async function getChaosStatus(server: http.Server) {
   return makeRequest(server, '/chaos/status', {
     method: 'GET'

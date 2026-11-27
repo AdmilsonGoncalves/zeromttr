@@ -26,7 +26,7 @@ In mission-critical distributed systems — such as instant payment settlement (
 
 ### How the Interactive Demo Works
 
-When you open the **Demo** slide-over drawer (`app-demo-settings`) in the War Room and click **"Simulate Incident"** (`POST /api/demo/chaos`), the Orchestrator's modular demo router (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) operates in one of two modes targeting the **`api-pagamentos-core`** workload (`apps/target-app-demo`). Separately, the always-available **Settings** drawer (`app-system-settings`, gear icon) lets operators inspect or update runtime alert cooldowns, target diff settings, LLM models, log levels, and the change audit log (`GET`/`PATCH /api/settings`, `GET /api/settings/audit`) without restarting containers:
+When you open the **Demo** slide-over drawer (`app-demo-settings`) in the War Room and click **"Simulate Incident"** (`POST /api/demo/chaos`), the Orchestrator's modular demo router (`demo.controller.ts`, `demo-session-lifecycle.ts`, `demo-guards.ts`, `demo-handlers.ts`) operates in one of two modes targeting the **`api-pagamentos-core`** workload (`apps/target-app-demo`). Separately, the always-available **Settings** drawer (`app-system-settings`, gear icon) lets operators inspect or update runtime alert cooldowns, target diff settings, LLM models, log levels, and the change audit log (`GET`/`PATCH /api/settings`) without restarting containers:
 
 1. **Replay Mode (public default):**
    - Streams a real-time SSE timeline of a recorded real execution (`data/last-recorded-incident.json`) via `ReplayRunner`.

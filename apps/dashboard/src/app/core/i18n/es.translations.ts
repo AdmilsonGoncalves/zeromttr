@@ -9,6 +9,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   sseConnected: 'SSE Conectado',
   sseOffline: 'SSE Desconectado',
   targetStatusUnknown: 'Objetivo: --',
+  unreachable: 'Inaccesible',
   demoMenuBtn: 'Demostración',
   demoMenuTitle: 'Demostración',
   demoMenuSubtitle: 'Configure el modo de ejecución, tráfico sintético y simulación de incidentes.',
@@ -265,6 +266,8 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   settingsDrawerSubtitle:
     'Ajuste políticas de alertas, servicio objetivo, modelo LLM y consulte el historial de cambios.',
   settingsLoading: 'Cargando configuración...',
+  settingsLoadError:
+    'No se pudo cargar la configuración. Haga clic en Recargar para intentarlo nuevamente.',
   settingsReadonlyNotice:
     'Modo solo lectura — configure SETTINGS_ADMIN_TOKEN en el servidor para habilitar cambios.',
   settingsAdminTokenLabel: 'Token administrativo (X-Settings-Admin-Token)',
@@ -296,7 +299,7 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   settingsLlmFallbackLabel: 'Modelo LLM Secundario (Fallback)',
   settingsOnCallEmailLabel: 'Correo del Guardia (Resend)',
   settingsOnCallEmailHint:
-    'Destinatario de post-mortems y enlaces HMAC. Enmascarado automáticamente por privacidad.',
+    'Destinatario de post-mortems y enlaces HMAC (enmascarado por privacidad). Dejarlo vacío usa el ON_CALL_ENGINEER_EMAIL predeterminado del servidor (.env).',
   settingsLogLevelLabel: 'Nivel de Log del Orquestador',
   settingsAuditEmpty: 'Aún no hay cambios de configuración registrados.',
   settingsReloadBtn: 'Recargar',

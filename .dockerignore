@@ -8,6 +8,10 @@ docs
 .idea
 .vscode
 *.log
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+var
 .pnpm-store
 secrets
 .env

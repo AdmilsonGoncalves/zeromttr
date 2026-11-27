@@ -13,10 +13,30 @@ export interface PrometheusTargetStatusConfig {
   suspectFilePath?: string;
   errorRateThresholdPercent?: number;
   getErrorRateThreshold?: () => number;
+  getDiffRefs?: () => { targetBaseRef: string; targetHeadRef: string };
+}
+
+interface ResolvedPrometheusTargetMetadata {
+  service: string;
+  version: string;
+  previousHealthyVersion: string;
+  targetRepo: string;
+  suspectFilePath: string;
+  errorThreshold: number;
+}
+
+interface TargetPromqlQueries {
+  rpsQuery: string;
+  errorRatioQuery: string;
+  p95Query: string;
 }
 
 const DEFAULT_ERROR_RATE_THRESHOLD_PERCENT = 5;
 const PROMQL_WINDOW_MS = 2 * 60 * 1000;
+const PASSIVE_CAPABILITIES = {
+  chaosSimulation: false,
+  healthyTrafficToggle: false
+} as const;
 
 function extractMetricSample(output: PromqlRangeOutput): number {
   const firstSeries = output.summarizedSeries[0];
@@ -25,6 +45,99 @@ function extractMetricSample(output: PromqlRangeOutput): number {
   }
   const value = firstSeries.latest ?? firstSeries.p95 ?? firstSeries.p50 ?? firstSeries.max ?? 0;
   return isNumber(value) ? Math.max(0, value) : 0;
+}
+
+function resolveTargetMetadata(
+  config: PrometheusTargetStatusConfig
+): ResolvedPrometheusTargetMetadata {
+  const dynamicRefs = config.getDiffRefs?.();
+  return {
+    service:
+      config.serviceName || process.env.TARGET_SERVICE_NAME || OrchestratorDefault.UNKNOWN_SERVICE,
+    version:
+      config.version ||
+      dynamicRefs?.targetHeadRef ||
+      process.env.TARGET_VERSION ||
+      OrchestratorDefault.UNKNOWN,
+    previousHealthyVersion:
+      config.previousHealthyVersion ||
+      dynamicRefs?.targetBaseRef ||
+      process.env.TARGET_PREVIOUS_VERSION ||
+      OrchestratorDefault.UNKNOWN,
+    targetRepo: config.targetRepo || resolveTargetRepoUrl(),
+    suspectFilePath: config.suspectFilePath ?? process.env.TARGET_SUSPECT_FILE_PATH ?? '',
+    errorThreshold:
+      config.getErrorRateThreshold?.() ??
+      config.errorRateThresholdPercent ??
+      parseNumber(
+        process.env.TARGET_ERROR_RATE_THRESHOLD_PERCENT,
+        DEFAULT_ERROR_RATE_THRESHOLD_PERCENT
+      )
+  };
+}
+
+function escapePromqlLabelValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function buildTargetPromqlQueries(service: string): TargetPromqlQueries {
+  const escapedService = escapePromqlLabelValue(service);
+  const totalRateExpr = `(sum(rate(http_server_duration_milliseconds_count{service_name="${escapedService}"}[1m])) or sum(rate(http_request_duration_seconds_count{service="${escapedService}"}[1m])))`;
+  const errorRateExpr = `(sum(rate(http_server_duration_milliseconds_count{service_name="${escapedService}",http_status_code=~"5.."}[1m])) or sum(rate(http_request_duration_seconds_count{service="${escapedService}",status=~"5.."}[1m])) or vector(0))`;
+
+  return {
+    rpsQuery: totalRateExpr,
+    errorRatioQuery: `((100 * ${errorRateExpr}) / (${totalRateExpr} > 0)) or vector(0)`,
+    p95Query: `(histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name="${escapedService}"}[1m])) by (le))) or (1000 * histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="${escapedService}"}[1m])) by (le)))`
+  };
+}
+
+function buildUnreachableStatus(metadata: ResolvedPrometheusTargetMetadata): TargetStatus {
+  return {
+    status: TargetHealthStatus.UNREACHABLE,
+    service: metadata.service,
+    version: metadata.version,
+    previousHealthyVersion: metadata.previousHealthyVersion,
+    targetRepo: metadata.targetRepo,
+    suspectFilePath: metadata.suspectFilePath,
+    capabilities: { ...PASSIVE_CAPABILITIES },
+    rawEdgeLogPreCollector: ''
+  };
+}
+
+function evaluatePrometheusTelemetry(
+  metadata: ResolvedPrometheusTargetMetadata,
+  rpsOut: PromqlRangeOutput,
+  errorOut: PromqlRangeOutput,
+  p95Out: PromqlRangeOutput
+): TargetStatus {
+  const hasObservedTelemetry =
+    rpsOut.summarizedSeries.length > 0 || p95Out.summarizedSeries.length > 0;
+  if (!hasObservedTelemetry) {
+    return buildUnreachableStatus(metadata);
+  }
+
+  const requestsPerSecond = round(extractMetricSample(rpsOut), 2);
+  const errorRate5xxPercent = Math.min(100, round(extractMetricSample(errorOut), 2));
+  const p95LatencyMs = round(extractMetricSample(p95Out), 2);
+  const isDegraded = errorRate5xxPercent > metadata.errorThreshold;
+
+  return {
+    status: isDegraded ? TargetHealthStatus.DEGRADED : TargetHealthStatus.HEALTHY,
+    service: metadata.service,
+    version: metadata.version,
+    previousHealthyVersion: metadata.previousHealthyVersion,
+    targetRepo: metadata.targetRepo,
+    suspectFilePath: metadata.suspectFilePath,
+    capabilities: { ...PASSIVE_CAPABILITIES },
+    rawEdgeLogPreCollector: '',
+    metrics: {
+      requestsPerSecond,
+      errorRate5xxPercent,
+      p95LatencyMs,
+      healthyTrafficActive: false
+    }
+  };
 }
 
 /**
@@ -40,99 +153,25 @@ export class PrometheusTargetStatusAdapter implements TargetStatusPort {
    * Queries Prometheus via `ToolsPort` for throughput, 5xx ratio, and p95 latency without requiring target API endpoints.
    */
   public async getStatus(): Promise<TargetStatus> {
-    const service =
-      this.config.serviceName ||
-      process.env.TARGET_SERVICE_NAME ||
-      OrchestratorDefault.UNKNOWN_SERVICE;
-    const version =
-      this.config.version ||
-      process.env.TARGET_VERSION ||
-      process.env.TARGET_HEAD_REF ||
-      OrchestratorDefault.UNKNOWN;
-    const previousHealthyVersion =
-      this.config.previousHealthyVersion ||
-      process.env.TARGET_PREVIOUS_VERSION ||
-      process.env.TARGET_BASE_REF ||
-      OrchestratorDefault.UNKNOWN;
-    const targetRepo = this.config.targetRepo || resolveTargetRepoUrl();
-    const suspectFilePath =
-      this.config.suspectFilePath ?? process.env.TARGET_SUSPECT_FILE_PATH ?? '';
-    const errorThreshold =
-      this.config.getErrorRateThreshold?.() ??
-      this.config.errorRateThresholdPercent ??
-      parseNumber(
-        process.env.TARGET_ERROR_RATE_THRESHOLD_PERCENT,
-        DEFAULT_ERROR_RATE_THRESHOLD_PERCENT
-      );
-
+    const metadata = resolveTargetMetadata(this.config);
+    const queries = buildTargetPromqlQueries(metadata.service);
     const endMs = Date.now();
-    const startIso = new Date(endMs - PROMQL_WINDOW_MS).toISOString();
-    const endIso = new Date(endMs).toISOString();
-
-    const rpsQuery = `sum(rate(http_server_duration_milliseconds_count{service_name="${service}"}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}"}[1m]))`;
-    const errorRatioQuery = `100 * (sum(rate(http_server_duration_milliseconds_count{service_name="${service}",http_status_code=~"5.."}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}",status=~"5.."}[1m])) or vector(0)) / clamp_min(sum(rate(http_server_duration_milliseconds_count{service_name="${service}"}[1m])) or sum(rate(http_request_duration_seconds_count{service="${service}"}[1m])), 1)`;
-    const p95Query = `(histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name="${service}"}[1m])) by (le))) or (1000 * histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="${service}"}[1m])) by (le)))`;
+    const range = {
+      start: new Date(endMs - PROMQL_WINDOW_MS).toISOString(),
+      end: new Date(endMs).toISOString(),
+      step: '30s'
+    };
 
     try {
       const [rpsOut, errorOut, p95Out] = await Promise.all([
-        this.toolsPort.executePromqlRange({
-          query: rpsQuery,
-          start: startIso,
-          end: endIso,
-          step: '30s'
-        }),
-        this.toolsPort.executePromqlRange({
-          query: errorRatioQuery,
-          start: startIso,
-          end: endIso,
-          step: '30s'
-        }),
-        this.toolsPort.executePromqlRange({
-          query: p95Query,
-          start: startIso,
-          end: endIso,
-          step: '30s'
-        })
+        this.toolsPort.executePromqlRange({ query: queries.rpsQuery, ...range }),
+        this.toolsPort.executePromqlRange({ query: queries.errorRatioQuery, ...range }),
+        this.toolsPort.executePromqlRange({ query: queries.p95Query, ...range })
       ]);
 
-      const requestsPerSecond = round(extractMetricSample(rpsOut), 2);
-      const errorRate5xxPercent = Math.min(100, round(extractMetricSample(errorOut), 2));
-      const p95LatencyMs = round(extractMetricSample(p95Out), 2);
-      const isDegraded = errorRate5xxPercent > errorThreshold;
-
-      return {
-        status: isDegraded ? TargetHealthStatus.DEGRADED : TargetHealthStatus.HEALTHY,
-        service,
-        version,
-        previousHealthyVersion,
-        targetRepo,
-        suspectFilePath,
-        capabilities: {
-          chaosSimulation: false,
-          healthyTrafficToggle: false
-        },
-        rawEdgeLogPreCollector: '',
-        metrics: {
-          requestsPerSecond,
-          errorRate5xxPercent,
-          p95LatencyMs,
-          healthyTrafficActive: false
-        }
-      };
+      return evaluatePrometheusTelemetry(metadata, rpsOut, errorOut, p95Out);
     } catch {
-      return {
-        status: TargetHealthStatus.UNREACHABLE,
-        service,
-        version,
-        previousHealthyVersion,
-        targetRepo,
-        suspectFilePath,
-        capabilities: {
-          chaosSimulation: false,
-          healthyTrafficToggle: false
-        },
-        rawEdgeLogPreCollector: ''
-      };
+      return buildUnreachableStatus(metadata);
     }
   }
 }

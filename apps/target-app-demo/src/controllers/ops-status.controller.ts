@@ -1,4 +1,5 @@
 import type http from 'node:http';
+import { isNonEmptyString } from '@zeromttr/utils';
 import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import type { TargetOpsStatus } from '../chaos/target-metadata-enums.js';
@@ -38,12 +39,15 @@ export interface TargetOpsStatusManifest {
   };
 }
 
-function areChaosEndpointsEnabled(): boolean {
-  if (process.env.CHAOS_ENDPOINTS_ENABLED !== undefined) {
-    return process.env.CHAOS_ENDPOINTS_ENABLED === 'true';
+/**
+ * Returns whether interactive chaos/traffic mutation endpoints are enabled for this target instance.
+ */
+export function areChaosEndpointsEnabled(): boolean {
+  if (isNonEmptyString(process.env.CHAOS_ENDPOINTS_ENABLED)) {
+    return process.env.CHAOS_ENDPOINTS_ENABLED.trim().toLowerCase() === 'true';
   }
-  if (process.env.ENABLE_DEMO_MODE !== undefined) {
-    return process.env.ENABLE_DEMO_MODE === 'true';
+  if (isNonEmptyString(process.env.ENABLE_DEMO_MODE)) {
+    return process.env.ENABLE_DEMO_MODE.trim().toLowerCase() === 'true';
   }
   return true;
 }

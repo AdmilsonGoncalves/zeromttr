@@ -1,5 +1,6 @@
 import http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { SystemSettingsPatchSchema } from '@zeromttr/contracts';
 import {
   isEmpty,
   isNonEmptyString,
@@ -33,6 +34,31 @@ import { HEALTHY_TARGET_STATUS, INITIAL_TARGET_STATUS, MOCK_INCIDENT } from './m
 export interface MockServerOptions {
   port?: number;
   heartbeatIntervalMs?: number;
+}
+
+function maskEmailForDisplay(email: string): string {
+  const trimmed = email.trim();
+  if (!isNonEmptyString(trimmed)) {
+    return '';
+  }
+  const atIndex = trimmed.indexOf('@');
+  if (atIndex <= 0) {
+    return '***';
+  }
+  const local = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex);
+  const visiblePrefix = local.slice(0, Math.min(2, Math.max(0, local.length - 1)));
+  return `${visiblePrefix}***${domain}`;
+}
+
+function formatMockAuditValue(
+  key: keyof SystemSettings,
+  value: SystemSettings[keyof SystemSettings]
+): string {
+  if (key === 'onCallEmail') {
+    return maskEmailForDisplay(String(value));
+  }
+  return String(value);
 }
 
 class ClientError extends Error {
@@ -333,7 +359,10 @@ export class MockServer {
     // GET /api/settings
     if (req.method === 'GET' && pathname === '/api/settings') {
       this.sendJson(res, HTTP_STATUS.OK, {
-        settings: this.systemSettings,
+        settings: {
+          ...this.systemSettings,
+          onCallEmail: maskEmailForDisplay(this.systemSettings.onCallEmail)
+        },
         readonlyInfo: {
           targetGithubRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
           targetBaseBranch: 'release/target-v2.14.8',
@@ -350,7 +379,17 @@ export class MockServer {
 
     // PATCH /api/settings
     if (req.method === 'PATCH' && pathname === '/api/settings') {
-      const patch = await this.parseBody<SystemSettingsPatch>(req);
+      const rawPatch = await this.parseBody<unknown>(req);
+      const parsed = SystemSettingsPatchSchema.safeParse(rawPatch);
+      if (!parsed.success) {
+        this.sendJson(res, HTTP_STATUS.BAD_REQUEST, {
+          error: 'Invalid system settings payload',
+          details: parsed.error.format()
+        });
+        return;
+      }
+
+      const patch: SystemSettingsPatch = parsed.data;
       const changedAt = nowIso();
       for (const key of Object.keys(patch) as Array<keyof SystemSettings>) {
         const nextVal = patch[key];
@@ -360,15 +399,18 @@ export class MockServer {
           this.settingsAuditLog.unshift({
             id: this.settingsAuditLog.length + 1,
             settingKey: key,
-            oldValue: String(oldVal),
-            newValue: String(nextVal),
+            oldValue: formatMockAuditValue(key, oldVal),
+            newValue: formatMockAuditValue(key, nextVal),
             actor: 'dashboard_operator',
             changedAt
           });
         }
       }
       this.sendJson(res, HTTP_STATUS.OK, {
-        settings: this.systemSettings,
+        settings: {
+          ...this.systemSettings,
+          onCallEmail: maskEmailForDisplay(this.systemSettings.onCallEmail)
+        },
         readonlyInfo: {
           targetGithubRepo: 'https://github.com/AdmilsonGoncalves/zeromttr',
           targetBaseBranch: 'release/target-v2.14.8',

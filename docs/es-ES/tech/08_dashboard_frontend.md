@@ -10,7 +10,7 @@
 | Framework | **Angular (última versión estable)** — Standalone Components, Signals, flujo de control `@if/@for`, `--ssr=false` |
 | Componentes UI | **PrimeNG** (`primeng`, `@primeuix/themes` preset **Aura Dark**, `primeicons`) |
 | Estilos | **Tailwind CSS v4** + `tailwindcss-primeui` (fondo `slate-950`, `border-slate-800`) con breakpoints estándar centralizados en `src/styles/breakpoints.css` (`@theme`) |
-| Componentes utilizados | `p-drawer`, `p-toggleswitch`, `p-inputnumber`, `p-select`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (barra FSM horizontal y gráficos SVG temporales con Tailwind y Signals) |
+| Componentes utilizados | `p-drawer`, `p-toggleswitch`, `p-tag`, `p-button`, `p-tabs`, `p-progressbar`, `p-toast`, `p-tooltip` (inputs/selects nativos, barra FSM horizontal y gráficos SVG temporales con Tailwind y Signals) |
 | Controles Compartidos (`app/shared/`) | **`DemoSettingsComponent`** (`<app-demo-settings>`, drawer de Demostración con botón solo icono por debajo de `lg` y oculto cuando `ENABLE_DEMO_MODE=false`), **`SystemSettingsComponent`** (`<app-system-settings>`, icono de engranaje siempre visible abriendo drawer de 4 pestañas: Alertas, Objetivo & Diff, LLM & Ops, Auditoría) y **`LocaleSwitcherComponent`** (`<app-locale-switcher>`, `🇧🇷 PT-BR \| 🇺🇸 EN-US \| 🇪🇸 ES-ES`), alineados a la derecha (`ms-auto`) incluso en una sola columna |
 | Internacionalización (i18n) | **Servicio Modular con Signals (`core/i18n/`)**, enum tipado `Language` (`PT_BR`, `EN_US`, `ES_ES`) cubriendo el 100 % de la interfaz, drawers y mensajes de error |
 | Servidor Mock | `apps/dashboard/mock-server/` (Node.js puro) emitiendo SSE y REST conforme al contrato de §3 |
@@ -35,9 +35,8 @@ La ruta principal `/` (`WarRoomComponent`) muestra los 4 cuadrantes alimentados 
 | `GET /api/incidents` | `Incident[]` (resumen, más reciente primero) |
 | `GET /api/incidents/:id` | `IncidentDetail` (**nunca** incluye `decisionToken` / `sig`) |
 | `GET /api/demo/config` | `{ "demoModeEnabled": boolean, "requireDemoKey": boolean, "publicLiveDemo": boolean, "turnstileSiteKey": string \| null, "turnstileRequired": boolean }` — controla la visibilidad de `app-demo-settings` (`ENABLE_DEMO_MODE`) y el campo de clave (`REQUIRE_DEMO_KEY`) |
-| `GET /api/settings` | `{ "settings": SystemSettings, "editable": boolean, "adminTokenRequired": boolean, "readonlyMeta": ... }` — alimenta el drawer `app-system-settings` (`onCallEmail` siempre enmascarado) |
-| `PATCH /api/settings` | cuerpo `SystemSettingsPatch` (cabecera opcional `X-Settings-Admin-Token` cuando se exige) → `200` con la configuración actualizada |
-| `GET /api/settings/audit` | `{ "entries": SettingsAuditEntry[] }` — historial de cambios de configuración mostrado en la pestaña Auditoría |
+| `GET /api/settings` | `{ "settings": SystemSettingsDisplay, "readonlyInfo": SystemSettingsReadonlyInfo, "editable": boolean, "requiresAuthKey": boolean, "auditLog": SettingsAuditEntry[] }` — alimenta el drawer `app-system-settings` (`onCallEmail` siempre enmascarado) y la pestaña Auditoría |
+| `PATCH /api/settings` | cuerpo `SystemSettingsPatch` (cabecera opcional `X-Settings-Admin-Token` cuando se exige) → `200` con `SystemSettingsResponse` actualizado (`settings`, `readonlyInfo`, `editable`, `requiresAuthKey`, `auditLog`) |
 | `POST /api/demo/chaos` | cuerpo `{ "mode": "live" \| "replay" }` (cabecera opcional `X-Live-Demo-Key`) → `202` |
 | `POST /api/demo/reset` | `202` — restaura el servicio objetivo y cierra los PRs de demostración en el repositorio objetivo |
 | `GET /api/target/status` | `{ "status": "healthy" \| "degraded" \| "unreachable", "service": string, "version": string, "previousHealthyVersion": string, "capabilities": { "chaosSimulation": boolean, "healthyTrafficToggle": boolean }, "rawEdgeLogPreCollector"?: string, "metrics"?: { "requestsPerSecond": number, "errorRate5xxPercent": number, "p95LatencyMs": number, "healthyTrafficActive": boolean, "saturation"?: { "resourceLabel": string, "active": number, "waiting": number, "max": number } } }` |

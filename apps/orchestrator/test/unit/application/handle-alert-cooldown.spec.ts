@@ -19,7 +19,7 @@ const FIRING_ALERT_PAYLOAD = {
 };
 
 describe('HandleAlert rejection cooldown and repeat suppression', () => {
-  it('should suppress new incidents during rejectionCooldownSeconds after a REJECTED incident', async () => {
+  it('should_suppress_new_incidents_during_rejectionCooldownSeconds_after_a_REJECTED_incident', async () => {
     const repository = new FileIncidentRepository();
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
     let rejectionCooldownSeconds = 900;
@@ -59,7 +59,7 @@ describe('HandleAlert rejection cooldown and repeat suppression', () => {
     expect(reopened.incident?.id).not.toBe(inc.id);
   });
 
-  it('should suppress reopening after RESOLVED during repeatSuppressionSeconds window', async () => {
+  it('should_suppress_reopening_after_RESOLVED_during_repeatSuppressionSeconds_window', async () => {
     const repository = new FileIncidentRepository();
     const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
 
@@ -84,5 +84,26 @@ describe('HandleAlert rejection cooldown and repeat suppression', () => {
     expect(suppressed.suppressed).toBe(true);
     expect(suppressed.suppressionReason).toBe('repeat_suppression');
     expect(suppressed.incident?.id).toBe(inc.id);
+  });
+
+  it('should_not_suppress_new_incident_after_FAILED_incident_during_repeatSuppressionSeconds', async () => {
+    const repository = new FileIncidentRepository();
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+
+    const handleAlert = new HandleAlert(repository, broadcaster, () => ({
+      rejectionCooldownSeconds: 900,
+      repeatSuppressionSeconds: 900,
+      decisionTtlSeconds: 900
+    }));
+
+    const first = await handleAlert.execute(FIRING_ALERT_PAYLOAD);
+    const inc = first.incident!;
+    inc.transition(IncidentState.FAILED, 'Demo reset by operator');
+    await repository.save(inc);
+
+    const reopened = await handleAlert.execute(FIRING_ALERT_PAYLOAD);
+    expect(reopened.isDuplicate).toBe(false);
+    expect(reopened.suppressed).toBeUndefined();
+    expect(reopened.incident?.id).not.toBe(inc.id);
   });
 });
