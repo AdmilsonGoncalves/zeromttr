@@ -421,6 +421,21 @@ describe('Target Status Providers (HttpTargetStatusAdapter & PrometheusTargetSta
       }
     });
 
+    it('should_report_unreachable_when_prometheus_series_have_zero_usable_samples', async () => {
+      const executePromqlRange = vi.fn(async () => ({
+        seriesCount: 1,
+        summarizedSeries: [{ metric: {}, latest: 0, p95: 0, max: 0, sampleCount: 0 }],
+        finops: createMockFinOpsData()
+      }));
+
+      const adapter = new PrometheusTargetStatusAdapter(
+        createMockToolsPort({ executePromqlRange }),
+        { serviceName: 'zero-samples-service' }
+      );
+      const status = await adapter.getStatus();
+      expect(status.status).toBe(TargetHealthStatus.UNREACHABLE);
+    });
+
     it('should_select_prometheus_provider_when_TARGET_STATUS_PROVIDER_is_prometheus', () => {
       process.env.TARGET_STATUS_PROVIDER = 'prometheus';
       const port = createTargetStatusPort(createMockToolsPort());

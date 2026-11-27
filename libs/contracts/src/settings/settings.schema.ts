@@ -120,7 +120,7 @@ export const DisplayOnCallEmailSchema = z.union([
   z.literal(''),
   z.literal('***'),
   z.string().trim().email().max(160),
-  z.string().trim().max(160).regex(MASKED_EMAIL_PATTERN)
+  z.string().trim().max(162).regex(MASKED_EMAIL_PATTERN)
 ]);
 
 export const SystemSettingsDisplaySchema = SystemSettingsSchema.extend({

@@ -57,7 +57,17 @@ export type AlertPolicySettings = Pick<
   'rejectionCooldownSeconds' | 'repeatSuppressionSeconds' | 'decisionTtlSeconds'
 >;
 
+const DEFAULT_DECISION_TTL_SECONDS = 15 * 60;
 const WARNING_SEVERITY_ALIASES: ReadonlySet<string> = new Set([AlertSeverity.WARNING, 'warn']);
+
+interface ResolvedAlertPolicy {
+  ttlSeconds: number;
+  rejectionCooldownSeconds: number;
+  repeatSuppressionSeconds: number;
+}
+
+type OpenIncidentReconciliation =
+  { status: 'duplicate'; result: HandleAlertResult } | { status: 'expired' } | { status: 'none' };
 
 function normalizeAlertSeverity(rawSeverity?: string): AlertSeverity {
   if (isNonEmptyString(rawSeverity)) {
@@ -67,6 +77,52 @@ function normalizeAlertSeverity(rawSeverity?: string): AlertSeverity {
     }
   }
   return AlertSeverity.CRITICAL;
+}
+
+function getLastActivityAt(incident: Incident): string {
+  const lastTransition = incident.transitions[incident.transitions.length - 1];
+  return lastTransition ? lastTransition.at : incident.startedAt;
+}
+
+function isOpenIncidentExpired(incident: Incident, nowMs: number, ttlSeconds: number): boolean {
+  const issuedExpiresAtMs =
+    incident.state === IncidentState.NOTIFIED && incident.notification?.decisionExpiresAt
+      ? Date.parse(incident.notification.decisionExpiresAt)
+      : NaN;
+  if (Number.isFinite(issuedExpiresAtMs)) {
+    return nowMs > issuedExpiresAtMs;
+  }
+
+  const elapsedSeconds = diffInSeconds(getLastActivityAt(incident), nowMs);
+  return elapsedSeconds > ttlSeconds;
+}
+
+function evaluateSuppressionReason(
+  latest: Incident,
+  nowMs: number,
+  policy: ResolvedAlertPolicy
+): AlertSuppressionReason | null {
+  const elapsedSeconds = diffInSeconds(getLastActivityAt(latest), nowMs);
+
+  if (
+    latest.state === IncidentState.REJECTED &&
+    policy.rejectionCooldownSeconds > 0 &&
+    elapsedSeconds < policy.rejectionCooldownSeconds
+  ) {
+    return 'rejection_cooldown';
+  }
+
+  const isConclusiveState =
+    latest.state === IncidentState.RESOLVED || latest.state === IncidentState.REJECTED;
+  if (
+    isConclusiveState &&
+    policy.repeatSuppressionSeconds > 0 &&
+    elapsedSeconds < policy.repeatSuppressionSeconds
+  ) {
+    return 'repeat_suppression';
+  }
+
+  return null;
 }
 
 /**
@@ -116,81 +172,85 @@ export class HandleAlert {
     return operation;
   }
 
-  private async processFiringAlert(
+  private resolvePolicy(): ResolvedAlertPolicy {
+    const policy = this.getAlertSettings?.();
+    return {
+      ttlSeconds: policy?.decisionTtlSeconds ?? DEFAULT_DECISION_TTL_SECONDS,
+      rejectionCooldownSeconds: policy?.rejectionCooldownSeconds ?? 0,
+      repeatSuppressionSeconds: policy?.repeatSuppressionSeconds ?? 0
+    };
+  }
+
+  private async reconcileOpenIncident(
+    fingerprint: string,
+    policy: ResolvedAlertPolicy,
+    nowMs: number
+  ): Promise<OpenIncidentReconciliation> {
+    const existing = await this.repository.findOpenByFingerprint(fingerprint);
+    if (!existing) {
+      return { status: 'none' };
+    }
+
+    if (!isOpenIncidentExpired(existing, nowMs, policy.ttlSeconds)) {
+      return {
+        status: 'duplicate',
+        result: {
+          incident: existing,
+          isDuplicate: true
+        }
+      };
+    }
+
+    const reason =
+      existing.state === IncidentState.NOTIFIED
+        ? TransitionReason.DECISION_TTL_EXPIRED
+        : TransitionReason.STALE_PROCESSING_TIMEOUT;
+    const transition = existing.transition(IncidentState.FAILED, reason);
+    await this.repository.save(existing);
+    this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
+      incidentId: existing.id,
+      from: transition.from,
+      to: transition.to,
+      at: transition.at,
+      reason: transition.reason
+    });
+    return { status: 'expired' };
+  }
+
+  private async checkRecentSuppression(
+    fingerprint: string,
+    policy: ResolvedAlertPolicy,
+    nowMs: number
+  ): Promise<HandleAlertResult | null> {
+    if (
+      (policy.rejectionCooldownSeconds <= 0 && policy.repeatSuppressionSeconds <= 0) ||
+      !this.repository.findLatestByFingerprint
+    ) {
+      return null;
+    }
+
+    const latest = await this.repository.findLatestByFingerprint(fingerprint);
+    if (!latest) {
+      return null;
+    }
+
+    const suppressionReason = evaluateSuppressionReason(latest, nowMs, policy);
+    if (!suppressionReason) {
+      return null;
+    }
+
+    return {
+      incident: latest,
+      isDuplicate: true,
+      suppressed: true,
+      suppressionReason
+    };
+  }
+
+  private async createAndPublishIncident(
     primaryAlert: GrafanaWebhookPayload['alerts'][number],
     fingerprint: string
   ): Promise<HandleAlertResult> {
-    const policy = this.getAlertSettings?.();
-    const ttlSeconds = policy?.decisionTtlSeconds ?? 15 * 60;
-    const rejectionCooldownSeconds = policy?.rejectionCooldownSeconds ?? 0;
-    const repeatSuppressionSeconds = policy?.repeatSuppressionSeconds ?? 0;
-
-    const existing = await this.repository.findOpenByFingerprint(fingerprint);
-    if (existing) {
-      const lastTransition = existing.transitions[existing.transitions.length - 1];
-      const lastReferenceAt = lastTransition ? lastTransition.at : existing.startedAt;
-      const elapsedSeconds = diffInSeconds(lastReferenceAt, Date.now());
-
-      if (elapsedSeconds > ttlSeconds) {
-        const reason =
-          existing.state === IncidentState.NOTIFIED
-            ? TransitionReason.DECISION_TTL_EXPIRED
-            : TransitionReason.STALE_PROCESSING_TIMEOUT;
-        const transition = existing.transition(IncidentState.FAILED, reason);
-        await this.repository.save(existing);
-        this.broadcaster.broadcast(IncidentEventType.TRANSITION, {
-          incidentId: existing.id,
-          from: transition.from,
-          to: transition.to,
-          at: transition.at,
-          reason: transition.reason
-        });
-      } else {
-        return {
-          incident: existing,
-          isDuplicate: true
-        };
-      }
-    } else if (
-      (rejectionCooldownSeconds > 0 || repeatSuppressionSeconds > 0) &&
-      this.repository.findLatestByFingerprint
-    ) {
-      const latest = await this.repository.findLatestByFingerprint(fingerprint);
-      if (latest) {
-        const lastTransition = latest.transitions[latest.transitions.length - 1];
-        const lastReferenceAt = lastTransition ? lastTransition.at : latest.startedAt;
-        const elapsedSeconds = diffInSeconds(lastReferenceAt, Date.now());
-
-        if (
-          latest.state === IncidentState.REJECTED &&
-          rejectionCooldownSeconds > 0 &&
-          elapsedSeconds < rejectionCooldownSeconds
-        ) {
-          return {
-            incident: latest,
-            isDuplicate: true,
-            suppressed: true,
-            suppressionReason: 'rejection_cooldown'
-          };
-        }
-
-        const isConclusiveState =
-          latest.state === IncidentState.RESOLVED || latest.state === IncidentState.REJECTED;
-        if (
-          isConclusiveState &&
-          repeatSuppressionSeconds > 0 &&
-          elapsedSeconds < repeatSuppressionSeconds
-        ) {
-          return {
-            incident: latest,
-            isDuplicate: true,
-            suppressed: true,
-            suppressionReason: 'repeat_suppression'
-          };
-        }
-      }
-    }
-
     const incidentId = `inc-${randomUUID().slice(0, 8)}`;
     const severity = normalizeAlertSeverity(primaryAlert.labels.severity);
     const mode: IncidentMode = IncidentExecutionMode.LIVE;
@@ -218,5 +278,27 @@ export class HandleAlert {
       incident,
       isDuplicate: false
     };
+  }
+
+  private async processFiringAlert(
+    primaryAlert: GrafanaWebhookPayload['alerts'][number],
+    fingerprint: string
+  ): Promise<HandleAlertResult> {
+    const policy = this.resolvePolicy();
+    const nowMs = Date.now();
+
+    const openReconciliation = await this.reconcileOpenIncident(fingerprint, policy, nowMs);
+    if (openReconciliation.status === 'duplicate') {
+      return openReconciliation.result;
+    }
+
+    if (openReconciliation.status === 'none') {
+      const suppressed = await this.checkRecentSuppression(fingerprint, policy, nowMs);
+      if (suppressed) {
+        return suppressed;
+      }
+    }
+
+    return this.createAndPublishIncident(primaryAlert, fingerprint);
   }
 }

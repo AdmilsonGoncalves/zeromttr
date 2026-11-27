@@ -73,6 +73,16 @@ export const RCA_SYNTHESIS_SCHEMA = {
   ]
 };
 
+const PLACEHOLDER_API_KEY_PREFIXES = ['change-me-', 'replace_with_'];
+
+function isUnconfiguredApiKey(apiKey: string): boolean {
+  if (!isNonEmptyString(apiKey)) {
+    return true;
+  }
+  const normalized = apiKey.trim().toLowerCase();
+  return PLACEHOLDER_API_KEY_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
 /**
  * Gemini reasoning adapter synthesizing structured RCA reports and full-file patches with retry/fallback.
  */
@@ -155,7 +165,7 @@ export class GeminiReasoningAdapter implements ReasoningPort {
    * Calls Gemini with structured output schema and retry/fallback model handling to synthesize RCA and a patch.
    */
   public async synthesizeRcaAndPatch(evidence: CollectedEvidence): Promise<RcaAndPatchSynthesis> {
-    if (!isNonEmptyString(this.apiKey) || this.apiKey === 'change-me-gemini-api-key') {
+    if (isUnconfiguredApiKey(this.apiKey)) {
       throw new Error('Gemini API key is not configured');
     }
 

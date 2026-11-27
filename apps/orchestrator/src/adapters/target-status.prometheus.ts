@@ -105,14 +105,17 @@ function buildUnreachableStatus(metadata: ResolvedPrometheusTargetMetadata): Tar
   };
 }
 
+function hasUsableSamples(output: PromqlRangeOutput): boolean {
+  return output.summarizedSeries.some((series) => (series.sampleCount ?? 1) > 0);
+}
+
 function evaluatePrometheusTelemetry(
   metadata: ResolvedPrometheusTargetMetadata,
   rpsOut: PromqlRangeOutput,
   errorOut: PromqlRangeOutput,
   p95Out: PromqlRangeOutput
 ): TargetStatus {
-  const hasObservedTelemetry =
-    rpsOut.summarizedSeries.length > 0 || p95Out.summarizedSeries.length > 0;
+  const hasObservedTelemetry = hasUsableSamples(rpsOut) || hasUsableSamples(p95Out);
   if (!hasObservedTelemetry) {
     return buildUnreachableStatus(metadata);
   }

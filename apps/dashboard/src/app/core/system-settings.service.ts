@@ -30,28 +30,43 @@ export class SystemSettingsService {
   readonly isSaving = signal<boolean>(false);
   readonly lastError = signal<string | null>(null);
 
+  private requestSeq = 0;
+  private activeFetchCount = 0;
+
   /**
    * Loads the current runtime settings, read-only metadata, and recent SQLite audit entries.
    */
   async fetchSettings(baseUrl = ''): Promise<boolean> {
+    const seq = ++this.requestSeq;
+    this.activeFetchCount += 1;
     this.isLoading.set(true);
     this.lastError.set(null);
 
     try {
       const response = await fetch(`${baseUrl}/api/settings`);
       if (!response.ok) {
-        this.lastError.set(`HTTP ${response.status}`);
+        if (seq === this.requestSeq) {
+          this.lastError.set(`HTTP ${response.status}`);
+        }
         return false;
       }
 
       const data = (await response.json()) as SystemSettingsResponse;
+      if (seq !== this.requestSeq) {
+        return false;
+      }
       this.applyResponse(data);
       return true;
     } catch (err) {
-      this.lastError.set(toErrorMessage(err));
+      if (seq === this.requestSeq) {
+        this.lastError.set(toErrorMessage(err));
+      }
       return false;
     } finally {
-      this.isLoading.set(false);
+      this.activeFetchCount = Math.max(0, this.activeFetchCount - 1);
+      if (this.activeFetchCount === 0) {
+        this.isLoading.set(false);
+      }
     }
   }
 
@@ -63,6 +78,7 @@ export class SystemSettingsService {
     authKey = '',
     baseUrl = ''
   ): Promise<SaveSettingsResult> {
+    this.requestSeq += 1;
     this.isSaving.set(true);
     this.lastError.set(null);
 

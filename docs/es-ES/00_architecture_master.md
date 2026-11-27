@@ -264,7 +264,7 @@ Ciclo **Red → Green → Refactor** centrado en la filosofía *Testing Trophy*:
 ### 6.3 Otras Reglas
 - **Clean Code / DRY / YAGNI / KISS**; funciones pequeñas, sin `any` fuera de las fronteras (usar `zod` para validar entradas externas).
 - **Idioma:** código, herramientas, logs y commits en en-US; documentación principal y README en en-US, pt-BR y es-ES.
-- **Seguridad por defecto:** tokens estrictamente segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN` y `SETTINGS_ADMIN_TOKEN` para `PATCH /api/settings`), `decisionToken` restringido al correo, `onCallEmail` siempre enmascarado en lecturas/auditoría, escape HTML en plantillas, redacción OTTL en borde + `PiiPromptGuard` pre-LLM.
+- **Seguridad por defecto:** tokens estrictamente segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN` y `SETTINGS_ADMIN_TOKEN` para `PATCH /api/settings` cuando está configurado; en despliegues privados con `ENABLE_DEMO_MODE=false` y sin `SETTINGS_ADMIN_TOKEN`, `PATCH /api/settings` sigue editable por operadores autenticados con `DASHBOARD_API_TOKEN`), `decisionToken` restringido al correo, `onCallEmail` siempre enmascarado en lecturas/auditoría, escape HTML en plantillas, redacción OTTL en borde + `PiiPromptGuard` pre-LLM.
 
 ---
 
@@ -381,7 +381,7 @@ flowchart TD
 | :--- | :--- |
 | Rendimiento | TTD (RCA + Diff) ≤ 15 s; TTPR (creación de PR) ≤ 30 s; respuesta de herramientas ≤ 5 s (p95) |
 | Economía de Tokens (FinOps) | ≤ 500 chars/línea de log, ≤ 100 líneas, ≤ 1500 chars/GitHub diff, ≤ 5 series PromQL |
-| Seguridad y Gobernanza | Tokens segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`, `SETTINGS_ADMIN_TOKEN`); `decisionToken` enviado **solo** por correo; `onCallEmail` enmascarado en `GET /api/settings` y auditoría; PII enmascarada en el borde (OTTL `transform`) y auditada pre-LLM (`PiiPromptGuard`) |
+| Seguridad y Gobernanza | Tokens segregados (`MCP_AUTH_TOKEN`, `GRAFANA_WEBHOOK_TOKEN`, `DASHBOARD_API_TOKEN`, y `SETTINGS_ADMIN_TOKEN` cuando está configurado — en modo privado con `ENABLE_DEMO_MODE=false` sin `SETTINGS_ADMIN_TOKEN`, `PATCH /api/settings` requiere solo `DASHBOARD_API_TOKEN`); `decisionToken` enviado **solo** por correo; `onCallEmail` enmascarado en `GET /api/settings` y auditoría; PII enmascarada en el borde (OTTL `transform`) y auditada pre-LLM (`PiiPromptGuard`) |
 | Confiabilidad | Timeouts; reintento con backoff; idempotencia por `incident_id`; deduplicación de alertas por fingerprint; fallback determinista si falla el LLM |
 | Estabilidad en Producción | Despliegue en VPS disparado solo en tags de release de plataforma `v1.*.*` o `workflow_dispatch` (nunca en pushes regulares a main ni en tags `v2.14.*` de la carga demo), manteniendo estable el entorno durante las evaluaciones |
 | Licencia | MIT |

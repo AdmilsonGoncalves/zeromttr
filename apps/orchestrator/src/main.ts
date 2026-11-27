@@ -210,7 +210,8 @@ function createSettingsRouterFactory(params: {
         adminToken,
         onSettingsUpdated: (updated) => {
           params.logger.setMinLevel(updated.logLevel);
-        }
+        },
+        logger: params.logger
       })
   };
 }
