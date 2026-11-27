@@ -14,12 +14,13 @@ import { escapeHtml, isNonEmptyString, stripUnsafeHtml } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
 import { Tag } from 'primeng/tag';
 import { Tooltip } from 'primeng/tooltip';
+import { UiSeverity } from '../../core/constants.js';
 import { IncidentState, NotificationStatus, type IncidentDetail } from '../../core/contract.js';
 import { I18nService, type TranslationDictionary } from '../../core/i18n/i18n.service.js';
 
 export interface PrBadgeConfig {
   labelKey: keyof TranslationDictionary;
-  severity: 'success' | 'info' | 'warn' | 'danger' | 'secondary';
+  severity: UiSeverity;
 }
 
 /**
@@ -66,19 +67,19 @@ export class RemediationPanelComponent {
   readonly prBadge = computed<PrBadgeConfig>(() => {
     const incident = this.incidentSignal();
     if (!incident?.remediation) {
-      return { labelKey: 'githubPrIdleStatus', severity: 'secondary' };
+      return { labelKey: 'githubPrIdleStatus', severity: UiSeverity.SECONDARY };
     }
     const state = this.displayedFsmStateSignal() ?? incident.state;
     if (state === IncidentState.RESOLVED) {
-      return { labelKey: 'githubPrApprovedStatus', severity: 'success' };
+      return { labelKey: 'githubPrApprovedStatus', severity: UiSeverity.SUCCESS };
     }
     if (state === IncidentState.REJECTED) {
-      return { labelKey: 'githubPrRejectedStatus', severity: 'danger' };
+      return { labelKey: 'githubPrRejectedStatus', severity: UiSeverity.DANGER };
     }
     if (state === IncidentState.FAILED) {
-      return { labelKey: 'githubPrClosedStatus', severity: 'danger' };
+      return { labelKey: 'githubPrClosedStatus', severity: UiSeverity.DANGER };
     }
-    return { labelKey: 'githubPrOpenStatus', severity: 'success' };
+    return { labelKey: 'githubPrOpenStatus', severity: UiSeverity.SUCCESS };
   });
 
   readonly safeResendPreview = computed<string>(() => {
@@ -147,7 +148,7 @@ export class RemediationPanelComponent {
 
     return `
     <div class="font-sans text-slate-300">
-      <h3 class="text-rose-500 mt-0 mb-1 font-semibold">🚨 ZeroMTTR Incident Post-Mortem</h3>
+      <h3 class="text-rose-500 mt-0 mb-1 font-semibold">${this.i18n.t('resendDefaultTitle')}</h3>
       <p class="text-[11px]">${this.i18n.t('resendDefaultBody')}</p>
     </div>
   `;

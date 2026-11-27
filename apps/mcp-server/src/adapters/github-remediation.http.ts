@@ -6,6 +6,8 @@ import type {
 } from '../ports/remediation.port.js';
 import { isNonEmptyArray, isNonEmptyString, isSafeRelativePath } from '@zeromttr/utils';
 import {
+  CONTENT_TYPE,
+  HTTP_HEADERS,
   HTTP_STATUS,
   buildUrl,
   isHttpSuccess,
@@ -52,12 +54,13 @@ export class GithubRemediationHttpAdapter implements RemediationPort {
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json',
+      [HTTP_HEADERS.ACCEPT]: 'application/vnd.github+json',
+      [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
       'User-Agent': 'ZeroMTTR-MCP-Server'
     };
     if (isNonEmptyString(this.config.githubToken)) {
-      headers.Authorization = `Bearer ${sanitizeHeaderValue(this.config.githubToken)}`;
+      headers[HTTP_HEADERS.AUTHORIZATION] =
+        `Bearer ${sanitizeHeaderValue(this.config.githubToken)}`;
     }
     return headers;
   }

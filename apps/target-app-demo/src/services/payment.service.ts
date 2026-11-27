@@ -1,13 +1,18 @@
 import { chaosManager } from '../chaos/chaos.manager.js';
-import { TargetReleaseVersion, TargetServiceIdentity } from '../chaos/target-metadata-enums.js';
+import {
+  TargetDatabaseState,
+  TargetHealthState,
+  TargetReleaseVersion,
+  TargetServiceIdentity
+} from '../chaos/target-metadata-enums.js';
 import type { CreatePaymentInput, Payment } from '../models/payment.model.js';
 import { paymentRepository, PaymentRepository } from '../repositories/payment.repository.js';
 
 export interface ServiceHealth {
-  status: 'ok' | 'degraded';
+  status: TargetHealthState.OK | TargetHealthState.DEGRADED;
   service: string;
   version: string;
-  database: 'connected' | 'pool_saturated';
+  database: TargetDatabaseState;
   pool: {
     active: number;
     waiting: number;
@@ -47,10 +52,12 @@ export class PaymentService {
     const isPoolSaturated = isChaos || (stats.active >= stats.max && stats.max > 0);
 
     return {
-      status: isPoolSaturated ? 'degraded' : 'ok',
+      status: isPoolSaturated ? TargetHealthState.DEGRADED : TargetHealthState.OK,
       service: TargetServiceIdentity.SERVICE_NAME,
       version: isChaos ? TargetReleaseVersion.DEGRADED : TargetReleaseVersion.HEALTHY,
-      database: isPoolSaturated ? 'pool_saturated' : 'connected',
+      database: isPoolSaturated
+        ? TargetDatabaseState.POOL_SATURATED
+        : TargetDatabaseState.CONNECTED,
       pool: stats
     };
   }

@@ -1,7 +1,8 @@
 import type http from 'node:http';
 import { performance } from 'node:perf_hooks';
 import { isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
+import { TargetHttpHeader, TargetServiceIdentity } from './chaos/target-metadata-enums.js';
 import { handleChaosRoutes } from './routes/chaos.routes.js';
 import { handleHealthRoutes } from './routes/health.routes.js';
 import { handleOpsRoutes } from './routes/ops.routes.js';
@@ -11,7 +12,7 @@ import { requestMetrics } from './telemetry/request-metrics.js';
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // Basic response defaults
-  res.setHeader('X-Service', 'api-pagamentos-core');
+  res.setHeader(TargetHttpHeader.SERVICE, TargetServiceIdentity.SERVICE_NAME);
 
   const host = req.headers.host || 'localhost:3001';
   const parsedUrl = new URL(req.url || '/', `http://${host}`);
@@ -53,7 +54,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         body = safeJsonParse(rawBody, rawBody);
       }
     } catch {
-      res.writeHead(HTTP_STATUS.BAD_REQUEST, { 'Content-Type': 'application/json' });
+      res.writeHead(HTTP_STATUS.BAD_REQUEST, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
       res.end(JSON.stringify({ error: 'Failed to read request body' }));
       return;
     }
@@ -77,12 +78,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 
   if (req.method === 'GET' && parsedUrl.pathname === '/') {
-    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'text/plain' });
+    res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.TEXT_PLAIN });
     res.end('ZeroMTTR Target Demo Workload Running');
     return;
   }
 
-  res.writeHead(HTTP_STATUS.NOT_FOUND, { 'Content-Type': 'application/json' });
+  res.writeHead(HTTP_STATUS.NOT_FOUND, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
   res.end(JSON.stringify({ error: 'Not Found' }));
 }
 
@@ -96,7 +97,9 @@ export function createApp(): http.RequestListener {
     handleRequest(req, res).catch((error: unknown) => {
       console.error('[target-app-demo] unhandled request error', error);
       if (!res.headersSent) {
-        res.writeHead(HTTP_STATUS.INTERNAL_SERVER_ERROR, { 'Content-Type': 'application/json' });
+        res.writeHead(HTTP_STATUS.INTERNAL_SERVER_ERROR, {
+          [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON
+        });
       }
       res.end(JSON.stringify({ error: 'Internal Server Error' }));
     });

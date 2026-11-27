@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { isNonEmptyString, normalizeIp, parseForwardedIp } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
+import { SecurityErrorCode } from './http-constants.js';
 
 export interface IpRateLimitOptions {
   windowMs: number;
@@ -50,18 +51,18 @@ export function extractClientIp(
 
   if (peerIp !== 'unknown' && isTrustedProxyIp(peerIp)) {
     if (trustCloudflare) {
-      const cfIp = parseForwardedIp(req.headers['cf-connecting-ip']);
+      const cfIp = parseForwardedIp(req.headers[HTTP_HEADERS.CF_CONNECTING_IP_LOWER]);
       if (cfIp) {
         return cfIp;
       }
     }
 
-    const forwardedIp = parseForwardedIp(req.headers['x-forwarded-for']);
+    const forwardedIp = parseForwardedIp(req.headers[HTTP_HEADERS.X_FORWARDED_FOR_LOWER]);
     if (forwardedIp) {
       return forwardedIp;
     }
 
-    const realIp = parseForwardedIp(req.headers['x-real-ip']);
+    const realIp = parseForwardedIp(req.headers[HTTP_HEADERS.X_REAL_IP_LOWER]);
     if (realIp) {
       return realIp;
     }
@@ -116,7 +117,7 @@ export function createIpRateLimitMiddleware(options: IpRateLimitOptions) {
       const retryAfterSeconds = Math.max(1, Math.ceil((existing.resetAtMs - now) / 1000));
       res.setHeader('Retry-After', String(retryAfterSeconds));
       res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
-        code: 'RATE_LIMIT_EXCEEDED',
+        code: SecurityErrorCode.RATE_LIMIT_EXCEEDED,
         error: errorMessage,
         retryAfterSeconds
       });

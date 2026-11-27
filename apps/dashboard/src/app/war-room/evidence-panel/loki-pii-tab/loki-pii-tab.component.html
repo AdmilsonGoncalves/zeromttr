@@ -2,16 +2,16 @@
   <div class="flex justify-center p-0.5">
     @if (incidentSignal() && isPiiPassedSignal() === true) {
       <div
-        class="bg-emerald-950 border border-emerald-500 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
+        class="max-w-full bg-emerald-950 border border-emerald-500 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center justify-center gap-2 shadow text-center"
       >
-        <i class="pi pi-check-circle text-emerald-400"></i>
+        <i class="pi pi-check-circle text-emerald-400 shrink-0"></i>
         <span>{{ i18n.t('piiGuardVerifiedBadge') }}</span>
       </div>
     } @else if (incidentSignal() && isPiiPassedSignal() === false) {
       <div
-        class="bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 shadow"
+        class="max-w-full bg-rose-950 border border-rose-500 text-rose-300 px-3 py-1 rounded-full text-xs font-bold flex items-center justify-center gap-2 shadow text-center"
       >
-        <i class="pi pi-exclamation-triangle text-rose-400"></i>
+        <i class="pi pi-exclamation-triangle text-rose-400 shrink-0"></i>
         <span>
           {{
             i18n.t('piiGuardBlockedBadge').replace('{N}', leakedPatternsCountSignal().toString())

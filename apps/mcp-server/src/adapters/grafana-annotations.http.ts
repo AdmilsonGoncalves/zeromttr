@@ -1,5 +1,7 @@
 import { isNonEmptyString, unique } from '@zeromttr/utils';
 import {
+  CONTENT_TYPE,
+  HTTP_HEADERS,
   buildUrl,
   isHttpSuccess,
   sanitizeHeaderValue,
@@ -58,11 +60,11 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
+      [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+      [HTTP_HEADERS.ACCEPT]: CONTENT_TYPE.JSON
     };
     if (isNonEmptyString(this.config.apiToken)) {
-      headers.Authorization = `Bearer ${sanitizeHeaderValue(this.config.apiToken)}`;
+      headers[HTTP_HEADERS.AUTHORIZATION] = `Bearer ${sanitizeHeaderValue(this.config.apiToken)}`;
     } else if (
       this.config.basicAuth &&
       isNonEmptyString(this.config.basicAuth.username) &&
@@ -73,7 +75,7 @@ export class GrafanaAnnotationsHttpAdapter implements AnnotationPort {
         `${this.config.basicAuth.username}:${this.config.basicAuth.password}`,
         'utf-8'
       ).toString('base64');
-      headers.Authorization = `Basic ${encoded}`;
+      headers[HTTP_HEADERS.AUTHORIZATION] = `Basic ${encoded}`;
     }
     return headers;
   }

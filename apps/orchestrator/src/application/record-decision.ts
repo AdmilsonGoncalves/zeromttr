@@ -1,3 +1,4 @@
+import { toErrorMessage } from '@zeromttr/utils';
 import { DecisionHmac } from '../domain/decision-hmac.js';
 import { DecisionAction, DecisionSource, GrafanaAnnotationTag } from '../domain/incident-enums.js';
 import { OrchestratorLogEvent } from '../domain/log-enums.js';
@@ -70,7 +71,7 @@ export class RecordDecision {
         this.logger?.warn({
           event: OrchestratorLogEvent.POST_APPROVAL_HOOK_FAILED,
           incidentId: incident.id,
-          message: err instanceof Error ? err.message : String(err)
+          message: toErrorMessage(err)
         });
       }
     }

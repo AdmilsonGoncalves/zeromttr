@@ -1,5 +1,6 @@
-import { isNonEmptyArray, isNonEmptyString, safeJsonParse, toErrorMessage } from '@zeromttr/utils';
+import { isNonEmptyArray, isNonEmptyString, safeJsonParse } from '@zeromttr/utils';
 import {
+  HTTP_HEADERS,
   buildUrl,
   isHttpSuccess,
   sanitizeHeaderValue,
@@ -35,11 +36,12 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      Accept: 'application/vnd.github+json',
+      [HTTP_HEADERS.ACCEPT]: 'application/vnd.github+json',
       'User-Agent': 'ZeroMTTR-MCP-Server'
     };
     if (isNonEmptyString(this.config.githubToken)) {
-      headers.Authorization = `Bearer ${sanitizeHeaderValue(this.config.githubToken)}`;
+      headers[HTTP_HEADERS.AUTHORIZATION] =
+        `Bearer ${sanitizeHeaderValue(this.config.githubToken)}`;
     }
     return headers;
   }
@@ -61,7 +63,7 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
     const compareText = await compareRes.text();
     let rawBytesFetched = Buffer.byteLength(compareText, 'utf-8');
 
-    let compareData: {
+    const compareData = safeJsonParse<{
       commits?: Array<{
         author?: { login?: string; name?: string; email?: string };
         commit?: {
@@ -76,11 +78,9 @@ export class GithubInspectorHttpAdapter implements RepoInspectorPort {
         deletions: number;
         patch?: string;
       }>;
-    };
-    try {
-      compareData = JSON.parse(compareText);
-    } catch (err) {
-      throw new Error(`Failed to parse GitHub compare JSON: ${toErrorMessage(err)}`);
+    }>(compareText);
+    if (!compareData) {
+      throw new Error('Failed to parse GitHub compare JSON');
     }
 
     // Extract author and commit message with strict PII sanitization

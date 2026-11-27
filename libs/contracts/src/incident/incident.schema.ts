@@ -16,6 +16,7 @@ export type IncidentState = (typeof IncidentState)[keyof typeof IncidentState];
 export const IncidentStateSchema = z.nativeEnum(IncidentState);
 
 export const IncidentEventType = {
+  HEARTBEAT: 'heartbeat',
   CREATED: 'incident.created',
   TRANSITION: 'incident.transition',
   FINOPS: 'incident.finops',

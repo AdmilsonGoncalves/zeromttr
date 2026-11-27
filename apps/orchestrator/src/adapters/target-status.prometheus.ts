@@ -1,4 +1,4 @@
-import { parseNumber, round } from '@zeromttr/utils';
+import { isNumber, parseNumber, round } from '@zeromttr/utils';
 import { OrchestratorDefault, TargetHealthStatus } from '../domain/incident-enums.js';
 import { resolveTargetRepoUrl } from '../domain/target-repo-url.js';
 import type { TargetStatus, TargetStatusPort } from '../ports/target-status.port.js';
@@ -23,7 +23,7 @@ function extractMetricSample(output: PromqlRangeOutput): number {
     return 0;
   }
   const value = firstSeries.latest ?? firstSeries.p95 ?? firstSeries.p50 ?? firstSeries.max ?? 0;
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
+  return isNumber(value) ? Math.max(0, value) : 0;
 }
 
 /**

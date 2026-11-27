@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { isFilled } from '@zeromttr/utils';
+import { clamp, isFilled, percentage } from '@zeromttr/utils';
 import { Knob } from 'primeng/knob';
 import { MeterGroup, type MeterItem } from 'primeng/metergroup';
 import { ProgressBar } from 'primeng/progressbar';
@@ -58,18 +58,12 @@ export class TargetTelemetryComponent {
 
   readonly throughputPercent = computed<number>(() => {
     const rps = this.metricsSignal()?.requestsPerSecond ?? 0;
-    return Math.min(
-      100,
-      Math.round((rps / TARGET_TELEMETRY_THRESHOLDS.THROUGHPUT_SCALE_MAX_RPS) * 100)
-    );
+    return clamp(percentage(rps, TARGET_TELEMETRY_THRESHOLDS.THROUGHPUT_SCALE_MAX_RPS, 0), 0, 100);
   });
 
   readonly latencyPercent = computed<number>(() => {
     const p95 = this.metricsSignal()?.p95LatencyMs ?? 0;
-    return Math.min(
-      100,
-      Math.round((p95 / TARGET_TELEMETRY_THRESHOLDS.LATENCY_P95_SCALE_MAX_MS) * 100)
-    );
+    return clamp(percentage(p95, TARGET_TELEMETRY_THRESHOLDS.LATENCY_P95_SCALE_MAX_MS, 0), 0, 100);
   });
 
   readonly throughputLevel = computed<TelemetryHealthLevel>(() => {

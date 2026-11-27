@@ -1,10 +1,12 @@
+import type { ReasoningSource } from '@zeromttr/contracts';
+
 export interface PostMortemNotification {
   incident_id: string;
   recipient_email?: string;
   title: string;
   rca_summary: string;
   evidence_coverage: string;
-  reasoning_source: 'llm' | 'fallback';
+  reasoning_source: ReasoningSource;
   blast_radius: string[];
   regression_commit: string;
   pull_request_url: string;

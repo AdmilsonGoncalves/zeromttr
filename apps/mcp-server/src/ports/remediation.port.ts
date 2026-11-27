@@ -1,3 +1,5 @@
+import type { ReasoningSource } from '@zeromttr/contracts';
+
 export interface RemediationPrRequest {
   incident_id: string;
   file_path: string;
@@ -5,7 +7,7 @@ export interface RemediationPrRequest {
   blob_sha?: string;
   title: string;
   rca_markdown: string;
-  reasoning_source: 'llm' | 'fallback';
+  reasoning_source: ReasoningSource;
 }
 
 export interface RemediationPrReceipt {

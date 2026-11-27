@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { nowIso } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
+import { IncidentEventType } from '../domain/incident-enums.js';
 import type { EventBroadcasterPort } from '../ports/event-broadcaster.port.js';
 
 /**
@@ -22,10 +23,10 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
    */
   public handleConnection(req: Request, res: Response): void {
     res.writeHead(HTTP_STATUS.OK, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no'
+      [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.EVENT_STREAM,
+      [HTTP_HEADERS.CACHE_CONTROL]: 'no-cache',
+      [HTTP_HEADERS.CONNECTION]: 'keep-alive',
+      [HTTP_HEADERS.X_ACCEL_BUFFERING]: 'no'
     });
 
     if (typeof res.flushHeaders === 'function') {
@@ -35,7 +36,9 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
     this.clients.add(res);
 
     // Initial heartbeat
-    res.write(`event: heartbeat\ndata: ${JSON.stringify({ at: nowIso() })}\n\n`);
+    res.write(
+      `event: ${IncidentEventType.HEARTBEAT}\ndata: ${JSON.stringify({ at: nowIso() })}\n\n`
+    );
 
     const cleanup = (): void => {
       this.clients.delete(res);
@@ -61,7 +64,7 @@ export class SseEventBroadcaster implements EventBroadcasterPort {
   }
 
   private sendHeartbeat(): void {
-    const payload = `event: heartbeat\ndata: ${JSON.stringify({ at: nowIso() })}\n\n`;
+    const payload = `event: ${IncidentEventType.HEARTBEAT}\ndata: ${JSON.stringify({ at: nowIso() })}\n\n`;
     for (const client of this.clients) {
       try {
         client.write(payload);

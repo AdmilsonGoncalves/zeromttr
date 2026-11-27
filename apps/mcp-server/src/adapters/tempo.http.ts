@@ -4,10 +4,11 @@ import {
   isNumber,
   isObject,
   isString,
+  parseIsoDate,
   round,
-  toErrorMessage
+  safeJsonParse
 } from '@zeromttr/utils';
-import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 import type { TracesPort, TraceSearchResult, TraceSearchWindow } from '../ports/traces.port.js';
 import { extractOtelAttributeValue, type RawSpan } from '../domain/span-analysis.js';
 
@@ -52,7 +53,7 @@ export class TempoHttpAdapter implements TracesPort {
   async getTrace(traceId: string): Promise<{ rawBytes: number; spans: RawSpan[] }> {
     const url = buildUrl(this.config.baseUrl, `/api/traces/${traceId}`);
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' }
+      headers: { [HTTP_HEADERS.ACCEPT]: CONTENT_TYPE.JSON }
     });
 
     if (!isHttpSuccess(response.status)) {
@@ -62,14 +63,12 @@ export class TempoHttpAdapter implements TracesPort {
     const text = await response.text();
     const rawBytes = Buffer.byteLength(text, 'utf-8');
 
-    let data: {
+    const data = safeJsonParse<{
       batches?: BatchSpanHolder[];
       resourceSpans?: BatchSpanHolder[];
-    };
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      throw new Error(`Failed to parse Tempo trace JSON: ${toErrorMessage(err)}`);
+    }>(text);
+    if (!data) {
+      throw new Error('Failed to parse Tempo trace JSON');
     }
 
     const spans: RawSpan[] = [];
@@ -136,14 +135,11 @@ export class TempoHttpAdapter implements TracesPort {
   }
 
   private toEpochSeconds(iso?: string): number | undefined {
-    if (!iso) {
+    const parsed = parseIsoDate(iso);
+    if (!parsed) {
       return undefined;
     }
-    const ms = Date.parse(iso);
-    if (!isNumber(ms)) {
-      return undefined;
-    }
-    return Math.floor(ms / 1000);
+    return Math.floor(parsed.getTime() / 1000);
   }
 
   /**
@@ -168,7 +164,7 @@ export class TempoHttpAdapter implements TracesPort {
       end: endSec
     });
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' }
+      headers: { [HTTP_HEADERS.ACCEPT]: CONTENT_TYPE.JSON }
     });
 
     if (!isHttpSuccess(response.status)) {
@@ -178,7 +174,7 @@ export class TempoHttpAdapter implements TracesPort {
     const text = await response.text();
     const rawBytes = Buffer.byteLength(text, 'utf-8');
 
-    let data: {
+    const data = safeJsonParse<{
       traces?: Array<{
         traceID?: string;
         traceId?: string;
@@ -195,11 +191,9 @@ export class TempoHttpAdapter implements TracesPort {
         startTimeUnixNano?: string | number;
         durationMs?: number;
       }>;
-    };
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      throw new Error(`Failed to parse Tempo search JSON: ${toErrorMessage(err)}`);
+    }>(text);
+    if (!data) {
+      throw new Error('Failed to parse Tempo search JSON');
     }
 
     const traces: TraceSearchResult[] = [];

@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
 import { buildTargetStatusManifest } from './ops-status.controller.js';
@@ -41,7 +41,7 @@ export class ChaosController {
       this.startSyntheticTrafficBurst();
     }
 
-    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+    res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
     res.end(
       JSON.stringify({
         success: true,
@@ -66,7 +66,7 @@ export class ChaosController {
       this.stopHealthyTraffic();
     }
 
-    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+    res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
     res.end(
       JSON.stringify({
         success: true,
@@ -106,7 +106,7 @@ export class ChaosController {
       for (let i = 0; i < HEALTHY_TRAFFIC_BATCH_SIZE; i++) {
         void fetch(targetUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON },
           body: payload
         }).catch(() => undefined);
       }
@@ -149,7 +149,7 @@ export class ChaosController {
       for (let i = 0; i < 6; i++) {
         void fetch(targetUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON },
           body: syntheticPayload
         }).catch(() => undefined);
       }
@@ -185,7 +185,7 @@ export class ChaosController {
    * Responds with the current target app chaos status JSON payload.
    */
   public getStatus(_req: http.IncomingMessage, res: http.ServerResponse): void {
-    res.writeHead(HTTP_STATUS.OK, { 'Content-Type': 'application/json' });
+    res.writeHead(HTTP_STATUS.OK, { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON });
     res.end(JSON.stringify(this.buildStatusPayload()));
   }
 }

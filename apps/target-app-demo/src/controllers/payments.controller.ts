@@ -1,10 +1,15 @@
 import type http from 'node:http';
+import {
+  PaymentErrorCode,
+  TargetHttpHeader,
+  TargetServiceIdentity
+} from '../chaos/target-metadata-enums.js';
 import { CreatePaymentSchema } from '../models/payment.model.js';
 import { KnexTimeoutError } from '../repositories/payment.repository.js';
 import { paymentService, PaymentService } from '../services/payment.service.js';
 import { SpanStatusCode, telemetry } from '../telemetry/otel.js';
 import { durationInSeconds, isNonEmptyString, toErrorMessage } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 
 /**
  * HTTP controller handling PIX payment creation/lookup with OpenTelemetry spans and latency metrics.
@@ -21,7 +26,7 @@ export class PaymentsController {
     body: unknown
   ): Promise<void> {
     const startTime = Date.now();
-    const rawTraceHeader = req.headers['x-trace-id'];
+    const rawTraceHeader = req.headers[TargetHttpHeader.TRACE_ID];
     const traceId = isNonEmptyString(rawTraceHeader) ? rawTraceHeader : telemetry.generateTraceId();
     const span = telemetry.startSpan('HTTP POST /payments', {
       traceId,
@@ -42,8 +47,8 @@ export class PaymentsController {
           message: 'Validation failed'
         });
         res.writeHead(HTTP_STATUS.BAD_REQUEST, {
-          'Content-Type': 'application/json',
-          'x-trace-id': traceId
+          [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+          [TargetHttpHeader.TRACE_ID]: traceId
         });
         res.end(JSON.stringify({ error: 'Validation failed', details: parsed.error.issues }));
         return;
@@ -57,8 +62,8 @@ export class PaymentsController {
       telemetry.endSpan(span, { code: SpanStatusCode.OK });
 
       res.writeHead(HTTP_STATUS.CREATED, {
-        'Content-Type': 'application/json',
-        'x-trace-id': traceId
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+        [TargetHttpHeader.TRACE_ID]: traceId
       });
       res.end(JSON.stringify(payment));
     } catch (error) {
@@ -75,16 +80,16 @@ export class PaymentsController {
         ? HTTP_STATUS.SERVICE_UNAVAILABLE
         : HTTP_STATUS.INTERNAL_SERVER_ERROR;
       res.writeHead(statusCode, {
-        'Content-Type': 'application/json',
-        'x-trace-id': traceId
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+        [TargetHttpHeader.TRACE_ID]: traceId
       });
       res.end(
         JSON.stringify({
           error: isPoolTimeout
             ? 'Knex: Timeout acquiring a connection. The pool is probably full. Are you missing a .transacting(trx) call?'
             : 'Internal Server Error',
-          code: isPoolTimeout ? 'KnexTimeoutError' : 'InternalError',
-          service: 'api-pagamentos-core'
+          code: isPoolTimeout ? PaymentErrorCode.KNEX_TIMEOUT : PaymentErrorCode.INTERNAL,
+          service: TargetServiceIdentity.SERVICE_NAME
         })
       );
     }
@@ -99,7 +104,7 @@ export class PaymentsController {
     paymentId: string
   ): Promise<void> {
     const startTime = Date.now();
-    const rawTraceHeader = req.headers['x-trace-id'];
+    const rawTraceHeader = req.headers[TargetHttpHeader.TRACE_ID];
     const traceId = isNonEmptyString(rawTraceHeader) ? rawTraceHeader : telemetry.generateTraceId();
     const span = telemetry.startSpan('HTTP GET /payments/:id', {
       traceId,
@@ -121,8 +126,8 @@ export class PaymentsController {
           message: 'Payment not found'
         });
         res.writeHead(HTTP_STATUS.NOT_FOUND, {
-          'Content-Type': 'application/json',
-          'x-trace-id': traceId
+          [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+          [TargetHttpHeader.TRACE_ID]: traceId
         });
         res.end(JSON.stringify({ error: 'Payment not found' }));
         return;
@@ -130,8 +135,8 @@ export class PaymentsController {
 
       telemetry.endSpan(span, { code: SpanStatusCode.OK });
       res.writeHead(HTTP_STATUS.OK, {
-        'Content-Type': 'application/json',
-        'x-trace-id': traceId
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+        [TargetHttpHeader.TRACE_ID]: traceId
       });
       res.end(JSON.stringify(payment));
     } catch (error) {
@@ -148,16 +153,16 @@ export class PaymentsController {
         ? HTTP_STATUS.SERVICE_UNAVAILABLE
         : HTTP_STATUS.INTERNAL_SERVER_ERROR;
       res.writeHead(statusCode, {
-        'Content-Type': 'application/json',
-        'x-trace-id': traceId
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+        [TargetHttpHeader.TRACE_ID]: traceId
       });
       res.end(
         JSON.stringify({
           error: isPoolTimeout
             ? 'Knex: Timeout acquiring a connection. The pool is probably full. Are you missing a .transacting(trx) call?'
             : 'Internal Server Error',
-          code: isPoolTimeout ? 'KnexTimeoutError' : 'InternalError',
-          service: 'api-pagamentos-core'
+          code: isPoolTimeout ? PaymentErrorCode.KNEX_TIMEOUT : PaymentErrorCode.INTERNAL,
+          service: TargetServiceIdentity.SERVICE_NAME
         })
       );
     }

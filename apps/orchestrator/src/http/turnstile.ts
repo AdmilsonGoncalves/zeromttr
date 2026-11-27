@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { isNonEmptyString, isObject, isString } from '@zeromttr/utils';
-import { HTTP_STATUS } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
+import { SecurityErrorCode } from './http-constants.js';
 import { extractClientIp } from './rate-limit.js';
 
 const DEFAULT_TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -32,7 +33,7 @@ export function validateTurnstileConfigPair(
  * Extracts a Cloudflare Turnstile token from the request header or body.
  */
 function extractTurnstileToken(req: Request): string | null {
-  const headerToken = req.headers['cf-turnstile-response'];
+  const headerToken = req.headers[HTTP_HEADERS.CF_TURNSTILE_RESPONSE_LOWER];
   if (isString(headerToken) && isNonEmptyString(headerToken)) {
     return headerToken.trim();
   }
@@ -62,7 +63,7 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
     const token = extractTurnstileToken(req);
     if (!token) {
       res.status(HTTP_STATUS.FORBIDDEN).json({
-        code: 'TURNSTILE_REQUIRED',
+        code: SecurityErrorCode.TURNSTILE_REQUIRED,
         error: 'Forbidden: Cloudflare Turnstile verification required'
       });
       return;
@@ -81,14 +82,14 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
 
         const verifyRes = await fetchFn(verifyUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.FORM_URLENCODED },
           body: body.toString(),
           signal: controller.signal
         });
 
         if (!verifyRes.ok) {
           res.status(HTTP_STATUS.FORBIDDEN).json({
-            code: 'TURNSTILE_FAILED',
+            code: SecurityErrorCode.TURNSTILE_FAILED,
             error: 'Forbidden: Cloudflare Turnstile verification failed'
           });
           return;
@@ -97,7 +98,7 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
         const payload = (await verifyRes.json()) as { success?: unknown };
         if (payload?.success !== true) {
           res.status(HTTP_STATUS.FORBIDDEN).json({
-            code: 'TURNSTILE_REJECTED',
+            code: SecurityErrorCode.TURNSTILE_REJECTED,
             error: 'Forbidden: Cloudflare Turnstile verification rejected'
           });
           return;
@@ -106,7 +107,7 @@ export function createTurnstileMiddleware(options: TurnstileMiddlewareOptions) {
         next();
       } catch {
         res.status(HTTP_STATUS.FORBIDDEN).json({
-          code: 'TURNSTILE_UNAVAILABLE',
+          code: SecurityErrorCode.TURNSTILE_UNAVAILABLE,
           error: 'Forbidden: Cloudflare Turnstile verification unavailable'
         });
       } finally {

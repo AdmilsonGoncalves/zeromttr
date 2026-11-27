@@ -24,8 +24,6 @@
   />
 
   <app-war-room-notices
-    [demoModeEnabled]="incidentService.demoModeEnabled()"
-    [activeMode]="incidentService.activeMode()"
     [turnstileSiteKey]="incidentService.turnstileSiteKey()"
     [simulationLockedByTurnstile]="incidentService.isSimulationLockedByTurnstile()"
     [turnstileResetTrigger]="incidentService.turnstileResetCounter()"

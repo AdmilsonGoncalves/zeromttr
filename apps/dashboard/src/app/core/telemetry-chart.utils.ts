@@ -1,3 +1,5 @@
+import { clamp, isNumber, round } from '@zeromttr/utils';
+
 export interface TimeSeriesSample {
   label: string;
   value: number;
@@ -31,19 +33,19 @@ export interface TimeSeriesGeometry {
 }
 
 function roundCoord(value: number): number {
-  return Math.round(value * 100) / 100;
+  return round(value, 2);
 }
 
 function resolveBounds(
   values: number[],
   options?: { min?: number; max?: number }
 ): { min: number; max: number; span: number } {
-  const finiteValues = values.filter((val) => Number.isFinite(val));
+  const finiteValues = values.filter((val) => isNumber(val));
   const boundedInput = finiteValues.length > 0 ? finiteValues : [0];
   const rawMin = options?.min ?? Math.min(...boundedInput);
   const rawMax = options?.max ?? Math.max(...boundedInput);
-  const min = Number.isFinite(rawMin) ? rawMin : 0;
-  const baseMax = Number.isFinite(rawMax) ? Math.max(min, rawMax) : min;
+  const min = isNumber(rawMin) ? rawMin : 0;
+  const baseMax = isNumber(rawMax) ? Math.max(min, rawMax) : min;
   const rawSpan = baseMax - min;
   const span = rawSpan > 0 ? rawSpan : Math.max(1, Math.abs(baseMax) * 0.25);
   const max = rawSpan > 0 ? baseMax : roundCoord(min + span);
@@ -82,13 +84,13 @@ export function buildTimeSeriesGeometry(
   const unit = options?.unit ?? '';
 
   const points: TimeSeriesPoint[] = samples.map((sample, idx) => {
-    const safeValue = Number.isFinite(sample.value) ? sample.value : min;
+    const safeValue = isNumber(sample.value) ? sample.value : min;
     const x =
       samples.length === 1
         ? roundCoord(padLeft + usableWidth / 2)
         : roundCoord(padLeft + (idx / (samples.length - 1)) * usableWidth);
     const ratio = (safeValue - min) / span;
-    const clampedRatio = Math.min(1, Math.max(0, ratio));
+    const clampedRatio = clamp(ratio, 0, 1);
     const y = roundCoord(padTop + usableHeight * (1 - clampedRatio));
     return { x, y, value: safeValue, label: sample.label };
   });

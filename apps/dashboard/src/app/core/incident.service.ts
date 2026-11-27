@@ -1,6 +1,7 @@
 import { computed, Injectable, signal } from '@angular/core';
 import {
   diffInSeconds,
+  isArray,
   isFilled,
   isNonEmptyArray,
   isNonEmptyString,
@@ -10,6 +11,7 @@ import {
   safeJsonParse,
   toErrorMessage
 } from '@zeromttr/utils';
+import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import {
   DecisionAction,
   type DecisionPayload,
@@ -344,7 +346,7 @@ export class IncidentService {
     if (!currentState) {
       return [
         awaitingAlertStage,
-        ...orderedIncidentStages.map((stage) => ({ ...stage, status: 'pending' as const }))
+        ...orderedIncidentStages.map((stage) => ({ ...stage, status: FsmStageStatus.PENDING }))
       ];
     }
 
@@ -363,12 +365,16 @@ export class IncidentService {
           awaitingAlertStage,
           ...orderedIncidentStages.map((stage, idx) => {
             if (idx < failedIdx) {
-              return { ...stage, status: 'completed' as const };
+              return { ...stage, status: FsmStageStatus.COMPLETED };
             }
             if (idx === failedIdx) {
-              return { ...stage, labelKey: 'fsmFailedLabel' as const, status: 'failed' as const };
+              return {
+                ...stage,
+                labelKey: 'fsmFailedLabel' as const,
+                status: FsmStageStatus.FAILED
+              };
             }
-            return { ...stage, status: 'pending' as const };
+            return { ...stage, status: FsmStageStatus.PENDING };
           })
         ];
       }
@@ -381,13 +387,17 @@ export class IncidentService {
         awaitingAlertStage,
         ...orderedIncidentStages.map((stage) => {
           if (visited.has(stage.state)) {
-            return { ...stage, status: 'completed' as const };
+            return { ...stage, status: FsmStageStatus.COMPLETED };
           }
           if (!failedMarked) {
             failedMarked = true;
-            return { ...stage, labelKey: 'fsmFailedLabel' as const, status: 'failed' as const };
+            return {
+              ...stage,
+              labelKey: 'fsmFailedLabel' as const,
+              status: FsmStageStatus.FAILED
+            };
           }
-          return { ...stage, status: 'pending' as const };
+          return { ...stage, status: FsmStageStatus.PENDING };
         })
       ];
     }
@@ -400,20 +410,20 @@ export class IncidentService {
       awaitingAlertStage,
       ...orderedIncidentStages.map((stage, idx) => {
         if (idx < activeIdx) {
-          return { ...stage, status: 'completed' as const };
+          return { ...stage, status: FsmStageStatus.COMPLETED };
         }
         if (idx === activeIdx) {
           return {
             ...stage,
             status:
               currentState === IncidentState.REJECTED
-                ? ('failed' as const)
+                ? FsmStageStatus.FAILED
                 : isTerminal
-                  ? ('completed' as const)
-                  : ('active' as const)
+                  ? FsmStageStatus.COMPLETED
+                  : FsmStageStatus.ACTIVE
           };
         }
-        return { ...stage, status: 'pending' as const };
+        return { ...stage, status: FsmStageStatus.PENDING };
       })
     ];
   });
@@ -746,7 +756,7 @@ export class IncidentService {
       }
     };
 
-    es.addEventListener('heartbeat', (_evt: MessageEvent) => {
+    es.addEventListener(IncidentEventType.HEARTBEAT, (_evt: MessageEvent) => {
       this.sseConnected.set(true);
     });
   }
@@ -1135,7 +1145,7 @@ export class IncidentService {
           const res = await fetch(`${baseUrl}/api/demo/config`, {
             signal: controller.signal
           });
-          if (res.status === 404) {
+          if (res.status === HTTP_STATUS.NOT_FOUND) {
             this.demoModeEnabled.set(false);
             this.requireDemoKey.set(true);
             this.publicLiveDemo.set(false);
@@ -1240,14 +1250,14 @@ export class IncidentService {
   ): Record<string, string> {
     const headers: Record<string, string> = {};
     if (includeJsonContentType) {
-      headers['Content-Type'] = 'application/json';
+      headers[HTTP_HEADERS.CONTENT_TYPE] = CONTENT_TYPE.JSON;
     }
     const key = this.liveDemoKey();
     if (isNonEmptyString(key)) {
-      headers['X-Live-Demo-Key'] = key.trim();
+      headers[HTTP_HEADERS.LIVE_DEMO_KEY] = key.trim();
     }
     if (isNonEmptyString(turnstileToken)) {
-      headers['CF-Turnstile-Response'] = turnstileToken.trim();
+      headers[HTTP_HEADERS.CF_TURNSTILE_RESPONSE] = turnstileToken.trim();
     }
     return headers;
   }
@@ -1321,14 +1331,14 @@ export class IncidentService {
               return;
             }
             const minStartedAt = this.chaosTriggeredAtMs > 0 ? this.chaosTriggeredAtMs - 5000 : 0;
-            const latest = Array.isArray(list)
+            const latest = isArray(list)
               ? list.find((inc) => {
                   if (!isNonEmptyString(inc?.id) || this.dismissedIncidentIds.has(inc.id)) {
                     return false;
                   }
                   if (minStartedAt > 0 && isNonEmptyString(inc.startedAt)) {
                     const startedMs = new Date(inc.startedAt).getTime();
-                    if (!Number.isNaN(startedMs) && startedMs < minStartedAt) {
+                    if (isNumber(startedMs) && startedMs < minStartedAt) {
                       return false;
                     }
                   }
@@ -1575,7 +1585,7 @@ export class IncidentService {
         `${baseUrl}/api/incidents/${encodeURIComponent(incidentId)}/decision`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON },
           body: JSON.stringify(payload)
         }
       );

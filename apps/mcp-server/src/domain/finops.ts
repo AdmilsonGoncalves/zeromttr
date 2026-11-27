@@ -20,8 +20,8 @@ export function calculateFinOps(rawBytes: number, compactedBytes: number): FinOp
   const estimated_tokens_saved = round(reductionBytes / 4);
 
   const validated = FinOpsMetricsSchema.parse({
-    rawBytesFetched: Math.round(safeRaw),
-    compactedBytesSentToLlm: Math.round(safeCompacted),
+    rawBytesFetched: round(safeRaw),
+    compactedBytesSentToLlm: round(safeCompacted),
     payloadReductionPercent: payload_reduction_percent,
     estimatedTokensSaved: estimated_tokens_saved
   });

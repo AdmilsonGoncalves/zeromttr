@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { TargetReleaseVersion, TargetServiceIdentity } from '../chaos/target-metadata-enums.js';
 import { millisToUnixNano, nowIso, nowUnixNano } from '@zeromttr/utils';
-import { buildUrl } from '@zeromttr/utils/http';
+import { CONTENT_TYPE, HTTP_HEADERS, buildUrl } from '@zeromttr/utils/http';
 import {
   OtelAttributeKey,
   OtelMetricUnit,
@@ -375,7 +375,7 @@ export class TelemetryService {
       const url = buildUrl(this.otlpEndpoint, path);
       await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(1000)
       }).catch(() => {
@@ -585,7 +585,7 @@ export class TelemetryService {
 
     const exportMs = Math.max(Date.now(), state.lastExportMs + 1);
     state.lastExportMs = exportMs;
-    const nowNano = String(BigInt(exportMs) * 1_000_000n);
+    const nowNano = millisToUnixNano(exportMs);
     const exemplar = state.pendingExemplar;
     state.pendingExemplar = undefined;
 

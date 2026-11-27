@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   isArray,
+  isFilled,
   isNonEmptyString,
   isNumber,
   isObject,
@@ -8,7 +9,15 @@ import {
   parseNumber,
   safeJsonParse
 } from '@zeromttr/utils';
-import { buildUrl, isHttpSuccess, sanitizeHeaderValue } from '@zeromttr/utils/http';
+import {
+  CONTENT_TYPE,
+  HTTP_HEADERS,
+  HTTP_STATUS,
+  buildUrl,
+  isHttpSuccess,
+  sanitizeHeaderValue,
+  trimTrailingSlash
+} from '@zeromttr/utils/http';
 import { OrchestratorDefault } from '../domain/incident-enums.js';
 import type {
   ToolsPort,
@@ -83,6 +92,13 @@ function firstNonEmptyString(...candidates: unknown[]): string {
   return '';
 }
 
+const OTEL_SPAN_STATUS_ERROR = 2;
+const OTEL_ERROR_STATUS_CODES = new Set<string | number>([
+  OTEL_SPAN_STATUS_ERROR,
+  'ERROR',
+  'STATUS_CODE_ERROR'
+]);
+
 function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: boolean): boolean {
   if (typeof span.hasError === 'boolean') {
     return span.hasError;
@@ -91,9 +107,8 @@ function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: bool
     return span.has_error;
   }
   if (
-    span.statusCode === 2 ||
-    span.statusCode === 'ERROR' ||
-    span.statusCode === 'STATUS_CODE_ERROR'
+    (isNumber(span.statusCode) || isString(span.statusCode)) &&
+    OTEL_ERROR_STATUS_CODES.has(span.statusCode)
   ) {
     return true;
   }
@@ -103,7 +118,7 @@ function inferSpanHasError(span: Record<string, unknown>, defaultHasError?: bool
       return true;
     }
     const httpStatus = Number(attrs['http.status_code'] ?? attrs['http.response.status_code']);
-    if (isNumber(httpStatus) && httpStatus >= 500) {
+    if (isNumber(httpStatus) && httpStatus >= HTTP_STATUS.INTERNAL_SERVER_ERROR) {
       return true;
     }
   }
@@ -120,7 +135,7 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
     spanId: String(span.spanId ?? span.span_id ?? ''),
     parentSpanId: isNonEmptyString(parentSpanRaw)
       ? parentSpanRaw
-      : parentSpanRaw !== undefined && parentSpanRaw !== null
+      : isFilled(parentSpanRaw)
         ? String(parentSpanRaw)
         : undefined,
     serviceName: String(span.serviceName ?? span.service_name ?? ''),
@@ -129,7 +144,7 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
     hasError: inferSpanHasError(span, defaultHasError),
     errorMessage: isNonEmptyString(errorMessageRaw)
       ? errorMessageRaw
-      : errorMessageRaw !== undefined && errorMessageRaw !== null
+      : isFilled(errorMessageRaw)
         ? String(errorMessageRaw)
         : undefined
   };
@@ -138,7 +153,7 @@ function mapTraceSpanItem(item: unknown, defaultHasError?: boolean): TraceSpanIt
 function normalizeMcpUrl(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
-    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    const cleanPath = trimTrailingSlash(parsed.pathname);
     if (cleanPath.endsWith('/mcp')) {
       parsed.pathname = cleanPath;
       return parsed.toString();
@@ -202,8 +217,8 @@ export class McpClientAdapter implements ToolsPort {
     const response = await fetch(this.baseUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.authToken}`
+        [HTTP_HEADERS.CONTENT_TYPE]: CONTENT_TYPE.JSON,
+        [HTTP_HEADERS.AUTHORIZATION]: `Bearer ${this.authToken}`
       },
       body: JSON.stringify({
         jsonrpc: '2.0',

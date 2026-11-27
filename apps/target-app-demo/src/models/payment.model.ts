@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-export const PaymentStatusEnum = z.enum(['completed', 'failed', 'pending']);
+export enum PaymentStatusValue {
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  PENDING = 'pending'
+}
+
+export const PaymentStatusEnum = z.nativeEnum(PaymentStatusValue);
 export type PaymentStatus = z.infer<typeof PaymentStatusEnum>;
 
 export const CreatePaymentSchema = z.object({

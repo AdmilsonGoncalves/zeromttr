@@ -57,7 +57,7 @@
   <!-- Human-in-the-Loop Decision Controls -->
   @if (displayedFsmStateSignal() === incidentState.NOTIFIED) {
     <div
-      class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center gap-1.5"
+      class="shrink-0 bg-amber-950/40 border border-amber-600/60 rounded p-2 text-xs text-amber-200 flex items-center justify-center text-center gap-1.5"
     >
       <i class="pi pi-lock text-amber-400 shrink-0"></i>
       <span class="leading-tight text-[11px]">{{ i18n.t('awaitingDecisionBadge') }}</span>
@@ -81,7 +81,7 @@
     }
   } @else if (displayedFsmStateSignal() === incidentState.RESOLVED) {
     <div
-      class="shrink-0 bg-emerald-950/60 border border-emerald-500/70 rounded p-2 text-xs text-emerald-200 flex items-center gap-1.5"
+      class="shrink-0 bg-emerald-950/60 border border-emerald-500/70 rounded p-2 text-xs text-emerald-200 flex items-center justify-center text-center gap-1.5"
     >
       <i class="pi pi-check-circle text-emerald-400 shrink-0"></i>
       <span class="leading-tight text-[11px] font-semibold">{{
@@ -90,7 +90,7 @@
     </div>
   } @else if (displayedFsmStateSignal() === incidentState.REJECTED) {
     <div
-      class="shrink-0 bg-rose-950/60 border border-rose-500/70 rounded p-2 text-xs text-rose-200 flex items-center gap-1.5"
+      class="shrink-0 bg-rose-950/60 border border-rose-500/70 rounded p-2 text-xs text-rose-200 flex items-center justify-center text-center gap-1.5"
     >
       <i class="pi pi-times-circle text-rose-400 shrink-0"></i>
       <span class="leading-tight text-[11px] font-semibold">{{ i18n.t('fsmHintRejected') }}</span>

@@ -130,6 +130,42 @@ export function sanitizeHeaderValue(value: string): string {
 }
 
 /**
+ * Standard HTTP header names used across adapters and HTTP transport boundaries.
+ */
+export const HTTP_HEADERS = {
+  ACCEPT: 'Accept',
+  AUTHORIZATION: 'Authorization',
+  AUTHORIZATION_LOWER: 'authorization',
+  CACHE_CONTROL: 'Cache-Control',
+  CONNECTION: 'Connection',
+  CONTENT_TYPE: 'Content-Type',
+  LIVE_DEMO_KEY: 'X-Live-Demo-Key',
+  LIVE_DEMO_KEY_LOWER: 'x-live-demo-key',
+  TURNSTILE_TOKEN: 'X-Turnstile-Token',
+  TURNSTILE_TOKEN_LOWER: 'x-turnstile-token',
+  CF_TURNSTILE_RESPONSE: 'CF-Turnstile-Response',
+  CF_TURNSTILE_RESPONSE_LOWER: 'cf-turnstile-response',
+  CF_CONNECTING_IP_LOWER: 'cf-connecting-ip',
+  X_ACCEL_BUFFERING: 'X-Accel-Buffering',
+  X_FORWARDED_FOR_LOWER: 'x-forwarded-for',
+  X_REAL_IP_LOWER: 'x-real-ip'
+} as const;
+
+export type HttpHeaderName = (typeof HTTP_HEADERS)[keyof typeof HTTP_HEADERS];
+
+/**
+ * Standard MIME media types used in HTTP `Content-Type` and `Accept` headers.
+ */
+export const CONTENT_TYPE = {
+  JSON: 'application/json',
+  TEXT_PLAIN: 'text/plain',
+  EVENT_STREAM: 'text/event-stream',
+  FORM_URLENCODED: 'application/x-www-form-urlencoded'
+} as const;
+
+export type ContentTypeValue = (typeof CONTENT_TYPE)[keyof typeof CONTENT_TYPE];
+
+/**
  * Standard HTTP status codes used across adapters and HTTP transport boundaries.
  */
 export const HTTP_STATUS = {

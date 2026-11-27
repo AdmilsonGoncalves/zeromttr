@@ -1,6 +1,6 @@
 import type { LogsPort, LokiQueryInput, LogsQueryResult } from '../ports/logs.port.js';
-import { isArray, isString, toErrorMessage } from '@zeromttr/utils';
-import { buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
+import { isArray, isString, safeJsonParse } from '@zeromttr/utils';
+import { CONTENT_TYPE, HTTP_HEADERS, buildUrl, isHttpSuccess } from '@zeromttr/utils/http';
 
 export interface LokiAdapterConfig {
   baseUrl: string;
@@ -23,7 +23,7 @@ export class LokiHttpAdapter implements LogsPort {
       limit: input.limit
     });
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' }
+      headers: { [HTTP_HEADERS.ACCEPT]: CONTENT_TYPE.JSON }
     });
 
     if (!isHttpSuccess(response.status)) {
@@ -33,7 +33,7 @@ export class LokiHttpAdapter implements LogsPort {
     const text = await response.text();
     const rawBytes = Buffer.byteLength(text, 'utf-8');
 
-    let data: {
+    const data = safeJsonParse<{
       status?: string;
       data?: {
         result?: Array<{
@@ -41,11 +41,9 @@ export class LokiHttpAdapter implements LogsPort {
           values?: [string, string][];
         }>;
       };
-    };
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      throw new Error(`Failed to parse Loki JSON response: ${toErrorMessage(err)}`);
+    }>(text);
+    if (!data) {
+      throw new Error('Failed to parse Loki JSON response');
     }
 
     const lines: string[] = [];

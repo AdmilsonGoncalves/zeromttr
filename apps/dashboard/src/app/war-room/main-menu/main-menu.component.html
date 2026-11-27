@@ -1,117 +1,234 @@
 @if (demoModeEnabledSignal()) {
-  <div
-    class="flex flex-wrap items-center gap-2 bg-slate-950/80 border border-slate-800/90 rounded-lg p-1 shadow-inner"
+  <!-- Header Trigger Button -->
+  <button
+    type="button"
+    (click)="openDrawer()"
+    [attr.aria-expanded]="isDrawerOpenSignal()"
+    aria-controls="war-room-demo-drawer"
+    [attr.aria-label]="i18n.t('headerMenuAriaLabel')"
+    [pTooltip]="i18n.t('tooltipDemoMenuBadge')"
+    tooltipPosition="bottom"
+    class="inline-flex items-center gap-2 h-8 px-2.5 rounded-md bg-amber-950/60 hover:bg-amber-900/70 border border-amber-500/50 hover:border-amber-400/80 text-xs font-semibold text-amber-200 cursor-pointer shrink-0 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
   >
-    <!-- Mode Selector & Optional Live Key Pill -->
-    <div class="flex flex-wrap items-center gap-1.5">
-      <p-selectbutton
-        [options]="modeOptions()"
-        [ngModel]="activeModeSignal()"
-        (ngModelChange)="onModeSelect($event)"
-        [disabled]="isWorkflowRunningSignal()"
-        optionLabel="label"
-        optionValue="value"
-        [pTooltip]="i18n.t('tooltipModeSelector')"
-        tooltipPosition="bottom"
-        styleClass="text-[11px]"
-      />
+    <i class="pi pi-sliders-h text-xs text-amber-300" aria-hidden="true"></i>
+    <span class="whitespace-nowrap">{{ i18n.t('demoMenuBtn') }}</span>
+    <span
+      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-950/70 border border-amber-500/30 text-[10px] font-mono uppercase tracking-wide text-amber-300"
+    >
+      @if (healthyTrafficActiveSignal()) {
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
+      }
+      {{ isLiveMode() ? i18n.t('demoModeShortLive') : i18n.t('demoModeShortReplay') }}
+    </span>
+  </button>
 
-      @if (activeModeSignal() === executionMode.LIVE && requireDemoKeySignal()) {
-        <form
-          (submit)="$event.preventDefault()"
-          class="inline-flex items-center gap-1.5 m-0 pl-2 border-l border-slate-800"
+  <!-- Full Demo Controls Sidebar (Drawer) -->
+  <p-drawer
+    id="war-room-demo-drawer"
+    [visible]="isDrawerOpenSignal()"
+    (visibleChange)="onDrawerVisibilityChange($event)"
+    position="right"
+    [modal]="true"
+    [dismissible]="true"
+    [closeOnEscape]="true"
+    [closable]="true"
+    appendTo="body"
+    styleClass="!bg-slate-900 !border-l !border-slate-800 !text-slate-100 !w-full sm:!w-96"
+  >
+    <ng-template #header>
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span
+          class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 shrink-0"
         >
-          <input
-            type="text"
-            autocomplete="username"
-            value="zeromttr-live-demo"
-            readonly
-            tabindex="-1"
-            aria-hidden="true"
-            class="sr-only"
-          />
-          <i class="pi pi-key text-[11px] text-cyan-400" aria-hidden="true"></i>
-          <input
-            type="password"
-            autocomplete="current-password"
-            [placeholder]="i18n.t('liveKeyPlaceholder')"
-            [value]="liveDemoKeySignal()"
+          <i class="pi pi-sliders-h text-sm" aria-hidden="true"></i>
+        </span>
+        <div class="min-w-0">
+          <h2 class="text-sm font-bold text-white leading-tight m-0 truncate">
+            {{ i18n.t('demoMenuTitle') }}
+          </h2>
+          <p class="text-[11px] text-slate-400 m-0 leading-snug">
+            {{ i18n.t('demoMenuSubtitle') }}
+          </p>
+        </div>
+      </div>
+    </ng-template>
+
+    <div class="flex flex-col gap-4 pt-1">
+      <!-- Section 1: Execution Mode (Live vs Replay) + Live Key -->
+      <section class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            {{ i18n.t('demoMenuModeSection') }}
+          </span>
+          <span
+            class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold"
+            [class]="
+              isLiveMode()
+                ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/40'
+                : 'bg-slate-800 text-slate-300 border border-slate-700'
+            "
+          >
+            {{ isLiveMode() ? i18n.t('liveMode') : i18n.t('replayMode') }}
+          </span>
+        </div>
+
+        <div class="flex items-start justify-between gap-3">
+          <label for="demo-live-mode-toggle" class="flex flex-col gap-0.5 cursor-pointer">
+            <span class="text-xs font-semibold text-slate-100">
+              {{ i18n.t('demoMenuLiveToggleLabel') }}
+            </span>
+            <span class="text-[11px] text-slate-400 leading-snug">
+              {{ isLiveMode() ? i18n.t('demoMenuLiveDesc') : i18n.t('demoMenuReplayDesc') }}
+            </span>
+          </label>
+          <p-toggleswitch
+            inputId="demo-live-mode-toggle"
+            [ngModel]="isLiveMode()"
+            (ngModelChange)="onLiveModeToggle($event)"
             [disabled]="isWorkflowRunningSignal()"
-            (input)="onLiveKeyInput($event)"
-            [pTooltip]="i18n.t('tooltipLiveKeyInput')"
-            tooltipPosition="bottom"
-            class="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 w-36 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="shrink-0 mt-0.5"
           />
-        </form>
+        </div>
+
+        <!-- Live API Key (always positioned in layout; disabled per .env or Replay mode) -->
+        <div class="border-t border-slate-800/90 pt-3 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <label
+              for="demo-live-key-input"
+              class="text-xs font-medium text-slate-300 flex items-center gap-1.5"
+            >
+              <i class="pi pi-key text-[11px] text-cyan-400" aria-hidden="true"></i>
+              <span>{{ i18n.t('demoMenuLiveKeyLabel') }}</span>
+            </label>
+            <span
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              [class]="
+                requireDemoKeySignal()
+                  ? 'bg-amber-950/70 text-amber-300 border border-amber-500/40'
+                  : 'bg-slate-800/80 text-slate-400 border border-slate-700'
+              "
+            >
+              {{
+                requireDemoKeySignal()
+                  ? i18n.t('demoMenuKeyRequiredBadge')
+                  : i18n.t('demoMenuKeyOptionalBadge')
+              }}
+            </span>
+          </div>
+
+          <form (submit)="$event.preventDefault()" class="m-0">
+            <input
+              type="text"
+              autocomplete="username"
+              value="zeromttr-live-demo"
+              readonly
+              tabindex="-1"
+              aria-hidden="true"
+              class="sr-only"
+            />
+            <input
+              id="demo-live-key-input"
+              type="password"
+              autocomplete="current-password"
+              [placeholder]="i18n.t('liveKeyPlaceholder')"
+              [value]="displayedLiveDemoKey()"
+              [disabled]="isLiveKeyInputDisabled()"
+              (input)="onLiveKeyInput($event)"
+              class="w-full bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 disabled:opacity-45 disabled:cursor-not-allowed transition-colors"
+            />
+          </form>
+
+          <p class="text-[11px] text-slate-400 leading-snug m-0">
+            {{ liveKeyHint() }}
+          </p>
+        </div>
+      </section>
+
+      <!-- Section 2: Synthetic Healthy Traffic Toggle -->
+      @if (showHealthyTrafficControl()) {
+        <section class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              {{ i18n.t('demoMenuTrafficSection') }}
+            </span>
+            <span
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              [class]="
+                healthyTrafficActiveSignal()
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-slate-800/80 text-slate-400 border border-slate-700'
+              "
+            >
+              {{
+                healthyTrafficActiveSignal()
+                  ? i18n.t('healthyTrafficActiveBadge')
+                  : i18n.t('healthyTrafficIdleBadge')
+              }}
+            </span>
+          </div>
+
+          <div class="flex items-start justify-between gap-3">
+            <label for="demo-healthy-traffic-toggle" class="flex flex-col gap-0.5 cursor-pointer">
+              <span class="text-xs font-semibold text-slate-100">
+                {{ i18n.t('demoMenuTrafficToggleLabel') }}
+              </span>
+              <span class="text-[11px] text-slate-400 leading-snug">
+                {{ healthyTrafficHint() }}
+              </span>
+            </label>
+            <p-toggleswitch
+              inputId="demo-healthy-traffic-toggle"
+              [ngModel]="healthyTrafficActiveSignal()"
+              (ngModelChange)="onHealthyTrafficToggle($event)"
+              [disabled]="isHealthyTrafficToggleDisabled()"
+              class="shrink-0 mt-0.5"
+            />
+          </div>
+        </section>
       }
-    </div>
 
-    <span class="hidden sm:block h-5 w-px bg-slate-800" aria-hidden="true"></span>
-
-    <!-- Simulation & Workload Control Actions -->
-    <div class="flex flex-wrap items-center gap-1.5">
-      @if (canToggleHealthyTraffic()) {
-        <p-button
-          [label]="
-            healthyTrafficActiveSignal()
-              ? i18n.t('healthyTrafficStopBtn')
-              : i18n.t('healthyTrafficStartBtn')
-          "
-          [severity]="healthyTrafficActiveSignal() ? 'warn' : 'success'"
-          size="small"
-          [disabled]="
-            isTogglingTrafficSignal() ||
-            simulationLockedByTurnstileSignal() ||
-            isHealthyTrafficStartBlockedSignal()
-          "
-          (onClick)="toggleHealthyTraffic.emit()"
-          [pTooltip]="
-            simulationLockedByTurnstileSignal()
-              ? i18n.t('tooltipTurnstilePending')
-              : isHealthyTrafficStartBlockedSignal()
-                ? i18n.t('tooltipHealthyTrafficRequiresRestore')
-                : i18n.t('tooltipHealthyTraffic', {
-                    service: targetStatusSignal()?.service || i18n.t('serviceStatusLabel')
-                  })
-          "
-          tooltipPosition="bottom"
-          styleClass="text-xs py-1 whitespace-nowrap"
-        />
-      }
-
+      <!-- Section 3: Incident Simulation & Service Recovery Actions -->
       @if (canSimulateChaos()) {
-        <p-button
-          [label]="i18n.t('simulateIncident')"
-          severity="danger"
-          size="small"
-          [disabled]="isWorkflowRunningSignal() || simulationLockedByTurnstileSignal()"
-          (onClick)="triggerChaos.emit()"
-          [pTooltip]="
-            simulationLockedByTurnstileSignal()
-              ? i18n.t('tooltipTurnstilePending')
-              : i18n.t('tooltipSimulateIncident')
-          "
-          tooltipPosition="bottom"
-          styleClass="text-xs py-1 whitespace-nowrap"
-        />
+        <section
+          class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-2.5"
+        >
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            {{ i18n.t('demoMenuActionsSection') }}
+          </span>
 
-        <p-button
-          [label]="i18n.t('restoreService')"
-          severity="secondary"
-          size="small"
-          [disabled]="
-            isResettingSignal() || isSimulatingSignal() || simulationLockedByTurnstileSignal()
-          "
-          (onClick)="resetService.emit()"
-          [pTooltip]="
-            simulationLockedByTurnstileSignal()
-              ? i18n.t('tooltipTurnstilePending')
-              : i18n.t('tooltipRestoreService')
-          "
-          tooltipPosition="bottom"
-          styleClass="text-xs py-1 whitespace-nowrap"
-        />
+          <p-button
+            [label]="i18n.t('simulateIncident')"
+            severity="danger"
+            size="small"
+            [disabled]="isWorkflowRunningSignal() || simulationLockedByTurnstileSignal()"
+            (onClick)="onTriggerChaos()"
+            [pTooltip]="
+              simulationLockedByTurnstileSignal()
+                ? i18n.t('tooltipTurnstilePending')
+                : i18n.t('tooltipSimulateIncident')
+            "
+            tooltipPosition="left"
+            styleClass="w-full text-xs font-semibold py-2"
+          />
+
+          <p-button
+            [label]="i18n.t('restoreService')"
+            severity="secondary"
+            size="small"
+            [disabled]="
+              isResettingSignal() || isSimulatingSignal() || simulationLockedByTurnstileSignal()
+            "
+            (onClick)="onResetService()"
+            [pTooltip]="
+              simulationLockedByTurnstileSignal()
+                ? i18n.t('tooltipTurnstilePending')
+                : i18n.t('tooltipRestoreService')
+            "
+            tooltipPosition="left"
+            styleClass="w-full text-xs font-semibold py-2"
+          />
+        </section>
       }
     </div>
-  </div>
+  </p-drawer>
 }

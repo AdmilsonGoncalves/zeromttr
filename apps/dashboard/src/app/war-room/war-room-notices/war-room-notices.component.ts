@@ -13,7 +13,6 @@ import {
 } from '@angular/core';
 import { isNonEmptyString } from '@zeromttr/utils';
 import { Button } from 'primeng/button';
-import { IncidentExecutionMode, type IncidentMode } from '../../core/contract.js';
 import { I18nService } from '../../core/i18n/i18n.service.js';
 
 interface TurnstileApi {
@@ -43,7 +42,7 @@ const TURNSTILE_SCRIPT_SRC =
   'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
 /**
- * Operational notices bar rendering Replay mode banner and Cloudflare Turnstile verification gate outside the pure header.
+ * Operational notices bar rendering the Cloudflare Turnstile verification gate outside the pure header.
  */
 @Component({
   selector: 'app-war-room-notices',
@@ -53,10 +52,7 @@ const TURNSTILE_SCRIPT_SRC =
 })
 export class WarRoomNoticesComponent implements OnDestroy {
   readonly i18n: I18nService;
-  readonly executionMode = IncidentExecutionMode;
 
-  readonly demoModeEnabledSignal = signal<boolean>(true);
-  readonly activeModeSignal = signal<IncidentMode>(IncidentExecutionMode.REPLAY);
   readonly turnstileSiteKeySignal = signal<string | null>(null);
   readonly simulationLockedByTurnstileSignal = signal<boolean>(false);
   readonly turnstileResetTriggerSignal = signal<number>(0);
@@ -70,16 +66,6 @@ export class WarRoomNoticesComponent implements OnDestroy {
   @ViewChild('turnstileContainer')
   set turnstileContainer(ref: ElementRef<HTMLElement> | undefined) {
     this.turnstileHostSignal.set(ref?.nativeElement ?? null);
-  }
-
-  @Input()
-  set demoModeEnabled(value: boolean) {
-    this.demoModeEnabledSignal.set(value);
-  }
-
-  @Input({ required: true })
-  set activeMode(value: IncidentMode) {
-    this.activeModeSignal.set(value);
   }
 
   @Input()

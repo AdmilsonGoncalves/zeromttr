@@ -1,6 +1,6 @@
 import path from 'node:path';
 import ts from 'typescript';
-import { isNonEmptyString } from '@zeromttr/utils';
+import { isArray, isNonEmptyString } from '@zeromttr/utils';
 import type { PatchSyntaxValidatorPort } from '../ports/reasoning.port.js';
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
@@ -161,7 +161,7 @@ export class TypeScriptPatchSyntaxValidator implements PatchSyntaxValidatorPort 
 
     const nocheckPragmas = sourceFile.pragmas?.get('ts-nocheck');
     if (nocheckPragmas) {
-      const entries = Array.isArray(nocheckPragmas) ? nocheckPragmas : [nocheckPragmas];
+      const entries = isArray(nocheckPragmas) ? nocheckPragmas : [nocheckPragmas];
       for (const entry of entries) {
         ranges.push(entry.range);
       }

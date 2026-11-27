@@ -40,6 +40,7 @@ describe('DecisionComponent', () => {
     component.ngOnInit();
     expect(component.incidentId()).toBe('inc-20261110-001');
     expect(component.isValid()).toBe(false);
+    expect(component.actionLabel()).toBe(i18n.t('decisionUnknownAction'));
     expect(component.errorMessage()).toContain('Fragmento HMAC ausente');
   });
 
@@ -53,6 +54,7 @@ describe('DecisionComponent', () => {
     expect(component.isValid()).toBe(true);
     expect(component.isExpired()).toBe(false);
     expect(component.action()).toBe('approve');
+    expect(component.actionLabel()).toBe('APPROVE');
     expect(component.sig()).toBe('hmac_secret_sig_xyz');
     expect(component.exp()).toBe(futureExp);
     expect(component.expirationFormatted()).toContain('UTC');

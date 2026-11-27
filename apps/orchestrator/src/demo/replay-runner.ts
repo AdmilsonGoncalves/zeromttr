@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ReplaySnapshotSchema, type ReplaySnapshot } from '@zeromttr/contracts';
-import { nowIso, parseNumber, safeJsonParse, toErrorMessage } from '@zeromttr/utils';
+import { nowIso, parseNumber, round, safeJsonParse, toErrorMessage } from '@zeromttr/utils';
 import { Incident, type IncidentFinops } from '../domain/incident.js';
 import {
   IncidentEventType,
@@ -131,7 +131,7 @@ export class ReplayRunner {
     if (runId !== this.activeRunId) {
       return;
     }
-    const scaledMs = Math.max(0, Math.round(ms * this.speedFactor));
+    const scaledMs = Math.max(0, round(ms * this.speedFactor));
     if (scaledMs === 0) {
       return;
     }

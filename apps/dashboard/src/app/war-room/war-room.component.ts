@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { isNonEmptyString } from '@zeromttr/utils';
+import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { MessageService } from 'primeng/api';
 import { Toast } from 'primeng/toast';
+import { DashboardApiErrorCode, ToastSeverity } from '../core/constants.js';
 import { DecisionAction, type IncidentMode } from '../core/contract.js';
 import { I18nService, type Language } from '../core/i18n/i18n.service.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
@@ -99,9 +101,12 @@ export class WarRoomComponent implements OnInit, OnDestroy {
   }
 
   private notifyActionError(result: DemoActionResult): void {
-    if (result.status === 403 && result.errorCode?.startsWith('TURNSTILE_')) {
+    if (
+      result.status === HTTP_STATUS.FORBIDDEN &&
+      result.errorCode?.startsWith(DashboardApiErrorCode.TURNSTILE_PREFIX)
+    ) {
       this.messageService.add({
-        severity: 'error',
+        severity: ToastSeverity.ERROR,
         summary: this.i18n.t('toastTurnstileRequiredSummary'),
         detail: this.i18n.t('toastTurnstileRequiredDetail'),
         life: 6000
@@ -109,9 +114,9 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (result.status === 403) {
+    if (result.status === HTTP_STATUS.FORBIDDEN) {
       this.messageService.add({
-        severity: 'error',
+        severity: ToastSeverity.ERROR,
         summary: this.i18n.t('toastLiveKeyRequiredSummary'),
         detail: this.i18n.t('toastLiveKeyRequiredDetail'),
         life: 6000
@@ -119,8 +124,8 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (result.status === 429) {
-      const isRateLimit = result.errorCode === 'RATE_LIMIT_EXCEEDED';
+    if (result.status === HTTP_STATUS.TOO_MANY_REQUESTS) {
+      const isRateLimit = result.errorCode === DashboardApiErrorCode.RATE_LIMIT_EXCEEDED;
       const summaryKey = isRateLimit ? 'toastRateLimitSummary' : 'toastCooldownSummary';
       const detailWithSecondsKey = isRateLimit
         ? 'toastRateLimitDetailWithSeconds'
@@ -132,7 +137,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
           ? this.i18n.t(detailWithSecondsKey).replace('{N}', String(result.retryAfterSeconds))
           : this.i18n.t(detailKey);
       this.messageService.add({
-        severity: 'warn',
+        severity: ToastSeverity.WARN,
         summary: this.i18n.t(summaryKey),
         detail,
         life: 6000
@@ -144,7 +149,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       ? `${this.i18n.t('toastActionErrorDetail')} (HTTP ${result.status})`
       : this.i18n.t('toastActionErrorDetail');
     this.messageService.add({
-      severity: 'error',
+      severity: ToastSeverity.ERROR,
       summary: this.i18n.t('toastActionErrorSummary'),
       detail: fallbackDetail,
       life: 6000
@@ -167,7 +172,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       : 'toastHealthyTrafficStoppedDetail';
     const service = this.incidentService.targetServiceName() || this.i18n.t('serviceStatusLabel');
     this.messageService.add({
-      severity: 'info',
+      severity: ToastSeverity.INFO,
       summary: this.i18n.t(
         nextEnable ? 'toastHealthyTrafficStartedSummary' : 'toastHealthyTrafficStoppedSummary'
       ),
@@ -186,7 +191,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
     this.messageService.add({
-      severity: 'success',
+      severity: ToastSeverity.SUCCESS,
       summary: this.i18n.t('toastChaosStartedSummary'),
       detail: this.i18n.t('toastChaosStartedDetail'),
       life: 4000
@@ -203,7 +208,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
     this.messageService.add({
-      severity: 'success',
+      severity: ToastSeverity.SUCCESS,
       summary: this.i18n.t('toastServiceRestoredSummary'),
       detail: this.i18n.t('toastServiceRestoredDetail'),
       life: 4000
@@ -221,7 +226,7 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     }
 
     this.messageService.add({
-      severity: 'success',
+      severity: ToastSeverity.SUCCESS,
       summary: this.i18n.t('toastDecisionApprovedSummary'),
       detail: this.i18n.t('toastDecisionApprovedDetail'),
       life: 5000
