@@ -164,6 +164,11 @@ export class WarRoomComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (nextEnable && this.incidentService.activeMode() !== IncidentExecutionMode.LIVE) {
+      await this.applyHealthyTrafficToggle(false);
+      return;
+    }
+
     const detailKey = nextEnable
       ? 'toastHealthyTrafficStartedDetail'
       : 'toastHealthyTrafficStoppedDetail';

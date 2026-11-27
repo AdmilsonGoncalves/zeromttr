@@ -61,14 +61,18 @@ stateDiagram-v2
     direction TB
     [*] --> RECEIVED: Grafana Webhook (202 Accepted)
     RECEIVED --> INVESTIGATING: Fingerprint deduplication
+    RECEIVED --> FAILED: Critical error / timeout
     INVESTIGATING --> ENRICHING: OTel collection finished (PromQL + Tempo + Loki)
     INVESTIGATING --> FAILED: No evidence / critical error
     ENRICHING --> REMEDIATING: Real diff healthy-version...buggy-version inspected in target repo
+    ENRICHING --> FAILED: Diff inspection error / timeout
     REMEDIATING --> AWAITING_PR: Patch verified by PiiPromptGuard & hotfix/* PR opened
+    REMEDIATING --> FAILED: Synthesis or PR creation error
     AWAITING_PR --> NOTIFIED: Notification step completed (email sent or DEGRADED fallback)
-    AWAITING_PR --> FAILED: GitHub API timeout / error
+    AWAITING_PR --> FAILED: Timeout / operational error
     NOTIFIED --> RESOLVED: Human approval (exclusive email HMAC or authorized simulation)
     NOTIFIED --> REJECTED: Human rejection (exclusive email HMAC or authorized simulation)
+    NOTIFIED --> FAILED: Decision TTL expired / operational reset
     RESOLVED --> [*]
     REJECTED --> [*]
     FAILED --> [*]
@@ -81,8 +85,8 @@ stateDiagram-v2
 | `RECEIVED`      | Alert received via Grafana webhook and accepted after token verification and deduplication/cooldown checks.                                                                |
 | `INVESTIGATING` | Correlated collection of metrics (Prometheus), error traces (Tempo), and masked logs (Loki) via MCP Server.                                                                |
 | `ENRICHING`     | Code diff inspection between the previous healthy release and the current version in the target Git repo.                                                                  |
-| `REMEDIATING`   | _Fail-closed_ privacy audit (`PiiPromptGuard`), RCA synthesis, and patch generation by the AI.                                                                             |
-| `AWAITING_PR`   | Creation of the `hotfix/zeromttr-*` branch, patch commit, and Pull Request submission on GitHub.                                                                           |
+| `REMEDIATING`   | _Fail-closed_ privacy audit (`PiiPromptGuard`), RCA/patch synthesis, creation of the `hotfix/zeromttr-*` branch, and opening of the Pull Request on GitHub.                |
+| `AWAITING_PR`   | Remediation Pull Request opened and recorded on GitHub, awaiting dispatch of the on-call notification step.                                                                |
 | `NOTIFIED`      | Pull Request opened and notification step completed (Post-Mortem email sent, or recorded with `DEGRADED` status if email delivery failed), awaiting signed human decision. |
 | `RESOLVED`      | Fix approved by the on-call engineer and incident closed successfully.                                                                                                     |
 | `REJECTED`      | Fix rejected by the on-call engineer (activates the _Human Takeover_ post-rejection cooldown window).                                                                      |

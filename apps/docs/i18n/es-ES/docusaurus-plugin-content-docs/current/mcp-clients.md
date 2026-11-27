@@ -35,6 +35,8 @@ export MCP_AUTH_TOKEN="${MCP_AUTH_TOKEN:-$(node --env-file-if-exists=.env -p "pr
 claude
 ```
 
+> Si tu `.env` utiliza interpolación de variables de Docker Compose (`${...}`) o comentarios en la misma línea, exporta directamente el valor resuelto con `export MCP_AUTH_TOKEN='<tu-token>'` antes de ejecutar los comandos.
+
 :::info Usuarios de Cursor
 Cursor lee configuraciones MCP de proyecto en `.cursor/mcp.json` y usa `${env:MCP_AUTH_TOKEN}` para interpolar variables de entorno. Exporta `MCP_AUTH_TOKEN` en tu shell antes de iniciar el cliente.
 :::

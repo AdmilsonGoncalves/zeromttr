@@ -108,6 +108,35 @@ describe('WarRoomComponent', () => {
     );
   });
 
+  it('should_stop_healthy_traffic_if_live_mode_is_disabled_while_enable_request_is_in_flight', async () => {
+    let resolveEnable!: (result: { ok: boolean; status: number }) => void;
+    const toggleSpy = vi
+      .spyOn(incidentService, 'toggleHealthyTraffic')
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveEnable = resolve;
+          })
+      )
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+
+    component.onModeChange('live');
+    incidentService.isTogglingTraffic.set(true);
+    const pendingEnable = component.onToggleHealthyTraffic();
+
+    // User switches back to Replay before the enable request settles
+    component.onModeChange('replay');
+    expect(toggleSpy).toHaveBeenCalledTimes(1);
+    expect(toggleSpy).toHaveBeenCalledWith(true);
+
+    incidentService.isTogglingTraffic.set(false);
+    resolveEnable({ ok: true, status: 200 });
+    await pendingEnable;
+
+    expect(toggleSpy).toHaveBeenCalledTimes(2);
+    expect(toggleSpy).toHaveBeenNthCalledWith(2, false);
+  });
+
   it('should update live demo key when onLiveKeyChange is called', () => {
     component.onLiveKeyChange('demo-secret-key-123');
     expect(incidentService.liveDemoKey()).toBe('demo-secret-key-123');

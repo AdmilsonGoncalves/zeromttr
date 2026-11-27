@@ -44,7 +44,7 @@ The **AI Provider** never accesses databases, observability backends, or GitHub 
 
 ### 3. Orchestrator (`orchestrator`) — The "Conductor" (Deterministic Workflow)
 
-The **Orchestrator** coordinates the entire incident lifecycle predictably: it receives the alert from **Grafana**, invokes the **MCP Server**'s **Eyes** to gather evidence, verifies zero PII (`PiiPromptGuard`), sends the audited context to the **AI Provider** for RCA and patch generation, and triggers the **MCP Server**'s **Hands** to open the **GitHub** Pull Request (running branch CI when the target repository configures a CI workflow) and email the on-call engineer for approval — while streaming every step live over SSE to the **War Room Dashboard**.
+The **Orchestrator** coordinates the entire incident lifecycle predictably: it receives the alert from **Grafana**, invokes the **MCP Server**'s **Eyes** to gather evidence, verifies zero PII (`PiiPromptGuard`), sends the audited context to the **AI Provider** for RCA and patch generation, and triggers the **MCP Server**'s **Hands** to open the **GitHub** Pull Request (running branch CI when the target repository has a CI workflow whose triggers and filters match the hotfix push or PR) and email the on-call engineer for approval — while streaming every step live over SSE to the **War Room Dashboard**.
 
 ```mermaid
 flowchart TD

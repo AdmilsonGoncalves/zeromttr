@@ -61,14 +61,18 @@ stateDiagram-v2
     direction TB
     [*] --> RECEIVED: Webhook Grafana (202 Accepted)
     RECEIVED --> INVESTIGATING: Deduplicación por fingerprint
+    RECEIVED --> FAILED: Error crítico / timeout
     INVESTIGATING --> ENRICHING: Recolección OTel finalizada (PromQL + Tempo + Loki)
     INVESTIGATING --> FAILED: Sin evidencias / error crítico
     ENRICHING --> REMEDIATING: Diff real version-saludable...version-con-bug inspeccionado en el repo objetivo
+    ENRICHING --> FAILED: Error en la inspección del diff / timeout
     REMEDIATING --> AWAITING_PR: Parche validado por PiiPromptGuard y PR hotfix/* abierto
+    REMEDIATING --> FAILED: Fallo en la síntesis o apertura del PR
     AWAITING_PR --> NOTIFIED: Etapa de notificación completada (correo enviado o fallback DEGRADED)
-    AWAITING_PR --> FAILED: Timeout / error en la API de GitHub
+    AWAITING_PR --> FAILED: Timeout / error operativo
     NOTIFIED --> RESOLVED: Aprobación humana (HMAC exclusivo del correo o simulación autorizada)
     NOTIFIED --> REJECTED: Rechazo humano (HMAC exclusivo del correo o simulación autorizada)
+    NOTIFIED --> FAILED: Expiración del TTL de decisión / reinicio operativo
     RESOLVED --> [*]
     REJECTED --> [*]
     FAILED --> [*]
@@ -81,8 +85,8 @@ stateDiagram-v2
 | `RECEIVED`      | Alerta recibida vía webhook de Grafana y aceptada tras validar el token y comprobar deduplicación/cooldown.                                                                          |
 | `INVESTIGATING` | Recolección correlacionada de métricas (Prometheus), trazas con error (Tempo) y logs enmascarados (Loki) vía MCP.                                                                    |
 | `ENRICHING`     | Inspección del diff de código entre la versión saludable anterior y la versión actual en el repositorio Git objetivo.                                                                |
-| `REMEDIATING`   | Auditoría _fail-closed_ de privacidad (`PiiPromptGuard`), síntesis de RCA y generación del parche por la IA.                                                                         |
-| `AWAITING_PR`   | Creación de la rama `hotfix/zeromttr-*`, aplicación del commit correctivo y apertura del Pull Request en GitHub.                                                                     |
+| `REMEDIATING`   | Auditoría _fail-closed_ de privacidad (`PiiPromptGuard`), síntesis de RCA/parche por la IA, creación de la rama `hotfix/zeromttr-*` y apertura del Pull Request en GitHub.           |
+| `AWAITING_PR`   | Pull Request de remediación ya abierto y registrado en GitHub, a la espera de la etapa de notificación al ingeniero de guardia.                                                      |
 | `NOTIFIED`      | Pull Request abierto y etapa de notificación completada (correo Post-Mortem enviado o registrado con estado `DEGRADED` si falla la entrega), a la espera de decisión humana firmada. |
 | `RESOLVED`      | Corrección aprobada por el ingeniero de guardia e incidente cerrado con éxito.                                                                                                       |
 | `REJECTED`      | Corrección rechazada por el ingeniero de guardia (activa la ventana de _Human Takeover_ / cooldown post-rechazo).                                                                    |

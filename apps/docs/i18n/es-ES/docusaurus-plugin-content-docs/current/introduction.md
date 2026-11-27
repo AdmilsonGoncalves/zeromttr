@@ -44,7 +44,7 @@ El **Proveedor de IA** nunca accede directamente a bases de datos, sistemas de o
 
 ### 3. Orquestador (`orchestrator`) — El "Director de Orquesta" (Flujo Determinístico)
 
-El **Orquestador** coordina todo el ciclo del incidente de forma predecible: recibe la alerta de **Grafana**, acciona los **Ojos** del **Servidor MCP** para recopilar evidencias, valida la ausencia de PII (`PiiPromptGuard`), envía el contexto auditado al **Proveedor de IA** para diagnosticar y generar el parche y, finalmente, acciona las **Manos** del **Servidor MCP** para abrir el Pull Request en **GitHub** (ejecutando el CI de la rama cuando el repositorio objetivo dispone de un workflow configurado) y enviar el correo de aprobación al ingeniero de guardia — transmitiendo cada etapa en vivo vía SSE al **War Room Dashboard**.
+El **Orquestador** coordina todo el ciclo del incidente de forma predecible: recibe la alerta de **Grafana**, acciona los **Ojos** del **Servidor MCP** para recopilar evidencias, valida la ausencia de PII (`PiiPromptGuard`), envía el contexto auditado al **Proveedor de IA** para diagnosticar y generar el parche y, finalmente, acciona las **Manos** del **Servidor MCP** para abrir el Pull Request en **GitHub** (ejecutando el CI de la rama cuando el repositorio objetivo dispone de un workflow cuyos disparadores y filtros coincidan con el push o PR de hotfix) y enviar el correo de aprobación al ingeniero de guardia — transmitiendo cada etapa en vivo vía SSE al **War Room Dashboard**.
 
 ```mermaid
 flowchart TD

@@ -14,7 +14,7 @@
     "build:workspace": "nx run-many -t build",
     "dashboard:mock": "pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build && pnpm --filter @zeromttr/dashboard run mock",
     "dashboard:dev": "pnpm --filter @zeromttr/dashboard run dev",
-    "dashboard:start": "pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build && (pnpm --filter @zeromttr/dashboard run mock & pnpm --filter @zeromttr/dashboard run dev)",
+    "dashboard:start": "pnpm --filter @zeromttr/utils --filter @zeromttr/contracts run build && (pnpm --dir apps/dashboard dlx tsx mock-server/index.ts & pnpm run dashboard:dev)",
     "docs:build": "pnpm --filter @zeromttr/docs run build",
     "docs:serve": "pnpm --filter @zeromttr/docs run serve",
     "docs:start": "pnpm --filter @zeromttr/docs run start",
