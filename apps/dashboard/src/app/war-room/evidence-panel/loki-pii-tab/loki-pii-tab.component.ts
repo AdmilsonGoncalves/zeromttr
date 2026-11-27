@@ -14,7 +14,7 @@ import { I18nService } from '../../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LokiPiiTabComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
 
   readonly incidentSignal = signal<IncidentDetail | null>(null);
   readonly targetStatusSignal = signal<TargetStatusResponse | null>(null);
@@ -90,9 +90,4 @@ export class LokiPiiTabComponent {
 
     return lines[0] ?? this.maskedPostOttlLog;
   });
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 }

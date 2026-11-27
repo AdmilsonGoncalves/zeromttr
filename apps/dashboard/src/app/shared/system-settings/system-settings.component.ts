@@ -43,8 +43,8 @@ const SETTINGS_ADMIN_TOKEN_STORAGE_KEY = 'zeromttr_settings_admin_token';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SystemSettingsComponent {
-  readonly i18n: I18nService;
-  readonly settingsService: SystemSettingsService;
+  readonly i18n = inject(I18nService);
+  readonly settingsService = inject(SystemSettingsService);
   readonly logLevels: readonly SystemLogLevel[] = Object.values(SystemLogLevel);
 
   readonly isDrawerOpenSignal = signal<boolean>(false);
@@ -96,11 +96,7 @@ export class SystemSettingsComponent {
     return true;
   });
 
-  constructor(...args: [I18nService?, SystemSettingsService?]) {
-    const [i18n, settingsService] = args;
-    this.i18n = i18n ?? inject(I18nService);
-    this.settingsService = settingsService ?? inject(SystemSettingsService);
-
+  constructor() {
     try {
       const savedToken = globalThis.sessionStorage?.getItem(SETTINGS_ADMIN_TOKEN_STORAGE_KEY);
       if (isNonEmptyString(savedToken)) {

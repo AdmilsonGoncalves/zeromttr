@@ -1,6 +1,6 @@
 import '@angular/compiler';
 import { describe, it, expect } from 'vitest';
-import { initDashboard } from '../src/main.js';
+import { initDashboard } from '../../src/main.js';
 
 describe('dashboard foundation', () => {
   it('should initialize dashboard', () => {

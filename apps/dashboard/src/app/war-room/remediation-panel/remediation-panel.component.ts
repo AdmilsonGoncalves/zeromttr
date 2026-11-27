@@ -33,9 +33,9 @@ export interface PrBadgeConfig {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RemediationPanelComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly incidentState = IncidentState;
-  private readonly sanitizer: DomSanitizer | null;
+  private readonly sanitizer = inject(DomSanitizer, { optional: true });
 
   readonly demoModeEnabledSignal = signal<boolean>(true);
   readonly incidentSignal = signal<IncidentDetail | null>(null);
@@ -89,20 +89,6 @@ export class RemediationPanelComponent {
     }
     return cleanHtml;
   });
-
-  constructor(...args: [I18nService?, DomSanitizer?]) {
-    const [i18n, sanitizer] = args;
-    this.i18n = i18n ?? inject(I18nService);
-    if (sanitizer) {
-      this.sanitizer = sanitizer;
-    } else {
-      try {
-        this.sanitizer = inject(DomSanitizer, { optional: true });
-      } catch {
-        this.sanitizer = null;
-      }
-    }
-  }
 
   private buildPreviewHtml(): string {
     const incident = this.incidentSignal();

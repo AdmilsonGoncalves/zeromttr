@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTimeSeriesGeometry } from '../src/app/core/telemetry-chart.utils.js';
+import { buildTimeSeriesGeometry } from '../../../src/app/core/telemetry-chart.utils.js';
 
 describe('telemetry-chart.utils', () => {
   describe('buildTimeSeriesGeometry', () => {

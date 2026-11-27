@@ -3,13 +3,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { WarRoomHeaderComponent } from '../src/app/war-room/war-room-header/war-room-header.component.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
+import { WarRoomHeaderComponent } from '../../../src/app/war-room/war-room-header/war-room-header.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HEADER_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/war-room-header/war-room-header.component.html'
+  '../../../src/app/war-room/war-room-header/war-room-header.component.html'
 );
 
 describe('WarRoomHeaderComponent', () => {
@@ -18,7 +19,9 @@ describe('WarRoomHeaderComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new WarRoomHeaderComponent(i18n);
+    component = createWithInjector(WarRoomHeaderComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
   });
 
   it('should emit langChange for valid inputs and ignore empty language', () => {

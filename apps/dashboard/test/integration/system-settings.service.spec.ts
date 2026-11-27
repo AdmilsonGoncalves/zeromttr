@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createMockServer, type MockServer } from '../mock-server/server.js';
-import { SystemLogLevel } from '../src/app/core/contract.js';
-import { SystemSettingsService } from '../src/app/core/system-settings.service.js';
+import { createMockServer, type MockServer } from '../../mock-server/server.js';
+import { SystemLogLevel } from '../../src/app/core/contract.js';
+import { SystemSettingsService } from '../../src/app/core/system-settings.service.js';
 
 describe('SystemSettingsService', () => {
   let server: MockServer;

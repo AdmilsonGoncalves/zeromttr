@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
 
 describe('I18nService', () => {
   it('should default to Portuguese translations', () => {

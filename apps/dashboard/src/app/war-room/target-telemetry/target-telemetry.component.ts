@@ -21,7 +21,7 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class TargetTelemetryComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly healthLevel = TelemetryHealthLevel;
 
   readonly metricsSignal = signal<TargetLiveMetrics | null>(null);
@@ -161,9 +161,4 @@ export class TargetTelemetryComponent {
     }
     return items;
   });
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 }

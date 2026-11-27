@@ -34,7 +34,7 @@ import { I18nService } from '../../core/i18n/i18n.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DemoSettingsComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly executionMode = IncidentExecutionMode;
 
   readonly isDrawerOpenSignal = signal<boolean>(false);
@@ -185,11 +185,6 @@ export class DemoSettingsComponent {
   @Output() readonly toggleHealthyTraffic = new EventEmitter<void>();
   @Output() readonly triggerChaos = new EventEmitter<void>();
   @Output() readonly resetService = new EventEmitter<void>();
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 
   /**
    * Opens the demo controls drawer.

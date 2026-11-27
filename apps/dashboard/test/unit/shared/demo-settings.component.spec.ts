@@ -3,14 +3,15 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { IncidentExecutionMode, TargetHealthStatus } from '../src/app/core/contract.js';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { DemoSettingsComponent } from '../src/app/shared/demo-settings/demo-settings.component.js';
+import { IncidentExecutionMode, TargetHealthStatus } from '../../../src/app/core/contract.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
+import { DemoSettingsComponent } from '../../../src/app/shared/demo-settings/demo-settings.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEMO_SETTINGS_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/shared/demo-settings/demo-settings.component.html'
+  '../../../src/app/shared/demo-settings/demo-settings.component.html'
 );
 
 describe('DemoSettingsComponent', () => {
@@ -19,7 +20,9 @@ describe('DemoSettingsComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new DemoSettingsComponent(i18n);
+    component = createWithInjector(DemoSettingsComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
   });
 
   it('should_open_and_close_drawer_and_close_automatically_on_triggerChaos_and_resetService', () => {

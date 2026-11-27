@@ -36,24 +36,9 @@ import { WarRoomNoticesComponent } from './war-room-notices/war-room-notices.com
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WarRoomComponent implements OnInit, OnDestroy {
-  readonly i18n: I18nService;
-  readonly incidentService: IncidentService;
-  readonly messageService: MessageService;
-
-  constructor(...args: [I18nService?, IncidentService?, MessageService?]) {
-    const [i18n, incidentService, messageService] = args;
-    this.i18n = i18n ?? inject(I18nService);
-    this.incidentService = incidentService ?? inject(IncidentService);
-    if (messageService) {
-      this.messageService = messageService;
-    } else {
-      try {
-        this.messageService = inject(MessageService, { optional: true }) ?? new MessageService();
-      } catch {
-        this.messageService = new MessageService();
-      }
-    }
-  }
+  readonly i18n = inject(I18nService);
+  readonly incidentService = inject(IncidentService);
+  readonly messageService = inject(MessageService, { optional: true }) ?? new MessageService();
 
   ngOnInit(): void {
     this.incidentService.connectSse();

@@ -3,13 +3,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { I18nService } from '../src/app/core/i18n/i18n.service.js';
-import { LiveMetricsTabComponent } from '../src/app/war-room/evidence-panel/live-metrics-tab/live-metrics-tab.component.js';
+import { I18nService } from '../../../../src/app/core/i18n/i18n.service.js';
+import { LiveMetricsTabComponent } from '../../../../src/app/war-room/evidence-panel/live-metrics-tab/live-metrics-tab.component.js';
+import { createWithInjector } from '../../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const LIVE_METRICS_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/evidence-panel/live-metrics-tab/live-metrics-tab.component.html'
+  '../../../../src/app/war-room/evidence-panel/live-metrics-tab/live-metrics-tab.component.html'
 );
 
 describe('LiveMetricsTabComponent', () => {
@@ -18,7 +19,9 @@ describe('LiveMetricsTabComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new LiveMetricsTabComponent(i18n);
+    component = createWithInjector(LiveMetricsTabComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
   });
 
   it('should_compute_live_time_series_geometries_from_telemetry_history', () => {

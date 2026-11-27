@@ -3,15 +3,16 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MOCK_INCIDENT } from '../mock-server/mock-data.js';
-import { IncidentState, NotificationStatus } from '../src/app/core/contract.js';
-import { I18nService, Language } from '../src/app/core/i18n/i18n.service.js';
-import { RemediationPanelComponent } from '../src/app/war-room/remediation-panel/remediation-panel.component.js';
+import { MOCK_INCIDENT } from '../../../mock-server/mock-data.js';
+import { IncidentState, NotificationStatus } from '../../../src/app/core/contract.js';
+import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
+import { RemediationPanelComponent } from '../../../src/app/war-room/remediation-panel/remediation-panel.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REMEDIATION_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/remediation-panel/remediation-panel.component.html'
+  '../../../src/app/war-room/remediation-panel/remediation-panel.component.html'
 );
 
 describe('RemediationPanelComponent', () => {
@@ -20,7 +21,9 @@ describe('RemediationPanelComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new RemediationPanelComponent(i18n);
+    component = createWithInjector(RemediationPanelComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
   });
 
   it('should_render_idle_preview_when_no_incident_is_active', () => {

@@ -17,7 +17,7 @@ import type { FsmStageItem } from '../../core/incident.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class FsmTimelineComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly stageStatus = FsmStageStatus;
 
   readonly stagesSignal = signal<FsmStageItem[]>([]);
@@ -44,9 +44,4 @@ export class FsmTimelineComponent {
       .t(this.hintKeySignal())
       .replace('{N}', this.liveWaitSecondsSignal().toString());
   });
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 }

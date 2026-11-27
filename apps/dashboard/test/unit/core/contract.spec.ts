@@ -10,7 +10,7 @@ import type {
   ReasoningSource,
   SpanNode,
   TargetHealthStatus
-} from '../src/app/core/contract.js';
+} from '../../../src/app/core/contract.js';
 
 describe('core contract', () => {
   it('should export dedicated domain types without raw string unions', () => {

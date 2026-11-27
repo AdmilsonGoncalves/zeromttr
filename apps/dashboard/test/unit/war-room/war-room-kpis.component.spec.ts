@@ -3,13 +3,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { I18nService } from '../src/app/core/i18n/i18n.service.js';
-import { WarRoomKpisComponent } from '../src/app/war-room/war-room-kpis/war-room-kpis.component.js';
+import { I18nService } from '../../../src/app/core/i18n/i18n.service.js';
+import { WarRoomKpisComponent } from '../../../src/app/war-room/war-room-kpis/war-room-kpis.component.js';
+import { createWithInjector } from '../../helpers/di.helper.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const KPIS_TEMPLATE_PATH = resolve(
   HERE,
-  '../src/app/war-room/war-room-kpis/war-room-kpis.component.html'
+  '../../../src/app/war-room/war-room-kpis/war-room-kpis.component.html'
 );
 
 describe('WarRoomKpisComponent', () => {
@@ -18,7 +19,9 @@ describe('WarRoomKpisComponent', () => {
 
   beforeEach(() => {
     i18n = new I18nService();
-    component = new WarRoomKpisComponent(i18n);
+    component = createWithInjector(WarRoomKpisComponent, [
+      { provide: I18nService, useValue: i18n }
+    ]);
   });
 
   it('should_expose_ttd_ttpr_evidence_coverage_reasoning_source_and_finops_signals', () => {

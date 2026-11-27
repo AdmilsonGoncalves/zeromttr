@@ -51,7 +51,7 @@ const TURNSTILE_SCRIPT_SRC =
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WarRoomNoticesComponent implements OnDestroy {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
 
   readonly turnstileSiteKeySignal = signal<string | null>(null);
   readonly simulationLockedByTurnstileSignal = signal<boolean>(false);
@@ -85,31 +85,24 @@ export class WarRoomNoticesComponent implements OnDestroy {
 
   @Output() readonly turnstileTokenChange = new EventEmitter<string | null>();
 
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
+  constructor() {
+    effect(() => {
+      const siteKey = this.turnstileSiteKeySignal();
+      const host = this.turnstileHostSignal();
+      if (isNonEmptyString(siteKey) && host && !this.turnstileWidgetId) {
+        this.mountTurnstileWidget(host, siteKey);
+      }
+    });
 
-    try {
-      effect(() => {
-        const siteKey = this.turnstileSiteKeySignal();
-        const host = this.turnstileHostSignal();
-        if (isNonEmptyString(siteKey) && host && !this.turnstileWidgetId) {
-          this.mountTurnstileWidget(host, siteKey);
+    effect(() => {
+      const trigger = this.turnstileResetTriggerSignal();
+      if (trigger > this.lastResetTrigger) {
+        this.lastResetTrigger = trigger;
+        if (this.turnstileWidgetId && globalThis.window?.turnstile) {
+          globalThis.window.turnstile.reset(this.turnstileWidgetId);
         }
-      });
-
-      effect(() => {
-        const trigger = this.turnstileResetTriggerSignal();
-        if (trigger > this.lastResetTrigger) {
-          this.lastResetTrigger = trigger;
-          if (this.turnstileWidgetId && globalThis.window?.turnstile) {
-            globalThis.window.turnstile.reset(this.turnstileWidgetId);
-          }
-        }
-      });
-    } catch {
-      // Ignore effect registration outside Angular injection context in pure Node unit tests
-    }
+      }
+    });
   }
 
   ngOnDestroy(): void {

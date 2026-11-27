@@ -30,7 +30,7 @@ import { SystemSettingsComponent } from '../../shared/system-settings/system-set
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class WarRoomHeaderComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly healthStatus = TargetHealthStatus;
 
   readonly demoModeEnabledSignal = signal<boolean>(false);
@@ -112,11 +112,6 @@ export class WarRoomHeaderComponent {
   @Output() readonly toggleHealthyTraffic = new EventEmitter<void>();
   @Output() readonly triggerChaos = new EventEmitter<void>();
   @Output() readonly resetService = new EventEmitter<void>();
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 
   /**
    * Emits the selected UI language when valid.

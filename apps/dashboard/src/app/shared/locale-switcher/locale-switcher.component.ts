@@ -37,7 +37,7 @@ const LOCALE_OPTIONS: LocaleOption[] = [
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LocaleSwitcherComponent {
-  readonly i18n: I18nService;
+  readonly i18n = inject(I18nService);
   readonly localeOptions: LocaleOption[] = LOCALE_OPTIONS;
 
   readonly currentLangSignal = signal<Language>(Language.PT_BR);
@@ -56,11 +56,6 @@ export class LocaleSwitcherComponent {
   }
 
   @Output() readonly langChange = new EventEmitter<Language>();
-
-  constructor(...args: [I18nService?]) {
-    const [i18n] = args;
-    this.i18n = i18n ?? inject(I18nService);
-  }
 
   /**
    * Toggles the locale selection dropdown menu.
