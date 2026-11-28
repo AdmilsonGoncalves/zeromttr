@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   I18nService,
+  LEGACY_LOCALE_STORAGE_KEY,
   LOCALE_STORAGE_KEY,
   Language
 } from '../../../src/app/core/i18n/i18n.service.js';
@@ -209,6 +210,32 @@ describe('I18nService', () => {
       expect(fakeDocument.documentElement.lang).toBe(savedLang);
     }
   );
+
+  it.each([Language.EN_US, Language.ES_ES])(
+    'should_migrate_legacy_locale_%s_to_namespaced_key_when_new_key_is_missing',
+    (legacyLang) => {
+      const storage = createMemoryStorage({ [LEGACY_LOCALE_STORAGE_KEY]: legacyLang });
+      stubLocalStorage(storage);
+      stubDocumentLang('pt-BR');
+
+      const service = new I18nService();
+      expect(service.currentLang()).toBe(legacyLang);
+      expect(storage.getItem(LOCALE_STORAGE_KEY)).toBe(legacyLang);
+    }
+  );
+
+  it('should_prefer_valid_namespaced_locale_over_legacy_key_without_overwriting_it', () => {
+    const storage = createMemoryStorage({
+      [LOCALE_STORAGE_KEY]: Language.ES_ES,
+      [LEGACY_LOCALE_STORAGE_KEY]: Language.EN_US
+    });
+    stubLocalStorage(storage);
+    stubDocumentLang('pt-BR');
+
+    const service = new I18nService();
+    expect(service.currentLang()).toBe(Language.ES_ES);
+    expect(storage.getItem(LOCALE_STORAGE_KEY)).toBe(Language.ES_ES);
+  });
 
   it.each(['fr-FR', 'pt', '', '   ', 'invalid-locale'])(
     'should_fallback_safely_to_pt_BR_when_persisted_locale_%j_is_invalid',

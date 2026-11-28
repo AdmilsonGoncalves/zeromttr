@@ -8,6 +8,7 @@ export { Language } from './i18n.types.js';
 export type { TranslationDictionary } from './i18n.types.js';
 
 export const LOCALE_STORAGE_KEY = 'zeromttr_locale';
+export const LEGACY_LOCALE_STORAGE_KEY = 'locale';
 
 const SUPPORTED_LANGUAGES = new Set<string>(Object.values(Language));
 
@@ -72,6 +73,11 @@ export class I18nService {
         const stored = storage.getItem(LOCALE_STORAGE_KEY);
         if (isSupportedLanguage(stored)) {
           return stored;
+        }
+        const legacy = storage.getItem(LEGACY_LOCALE_STORAGE_KEY);
+        if (isSupportedLanguage(legacy)) {
+          this.persistLanguage(legacy);
+          return legacy;
         }
       }
     } catch {
