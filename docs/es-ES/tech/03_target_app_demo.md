@@ -26,6 +26,7 @@ apps/target-app-demo/src/
 ## 3. Requisitos Funcionales del Contenedor Local
 - `POST /payments` (procesa una transacción PIX), `GET /payments/:id`, `GET /health`.
 - `POST /chaos/pool-saturation?enable=true|false` alterna el modo de operación de `PaymentRepository` entre el comportamiento saludable de la versión `v2.14.7` y el comportamiento con regresión de la versión `v2.14.8` (cuando `CHAOS_AUTO_TRAFFIC_BURST=true`, dispara también oleadas sintéticas de tráfico).
+- `POST /chaos/healthy-traffic?enable=true|false` inicia o detiene el flujo continuo de tráfico saludable (intervalo configurable vía `HEALTHY_TRAFFIC_INTERVAL_MS`, por defecto `1500` ms, y arranque automático opcional vía `HEALTHY_TRAFFIC_AUTO_START=true`).
 - `GET /ops/status` (con retrocompatibilidad en `GET /chaos/status` delegando al mismo constructor) devuelve el manifiesto operacional neutro con `capabilities` y `saturation` genérico:
   ```json
   {

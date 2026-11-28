@@ -1,12 +1,13 @@
 import type http from 'node:http';
-import { isNonEmptyString } from '@zeromttr/utils';
+import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
 import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
 import { buildTargetStatusManifest } from './ops-status.controller.js';
 import { telemetry } from '../telemetry/otel.js';
 
-const HEALTHY_TRAFFIC_INTERVAL_MS = 1500;
+const DEFAULT_HEALTHY_TRAFFIC_INTERVAL_MS = 1500;
+const MIN_HEALTHY_TRAFFIC_INTERVAL_MS = 500;
 const HEALTHY_TRAFFIC_BATCH_SIZE = 2;
 
 /**
@@ -88,7 +89,10 @@ export class ChaosController {
     this.healthyTrafficActive = false;
   }
 
-  private startHealthyTraffic(): void {
+  /**
+   * Starts continuous healthy synthetic traffic against `POST /payments` using `HEALTHY_TRAFFIC_INTERVAL_MS`.
+   */
+  public startHealthyTraffic(portOverride?: number): void {
     if (this.healthyTrafficActive && this.healthyTrafficTimer) {
       return;
     }
@@ -96,11 +100,12 @@ export class ChaosController {
     this.stopHealthyTraffic();
     this.healthyTrafficActive = true;
 
+    const intervalMs = this.resolveHealthyTrafficIntervalMs();
     const fireHealthyWave = (): void => {
       if (!this.healthyTrafficActive) {
         return;
       }
-      const port = process.env.PORT || '3001';
+      const port = portOverride ? String(portOverride) : process.env.PORT || '3001';
       const targetUrl = `http://127.0.0.1:${port}/payments`;
       const payload = this.buildSyntheticPaymentPayload('PIX Healthy Stream #OK');
 
@@ -114,8 +119,19 @@ export class ChaosController {
     };
 
     fireHealthyWave();
-    this.healthyTrafficTimer = setInterval(fireHealthyWave, HEALTHY_TRAFFIC_INTERVAL_MS);
+    this.healthyTrafficTimer = setInterval(fireHealthyWave, intervalMs);
     this.healthyTrafficTimer.unref();
+  }
+
+  private resolveHealthyTrafficIntervalMs(): number {
+    const raw = parseNumber(
+      process.env.HEALTHY_TRAFFIC_INTERVAL_MS,
+      DEFAULT_HEALTHY_TRAFFIC_INTERVAL_MS
+    );
+    if (!Number.isFinite(raw) || raw < MIN_HEALTHY_TRAFFIC_INTERVAL_MS) {
+      return MIN_HEALTHY_TRAFFIC_INTERVAL_MS;
+    }
+    return Math.trunc(raw);
   }
 
   private stopSyntheticTrafficBurst(): void {
