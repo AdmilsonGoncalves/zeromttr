@@ -180,6 +180,7 @@ describe('I18nService', () => {
   });
 
   it('should_persist_selected_locale_in_localStorage_and_sync_html_lang', () => {
+    expect(LOCALE_STORAGE_KEY).toBe('zeromttr_locale');
     const storage = createMemoryStorage();
     stubLocalStorage(storage);
     const fakeDocument = stubDocumentLang('pt-BR');

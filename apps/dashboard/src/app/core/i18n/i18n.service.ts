@@ -7,7 +7,7 @@ import { PT_TRANSLATIONS } from './pt.translations.js';
 export { Language } from './i18n.types.js';
 export type { TranslationDictionary } from './i18n.types.js';
 
-export const LOCALE_STORAGE_KEY = 'locale';
+export const LOCALE_STORAGE_KEY = 'zeromttr_locale';
 
 const SUPPORTED_LANGUAGES = new Set<string>(Object.values(Language));
 
@@ -23,7 +23,7 @@ function isSupportedLanguage(value: unknown): value is Language {
 
 /**
  * Signal-based internationalization service switching dashboard copy across Portuguese, English, and Spanish
- * with safe `localStorage` persistence (`locale`) and `<html lang>` synchronization.
+ * with safe `localStorage` persistence (`zeromttr_locale`) and `<html lang>` synchronization.
  */
 @Injectable({
   providedIn: 'root'
@@ -40,7 +40,7 @@ export class I18nService {
   }
 
   /**
-   * Switches the active UI language signal, persists it under `localStorage['locale']`,
+   * Switches the active UI language signal, persists it under `localStorage['zeromttr_locale']`,
    * and updates `<html lang="...">`.
    */
   setLang(lang: Language): void {
