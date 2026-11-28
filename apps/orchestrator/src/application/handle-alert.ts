@@ -4,6 +4,7 @@ import type { SystemSettings } from '@zeromttr/contracts';
 import { diffInSeconds, isNonEmptyString } from '@zeromttr/utils';
 import {
   AlertSeverity,
+  AlertSuppressionReason,
   GrafanaAlertStatus,
   IncidentEventType,
   IncidentExecutionMode,
@@ -42,7 +43,7 @@ export const GrafanaWebhookPayloadSchema = z
 
 export type GrafanaWebhookPayload = z.infer<typeof GrafanaWebhookPayloadSchema>;
 
-export type AlertSuppressionReason = 'rejection_cooldown' | 'repeat_suppression';
+export type { AlertSuppressionReason };
 
 export interface HandleAlertResult {
   incident: Incident | null;
@@ -50,6 +51,8 @@ export interface HandleAlertResult {
   ignored?: boolean;
   suppressed?: boolean;
   suppressionReason?: AlertSuppressionReason;
+  remainingSeconds?: number;
+  windowSeconds?: number;
 }
 
 export type AlertPolicySettings = Pick<
@@ -97,11 +100,17 @@ function isOpenIncidentExpired(incident: Incident, nowMs: number, ttlSeconds: nu
   return elapsedSeconds > ttlSeconds;
 }
 
-function evaluateSuppressionReason(
+interface SuppressionEvaluation {
+  reason: AlertSuppressionReason;
+  remainingSeconds: number;
+  windowSeconds: number;
+}
+
+function evaluateSuppression(
   latest: Incident,
   nowMs: number,
   policy: ResolvedAlertPolicy
-): AlertSuppressionReason | null {
+): SuppressionEvaluation | null {
   const elapsedSeconds = diffInSeconds(getLastActivityAt(latest), nowMs);
 
   if (
@@ -109,7 +118,11 @@ function evaluateSuppressionReason(
     policy.rejectionCooldownSeconds > 0 &&
     elapsedSeconds < policy.rejectionCooldownSeconds
   ) {
-    return 'rejection_cooldown';
+    return {
+      reason: AlertSuppressionReason.REJECTION_COOLDOWN,
+      remainingSeconds: Math.max(1, Math.ceil(policy.rejectionCooldownSeconds - elapsedSeconds)),
+      windowSeconds: policy.rejectionCooldownSeconds
+    };
   }
 
   const isConclusiveState =
@@ -119,7 +132,11 @@ function evaluateSuppressionReason(
     policy.repeatSuppressionSeconds > 0 &&
     elapsedSeconds < policy.repeatSuppressionSeconds
   ) {
-    return 'repeat_suppression';
+    return {
+      reason: AlertSuppressionReason.REPEAT_SUPPRESSION,
+      remainingSeconds: Math.max(1, Math.ceil(policy.repeatSuppressionSeconds - elapsedSeconds)),
+      windowSeconds: policy.repeatSuppressionSeconds
+    };
   }
 
   return null;
@@ -160,7 +177,7 @@ export class HandleAlert {
     if (pending) {
       const firstResult = await pending;
       return {
-        incident: firstResult.incident,
+        ...firstResult,
         isDuplicate: true
       };
     }
@@ -234,16 +251,27 @@ export class HandleAlert {
       return null;
     }
 
-    const suppressionReason = evaluateSuppressionReason(latest, nowMs, policy);
-    if (!suppressionReason) {
+    const suppression = evaluateSuppression(latest, nowMs, policy);
+    if (!suppression) {
       return null;
     }
+
+    this.broadcaster.broadcast(IncidentEventType.ALERT_SUPPRESSED, {
+      incidentId: latest.id,
+      service: latest.service,
+      reason: suppression.reason,
+      remainingSeconds: suppression.remainingSeconds,
+      windowSeconds: suppression.windowSeconds,
+      at: new Date(nowMs).toISOString()
+    });
 
     return {
       incident: latest,
       isDuplicate: true,
       suppressed: true,
-      suppressionReason
+      suppressionReason: suppression.reason,
+      remainingSeconds: suppression.remainingSeconds,
+      windowSeconds: suppression.windowSeconds
     };
   }
 

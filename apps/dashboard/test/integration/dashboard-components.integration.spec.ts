@@ -107,6 +107,7 @@ describe('Dashboard Components Integration (TestBed + happy-dom)', () => {
     const fetchDemoSpy = vi.spyOn(incidentService, 'fetchDemoConfig').mockResolvedValue();
     const fetchTargetSpy = vi.spyOn(incidentService, 'fetchTargetStatus').mockResolvedValue();
     const fetchIncidentsSpy = vi.spyOn(incidentService, 'fetchIncidents').mockResolvedValue();
+    const fetchSettingsSpy = vi.spyOn(settingsService, 'fetchSettings').mockResolvedValue(true);
 
     const fixture = createDashboardFixture(WarRoomComponent, {
       providers: [
@@ -121,6 +122,7 @@ describe('Dashboard Components Integration (TestBed + happy-dom)', () => {
     expect(fetchDemoSpy).toHaveBeenCalledTimes(1);
     expect(fetchTargetSpy).toHaveBeenCalledTimes(1);
     expect(fetchIncidentsSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSettingsSpy).toHaveBeenCalledTimes(1);
 
     const hostEl = fixture.nativeElement as HTMLElement;
     expect(hostEl.querySelector('p-toast')).not.toBeNull();

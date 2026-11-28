@@ -4,7 +4,8 @@
 > **Trilha:** Logística & Automação (_Automação de fluxos operacionais e integração entre sistemas críticos_)  
 > **Organização:** AGJ Works ([https://agjworks.com](https://agjworks.com))  
 > **Repositório:** [https://github.com/AdmilsonGoncalves/zeromttr](https://github.com/AdmilsonGoncalves/zeromttr)  
-> **Ambiente de Demonstração:** [https://zeromttr.agjworks.com](https://zeromttr.agjworks.com)
+> **Ambiente de Demonstração:** [https://zeromttr.agjworks.com](https://zeromttr.agjworks.com)  
+> **Manual do Usuário:** [https://docs-zeromttr.agjworks.com](https://docs-zeromttr.agjworks.com)
 
 ---
 

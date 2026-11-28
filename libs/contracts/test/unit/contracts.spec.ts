@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AlertSuppressedEventSchema,
+  AlertSuppressionReason,
   AnalyzeOtelTraceInputSchema,
   AnnotateGrafanaIncidentInputSchema,
   CollectedEvidenceSchema,
@@ -7,6 +9,8 @@ import {
   ExecutePromqlRangeInputSchema,
   FinOpsMetricsSchema,
   IncidentDetailSchema,
+  IncidentEventType,
+  IncidentLlmFailedEventSchema,
   IncidentState,
   InspectGitDeployDiffInputSchema,
   PiiGuardAuditSchema,
@@ -431,5 +435,50 @@ describe('@zeromttr/contracts Zod schemas', () => {
     expect(SystemSettingsPatchSchema.safeParse({ llmModel: '../evil/model' }).success).toBe(false);
     expect(SystemSettingsPatchSchema.safeParse({ llmModel: 'openai//gpt-4o' }).success).toBe(false);
     expect(SystemSettingsPatchSchema.safeParse({ llmModel: 'openai/' }).success).toBe(false);
+  });
+
+  it('should_validate_alert_suppressed_sse_event_schema', () => {
+    expect(IncidentEventType.ALERT_SUPPRESSED).toBe('alert.suppressed');
+    expect(
+      AlertSuppressedEventSchema.safeParse({
+        incidentId: 'inc-f823b1b9',
+        service: 'api-pagamentos-core',
+        reason: AlertSuppressionReason.REPEAT_SUPPRESSION,
+        remainingSeconds: 180,
+        windowSeconds: 900,
+        at: '2026-11-28T02:45:00.000Z'
+      }).success
+    ).toBe(true);
+
+    expect(
+      AlertSuppressedEventSchema.safeParse({
+        incidentId: 'inc-f823b1b9',
+        service: 'api-pagamentos-core',
+        reason: 'unknown_reason',
+        remainingSeconds: -5,
+        windowSeconds: 900,
+        at: '2026-11-28T02:45:00.000Z'
+      }).success
+    ).toBe(false);
+
+    expect(IncidentEventType.LLM_FAILED).toBe('incident.llm_failed');
+    expect(
+      IncidentLlmFailedEventSchema.safeParse({
+        incidentId: 'inc-f823b1b9',
+        service: 'api-pagamentos-core',
+        error: 'LLM request timed out after 15000ms',
+        fallbackUsed: true,
+        at: '2026-11-28T02:45:00.000Z'
+      }).success
+    ).toBe(true);
+    expect(
+      IncidentLlmFailedEventSchema.safeParse({
+        incidentId: 'inc-f823b1b9',
+        service: 'api-pagamentos-core',
+        error: 'timeout',
+        fallbackUsed: 'yes',
+        at: '2026-11-28T02:45:00.000Z'
+      }).success
+    ).toBe(false);
   });
 });

@@ -24,10 +24,20 @@ export const IncidentEventType = {
   RCA: 'incident.rca',
   REMEDIATION: 'incident.remediation',
   NOTIFIED: 'incident.notified',
-  DECISION: 'incident.decision'
+  DECISION: 'incident.decision',
+  ALERT_SUPPRESSED: 'alert.suppressed',
+  LLM_FAILED: 'incident.llm_failed'
 } as const;
 export type IncidentEventType = (typeof IncidentEventType)[keyof typeof IncidentEventType];
 export const IncidentEventTypeSchema = z.nativeEnum(IncidentEventType);
+
+export const AlertSuppressionReason = {
+  REJECTION_COOLDOWN: 'rejection_cooldown',
+  REPEAT_SUPPRESSION: 'repeat_suppression'
+} as const;
+export type AlertSuppressionReason =
+  (typeof AlertSuppressionReason)[keyof typeof AlertSuppressionReason];
+export const AlertSuppressionReasonSchema = z.nativeEnum(AlertSuppressionReason);
 
 export const TargetHealthStatus = {
   HEALTHY: 'healthy',
@@ -301,6 +311,25 @@ export const IncidentDecisionEventSchema = z.object({
   source: DecisionSourceSchema
 });
 export type IncidentDecisionEvent = z.infer<typeof IncidentDecisionEventSchema>;
+
+export const AlertSuppressedEventSchema = z.object({
+  incidentId: z.string(),
+  service: z.string(),
+  reason: AlertSuppressionReasonSchema,
+  remainingSeconds: z.number().int().nonnegative(),
+  windowSeconds: z.number().int().nonnegative(),
+  at: z.string()
+});
+export type AlertSuppressedEvent = z.infer<typeof AlertSuppressedEventSchema>;
+
+export const IncidentLlmFailedEventSchema = z.object({
+  incidentId: z.string(),
+  service: z.string(),
+  error: z.string(),
+  fallbackUsed: z.boolean(),
+  at: z.string()
+});
+export type IncidentLlmFailedEvent = z.infer<typeof IncidentLlmFailedEventSchema>;
 
 export const HeartbeatEventSchema = z.object({
   at: z.string()

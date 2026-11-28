@@ -263,7 +263,8 @@ export class DemoSettingsComponent {
 
   private syncHealthyTrafficSwitchControl(): void {
     this.healthyTrafficModel?.control.setValue(this.healthyTrafficActiveSignal(), {
-      emitEvent: false
+      emitEvent: false,
+      emitViewToModelChange: false
     });
   }
 

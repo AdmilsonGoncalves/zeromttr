@@ -26,6 +26,7 @@ apps/target-app-demo/src/
 ## 3. Local Container Functional Requirements
 - `POST /payments` (processes PIX transaction), `GET /payments/:id`, `GET /health`.
 - `POST /chaos/pool-saturation?enable=true|false` toggles `PaymentRepository` operation mode between the healthy `v2.14.7` release behavior and the regressed `v2.14.8` release behavior (when `CHAOS_AUTO_TRAFFIC_BURST=true`, also triggers synthetic traffic burst waves).
+- `POST /chaos/healthy-traffic?enable=true|false` starts or stops continuous healthy traffic (interval configurable via `HEALTHY_TRAFFIC_INTERVAL_MS`, default `1500` ms, with optional boot auto-start via `HEALTHY_TRAFFIC_AUTO_START=true`).
 - `GET /ops/status` (with backward-compatible `GET /chaos/status` delegating to the same manifest builder) returns the neutral operational manifest with `capabilities` and generic `saturation`:
   ```json
   {

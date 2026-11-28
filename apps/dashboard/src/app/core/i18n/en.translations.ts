@@ -248,6 +248,25 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   toastHealthyTrafficStartedDetail: 'Continuous healthy requests streaming to {{service}}.',
   toastHealthyTrafficStoppedSummary: 'Healthy traffic stopped',
   toastHealthyTrafficStoppedDetail: 'Continuous request stream stopped.',
+  toastAlertSuppressedRepeatSummary: 'Alert suppressed (repeat suppression)',
+  toastAlertSuppressedRepeatDetail:
+    'A recent incident for {{service}} was closed moments ago. New alerts remain suppressed for {{remaining}} more (window: {{window}}). Adjust this in Settings (⚙️ → Alerts).',
+  toastAlertSuppressedRejectionSummary: 'Alert suppressed (rejection cooldown)',
+  toastAlertSuppressedRejectionDetail:
+    'A recent incident for {{service}} was rejected by an operator. New alerts remain suppressed for {{remaining}} more (window: {{window}}). Adjust this in Settings (⚙️ → Alerts).',
+  grafanaRepeatIntervalFallback: 'the configured repeat interval',
+  toastGrafanaRepeatAlreadyDegradedSummary: 'Target already degraded — Grafana repeat wait',
+  toastGrafanaRepeatAlreadyDegradedDetail:
+    'The target service was already degraded before this trigger. If the Grafana alert remained firing, the next webhook will only be sent after {{interval}}. Click Restore Service and wait ~30s, or adjust policies in Settings (⚙️) and .env.',
+  toastGrafanaRepeatWaitSummary: 'Waiting for Grafana alert for {{seconds}}s',
+  toastGrafanaRepeatWaitDetail:
+    'If a previous alert stayed firing, Grafana only re-notifies after {{interval}}. Restore the service and wait ~30s for the alert to clear, or adjust suppression in Settings (⚙️) and GRAFANA_ALERT_REPEAT_INTERVAL in .env.',
+  toastLlmFailedFallbackSummary: 'LLM model connection failed (using fallback)',
+  toastLlmFailedFallbackDetail:
+    'Could not reach the configured LLM model for {{service}} ({{error}}). Diagnosis continued with deterministic fallback. Check the model in Settings (⚙️ → AI) and credentials/URL in .env.',
+  toastLlmFailedSummary: 'LLM model connection failed',
+  toastLlmFailedDetail:
+    'Could not reach the configured LLM model for {{service}} ({{error}}) and fallback could not be applied. Check the model in Settings (⚙️ → AI) and credentials/URL in .env.',
 
   // === System Settings Drawer ===
   settingsBtnAriaLabel: 'Open settings',

@@ -4,7 +4,8 @@
 > **Track:** Logistics & Automation (_Operational workflow automation & mission-critical system integrations_)  
 > **Organization:** AGJ Works ([https://agjworks.com](https://agjworks.com))  
 > **Repository:** [https://github.com/AdmilsonGoncalves/zeromttr](https://github.com/AdmilsonGoncalves/zeromttr)  
-> **Public Demo:** [https://zeromttr.agjworks.com](https://zeromttr.agjworks.com)
+> **Public Demo:** [https://zeromttr.agjworks.com](https://zeromttr.agjworks.com)  
+> **User Manual:** [https://docs-zeromttr.agjworks.com](https://docs-zeromttr.agjworks.com)
 
 ---
 

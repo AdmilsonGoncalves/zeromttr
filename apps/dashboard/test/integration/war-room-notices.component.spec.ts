@@ -25,6 +25,9 @@ describe('WarRoomNoticesComponent (TestBed)', () => {
     let capturedOptions:
       | {
           sitekey: string;
+          theme?: string;
+          size?: string;
+          appearance?: string;
           callback?: (token: string) => void;
           'expired-callback'?: () => void;
           'error-callback'?: () => void;
@@ -63,6 +66,8 @@ describe('WarRoomNoticesComponent (TestBed)', () => {
 
     expect(renderSpy).toHaveBeenCalledTimes(1);
     expect(capturedOptions?.sitekey).toBe('0x4AAAAAA');
+    expect(capturedOptions?.size).toBe('normal');
+    expect(capturedOptions?.appearance).toBe('interaction-only');
     expect(fixture.nativeElement.textContent).toContain(i18n.t('turnstilePendingNotice'));
     expect(fixture.nativeElement.textContent).not.toContain('replayNotice');
 
@@ -184,5 +189,109 @@ describe('WarRoomNoticesComponent (TestBed)', () => {
     expect(component.turnstileLoadErrorSignal()).toBe(true);
 
     fixture.destroy();
+  });
+
+  it('should use compact turnstile size on narrow viewports', () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: 360
+    });
+
+    let capturedSize: string | undefined;
+    window.turnstile = {
+      render: vi.fn((_host, options) => {
+        capturedSize = options.size;
+        return 'widget-narrow';
+      }),
+      reset: vi.fn(),
+      remove: vi.fn()
+    };
+
+    try {
+      const fixture = createDashboardFixture(WarRoomNoticesComponent, {
+        providers: [{ provide: I18nService, useValue: i18n }]
+      });
+      fixture.componentRef.setInput('turnstileSiteKey', '0x4DDDDDD');
+      fixture.detectChanges();
+      TestBed.tick();
+
+      expect(capturedSize).toBe('compact');
+      fixture.destroy();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        writable: true,
+        value: originalWidth
+      });
+    }
+  });
+
+  it('should recreate turnstile widget when viewport crosses compact breakpoint', () => {
+    const originalWidth = window.innerWidth;
+    const setWidth = (width: number): void => {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        writable: true,
+        value: width
+      });
+    };
+
+    const renderedSizes: Array<string | undefined> = [];
+    let renderCount = 0;
+    const removeSpy = vi.fn();
+    window.turnstile = {
+      render: vi.fn((_host, options) => {
+        renderCount += 1;
+        renderedSizes.push(options.size);
+        return `widget-${renderCount}`;
+      }),
+      reset: vi.fn(),
+      remove: removeSpy
+    };
+
+    try {
+      setWidth(1024);
+      const fixture = createDashboardFixture(WarRoomNoticesComponent, {
+        providers: [{ provide: I18nService, useValue: i18n }]
+      });
+      const tokenEvents: Array<string | null> = [];
+      fixture.componentInstance.turnstileTokenChange.subscribe((t) => tokenEvents.push(t));
+
+      fixture.componentRef.setInput('turnstileSiteKey', '0x4EEEEEE');
+      fixture.detectChanges();
+      TestBed.tick();
+      expect(renderedSizes).toEqual(['normal']);
+
+      // Resize within same (> 400) band should not recreate widget
+      setWidth(640);
+      window.dispatchEvent(new Event('resize'));
+      expect(renderedSizes).toEqual(['normal']);
+      expect(removeSpy).not.toHaveBeenCalled();
+
+      // Crossing below 400px recreates with compact size
+      setWidth(360);
+      window.dispatchEvent(new Event('resize'));
+      expect(removeSpy).toHaveBeenCalledWith('widget-1');
+      expect(renderedSizes).toEqual(['normal', 'compact']);
+      expect(tokenEvents).toContain(null);
+
+      // Crossing back >= 400px recreates with normal size
+      setWidth(800);
+      window.dispatchEvent(new Event('resize'));
+      expect(removeSpy).toHaveBeenCalledWith('widget-2');
+      expect(renderedSizes).toEqual(['normal', 'compact', 'normal']);
+
+      fixture.destroy();
+      expect(removeSpy).toHaveBeenCalledWith('widget-3');
+
+      // Resizing after destroy should be ignored
+      setWidth(320);
+      window.dispatchEvent(new Event('resize'));
+      expect(renderedSizes).toEqual(['normal', 'compact', 'normal']);
+    } finally {
+      setWidth(originalWidth);
+    }
   });
 });

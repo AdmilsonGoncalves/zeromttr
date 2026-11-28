@@ -22,6 +22,7 @@ interface TurnstileApi {
       sitekey: string;
       theme?: 'light' | 'dark' | 'auto';
       size?: 'normal' | 'compact' | 'flexible';
+      appearance?: 'always' | 'execute' | 'interaction-only';
       callback?: (token: string) => void;
       'expired-callback'?: () => void;
       'error-callback'?: () => void;
@@ -60,8 +61,12 @@ export class WarRoomNoticesComponent implements OnDestroy {
 
   private readonly turnstileHostSignal = signal<HTMLElement | null>(null);
   private turnstileWidgetId: string | null = null;
+  private currentWidgetSize: 'compact' | 'normal' | null = null;
   private lastResetTrigger = 0;
   private isDestroyed = false;
+  private readonly onWindowResize = (): void => {
+    this.syncTurnstileWidgetSize();
+  };
 
   @ViewChild('turnstileContainer')
   set turnstileContainer(ref: ElementRef<HTMLElement> | undefined) {
@@ -103,15 +108,50 @@ export class WarRoomNoticesComponent implements OnDestroy {
         }
       }
     });
+
+    if (typeof globalThis.window?.addEventListener === 'function') {
+      globalThis.window.addEventListener('resize', this.onWindowResize);
+    }
   }
 
   ngOnDestroy(): void {
     this.isDestroyed = true;
+    if (typeof globalThis.window?.removeEventListener === 'function') {
+      globalThis.window.removeEventListener('resize', this.onWindowResize);
+    }
+    this.unmountTurnstileWidget();
+    this.turnstileTokenChange.emit(null);
+  }
+
+  private resolveTurnstileSize(): 'compact' | 'normal' {
+    const viewportWidth = globalThis.window?.innerWidth ?? 1024;
+    return viewportWidth < 400 ? 'compact' : 'normal';
+  }
+
+  private unmountTurnstileWidget(): void {
     if (this.turnstileWidgetId && globalThis.window?.turnstile) {
       globalThis.window.turnstile.remove(this.turnstileWidgetId);
       this.turnstileWidgetId = null;
     }
+    this.currentWidgetSize = null;
+  }
+
+  private syncTurnstileWidgetSize(): void {
+    if (this.isDestroyed || !this.turnstileWidgetId || !globalThis.window?.turnstile) {
+      return;
+    }
+    const nextSize = this.resolveTurnstileSize();
+    if (nextSize === this.currentWidgetSize) {
+      return;
+    }
+    const host = this.turnstileHostSignal();
+    const siteKey = this.turnstileSiteKeySignal();
+    if (!host || !isNonEmptyString(siteKey)) {
+      return;
+    }
+    this.unmountTurnstileWidget();
     this.turnstileTokenChange.emit(null);
+    this.mountTurnstileWidget(host, siteKey);
   }
 
   /**
@@ -133,10 +173,13 @@ export class WarRoomNoticesComponent implements OnDestroy {
         return;
       }
       this.turnstileLoadErrorSignal.set(false);
+      const size = this.resolveTurnstileSize();
+      this.currentWidgetSize = size;
       this.turnstileWidgetId = globalThis.window.turnstile.render(host, {
         sitekey: siteKey,
         theme: 'dark',
-        size: 'compact',
+        size,
+        appearance: 'interaction-only',
         callback: (token: string) => {
           this.turnstileTokenChange.emit(token);
         },

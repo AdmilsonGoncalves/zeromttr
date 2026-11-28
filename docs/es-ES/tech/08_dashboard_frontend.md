@@ -54,6 +54,8 @@ La ruta principal `/` (`WarRoomComponent`) muestra los 4 cuadrantes alimentados 
 | `incident.remediation` | `{ incidentId, branchUrl, pullRequestUrl?, commitSha? }` |
 | `incident.notified` | `{ incidentId, emailId, htmlPreview? }` (**sin** `decisionToken` / `sig`) |
 | `incident.decision` | `{ incidentId, action, source: 'email_hmac' \| 'demo_simulation' }` |
+| `alert.suppressed` | `{ incidentId, service, reason: 'repeat_suppression' \| 'rejection_cooldown', remainingSeconds, windowSeconds, at }` |
+| `incident.llm_failed` | `{ incidentId, service, error, fallbackUsed, at }` |
 | `heartbeat` | `{ at }` cada 15 s |
 
 ### 3.3 Tipos TypeScript (`apps/dashboard/src/app/core/contract.ts`)

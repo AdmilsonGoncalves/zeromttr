@@ -54,6 +54,8 @@ The main route `/` (`WarRoomComponent`) displays the 4 quadrants powered by real
 | `incident.remediation` | `{ incidentId, branchUrl, pullRequestUrl?, commitSha? }` |
 | `incident.notified` | `{ incidentId, emailId, htmlPreview? }` (**without** `decisionToken` / `sig`) |
 | `incident.decision` | `{ incidentId, action, source: 'email_hmac' \| 'demo_simulation' }` |
+| `alert.suppressed` | `{ incidentId, service, reason: 'repeat_suppression' \| 'rejection_cooldown', remainingSeconds, windowSeconds, at }` |
+| `incident.llm_failed` | `{ incidentId, service, error, fallbackUsed, at }` |
 | `heartbeat` | `{ at }` every 15 s |
 
 ### 3.3 TypeScript Types (`apps/dashboard/src/app/core/contract.ts`)

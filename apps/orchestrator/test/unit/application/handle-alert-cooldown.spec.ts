@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FileIncidentRepository } from '../../../src/adapters/repo.file.js';
 import { HandleAlert } from '../../../src/application/handle-alert.js';
+import { AlertSuppressionReason, IncidentEventType } from '../../../src/domain/incident-enums.js';
 import { IncidentState } from '../../../src/domain/incident-state.js';
 import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
 
@@ -48,8 +49,21 @@ describe('HandleAlert rejection cooldown and repeat suppression', () => {
     const suppressed = await handleAlert.execute(FIRING_ALERT_PAYLOAD);
     expect(suppressed.isDuplicate).toBe(true);
     expect(suppressed.suppressed).toBe(true);
-    expect(suppressed.suppressionReason).toBe('rejection_cooldown');
+    expect(suppressed.suppressionReason).toBe(AlertSuppressionReason.REJECTION_COOLDOWN);
+    expect(suppressed.windowSeconds).toBe(900);
+    expect(suppressed.remainingSeconds).toBeGreaterThan(0);
+    expect(suppressed.remainingSeconds).toBeLessThanOrEqual(900);
     expect(suppressed.incident?.id).toBe(inc.id);
+    expect(broadcaster.broadcast).toHaveBeenCalledWith(
+      IncidentEventType.ALERT_SUPPRESSED,
+      expect.objectContaining({
+        incidentId: inc.id,
+        service: 'api-pagamentos-core',
+        reason: AlertSuppressionReason.REJECTION_COOLDOWN,
+        windowSeconds: 900,
+        remainingSeconds: suppressed.remainingSeconds
+      })
+    );
 
     // Disabling cooldown dynamically allows opening a new incident
     rejectionCooldownSeconds = 0;
@@ -82,8 +96,21 @@ describe('HandleAlert rejection cooldown and repeat suppression', () => {
     const suppressed = await handleAlert.execute(FIRING_ALERT_PAYLOAD);
     expect(suppressed.isDuplicate).toBe(true);
     expect(suppressed.suppressed).toBe(true);
-    expect(suppressed.suppressionReason).toBe('repeat_suppression');
+    expect(suppressed.suppressionReason).toBe(AlertSuppressionReason.REPEAT_SUPPRESSION);
+    expect(suppressed.windowSeconds).toBe(300);
+    expect(suppressed.remainingSeconds).toBeGreaterThan(0);
+    expect(suppressed.remainingSeconds).toBeLessThanOrEqual(300);
     expect(suppressed.incident?.id).toBe(inc.id);
+    expect(broadcaster.broadcast).toHaveBeenCalledWith(
+      IncidentEventType.ALERT_SUPPRESSED,
+      expect.objectContaining({
+        incidentId: inc.id,
+        service: 'api-pagamentos-core',
+        reason: AlertSuppressionReason.REPEAT_SUPPRESSION,
+        windowSeconds: 300,
+        remainingSeconds: suppressed.remainingSeconds
+      })
+    );
   });
 
   it('should_not_suppress_new_incident_after_FAILED_incident_during_repeatSuppressionSeconds', async () => {

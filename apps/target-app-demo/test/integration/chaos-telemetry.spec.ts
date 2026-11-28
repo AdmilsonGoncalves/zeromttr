@@ -1,6 +1,8 @@
 import http from 'node:http';
+import { MAX_TIMER_DELAY_MS } from '@zeromttr/utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
+import { startServer } from '../../src/server.js';
 import { chaosController } from '../../src/controllers/chaos.controller.js';
 import { chaosManager } from '../../src/chaos/chaos.manager.js';
 import { paymentRepository } from '../../src/repositories/payment.repository.js';
@@ -57,6 +59,9 @@ describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
     requestMetrics.reset();
     delete process.env.CHAOS_AUTO_TRAFFIC_BURST;
     delete process.env.DEMO_MODE;
+    delete process.env.HEALTHY_TRAFFIC_AUTO_START;
+    delete process.env.HEALTHY_TRAFFIC_INTERVAL_MS;
+    delete process.env.CHAOS_ENDPOINTS_ENABLED;
     if (originalPort !== undefined) {
       process.env.PORT = originalPort;
     } else {
@@ -148,5 +153,68 @@ describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
     await requestJson(server, 'POST', '/chaos/pool-saturation?enable=true');
     expect(fetchSpy).toHaveBeenCalledTimes(6);
     await requestJson(server, 'POST', '/chaos/pool-saturation?enable=false');
+  });
+
+  it('should_auto_start_healthy_traffic_on_boot_with_configurable_interval_when_enabled', async () => {
+    process.env.HEALTHY_TRAFFIC_AUTO_START = 'true';
+    process.env.HEALTHY_TRAFFIC_INTERVAL_MS = '3000';
+    process.env.CHAOS_ENDPOINTS_ENABLED = 'true';
+
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    server = startServer(0);
+    await new Promise<void>((resolve) => {
+      server?.once('listening', resolve);
+    });
+
+    expect(chaosController.isHealthyTrafficActive()).toBe(true);
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 3000);
+
+    const statusRes = await requestJson(server, 'GET', '/chaos/status');
+    expect(statusRes.status).toBe(200);
+    expect((statusRes.body.metrics as { healthyTrafficActive: boolean }).healthyTrafficActive).toBe(
+      true
+    );
+  });
+
+  it('should_not_auto_start_healthy_traffic_when_chaos_endpoints_are_disabled', async () => {
+    process.env.HEALTHY_TRAFFIC_AUTO_START = 'true';
+    process.env.CHAOS_ENDPOINTS_ENABLED = 'false';
+
+    server = startServer(0);
+    await new Promise<void>((resolve) => {
+      server?.once('listening', resolve);
+    });
+
+    expect(chaosController.isHealthyTrafficActive()).toBe(false);
+  });
+
+  it('should cap healthy traffic interval at 32bit max and reuse bound port on restart', async () => {
+    process.env.HEALTHY_TRAFFIC_AUTO_START = 'true';
+    process.env.HEALTHY_TRAFFIC_INTERVAL_MS = '9999999999';
+    process.env.CHAOS_ENDPOINTS_ENABLED = 'true';
+
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    server = startServer(0);
+    await new Promise<void>((resolve) => {
+      server?.once('listening', resolve);
+    });
+
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), MAX_TIMER_DELAY_MS);
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Server address unavailable');
+    }
+
+    // Stop and restart via HTTP toggle without process.env.PORT set; must reuse boundPort
+    delete process.env.PORT;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await requestJson(server, 'POST', '/chaos/healthy-traffic?enable=false');
+    await requestJson(server, 'POST', '/chaos/healthy-traffic?enable=true');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `http://127.0.0.1:${address.port}/payments`,
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 });

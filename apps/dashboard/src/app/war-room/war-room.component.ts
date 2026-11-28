@@ -4,9 +4,18 @@ import { HTTP_STATUS } from '@zeromttr/utils/http';
 import { MessageService } from 'primeng/api';
 import { Toast } from 'primeng/toast';
 import { DashboardApiErrorCode, ToastSeverity } from '../core/constants.js';
-import { DecisionAction, IncidentExecutionMode, type IncidentMode } from '../core/contract.js';
+import {
+  AlertSuppressionReason,
+  type AlertSuppressedEvent,
+  DecisionAction,
+  IncidentExecutionMode,
+  type IncidentLlmFailedEvent,
+  TargetHealthStatus,
+  type IncidentMode
+} from '../core/contract.js';
 import { I18nService, type Language } from '../core/i18n/i18n.service.js';
 import { IncidentService, type DemoActionResult } from '../core/incident.service.js';
+import { SystemSettingsService } from '../core/system-settings.service.js';
 import { EvidencePanelComponent } from './evidence-panel/evidence-panel.component.js';
 import { FsmTimelineComponent } from './fsm-timeline/fsm-timeline.component.js';
 import { RemediationPanelComponent } from './remediation-panel/remediation-panel.component.js';
@@ -38,17 +47,33 @@ import { WarRoomNoticesComponent } from './war-room-notices/war-room-notices.com
 export class WarRoomComponent implements OnInit, OnDestroy {
   readonly i18n = inject(I18nService);
   readonly incidentService = inject(IncidentService);
+  readonly settingsService = inject(SystemSettingsService, { optional: true });
   readonly messageService = inject(MessageService, { optional: true }) ?? new MessageService();
 
+  private readonly unsubscribers: Array<() => void> = [];
+  private suppressGrafanaWaitWarning = false;
+
   ngOnInit(): void {
+    this.unsubscribers.push(
+      this.incidentService.onAlertSuppressed((event) => this.notifyAlertSuppressed(event)),
+      this.incidentService.onLlmFailed((event) => this.notifyLlmFailed(event)),
+      this.incidentService.onLiveWaitExceeded((seconds) => this.notifyGrafanaRepeatWait(seconds))
+    );
     this.incidentService.connectSse();
     void this.incidentService.fetchDemoConfig();
     void this.incidentService.fetchTargetStatus();
+    if (this.settingsService && !this.settingsService.readonlyInfo()) {
+      void this.settingsService.fetchSettings();
+    }
     this.incidentService.startTargetStatusPolling();
     void this.incidentService.fetchIncidents();
   }
 
   ngOnDestroy(): void {
+    for (const unsubscribe of this.unsubscribers) {
+      unsubscribe();
+    }
+    this.unsubscribers.length = 0;
     this.incidentService.stopTargetStatusPolling();
     this.incidentService.disconnectSse();
   }
@@ -183,13 +208,103 @@ export class WarRoomComponent implements OnInit, OnDestroy {
     });
   }
 
+  private formatDurationSeconds(seconds: number): string {
+    const normalized = Math.max(0, Math.round(seconds));
+    if (normalized < 60) {
+      return `${normalized}s`;
+    }
+    const mins = Math.floor(normalized / 60);
+    const rem = normalized % 60;
+    if (rem === 0) {
+      return `${mins}m`;
+    }
+    return `${mins}m ${rem}s`;
+  }
+
+  private resolveGrafanaRepeatIntervalLabel(): string {
+    const configured = this.settingsService?.readonlyInfo()?.grafanaRepeatInterval;
+    if (isNonEmptyString(configured)) {
+      return configured;
+    }
+    return this.i18n.t('grafanaRepeatIntervalFallback');
+  }
+
+  private notifyAlertSuppressed(event: AlertSuppressedEvent): void {
+    const isRejection = event.reason === AlertSuppressionReason.REJECTION_COOLDOWN;
+    const summaryKey = isRejection
+      ? 'toastAlertSuppressedRejectionSummary'
+      : 'toastAlertSuppressedRepeatSummary';
+    const detailKey = isRejection
+      ? 'toastAlertSuppressedRejectionDetail'
+      : 'toastAlertSuppressedRepeatDetail';
+
+    this.messageService.add({
+      severity: ToastSeverity.WARN,
+      summary: this.i18n.t(summaryKey),
+      detail: this.i18n.t(detailKey, {
+        service: event.service || this.i18n.t('serviceStatusLabel'),
+        remaining: this.formatDurationSeconds(event.remainingSeconds),
+        window: this.formatDurationSeconds(event.windowSeconds)
+      }),
+      life: 10000
+    });
+  }
+
+  private notifyLlmFailed(event: IncidentLlmFailedEvent): void {
+    const summaryKey = event.fallbackUsed
+      ? 'toastLlmFailedFallbackSummary'
+      : 'toastLlmFailedSummary';
+    const detailKey = event.fallbackUsed ? 'toastLlmFailedFallbackDetail' : 'toastLlmFailedDetail';
+
+    this.messageService.add({
+      severity: event.fallbackUsed ? ToastSeverity.WARN : ToastSeverity.ERROR,
+      summary: this.i18n.t(summaryKey),
+      detail: this.i18n.t(detailKey, {
+        service: event.service || this.i18n.t('serviceStatusLabel'),
+        error: event.error
+      }),
+      life: 12000
+    });
+  }
+
+  private notifyGrafanaRepeatWait(seconds: number): void {
+    if (this.suppressGrafanaWaitWarning) {
+      return;
+    }
+    this.messageService.add({
+      severity: ToastSeverity.WARN,
+      summary: this.i18n.t('toastGrafanaRepeatWaitSummary', { seconds: String(seconds) }),
+      detail: this.i18n.t('toastGrafanaRepeatWaitDetail', {
+        interval: this.resolveGrafanaRepeatIntervalLabel()
+      }),
+      life: 12000
+    });
+  }
+
   /**
    * Triggers a simulated failure or replay sequence and surfaces status feedback via toast.
    */
   async onTriggerChaos(): Promise<void> {
+    const wasAlreadyDegraded =
+      this.incidentService.activeMode() === IncidentExecutionMode.LIVE &&
+      this.incidentService.targetStatus()?.status === TargetHealthStatus.DEGRADED;
+    this.suppressGrafanaWaitWarning = false;
+
     const result = await this.incidentService.triggerChaos();
     if (!result.ok) {
       this.notifyActionError(result);
+      return;
+    }
+    if (wasAlreadyDegraded) {
+      this.suppressGrafanaWaitWarning = true;
+      this.messageService.add({
+        severity: ToastSeverity.WARN,
+        summary: this.i18n.t('toastGrafanaRepeatAlreadyDegradedSummary'),
+        detail: this.i18n.t('toastGrafanaRepeatAlreadyDegradedDetail', {
+          interval: this.resolveGrafanaRepeatIntervalLabel()
+        }),
+        life: 12000
+      });
       return;
     }
     this.messageService.add({

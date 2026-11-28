@@ -42,7 +42,13 @@ export function createWebhookRouter(
         res.status(HTTP_STATUS.ACCEPTED).json({
           status: HttpResponseStatus.ACCEPTED,
           incidentId,
-          isDuplicate: result.isDuplicate
+          isDuplicate: result.isDuplicate,
+          ...(result.suppressed ? { suppressed: true } : {}),
+          ...(result.suppressionReason ? { suppressionReason: result.suppressionReason } : {}),
+          ...(result.remainingSeconds !== undefined
+            ? { remainingSeconds: result.remainingSeconds }
+            : {}),
+          ...(result.windowSeconds !== undefined ? { windowSeconds: result.windowSeconds } : {})
         });
       } catch (err) {
         if (err instanceof ZodError) {

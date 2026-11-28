@@ -259,6 +259,25 @@ export const ES_TRANSLATIONS: TranslationDictionary = {
   toastHealthyTrafficStartedDetail: 'Solicitudes saludables continuas enviándose a {{service}}.',
   toastHealthyTrafficStoppedSummary: 'Tráfico saludable detenido',
   toastHealthyTrafficStoppedDetail: 'Flujo continuo de solicitudes finalizado.',
+  toastAlertSuppressedRepeatSummary: 'Alerta suprimida (supresión de repetición)',
+  toastAlertSuppressedRepeatDetail:
+    'Un incidente reciente de {{service}} se cerró hace poco. Las nuevas alertas permanecen suprimidas durante {{remaining}} más (ventana: {{window}}). Ajuste esto en Configuración (⚙️ → Alertas).',
+  toastAlertSuppressedRejectionSummary: 'Alerta suprimida (cooldown tras rechazo)',
+  toastAlertSuppressedRejectionDetail:
+    'Un incidente reciente de {{service}} fue rechazado por un operador. Las nuevas alertas permanecen suprimidas durante {{remaining}} más (ventana: {{window}}). Ajuste esto en Configuración (⚙️ → Alertas).',
+  grafanaRepeatIntervalFallback: 'el intervalo de repetición configurado',
+  toastGrafanaRepeatAlreadyDegradedSummary: 'Servicio ya degradado — espera de reenvío en Grafana',
+  toastGrafanaRepeatAlreadyDegradedDetail:
+    'El servicio objetivo ya estaba degradado antes de este disparo. Si la alerta de Grafana siguió activa, el próximo webhook solo se enviará tras {{interval}}. Haga clic en Restaurar Servicio y espere ~30s, o ajuste las políticas en Configuración (⚙️) y .env.',
+  toastGrafanaRepeatWaitSummary: 'Esperando alerta de Grafana hace {{seconds}}s',
+  toastGrafanaRepeatWaitDetail:
+    'Si una alerta anterior siguió activa, Grafana solo reenvía tras {{interval}}. Restaure el servicio y espere ~30s para que la alerta vuelva a OK, o ajuste la supresión en Configuración (⚙️) y GRAFANA_ALERT_REPEAT_INTERVAL en .env.',
+  toastLlmFailedFallbackSummary: 'Error de conexión con el modelo LLM (usando fallback)',
+  toastLlmFailedFallbackDetail:
+    'No se pudo consultar el modelo LLM para {{service}} ({{error}}). El diagnóstico continuó con fallback determinista. Verifique el modelo en Configuración (⚙️ → IA) y las credenciales/URL en .env.',
+  toastLlmFailedSummary: 'Error de conexión con el modelo LLM',
+  toastLlmFailedDetail:
+    'No se pudo consultar el modelo LLM para {{service}} ({{error}}) y no fue posible aplicar el fallback. Verifique el modelo en Configuración (⚙️ → IA) y las credenciales/URL en .env.',
 
   // === System Settings Drawer ===
   settingsBtnAriaLabel: 'Abrir configuración',
