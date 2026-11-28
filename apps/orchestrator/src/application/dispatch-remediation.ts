@@ -274,7 +274,7 @@ export class DispatchRemediation {
     }
 
     const { synthesis, reasoningSource, piiAudit } = await this.synthesizeWithGuardrails(
-      incident.id,
+      incident,
       evidence,
       authoritativeSuspectPath
     );
@@ -341,8 +341,57 @@ export class DispatchRemediation {
     });
   }
 
+  private redactCredentials(rawMessage: string): string {
+    return rawMessage
+      .replace(/\s+/g, ' ')
+      .replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[REDACTED]@')
+      .replace(
+        /(\b(?:access_token|refresh_token|id_token|api_key|apikey|key|token|secret|password|client_secret)["']?\s*[=:]\s*["']?)[^&\s,;"'}]+/gi,
+        '$1[REDACTED]'
+      )
+      .replace(/\bBearer\s+\S+/gi, 'Bearer [REDACTED]')
+      .replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{16,})\b/g, '[REDACTED_KEY]')
+      .trim();
+  }
+
+  private isAcceptableLlmPatch(
+    rawSynthesis: RcaAndPatchSynthesis,
+    authoritativeSuspectPath: string,
+    suspectFileContent: string | undefined
+  ): boolean {
+    try {
+      return (
+        isNonEmptyString(rawSynthesis.patchedContent) &&
+        !isTruncatedLlmSnippet(rawSynthesis.patchedContent) &&
+        validatePatchDefensively(
+          rawSynthesis,
+          authoritativeSuspectPath,
+          this.options,
+          suspectFileContent
+        )
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private sanitizeLlmFailureReason(rawMessage: string): string {
+    const cleaned = this.redactCredentials(rawMessage);
+
+    if (!isNonEmptyString(cleaned)) {
+      return 'LLM provider request failed';
+    }
+
+    const piiCheck = PiiPromptGuard.inspectAndEnforceFailClosed(cleaned);
+    if (!piiCheck.passed) {
+      return 'LLM provider request failed';
+    }
+
+    return cleaned.length > 200 ? `${cleaned.slice(0, 197)}...` : cleaned;
+  }
+
   private async synthesizeWithGuardrails(
-    incidentId: string,
+    incident: Incident,
     evidence: CollectedEvidence,
     authoritativeSuspectPath: string
   ): Promise<{
@@ -350,12 +399,14 @@ export class DispatchRemediation {
     reasoningSource: ReasoningSource;
     piiAudit: PiiAuditSummary;
   }> {
+    const incidentId = incident.id;
     const promptToAudit = JSON.stringify(evidence);
     const piiAudit = PiiPromptGuard.inspectAndEnforceFailClosed(promptToAudit);
     const suspectFileContent = evidence.gitDiff?.suspectFileContent;
 
     let synthesis: RcaAndPatchSynthesis;
     let reasoningSource: ReasoningSource;
+    let llmFailureReason: string | null = null;
 
     if (!piiAudit.passed) {
       // Fail-closed! Route directly to fallback
@@ -376,35 +427,44 @@ export class DispatchRemediation {
       synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
       reasoningSource = ReasoningProvider.FALLBACK;
     } else {
+      let rawSynthesis: RcaAndPatchSynthesis | null = null;
       try {
-        const rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
-        if (
-          isNonEmptyString(rawSynthesis.patchedContent) &&
-          !isTruncatedLlmSnippet(rawSynthesis.patchedContent) &&
-          validatePatchDefensively(
-            rawSynthesis,
-            authoritativeSuspectPath,
-            this.options,
-            suspectFileContent
-          )
-        ) {
-          synthesis = rawSynthesis;
-          reasoningSource = ReasoningProvider.LLM;
-        } else {
-          this.logger?.warn({
-            event: OrchestratorLogEvent.LLM_PATCH_REJECTED,
-            incidentId,
-            message:
-              'LLM synthesis patch rejected by defensive validation; routing to deterministic fallback'
-          });
-          synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
-          reasoningSource = ReasoningProvider.FALLBACK;
-        }
+        rawSynthesis = await this.llmAdapter.synthesizeRcaAndPatch(evidence);
       } catch (err) {
+        const rawError = toErrorMessage(err);
+        llmFailureReason = this.sanitizeLlmFailureReason(rawError);
         this.logger?.warn({
           event: OrchestratorLogEvent.LLM_SYNTHESIS_FAILED,
           incidentId,
-          message: toErrorMessage(err)
+          message: this.redactCredentials(rawError)
+        });
+      }
+
+      if (rawSynthesis === null) {
+        try {
+          synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
+          reasoningSource = ReasoningProvider.FALLBACK;
+        } catch (fallbackErr) {
+          this.broadcaster.broadcast(IncidentEventType.LLM_FAILED, {
+            incidentId,
+            service: incident.service,
+            error: llmFailureReason ?? 'LLM provider request failed',
+            fallbackUsed: false,
+            at: nowIso()
+          });
+          throw fallbackErr;
+        }
+      } else if (
+        this.isAcceptableLlmPatch(rawSynthesis, authoritativeSuspectPath, suspectFileContent)
+      ) {
+        synthesis = rawSynthesis;
+        reasoningSource = ReasoningProvider.LLM;
+      } else {
+        this.logger?.warn({
+          event: OrchestratorLogEvent.LLM_PATCH_REJECTED,
+          incidentId,
+          message:
+            'LLM synthesis patch rejected by defensive validation; routing to deterministic fallback'
         });
         synthesis = await this.fallbackAdapter.synthesizeRcaAndPatch(evidence);
         reasoningSource = ReasoningProvider.FALLBACK;
@@ -420,7 +480,26 @@ export class DispatchRemediation {
         suspectFileContent
       )
     ) {
+      if (llmFailureReason) {
+        this.broadcaster.broadcast(IncidentEventType.LLM_FAILED, {
+          incidentId,
+          service: incident.service,
+          error: llmFailureReason,
+          fallbackUsed: false,
+          at: nowIso()
+        });
+      }
       throw new Error('Fallback remediation patch failed defensive validation');
+    }
+
+    if (llmFailureReason) {
+      this.broadcaster.broadcast(IncidentEventType.LLM_FAILED, {
+        incidentId,
+        service: incident.service,
+        error: llmFailureReason,
+        fallbackUsed: true,
+        at: nowIso()
+      });
     }
 
     return { synthesis, reasoningSource, piiAudit };

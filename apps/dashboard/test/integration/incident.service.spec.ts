@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import {
+  AlertSuppressionReason,
   DecisionAction,
   DecisionSource,
+  IncidentEventType,
   IncidentExecutionMode,
   IncidentState,
   ReasoningProvider,
@@ -761,6 +763,345 @@ describe('IncidentService', () => {
         value: originalStorage,
         configurable: true
       });
+    }
+  });
+
+  it('should_align_mode_with_live_when_healthy_traffic_is_already_active_in_a_fresh_browser_context', async () => {
+    const trafficStatus = {
+      status: TargetHealthStatus.HEALTHY,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.7',
+      previousHealthyVersion: 'v2.14.7',
+      capabilities: { chaosSimulation: true, healthyTrafficToggle: true },
+      metrics: {
+        requestsPerSecond: 1.4,
+        errorRate5xxPercent: 0,
+        p95LatencyMs: 7,
+        healthyTrafficActive: true
+      }
+    };
+    const respond = (body: unknown): Response =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    try {
+      // Public live demo (no key required): fresh context aligns with Live once config is known
+      fetchSpy.mockResolvedValueOnce(respond(trafficStatus));
+      const publicService = new IncidentService();
+      await publicService.fetchTargetStatus('http://localhost:8080');
+      expect(publicService.activeMode()).toBe(IncidentExecutionMode.REPLAY);
+      publicService.publicLiveDemo.set(true);
+      fetchSpy.mockResolvedValueOnce(respond(trafficStatus));
+      await publicService.fetchTargetStatus('http://localhost:8080');
+      expect(publicService.activeMode()).toBe(IncidentExecutionMode.LIVE);
+
+      // Key-protected deployment without key: stay in Replay (traffic can still be turned off)
+      fetchSpy.mockResolvedValueOnce(respond(trafficStatus));
+      const lockedService = new IncidentService();
+      await lockedService.fetchTargetStatus('http://localhost:8080');
+      expect(lockedService.activeMode()).toBe(IncidentExecutionMode.REPLAY);
+
+      // Explicit user choice is never overridden
+      fetchSpy.mockResolvedValueOnce(respond(trafficStatus));
+      const chosenService = new IncidentService();
+      chosenService.publicLiveDemo.set(true);
+      chosenService.setActiveMode(IncidentExecutionMode.REPLAY);
+      await chosenService.fetchTargetStatus('http://localhost:8080');
+      expect(chosenService.activeMode()).toBe(IncidentExecutionMode.REPLAY);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('should_keep_saved_replay_mode_after_reload_when_healthy_traffic_is_active', async () => {
+    const store = new Map<string, string>([['zeromttr_active_mode', IncidentExecutionMode.REPLAY]]);
+    const mockStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      }
+    } as unknown as Storage;
+    const originalStorage = globalThis.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', { value: mockStorage, configurable: true });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.HEALTHY,
+          service: 'api-pagamentos-core',
+          version: 'v2.14.7',
+          previousHealthyVersion: 'v2.14.7',
+          capabilities: { chaosSimulation: true, healthyTrafficToggle: true },
+          metrics: {
+            requestsPerSecond: 1.4,
+            errorRate5xxPercent: 0,
+            p95LatencyMs: 7,
+            healthyTrafficActive: true
+          }
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    try {
+      const reloadedService = new IncidentService();
+      reloadedService.publicLiveDemo.set(true);
+      await reloadedService.fetchTargetStatus('http://localhost:8080');
+      expect(reloadedService.activeMode()).toBe(IncidentExecutionMode.REPLAY);
+    } finally {
+      fetchSpy.mockRestore();
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: originalStorage,
+        configurable: true
+      });
+    }
+  });
+
+  it('should_handle_alert_suppressed_sse_even_for_dismissed_incident_and_stop_live_wait', async () => {
+    const listeners = new Map<string, Array<(evt: MessageEvent) => void>>();
+    const originalEventSource = globalThis.EventSource;
+    class FakeEventSource {
+      static readonly CLOSED = 2;
+      readyState = 1;
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      addEventListener(type: string, cb: (evt: MessageEvent) => void): void {
+        const current = listeners.get(type) ?? [];
+        current.push(cb);
+        listeners.set(type, current);
+      }
+      close(): void {
+        this.readyState = 2;
+      }
+    }
+    globalThis.EventSource = FakeEventSource as unknown as typeof EventSource;
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/api/demo/chaos')) {
+        return new Response(JSON.stringify({ status: 'accepted', mode: 'live' }), {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.DEGRADED,
+          service: 'api-pagamentos-core',
+          version: 'v2.14.8',
+          previousHealthyVersion: 'v2.14.7'
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const service = new IncidentService();
+    try {
+      service.connectSse('http://localhost:8080');
+      service.setActiveMode(IncidentExecutionMode.LIVE);
+      service.currentIncident.set({
+        ...JSON.parse(JSON.stringify(MOCK_INCIDENT)),
+        id: 'inc-prev-resolved',
+        state: IncidentState.RESOLVED
+      });
+
+      const suppressedSpy = vi.fn();
+      const unsubscribe = service.onAlertSuppressed(suppressedSpy);
+
+      // Triggers chaos, marking inc-prev-resolved as dismissed and awaitingIncidentStart = true
+      const chaosRes = await service.triggerChaos('http://localhost:8080');
+      expect(chaosRes.ok).toBe(true);
+      expect(service.awaitingIncidentStart()).toBe(true);
+
+      // Orchestrator suppresses webhook referencing inc-prev-resolved (which is in dismissedIncidentIds!)
+      const suppressedPayload = {
+        incidentId: 'inc-prev-resolved',
+        service: 'api-pagamentos-core',
+        reason: AlertSuppressionReason.REPEAT_SUPPRESSION,
+        remainingSeconds: 420,
+        windowSeconds: 900,
+        at: '2026-11-28T02:45:00.000Z'
+      };
+      const handlers = listeners.get(IncidentEventType.ALERT_SUPPRESSED) ?? [];
+      expect(handlers.length).toBeGreaterThan(0);
+      for (const handler of handlers) {
+        handler({ data: JSON.stringify(suppressedPayload) } as MessageEvent);
+      }
+
+      expect(service.awaitingIncidentStart()).toBe(false);
+      expect(service.liveWaitSeconds()).toBe(0);
+      expect(service.lastSuppressedAlert()).toEqual(suppressedPayload);
+      expect(suppressedSpy).toHaveBeenCalledWith(suppressedPayload);
+
+      // LLM connection failure SSE event notifies registered listeners and updates signal
+      const llmFailedSpy = vi.fn();
+      const unsubLlm = service.onLlmFailed(llmFailedSpy);
+      const llmFailedPayload = {
+        incidentId: 'inc-active-llm-fail',
+        service: 'api-pagamentos-core',
+        error: 'ECONNREFUSED http://ollama:11434/v1',
+        fallbackUsed: true,
+        at: '2026-11-28T02:46:00.000Z'
+      };
+      const llmHandlers = listeners.get(IncidentEventType.LLM_FAILED) ?? [];
+      expect(llmHandlers.length).toBeGreaterThan(0);
+      for (const handler of llmHandlers) {
+        handler({ data: JSON.stringify(llmFailedPayload) } as MessageEvent);
+      }
+      expect(service.lastLlmFailure()).toEqual(llmFailedPayload);
+      expect(llmFailedSpy).toHaveBeenCalledWith(llmFailedPayload);
+
+      unsubLlm();
+      unsubscribe();
+    } finally {
+      service.disconnectSse();
+      fetchSpy.mockRestore();
+      globalThis.EventSource = originalEventSource;
+    }
+  });
+
+  it('should_ignore_malformed_foreign_service_and_repeated_suppression_sse_events', () => {
+    const listeners = new Map<string, Array<(evt: MessageEvent) => void>>();
+    const originalEventSource = globalThis.EventSource;
+    class FakeEventSource {
+      static readonly CLOSED = 2;
+      readyState = 1;
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      addEventListener(type: string, cb: (evt: MessageEvent) => void): void {
+        const current = listeners.get(type) ?? [];
+        current.push(cb);
+        listeners.set(type, current);
+      }
+      close(): void {
+        this.readyState = 2;
+      }
+    }
+    globalThis.EventSource = FakeEventSource as unknown as typeof EventSource;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ status: TargetHealthStatus.HEALTHY }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+    );
+
+    const service = new IncidentService();
+    const emit = (type: string, payload: unknown): void => {
+      for (const handler of listeners.get(type) ?? []) {
+        handler({ data: JSON.stringify(payload) } as MessageEvent);
+      }
+    };
+    try {
+      service.connectSse('http://localhost:8080');
+      service.targetStatus.set({
+        status: TargetHealthStatus.HEALTHY,
+        service: 'api-pagamentos-core',
+        version: 'v2.14.7',
+        previousHealthyVersion: 'v2.14.7',
+        capabilities: { chaosSimulation: true, healthyTrafficToggle: true }
+      });
+      const suppressedSpy = vi.fn();
+      const llmFailedSpy = vi.fn();
+      const unsubscribe = service.onAlertSuppressed(suppressedSpy);
+      const unsubLlm = service.onLlmFailed(llmFailedSpy);
+
+      const validPayload = {
+        incidentId: 'inc-prev-resolved',
+        service: 'api-pagamentos-core',
+        reason: AlertSuppressionReason.REPEAT_SUPPRESSION,
+        remainingSeconds: 420,
+        windowSeconds: 900,
+        at: '2026-11-28T02:45:00.000Z'
+      };
+
+      emit(IncidentEventType.ALERT_SUPPRESSED, { ...validPayload, remainingSeconds: undefined });
+      emit(IncidentEventType.LLM_FAILED, { incidentId: 'inc-llm', service: 'api-pagamentos-core' });
+      emit(IncidentEventType.ALERT_SUPPRESSED, { ...validPayload, service: 'other-service' });
+      expect(suppressedSpy).not.toHaveBeenCalled();
+      expect(llmFailedSpy).not.toHaveBeenCalled();
+      expect(service.lastSuppressedAlert()).toBeNull();
+      expect(service.lastLlmFailure()).toBeNull();
+
+      emit(IncidentEventType.ALERT_SUPPRESSED, validPayload);
+      emit(IncidentEventType.ALERT_SUPPRESSED, { ...validPayload, remainingSeconds: 360 });
+      expect(suppressedSpy).toHaveBeenCalledTimes(1);
+      expect(service.lastSuppressedAlert()?.remainingSeconds).toBe(360);
+
+      const validLlmPayload = {
+        incidentId: 'inc-llm',
+        service: 'api-pagamentos-core',
+        error: 'LLM provider request failed',
+        fallbackUsed: true,
+        at: '2026-11-28T02:46:00.000Z'
+      };
+      emit(IncidentEventType.LLM_FAILED, { ...validLlmPayload, service: 'other-service' });
+      expect(llmFailedSpy).not.toHaveBeenCalled();
+      expect(service.lastLlmFailure()).toBeNull();
+      emit(IncidentEventType.LLM_FAILED, validLlmPayload);
+      expect(llmFailedSpy).toHaveBeenCalledTimes(1);
+
+      unsubLlm();
+      unsubscribe();
+    } finally {
+      service.disconnectSse();
+      fetchSpy.mockRestore();
+      globalThis.EventSource = originalEventSource;
+    }
+  });
+
+  it('should_notify_live_wait_exceeded_once_when_grafana_alert_takes_45s_or_more', async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/api/demo/chaos')) {
+        return new Response(JSON.stringify({ status: 'accepted', mode: 'live' }), {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          status: TargetHealthStatus.DEGRADED,
+          service: 'api-pagamentos-core',
+          version: 'v2.14.8',
+          previousHealthyVersion: 'v2.14.7'
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const service = new IncidentService();
+    try {
+      const waitExceededSpy = vi.fn();
+      const unsubscribe = service.onLiveWaitExceeded(waitExceededSpy);
+
+      service.setActiveMode(IncidentExecutionMode.LIVE);
+      await service.triggerChaos('http://localhost:8080');
+      expect(service.awaitingIncidentStart()).toBe(true);
+
+      vi.advanceTimersByTime(44_000);
+      expect(waitExceededSpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1_000);
+      expect(waitExceededSpy).toHaveBeenCalledTimes(1);
+      expect(waitExceededSpy).toHaveBeenCalledWith(45);
+
+      // Should only fire once during the same wait cycle
+      vi.advanceTimersByTime(30_000);
+      expect(waitExceededSpy).toHaveBeenCalledTimes(1);
+
+      unsubscribe();
+      service.awaitingIncidentStart.set(false);
+    } finally {
+      service.disconnectSse();
+      fetchSpy.mockRestore();
+      vi.useRealTimers();
     }
   });
 });

@@ -1,5 +1,8 @@
 export {
   AlertSeverity,
+  AlertSuppressedEventSchema,
+  AlertSuppressionReason,
+  IncidentLlmFailedEventSchema,
   DecisionAction,
   DecisionSource,
   IncidentEventType,
@@ -13,6 +16,7 @@ export {
 } from '@zeromttr/contracts';
 
 export type {
+  AlertSuppressedEvent,
   ChaosPayload,
   DecisionPayload,
   HeartbeatEvent,
@@ -25,6 +29,7 @@ export type {
   IncidentDocsEvent,
   IncidentFinops,
   IncidentFinopsEvent,
+  IncidentLlmFailedEvent,
   IncidentMode,
   IncidentNotification,
   IncidentNotifiedEvent,

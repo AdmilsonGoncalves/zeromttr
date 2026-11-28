@@ -1,7 +1,12 @@
 import '@angular/compiler';
-import { isDevMode } from '@angular/core';
-import { describe, it, expect } from 'vitest';
+import { enableProdMode, isDevMode } from '@angular/core';
+import { describe, it, expect, vi } from 'vitest';
 import { configureAngularRuntimeMode, initDashboard } from '../../src/main.js';
+
+vi.mock('@angular/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@angular/core')>();
+  return { ...actual, enableProdMode: vi.fn() };
+});
 
 describe('dashboard foundation', () => {
   it('should initialize dashboard', () => {
@@ -11,9 +16,10 @@ describe('dashboard foundation', () => {
 
   it('should_enable_angular_prod_mode_only_when_running_production_bundle', () => {
     expect(configureAngularRuntimeMode(false)).toBe(false);
-    expect(isDevMode()).toBe(true);
+    expect(enableProdMode).not.toHaveBeenCalled();
 
     expect(configureAngularRuntimeMode(true)).toBe(true);
-    expect(isDevMode()).toBe(false);
+    expect(enableProdMode).toHaveBeenCalledTimes(1);
+    expect(isDevMode()).toBe(true);
   });
 });

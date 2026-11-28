@@ -4,9 +4,15 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WarRoomComponent } from '../../../src/app/war-room/war-room.component.js';
-import { TargetHealthStatus } from '../../../src/app/core/contract.js';
+import {
+  AlertSuppressionReason,
+  IncidentExecutionMode,
+  SettingsPersistenceEngine,
+  TargetHealthStatus
+} from '../../../src/app/core/contract.js';
 import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
 import { IncidentService } from '../../../src/app/core/incident.service.js';
+import { SystemSettingsService } from '../../../src/app/core/system-settings.service.js';
 import { MOCK_INCIDENT } from '../../../mock-server/mock-data.js';
 import { createWithInjector } from '../../helpers/di.helper.js';
 
@@ -270,5 +276,191 @@ describe('WarRoomComponent', () => {
     expect(html).toContain('<app-war-room-notices');
     expect(html).toContain('<app-war-room-kpis');
     expect(html).not.toContain('</app-war-room-header>');
+  });
+
+  it('should_show_warning_toasts_for_alert_suppression_already_degraded_trigger_and_grafana_repeat_wait', async () => {
+    const settingsService = new SystemSettingsService();
+    vi.spyOn(settingsService, 'fetchSettings').mockResolvedValue(true);
+    settingsService.readonlyInfo.set({
+      targetGithubRepo: 'org/repo',
+      targetBaseBranch: 'release/target-v2.14.8',
+      targetStatusProvider: 'manifest',
+      grafanaRepeatInterval: '15m',
+      persistenceEngine: SettingsPersistenceEngine.SQLITE
+    });
+
+    let alertSuppressedCallback:
+      | ((event: {
+          incidentId: string;
+          service: string;
+          reason: AlertSuppressionReason;
+          remainingSeconds: number;
+          windowSeconds: number;
+          at: string;
+        }) => void)
+      | null = null;
+    let liveWaitExceededCallback: ((seconds: number) => void) | null = null;
+    let llmFailedCallback:
+      | ((event: {
+          incidentId: string;
+          service: string;
+          error: string;
+          fallbackUsed: boolean;
+          at: string;
+        }) => void)
+      | null = null;
+
+    vi.spyOn(incidentService, 'onAlertSuppressed').mockImplementation((cb) => {
+      alertSuppressedCallback = cb;
+      return () => {
+        alertSuppressedCallback = null;
+      };
+    });
+    vi.spyOn(incidentService, 'onLlmFailed').mockImplementation((cb) => {
+      llmFailedCallback = cb;
+      return () => {
+        llmFailedCallback = null;
+      };
+    });
+    vi.spyOn(incidentService, 'onLiveWaitExceeded').mockImplementation((cb) => {
+      liveWaitExceededCallback = cb;
+      return () => {
+        liveWaitExceededCallback = null;
+      };
+    });
+
+    const warRoom = createWithInjector(WarRoomComponent, [
+      { provide: I18nService, useValue: i18n },
+      { provide: IncidentService, useValue: incidentService },
+      { provide: SystemSettingsService, useValue: settingsService }
+    ]);
+    const toastSpy = vi.spyOn(warRoom.messageService, 'add');
+
+    warRoom.ngOnInit();
+    expect(alertSuppressedCallback).not.toBeNull();
+    expect(liveWaitExceededCallback).not.toBeNull();
+
+    // 1a. Repeat suppression SSE toast
+    alertSuppressedCallback!({
+      incidentId: 'inc-prev-1',
+      service: 'api-pagamentos-core',
+      reason: AlertSuppressionReason.REPEAT_SUPPRESSION,
+      remainingSeconds: 185,
+      windowSeconds: 900,
+      at: '2026-11-28T02:45:00.000Z'
+    });
+    expect(toastSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastAlertSuppressedRepeatSummary'),
+        detail: expect.stringContaining('3m 5s')
+      })
+    );
+
+    // 1b. Rejection cooldown SSE toast
+    alertSuppressedCallback!({
+      incidentId: 'inc-prev-2',
+      service: 'api-pagamentos-core',
+      reason: AlertSuppressionReason.REJECTION_COOLDOWN,
+      remainingSeconds: 600,
+      windowSeconds: 900,
+      at: '2026-11-28T02:46:00.000Z'
+    });
+    expect(toastSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastAlertSuppressedRejectionSummary'),
+        detail: expect.stringMatching(/\b10m\b/)
+      })
+    );
+
+    // 2a. Triggering Live chaos while target is already DEGRADED shows immediate Grafana repeat warning
+    incidentService.setActiveMode(IncidentExecutionMode.LIVE);
+    incidentService.targetStatus.set({
+      status: TargetHealthStatus.DEGRADED,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.8',
+      previousHealthyVersion: 'v2.14.7',
+      capabilities: { chaosSimulation: true, healthyTrafficToggle: true }
+    });
+    vi.spyOn(incidentService, 'triggerChaos').mockResolvedValueOnce({ ok: true, status: 202 });
+
+    await warRoom.onTriggerChaos();
+    expect(toastSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastGrafanaRepeatAlreadyDegradedSummary'),
+        detail: expect.stringContaining('15m')
+      })
+    );
+
+    // Duplicate 45s wait warning should be suppressed for the already-warned trigger
+    const callsAfterDegradedTrigger = toastSpy.mock.calls.length;
+    liveWaitExceededCallback!(45);
+    expect(toastSpy).toHaveBeenCalledTimes(callsAfterDegradedTrigger);
+
+    // 2b. Triggering Live chaos from HEALTHY resets suppression flag so 45s wait warning fires
+    incidentService.targetStatus.set({
+      status: TargetHealthStatus.HEALTHY,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.7',
+      previousHealthyVersion: 'v2.14.7',
+      capabilities: { chaosSimulation: true, healthyTrafficToggle: true }
+    });
+    vi.spyOn(incidentService, 'triggerChaos').mockResolvedValueOnce({ ok: true, status: 202 });
+    await warRoom.onTriggerChaos();
+    expect(toastSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        severity: 'success',
+        summary: i18n.t('toastChaosStartedSummary')
+      })
+    );
+
+    liveWaitExceededCallback!(45);
+    expect(toastSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastGrafanaRepeatWaitSummary', { seconds: '45' }),
+        detail: expect.stringContaining('15m')
+      })
+    );
+
+    // 3a. LLM connection failure with fallback shows WARN toast with error details
+    expect(llmFailedCallback).not.toBeNull();
+    llmFailedCallback!({
+      incidentId: 'inc-llm-1',
+      service: 'api-pagamentos-core',
+      error: 'HTTP 401 Invalid API key',
+      fallbackUsed: true,
+      at: '2026-11-28T02:47:00.000Z'
+    });
+    expect(toastSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        summary: i18n.t('toastLlmFailedFallbackSummary'),
+        detail: expect.stringContaining('HTTP 401 Invalid API key')
+      })
+    );
+
+    // 3b. LLM connection failure without fallback shows ERROR toast
+    llmFailedCallback!({
+      incidentId: 'inc-llm-2',
+      service: 'api-pagamentos-core',
+      error: 'ECONNREFUSED http://ollama:11434/v1',
+      fallbackUsed: false,
+      at: '2026-11-28T02:48:00.000Z'
+    });
+    expect(toastSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        severity: 'error',
+        summary: i18n.t('toastLlmFailedSummary'),
+        detail: expect.stringContaining('ECONNREFUSED http://ollama:11434/v1')
+      })
+    );
+
+    warRoom.ngOnDestroy();
+    expect(alertSuppressedCallback).toBeNull();
+    expect(llmFailedCallback).toBeNull();
+    expect(liveWaitExceededCallback).toBeNull();
   });
 });

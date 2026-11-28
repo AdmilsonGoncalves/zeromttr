@@ -1,5 +1,6 @@
 export {
   AlertSeverity,
+  AlertSuppressionReason,
   DecisionAction,
   DecisionSource,
   IncidentEventType,

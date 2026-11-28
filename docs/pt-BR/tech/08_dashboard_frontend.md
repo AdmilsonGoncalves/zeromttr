@@ -54,6 +54,8 @@ A rota principal `/` (`WarRoomComponent`) exibe os 4 quadrantes alimentados via 
 | `incident.remediation` | `{ incidentId, branchUrl, pullRequestUrl?, commitSha? }` |
 | `incident.notified` | `{ incidentId, emailId, htmlPreview? }` (**sem** `decisionToken` / `sig`) |
 | `incident.decision` | `{ incidentId, action, source: 'email_hmac' \| 'demo_simulation' }` |
+| `alert.suppressed` | `{ incidentId, service, reason: 'repeat_suppression' \| 'rejection_cooldown', remainingSeconds, windowSeconds, at }` |
+| `incident.llm_failed` | `{ incidentId, service, error, fallbackUsed, at }` |
 | `heartbeat` | `{ at }` a cada 15 s |
 
 ### 3.3 Tipos TypeScript (`apps/dashboard/src/app/core/contract.ts`)

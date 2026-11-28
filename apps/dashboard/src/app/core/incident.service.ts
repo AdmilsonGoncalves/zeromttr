@@ -13,6 +13,8 @@ import {
 } from '@zeromttr/utils';
 import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import {
+  type AlertSuppressedEvent,
+  AlertSuppressedEventSchema,
   DecisionAction,
   type DecisionPayload,
   type DemoConfigResponse,
@@ -25,6 +27,8 @@ import {
   IncidentEventType,
   IncidentExecutionMode,
   type IncidentFinopsEvent,
+  type IncidentLlmFailedEvent,
+  IncidentLlmFailedEventSchema,
   type IncidentMode,
   type IncidentNotifiedEvent,
   type IncidentRcaEvent,
@@ -109,6 +113,7 @@ const LIVE_DEMO_KEY_STORAGE_KEY = 'zeromttr_live_demo_key';
 const ACTIVE_MODE_STORAGE_KEY = 'zeromttr_active_mode';
 const VISUAL_STEP_INTERVAL_MS = 450;
 const MAX_TELEMETRY_HISTORY_POINTS = 45;
+const GRAFANA_ALERT_WAIT_WARNING_SECONDS = 45;
 
 /**
  * Signal-based state manager handling SSE incident streaming, polling, demo triggers, and signed decisions.
@@ -136,8 +141,15 @@ export class IncidentService {
   private readonly incidentUpdateGeneration = new Map<string, number>();
   private chaosTriggeredAtMs = 0;
   private activeModeModifiedByUser = false;
+  private liveWaitWarningEmitted = false;
+  private lastNotifiedSuppressionKey: string | null = null;
+  private readonly alertSuppressedListeners = new Set<(event: AlertSuppressedEvent) => void>();
+  private readonly llmFailedListeners = new Set<(event: IncidentLlmFailedEvent) => void>();
+  private readonly liveWaitExceededListeners = new Set<(seconds: number) => void>();
 
   readonly currentIncident = signal<IncidentDetail | null>(null);
+  readonly lastSuppressedAlert = signal<AlertSuppressedEvent | null>(null);
+  readonly lastLlmFailure = signal<IncidentLlmFailedEvent | null>(null);
   readonly targetStatus = signal<TargetStatusResponse | null>(null);
   readonly targetServiceName = computed<string>(() => this.targetStatus()?.service ?? '');
   readonly targetCapabilities = computed<TargetCapabilities>(
@@ -648,11 +660,56 @@ export class IncidentService {
     }
   }
 
+  /**
+   * Registers a listener invoked whenever the orchestrator broadcasts an `alert.suppressed` SSE event.
+   */
+  onAlertSuppressed(listener: (event: AlertSuppressedEvent) => void): () => void {
+    this.alertSuppressedListeners.add(listener);
+    return () => {
+      this.alertSuppressedListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Registers a listener invoked whenever the orchestrator broadcasts an `incident.llm_failed` SSE event.
+   */
+  onLlmFailed(listener: (event: IncidentLlmFailedEvent) => void): () => void {
+    this.llmFailedListeners.add(listener);
+    return () => {
+      this.llmFailedListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Registers a listener invoked once per live wait cycle when Grafana alert waiting exceeds the expected threshold.
+   */
+  onLiveWaitExceeded(listener: (seconds: number) => void): () => void {
+    this.liveWaitExceededListeners.add(listener);
+    return () => {
+      this.liveWaitExceededListeners.delete(listener);
+    };
+  }
+
   private startLiveWaitTimer(): void {
     this.stopLiveWaitTimer();
     this.liveWaitSeconds.set(0);
+    this.liveWaitWarningEmitted = false;
     this.liveWaitTimer = setInterval(() => {
-      this.liveWaitSeconds.update((sec) => sec + 1);
+      let nextSeconds = 0;
+      this.liveWaitSeconds.update((sec) => {
+        nextSeconds = sec + 1;
+        return nextSeconds;
+      });
+      if (
+        !this.liveWaitWarningEmitted &&
+        this.awaitingIncidentStart() &&
+        nextSeconds >= GRAFANA_ALERT_WAIT_WARNING_SECONDS
+      ) {
+        this.liveWaitWarningEmitted = true;
+        for (const listener of this.liveWaitExceededListeners) {
+          listener(nextSeconds);
+        }
+      }
     }, 1000);
   }
 
@@ -661,6 +718,7 @@ export class IncidentService {
       clearInterval(this.liveWaitTimer);
       this.liveWaitTimer = null;
     }
+    this.liveWaitWarningEmitted = false;
     this.liveWaitSeconds.set(0);
   }
 
@@ -794,6 +852,57 @@ export class IncidentService {
       IncidentEventType.DECISION,
       (payload) => this.handleDecisionEvent(payload, baseUrl)
     );
+    this.registerIncidentListener<IncidentLlmFailedEvent>(
+      es,
+      IncidentEventType.LLM_FAILED,
+      (payload) => {
+        const parsed = IncidentLlmFailedEventSchema.safeParse(payload);
+        if (parsed.success) {
+          this.handleLlmFailedEvent(parsed.data);
+        }
+      }
+    );
+    es.addEventListener(IncidentEventType.ALERT_SUPPRESSED, (evt: MessageEvent) => {
+      const parsed = AlertSuppressedEventSchema.safeParse(safeJsonParse<unknown>(evt.data));
+      if (!parsed.success || !isNonEmptyString(parsed.data.incidentId)) {
+        return;
+      }
+      this.handleAlertSuppressedEvent(parsed.data);
+    });
+  }
+
+  private handleLlmFailedEvent(payload: IncidentLlmFailedEvent): void {
+    const targetService = this.targetServiceName();
+    if (isNonEmptyString(targetService) && payload.service !== targetService) {
+      return;
+    }
+    this.lastLlmFailure.set(payload);
+    for (const listener of this.llmFailedListeners) {
+      listener(payload);
+    }
+  }
+
+  private handleAlertSuppressedEvent(payload: AlertSuppressedEvent): void {
+    const targetService = this.targetServiceName();
+    if (isNonEmptyString(targetService) && payload.service !== targetService) {
+      return;
+    }
+
+    const wasAwaitingIncidentStart = this.awaitingIncidentStart();
+    this.lastSuppressedAlert.set(payload);
+    if (wasAwaitingIncidentStart) {
+      this.awaitingIncidentStart.set(false);
+      this.stopLiveWaitTimer();
+    }
+
+    const suppressionKey = `${payload.incidentId}:${payload.reason}`;
+    if (!wasAwaitingIncidentStart && suppressionKey === this.lastNotifiedSuppressionKey) {
+      return;
+    }
+    this.lastNotifiedSuppressionKey = suppressionKey;
+    for (const listener of this.alertSuppressedListeners) {
+      listener(payload);
+    }
   }
 
   private registerIncidentListener<T extends { incidentId: string }>(
@@ -1066,12 +1175,42 @@ export class IncidentService {
         const status = (await res.json()) as TargetStatusResponse;
         this.targetStatus.set(status);
         this.appendTelemetrySample(status);
+        this.syncLiveModeWithActiveTraffic();
         this.loadError.set(null);
       } else {
         this.loadError.set(`Failed to fetch target status: HTTP ${res.status}`);
       }
     } catch (err) {
       this.loadError.set(toErrorMessage(err));
+    }
+  }
+
+  /**
+   * Healthy synthetic traffic is server-side state, whereas the execution mode is browser-local state.
+   * When a fresh browser context (e.g., private window) finds traffic still running and the user has not
+   * chosen a mode yet, align the UI with Live so the toggles reflect reality, but only if Live is permitted.
+   */
+  private syncLiveModeWithActiveTraffic(): void {
+    if (
+      this.activeModeModifiedByUser ||
+      this.activeMode() === IncidentExecutionMode.LIVE ||
+      !(this.targetStatus()?.metrics?.healthyTrafficActive ?? false) ||
+      this.hasSavedReplayMode()
+    ) {
+      return;
+    }
+    if (this.publicLiveDemo() || isNonEmptyString(this.liveDemoKey())) {
+      this.activeMode.set(IncidentExecutionMode.LIVE);
+    }
+  }
+
+  private hasSavedReplayMode(): boolean {
+    try {
+      return (
+        globalThis.localStorage?.getItem(ACTIVE_MODE_STORAGE_KEY) === IncidentExecutionMode.REPLAY
+      );
+    } catch {
+      return false;
     }
   }
 
@@ -1180,6 +1319,7 @@ export class IncidentService {
                 // Ignore storage access errors
               }
             }
+            this.syncLiveModeWithActiveTraffic();
             this.demoConfigLoaded = true;
             return;
           }

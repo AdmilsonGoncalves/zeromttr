@@ -11,6 +11,7 @@ import type {
   RcaAndPatchSynthesis
 } from '../../../src/ports/reasoning.port.js';
 import type { EventBroadcasterPort } from '../../../src/ports/event-broadcaster.port.js';
+import type { LoggerPort } from '../../../src/ports/logger.port.js';
 
 describe('DispatchRemediation Use Case', () => {
   const createMockIncident = () =>
@@ -879,5 +880,237 @@ describe('DispatchRemediation Use Case', () => {
     expect(llmAdapter.synthesizeRcaAndPatch).not.toHaveBeenCalled();
     expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalledTimes(1);
     expect(result.reasoningSource).toBe('fallback');
+  });
+
+  it('should_broadcast_sanitized_incident_llm_failed_sse_when_llm_connection_fails', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(async () => ({
+        branchName: 'hotfix/zeromttr-inc-llm-fail-001',
+        branchUrl:
+          'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-llm-fail-001',
+        pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/102',
+        commitSha: 'commit-llm-fail'
+      })),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 107, success: true }))
+    };
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => {
+        throw new Error(
+          'HTTP 503 calling https://api.example.com/v1?key=secret123 with Bearer tok_abc and sk-1234567890abcdef'
+        );
+      })
+    };
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Fallback summary after LLM outage',
+        rootCause: 'Pool exhaustion',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: validPatch,
+        explanation: 'Restored pool max'
+      }))
+    };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    const result = await useCase.execute(incident.id, validEvidence, 'blob123');
+    expect(result.reasoningSource).toBe('fallback');
+    expect(broadcaster.broadcast).toHaveBeenCalledWith(
+      'incident.llm_failed',
+      expect.objectContaining({
+        incidentId: incident.id,
+        service: 'api-pagamentos-core',
+        fallbackUsed: true,
+        error:
+          'HTTP 503 calling https://api.example.com/v1?key=[REDACTED] with Bearer [REDACTED] and [REDACTED_KEY]'
+      })
+    );
+  });
+
+  it('should_broadcast_incident_llm_failed_with_fallbackUsed_false_when_both_llm_and_fallback_fail', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn()
+    };
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => {
+        throw new Error('ECONNREFUSED http://ollama:11434/v1');
+      })
+    };
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => {
+        throw new Error('Fallback synthesis error');
+      })
+    };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    await expect(useCase.execute(incident.id, validEvidence, 'blob123')).rejects.toThrow(
+      'Fallback synthesis error'
+    );
+    expect(broadcaster.broadcast).toHaveBeenCalledWith(
+      'incident.llm_failed',
+      expect.objectContaining({
+        incidentId: incident.id,
+        service: 'api-pagamentos-core',
+        fallbackUsed: false,
+        error: 'ECONNREFUSED http://ollama:11434/v1'
+      })
+    );
+  });
+
+  it.each([
+    {
+      rawError: 'HTTP 401 access_token=opaqueCredential_abc123 rejected',
+      expected: 'HTTP 401 access_token=[REDACTED] rejected',
+      secret: 'opaqueCredential_abc123'
+    },
+    {
+      rawError: 'HTTP 401 {"access_token":"opaqueCredential_abc123","scope":"llm"}',
+      expected: 'HTTP 401 {"access_token":"[REDACTED]","scope":"llm"}',
+      secret: 'opaqueCredential_abc123'
+    },
+    {
+      rawError: 'ECONNREFUSED https://svc-user:s3cretPassw0rd@llm.internal/v1',
+      expected: 'ECONNREFUSED https://[REDACTED]@llm.internal/v1',
+      secret: 's3cretPassw0rd'
+    }
+  ])(
+    'should_redact_credentials_in_sse_payload_and_structured_log ($expected)',
+    async ({ rawError, expected, secret }) => {
+      const incident = createMockIncident();
+      const repo: IncidentRepository = {
+        findById: vi.fn(async () => incident),
+        findOpenByFingerprint: vi.fn(async () => null),
+        findAll: vi.fn(async () => [incident]),
+        save: vi.fn(async () => {})
+      };
+      const tools: ToolsPort = {
+        executePromqlRange: vi.fn(),
+        queryLokiLogs: vi.fn(),
+        analyzeOtelTrace: vi.fn(),
+        searchTracesByTraceQL: vi.fn(),
+        inspectGitDeployDiff: vi.fn(),
+        createRemediationPr: vi.fn(async () => ({
+          branchName: 'hotfix/zeromttr-inc-llm-token-001',
+          branchUrl:
+            'https://github.com/AdmilsonGoncalves/zeromttr/tree/hotfix/zeromttr-inc-llm-token-001',
+          pullRequestUrl: 'https://github.com/AdmilsonGoncalves/zeromttr/pull/103',
+          commitSha: 'commit-llm-token'
+        })),
+        sendPostMortemResend: vi.fn(),
+        annotateGrafanaIncident: vi.fn(async () => ({ annotationId: 108, success: true }))
+      };
+      const llmAdapter: ReasoningPort = {
+        synthesizeRcaAndPatch: vi.fn(async () => {
+          throw new Error(rawError);
+        })
+      };
+      const fallbackAdapter: ReasoningPort = {
+        synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+          summary: 'Fallback summary after LLM auth failure',
+          rootCause: 'Pool exhaustion',
+          evidenceRefs: ['trace1'],
+          suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+          patchedContent: validPatch,
+          explanation: 'Restored pool max'
+        }))
+      };
+      const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+      const logger: LoggerPort = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const useCase = new DispatchRemediation(
+        repo,
+        tools,
+        llmAdapter,
+        fallbackAdapter,
+        broadcaster,
+        logger
+      );
+
+      await useCase.execute(incident.id, validEvidence, 'blob123');
+
+      expect(broadcaster.broadcast).toHaveBeenCalledWith(
+        'incident.llm_failed',
+        expect.objectContaining({
+          fallbackUsed: true,
+          error: expected
+        })
+      );
+      const serializedLogs = JSON.stringify(vi.mocked(logger.warn).mock.calls);
+      expect(serializedLogs).toContain('[REDACTED]');
+      expect(serializedLogs).not.toContain(secret);
+    }
+  );
+
+  it('should_not_report_fallback_exceptions_as_llm_failures_when_llm_patch_is_rejected', async () => {
+    const incident = createMockIncident();
+    const repo: IncidentRepository = {
+      findById: vi.fn(async () => incident),
+      findOpenByFingerprint: vi.fn(async () => null),
+      findAll: vi.fn(async () => [incident]),
+      save: vi.fn(async () => {})
+    };
+    const tools: ToolsPort = {
+      executePromqlRange: vi.fn(),
+      queryLokiLogs: vi.fn(),
+      analyzeOtelTrace: vi.fn(),
+      searchTracesByTraceQL: vi.fn(),
+      inspectGitDeployDiff: vi.fn(),
+      createRemediationPr: vi.fn(),
+      sendPostMortemResend: vi.fn(),
+      annotateGrafanaIncident: vi.fn()
+    };
+    const llmAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async (): Promise<RcaAndPatchSynthesis> => ({
+        summary: 'Invalid LLM patch',
+        rootCause: 'Pool exhaustion',
+        evidenceRefs: ['trace1'],
+        suspectFilePath: 'apps/target-app-demo/src/repositories/payment.repository.ts',
+        patchedContent: '',
+        explanation: 'Empty patch'
+      }))
+    };
+    const fallbackAdapter: ReasoningPort = {
+      synthesizeRcaAndPatch: vi.fn(async () => {
+        throw new Error('Fallback synthesis error');
+      })
+    };
+    const broadcaster: EventBroadcasterPort = { broadcast: vi.fn() };
+    const useCase = new DispatchRemediation(repo, tools, llmAdapter, fallbackAdapter, broadcaster);
+
+    await expect(useCase.execute(incident.id, validEvidence, 'blob123')).rejects.toThrow(
+      'Fallback synthesis error'
+    );
+    expect(fallbackAdapter.synthesizeRcaAndPatch).toHaveBeenCalledTimes(1);
+    expect(broadcaster.broadcast).not.toHaveBeenCalledWith(
+      'incident.llm_failed',
+      expect.anything()
+    );
   });
 });

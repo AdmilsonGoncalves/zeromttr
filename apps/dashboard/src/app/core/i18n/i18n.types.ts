@@ -231,6 +231,19 @@ export interface TranslationDictionary {
   toastHealthyTrafficStartedDetail: string;
   toastHealthyTrafficStoppedSummary: string;
   toastHealthyTrafficStoppedDetail: string;
+  toastAlertSuppressedRepeatSummary: string;
+  toastAlertSuppressedRepeatDetail: string;
+  toastAlertSuppressedRejectionSummary: string;
+  toastAlertSuppressedRejectionDetail: string;
+  grafanaRepeatIntervalFallback: string;
+  toastGrafanaRepeatAlreadyDegradedSummary: string;
+  toastGrafanaRepeatAlreadyDegradedDetail: string;
+  toastGrafanaRepeatWaitSummary: string;
+  toastGrafanaRepeatWaitDetail: string;
+  toastLlmFailedFallbackSummary: string;
+  toastLlmFailedFallbackDetail: string;
+  toastLlmFailedSummary: string;
+  toastLlmFailedDetail: string;
 
   // === System Settings Drawer (SQLite) ===
   settingsBtnAriaLabel: string;
