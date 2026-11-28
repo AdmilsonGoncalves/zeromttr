@@ -28,7 +28,7 @@ export class PaymentRepository {
   private waitingWaiters = 0;
   private pendingCleanups = new Set<() => void>();
 
-  // Pool Configuration (Restored to baseline v2.14.7: max 10)
+  // Pool Configuration (Baseline restoration: max 10)
   private healthyMaxConnections = 10;
   private degradedMaxConnections = 2;
   private acquireTimeoutMs = parseNumber(process.env.DB_ACQUIRE_TIMEOUT_MS, 150);
@@ -178,10 +178,12 @@ export class PaymentRepository {
 
         const payment = await this.executePaymentInsert(client, input);
 
+        // NOTE: In the v2.14.8 regression commit, client.release() was omitted intentionally in degraded mode
+
         telemetry.endSpan(span, { code: SpanStatusCode.OK });
         return payment;
       } else {
-        // --- HEALTHY BASELINE (Restored Release v2.14.7) ---
+        // --- HEALTHY BASELINE (Restored v2.14.7) ---
         // Knex pool max: 10, strictly releasing connections in try { ... } finally { client.release() }
         const client = await this.acquireConnection(traceId);
         try {
