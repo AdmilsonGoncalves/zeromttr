@@ -25,6 +25,9 @@ describe('WarRoomNoticesComponent (TestBed)', () => {
     let capturedOptions:
       | {
           sitekey: string;
+          theme?: string;
+          size?: string;
+          appearance?: string;
           callback?: (token: string) => void;
           'expired-callback'?: () => void;
           'error-callback'?: () => void;
@@ -63,6 +66,8 @@ describe('WarRoomNoticesComponent (TestBed)', () => {
 
     expect(renderSpy).toHaveBeenCalledTimes(1);
     expect(capturedOptions?.sitekey).toBe('0x4AAAAAA');
+    expect(capturedOptions?.size).toBe('normal');
+    expect(capturedOptions?.appearance).toBe('interaction-only');
     expect(fixture.nativeElement.textContent).toContain(i18n.t('turnstilePendingNotice'));
     expect(fixture.nativeElement.textContent).not.toContain('replayNotice');
 

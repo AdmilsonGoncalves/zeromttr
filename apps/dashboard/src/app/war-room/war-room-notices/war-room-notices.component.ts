@@ -22,6 +22,7 @@ interface TurnstileApi {
       sitekey: string;
       theme?: 'light' | 'dark' | 'auto';
       size?: 'normal' | 'compact' | 'flexible';
+      appearance?: 'always' | 'execute' | 'interaction-only';
       callback?: (token: string) => void;
       'expired-callback'?: () => void;
       'error-callback'?: () => void;
@@ -136,7 +137,8 @@ export class WarRoomNoticesComponent implements OnDestroy {
       this.turnstileWidgetId = globalThis.window.turnstile.render(host, {
         sitekey: siteKey,
         theme: 'dark',
-        size: 'compact',
+        size: 'normal',
+        appearance: 'interaction-only',
         callback: (token: string) => {
           this.turnstileTokenChange.emit(token);
         },
