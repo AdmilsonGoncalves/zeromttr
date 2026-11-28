@@ -2,6 +2,7 @@ import '@angular/compiler';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FormControl, type NgModel } from '@angular/forms';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentExecutionMode, TargetHealthStatus } from '../../../src/app/core/contract.js';
 import { I18nService, Language } from '../../../src/app/core/i18n/i18n.service.js';
@@ -238,5 +239,60 @@ describe('DemoSettingsComponent', () => {
     expect(html).toContain('simulateIncident');
     expect(html).toContain('restoreService');
     expect(html).not.toContain('<app-locale-switcher');
+  });
+
+  it('should_sync_healthy_traffic_switch_without_re_emitting_ngModelChange_or_recursing', () => {
+    const trafficSpy = vi.fn();
+    const writeValueSpy = vi.fn();
+    component.toggleHealthyTraffic.subscribe(trafficSpy);
+
+    const control = new FormControl<boolean>(false, { nonNullable: true });
+    // Mirror Angular NgModel setUpModelChangePipeline: writeValue always runs on model->view,
+    // and viewToModelUpdate (ngModelChange) runs whenever emitViewToModelChange !== false.
+    control.registerOnChange((newValue: boolean, emitModelEvent: boolean) => {
+      writeValueSpy(newValue);
+      if (emitModelEvent) {
+        component.onHealthyTrafficToggle(newValue);
+      }
+    });
+    const setValueSpy = vi.spyOn(control, 'setValue');
+
+    component.healthyTrafficModel = { control } as unknown as NgModel;
+    component.activeMode = IncidentExecutionMode.LIVE;
+    component.healthyTrafficActive = false;
+    component.targetStatus = {
+      status: TargetHealthStatus.DEGRADED,
+      service: 'api-pagamentos-core',
+      version: 'v2.14.8',
+      previousHealthyVersion: 'v2.14.7',
+      capabilities: {
+        chaosSimulation: true,
+        healthyTrafficToggle: true
+      }
+    };
+
+    // Guarded toggle (disabled while degraded) must revert the view without recursing
+    expect(() => component.onHealthyTrafficToggle(true)).not.toThrow();
+    expect(setValueSpy).toHaveBeenCalledWith(false, {
+      emitEvent: false,
+      emitViewToModelChange: false
+    });
+    expect(writeValueSpy).toHaveBeenCalledWith(false);
+    expect(trafficSpy).not.toHaveBeenCalled();
+
+    // Completing a toggle request (isTogglingTraffic: true -> false) must sync without recursing
+    setValueSpy.mockClear();
+    writeValueSpy.mockClear();
+    component.healthyTrafficActive = true;
+    component.isTogglingTraffic = true;
+    expect(() => {
+      component.isTogglingTraffic = false;
+    }).not.toThrow();
+    expect(setValueSpy).toHaveBeenCalledWith(true, {
+      emitEvent: false,
+      emitViewToModelChange: false
+    });
+    expect(writeValueSpy).toHaveBeenCalledWith(true);
+    expect(trafficSpy).not.toHaveBeenCalled();
   });
 });
