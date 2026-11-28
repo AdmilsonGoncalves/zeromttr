@@ -60,5 +60,5 @@ Quando o ZeroMTTR está conectado a um serviço real de produção (ou monitorad
 :::
 
 :::note Janela anônima ou novo navegador
-O tráfego saudável é um estado do servidor, enquanto o modo (Live/Replay) é guardado no navegador. Ao abrir o War Room em um navegador novo (ex.: janela anônima) com o tráfego ainda ativo, o painel alinha o modo para **Live** automaticamente — desde que o Modo Live seja permitido (sem chave exigida ou com chave informada). Se uma chave for exigida e não estiver salva, o modo permanece **Replay**, mas você ainda pode desligar o tráfego pelo painel **Demonstração**.
+O tráfego saudável é um estado do servidor, enquanto o modo (Live/Replay) é guardado no navegador. Ao abrir o War Room em um navegador novo (ex.: janela anônima) com o tráfego ainda ativo, o painel alinha o modo para **Live** automaticamente — desde que o Modo Live seja permitido (sem chave exigida ou com chave informada). Se `REQUIRE_DEMO_KEY=true` e nenhuma chave estiver salva, o modo permanece **Replay** e interromper o tráfego ainda exige autorização: mude para **Live** e informe a **Chave de Demonstração Live** antes de desligar o tráfego.
 :::

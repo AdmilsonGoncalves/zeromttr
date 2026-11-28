@@ -60,5 +60,5 @@ Cuando ZeroMTTR está conectado a un servicio real de producción (o monitorizad
 :::
 
 :::note Ventana privada o navegador nuevo
-El tráfico saludable es estado del servidor, mientras que el modo (Live/Replay) se guarda en el navegador. Al abrir el War Room en un navegador nuevo (p. ej., ventana privada) con el tráfico aún activo, el panel alinea el modo a **Live** automáticamente, siempre que el Modo Live esté permitido (sin clave exigida o con clave informada). Si se exige clave y no está guardada, el modo permanece **Replay**, pero aún puedes apagar el tráfico desde el panel **Demostración**.
+El tráfico saludable es estado del servidor, mientras que el modo (Live/Replay) se guarda en el navegador. Al abrir el War Room en un navegador nuevo (p. ej., ventana privada) con el tráfico aún activo, el panel alinea el modo a **Live** automáticamente, siempre que el Modo Live esté permitido (sin clave exigida o con clave informada). Si `REQUIRE_DEMO_KEY=true` y no hay clave guardada, el modo permanece **Replay** y detener el tráfico sigue exigiendo autorización: cambia a **Live** e introduce la **Clave de Demo Live** antes de apagar el tráfico.
 :::

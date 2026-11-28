@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { isNonEmptyString, parseNumber } from '@zeromttr/utils';
+import { isNonEmptyString, MAX_TIMER_DELAY_MS, parseNumber } from '@zeromttr/utils';
 import { CONTENT_TYPE, HTTP_HEADERS, HTTP_STATUS } from '@zeromttr/utils/http';
 import { chaosManager } from '../chaos/chaos.manager.js';
 import { paymentRepository } from '../repositories/payment.repository.js';
@@ -17,6 +17,16 @@ export class ChaosController {
   private activeBurstTimers: NodeJS.Timeout[] = [];
   private healthyTrafficTimer: NodeJS.Timeout | null = null;
   private healthyTrafficActive = false;
+  private boundPort?: number;
+
+  /**
+   * Stores the actual bound HTTP port so endpoint-triggered restarts reuse it across toggles.
+   */
+  public setBoundPort(port: number): void {
+    if (Number.isInteger(port) && port > 0) {
+      this.boundPort = port;
+    }
+  }
 
   /**
    * Toggles pool saturation chaos mode, resets the pool on recovery, and responds with updated status.
@@ -93,6 +103,9 @@ export class ChaosController {
    * Starts continuous healthy synthetic traffic against `POST /payments` using `HEALTHY_TRAFFIC_INTERVAL_MS`.
    */
   public startHealthyTraffic(portOverride?: number): void {
+    if (portOverride && Number.isInteger(portOverride) && portOverride > 0) {
+      this.boundPort = portOverride;
+    }
     if (this.healthyTrafficActive && this.healthyTrafficTimer) {
       return;
     }
@@ -105,7 +118,8 @@ export class ChaosController {
       if (!this.healthyTrafficActive) {
         return;
       }
-      const port = portOverride ? String(portOverride) : process.env.PORT || '3001';
+      const effectivePort = portOverride ?? this.boundPort;
+      const port = effectivePort ? String(effectivePort) : process.env.PORT || '3001';
       const targetUrl = `http://127.0.0.1:${port}/payments`;
       const payload = this.buildSyntheticPaymentPayload('PIX Healthy Stream #OK');
 
@@ -131,7 +145,7 @@ export class ChaosController {
     if (!Number.isFinite(raw) || raw < MIN_HEALTHY_TRAFFIC_INTERVAL_MS) {
       return MIN_HEALTHY_TRAFFIC_INTERVAL_MS;
     }
-    return Math.trunc(raw);
+    return Math.min(Math.trunc(raw), MAX_TIMER_DELAY_MS);
   }
 
   private stopSyntheticTrafficBurst(): void {

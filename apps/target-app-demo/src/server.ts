@@ -24,6 +24,7 @@ export function startServer(port: number = defaultPort): http.Server {
   server.listen(port, () => {
     const address = server.address();
     const boundPort = typeof address === 'object' && address ? address.port : port;
+    chaosController.setBoundPort(boundPort);
     if (areChaosEndpointsEnabled() && isHealthyTrafficAutoStartEnabled()) {
       chaosController.startHealthyTraffic(boundPort);
     }

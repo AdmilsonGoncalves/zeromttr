@@ -909,7 +909,7 @@ describe('DispatchRemediation Use Case', () => {
     const llmAdapter: ReasoningPort = {
       synthesizeRcaAndPatch: vi.fn(async () => {
         throw new Error(
-          'HTTP 503 calling https://api.example.com/v1?key=secret123 with Bearer tok_abc and sk-1234567890abcdef'
+          'HTTP 503 calling https://api.example.com/v1?key=secret123 with Bearer tok_abc and password="my secret 123!", api_key=\'tok spaces\' and sk-1234567890abcdef'
         );
       })
     };
@@ -935,7 +935,7 @@ describe('DispatchRemediation Use Case', () => {
         service: 'api-pagamentos-core',
         fallbackUsed: true,
         error:
-          'HTTP 503 calling https://api.example.com/v1?key=[REDACTED] with Bearer [REDACTED] and [REDACTED_KEY]'
+          'HTTP 503 calling https://api.example.com/v1?key=[REDACTED] with Bearer [REDACTED] and password="[REDACTED]", api_key="[REDACTED]" and [REDACTED_KEY]'
       })
     );
   });

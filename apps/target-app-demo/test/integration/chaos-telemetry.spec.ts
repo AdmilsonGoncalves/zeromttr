@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { MAX_TIMER_DELAY_MS } from '@zeromttr/utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { startServer } from '../../src/server.js';
@@ -185,5 +186,35 @@ describe('Target App Chaos Telemetry & Healthy Traffic Routes', () => {
     });
 
     expect(chaosController.isHealthyTrafficActive()).toBe(false);
+  });
+
+  it('should cap healthy traffic interval at 32bit max and reuse bound port on restart', async () => {
+    process.env.HEALTHY_TRAFFIC_AUTO_START = 'true';
+    process.env.HEALTHY_TRAFFIC_INTERVAL_MS = '9999999999';
+    process.env.CHAOS_ENDPOINTS_ENABLED = 'true';
+
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    server = startServer(0);
+    await new Promise<void>((resolve) => {
+      server?.once('listening', resolve);
+    });
+
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), MAX_TIMER_DELAY_MS);
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Server address unavailable');
+    }
+
+    // Stop and restart via HTTP toggle without process.env.PORT set; must reuse boundPort
+    delete process.env.PORT;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await requestJson(server, 'POST', '/chaos/healthy-traffic?enable=false');
+    await requestJson(server, 'POST', '/chaos/healthy-traffic?enable=true');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `http://127.0.0.1:${address.port}/payments`,
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 });

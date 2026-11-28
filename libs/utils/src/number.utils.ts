@@ -1,6 +1,11 @@
 import { isNonEmptyString } from './string.utils.js';
 
 /**
+ * Maximum 32-bit signed integer delay (ms) accepted by Node.js and browser `setTimeout`/`setInterval`.
+ */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+/**
  * Checks if a value is a valid finite number (excluding NaN, Infinity, -Infinity).
  */
 export function isNumber(value: unknown): value is number {

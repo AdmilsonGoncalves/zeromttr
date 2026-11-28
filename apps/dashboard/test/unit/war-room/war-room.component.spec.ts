@@ -289,43 +289,49 @@ describe('WarRoomComponent', () => {
       persistenceEngine: SettingsPersistenceEngine.SQLITE
     });
 
-    let alertSuppressedCallback:
-      | ((event: {
-          incidentId: string;
-          service: string;
-          reason: AlertSuppressionReason;
-          remainingSeconds: number;
-          windowSeconds: number;
-          at: string;
-        }) => void)
-      | null = null;
-    let liveWaitExceededCallback: ((seconds: number) => void) | null = null;
-    let llmFailedCallback:
-      | ((event: {
-          incidentId: string;
-          service: string;
-          error: string;
-          fallbackUsed: boolean;
-          at: string;
-        }) => void)
-      | null = null;
+    const callbacks: {
+      alertSuppressed:
+        | ((event: {
+            incidentId: string;
+            service: string;
+            reason: AlertSuppressionReason;
+            remainingSeconds: number;
+            windowSeconds: number;
+            at: string;
+          }) => void)
+        | null;
+      liveWaitExceeded: ((seconds: number) => void) | null;
+      llmFailed:
+        | ((event: {
+            incidentId: string;
+            service: string;
+            error: string;
+            fallbackUsed: boolean;
+            at: string;
+          }) => void)
+        | null;
+    } = {
+      alertSuppressed: null,
+      liveWaitExceeded: null,
+      llmFailed: null
+    };
 
     vi.spyOn(incidentService, 'onAlertSuppressed').mockImplementation((cb) => {
-      alertSuppressedCallback = cb;
+      callbacks.alertSuppressed = cb;
       return () => {
-        alertSuppressedCallback = null;
+        callbacks.alertSuppressed = null;
       };
     });
     vi.spyOn(incidentService, 'onLlmFailed').mockImplementation((cb) => {
-      llmFailedCallback = cb;
+      callbacks.llmFailed = cb;
       return () => {
-        llmFailedCallback = null;
+        callbacks.llmFailed = null;
       };
     });
     vi.spyOn(incidentService, 'onLiveWaitExceeded').mockImplementation((cb) => {
-      liveWaitExceededCallback = cb;
+      callbacks.liveWaitExceeded = cb;
       return () => {
-        liveWaitExceededCallback = null;
+        callbacks.liveWaitExceeded = null;
       };
     });
 
@@ -337,11 +343,11 @@ describe('WarRoomComponent', () => {
     const toastSpy = vi.spyOn(warRoom.messageService, 'add');
 
     warRoom.ngOnInit();
-    expect(alertSuppressedCallback).not.toBeNull();
-    expect(liveWaitExceededCallback).not.toBeNull();
+    expect(callbacks.alertSuppressed).not.toBeNull();
+    expect(callbacks.liveWaitExceeded).not.toBeNull();
 
     // 1a. Repeat suppression SSE toast
-    alertSuppressedCallback!({
+    callbacks.alertSuppressed!({
       incidentId: 'inc-prev-1',
       service: 'api-pagamentos-core',
       reason: AlertSuppressionReason.REPEAT_SUPPRESSION,
@@ -358,7 +364,7 @@ describe('WarRoomComponent', () => {
     );
 
     // 1b. Rejection cooldown SSE toast
-    alertSuppressedCallback!({
+    callbacks.alertSuppressed!({
       incidentId: 'inc-prev-2',
       service: 'api-pagamentos-core',
       reason: AlertSuppressionReason.REJECTION_COOLDOWN,
@@ -396,7 +402,7 @@ describe('WarRoomComponent', () => {
 
     // Duplicate 45s wait warning should be suppressed for the already-warned trigger
     const callsAfterDegradedTrigger = toastSpy.mock.calls.length;
-    liveWaitExceededCallback!(45);
+    callbacks.liveWaitExceeded!(45);
     expect(toastSpy).toHaveBeenCalledTimes(callsAfterDegradedTrigger);
 
     // 2b. Triggering Live chaos from HEALTHY resets suppression flag so 45s wait warning fires
@@ -416,7 +422,7 @@ describe('WarRoomComponent', () => {
       })
     );
 
-    liveWaitExceededCallback!(45);
+    callbacks.liveWaitExceeded!(45);
     expect(toastSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({
         severity: 'warn',
@@ -426,8 +432,8 @@ describe('WarRoomComponent', () => {
     );
 
     // 3a. LLM connection failure with fallback shows WARN toast with error details
-    expect(llmFailedCallback).not.toBeNull();
-    llmFailedCallback!({
+    expect(callbacks.llmFailed).not.toBeNull();
+    callbacks.llmFailed!({
       incidentId: 'inc-llm-1',
       service: 'api-pagamentos-core',
       error: 'HTTP 401 Invalid API key',
@@ -443,7 +449,7 @@ describe('WarRoomComponent', () => {
     );
 
     // 3b. LLM connection failure without fallback shows ERROR toast
-    llmFailedCallback!({
+    callbacks.llmFailed!({
       incidentId: 'inc-llm-2',
       service: 'api-pagamentos-core',
       error: 'ECONNREFUSED http://ollama:11434/v1',
@@ -459,8 +465,8 @@ describe('WarRoomComponent', () => {
     );
 
     warRoom.ngOnDestroy();
-    expect(alertSuppressedCallback).toBeNull();
-    expect(llmFailedCallback).toBeNull();
-    expect(liveWaitExceededCallback).toBeNull();
+    expect(callbacks.alertSuppressed).toBeNull();
+    expect(callbacks.llmFailed).toBeNull();
+    expect(callbacks.liveWaitExceeded).toBeNull();
   });
 });

@@ -134,10 +134,11 @@ export class WarRoomNoticesComponent implements OnDestroy {
         return;
       }
       this.turnstileLoadErrorSignal.set(false);
+      const viewportWidth = globalThis.window?.innerWidth ?? 1024;
       this.turnstileWidgetId = globalThis.window.turnstile.render(host, {
         sitekey: siteKey,
         theme: 'dark',
-        size: 'normal',
+        size: viewportWidth < 400 ? 'compact' : 'normal',
         appearance: 'interaction-only',
         callback: (token: string) => {
           this.turnstileTokenChange.emit(token);

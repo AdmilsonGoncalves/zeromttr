@@ -60,5 +60,5 @@ When connected to a real production service (or monitored passively via Promethe
 :::
 
 :::note Private window or new browser
-Healthy traffic is server-side state, while the mode (Live/Replay) is stored in the browser. When opening the War Room in a fresh browser (e.g., a private window) while traffic is still running, the dashboard automatically aligns the mode to **Live** — provided Live Mode is allowed (no key required, or a key is entered). If a key is required and not saved, the mode stays **Replay**, but you can still turn traffic off from the **Demo** drawer.
+Healthy traffic is server-side state, while the mode (Live/Replay) is stored in the browser. When opening the War Room in a fresh browser (e.g., a private window) while traffic is still running, the dashboard automatically aligns the mode to **Live** — provided Live Mode is allowed (no key required, or a key is entered). If `REQUIRE_DEMO_KEY=true` and no key is saved yet, the mode stays **Replay** and stopping traffic still requires Live Demo Key authorization: switch to **Live** and enter the **Live Demo Key** before toggling traffic off.
 :::

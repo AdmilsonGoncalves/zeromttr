@@ -346,7 +346,11 @@ export class DispatchRemediation {
       .replace(/\s+/g, ' ')
       .replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[REDACTED]@')
       .replace(
-        /(\b(?:access_token|refresh_token|id_token|api_key|apikey|key|token|secret|password|client_secret)["']?\s*[=:]\s*["']?)[^&\s,;"'}]+/gi,
+        /(\b(?:access_token|refresh_token|id_token|api_key|apikey|key|token|secret|password|client_secret)["']?\s*[=:]\s*)(?:"[^"]*"|'[^']*')/gi,
+        '$1"[REDACTED]"'
+      )
+      .replace(
+        /(\b(?:access_token|refresh_token|id_token|api_key|apikey|key|token|secret|password|client_secret)\s*[=:]\s*)[^&\s,;"'}]+/gi,
         '$1[REDACTED]'
       )
       .replace(/\bBearer\s+\S+/gi, 'Bearer [REDACTED]')

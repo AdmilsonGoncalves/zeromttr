@@ -190,4 +190,41 @@ describe('WarRoomNoticesComponent (TestBed)', () => {
 
     fixture.destroy();
   });
+
+  it('should use compact turnstile size on narrow viewports', () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: 360
+    });
+
+    let capturedSize: string | undefined;
+    window.turnstile = {
+      render: vi.fn((_host, options) => {
+        capturedSize = options.size;
+        return 'widget-narrow';
+      }),
+      reset: vi.fn(),
+      remove: vi.fn()
+    };
+
+    try {
+      const fixture = createDashboardFixture(WarRoomNoticesComponent, {
+        providers: [{ provide: I18nService, useValue: i18n }]
+      });
+      fixture.componentRef.setInput('turnstileSiteKey', '0x4DDDDDD');
+      fixture.detectChanges();
+      TestBed.tick();
+
+      expect(capturedSize).toBe('compact');
+      fixture.destroy();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        writable: true,
+        value: originalWidth
+      });
+    }
+  });
 });
